@@ -21,16 +21,22 @@ set(version_file "${CMAKE_CURRENT_BINARY_DIR}/version.cpp")
 
 # build the rest of the kernel
 add_executable(kernel
-    ${CMAKE_CURRENT_LIST_DIR}/src/boot.S
     ${CMAKE_CURRENT_LIST_DIR}/src/init.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/c/stack_guard.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/c/string.c
     ${version_file}
 )
 
 target_include_directories(kernel PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
 
+target_link_libraries(kernel PRIVATE ${ARCH_TARGET_NAME})
+target_link_libraries(kernel PRIVATE ${PLATFORM_TARGET_NAME})
+
 set_target_properties(kernel PROPERTIES OUTPUT_NAME "kernel-${KERNEL_ARCH}-${KERNEL_PLATFORM}")
 set_target_properties(kernel PROPERTIES SUFFIX "${PLATFORM_KERNEL_EXTENSION}")
 
-message(${PLATFORM_LINKER_SCRIPT})
+# configure the linker script
+message("Platform linker script: ${PLATFORM_LINKER_SCRIPT}")
 set_target_properties(kernel PROPERTIES LINK_DEPENDS ${PLATFORM_LINKER_SCRIPT})
+string(APPEND CMAKE_EXE_LINKER_FLAGS " -Wl,-T,${PLATFORM_LINKER_SCRIPT}")
 

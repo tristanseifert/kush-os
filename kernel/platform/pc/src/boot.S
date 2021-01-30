@@ -1,0 +1,138 @@
+// Declare constants for the multiboot header.
+#define ALIGN    1<<0
+#define MEMINFO  1<<1
+#define FLAGS    ALIGN | MEMINFO
+#define MAGIC    0x1BADB002
+#define CHECKSUM -(MAGIC + FLAGS)
+
+// define the multiboot header
+.section .multiboot
+
+.align 4
+.long MAGIC
+.long FLAGS
+.long CHECKSUM
+
+/*************************************************************************************************/
+.section .entry, "ax"
+
+.extern kernel_init
+.extern kernel_main
+
+.extern arch_init
+.extern platform_init
+
+.extern x86_multiboot_info
+
+.globl _osentry
+.type _osentry, @function
+.set osentry, (_osentry - 0xC0000000)
+.globl osentry
+
+/**
+ * Entry point for the bootloader
+ */
+_osentry:
+    cli
+
+# Enter protected mode
+    mov         %cr0, %ecx
+    or          $0x00000001, %ecx
+    mov         %ecx, %cr0
+
+# Load page directory
+    mov         $(boot_page_directory - 0xC0000000), %ecx
+    mov         %ecx, %cr3
+
+# Enable paging
+    mov         %cr0, %ecx
+    or          $0x80000000, %ecx
+    mov         %ecx, %cr0
+
+# jump to the higher half kernel
+    lea         jmp_highhalf, %ecx
+    jmp         *%ecx
+
+
+# We have rudimentary paging down here.
+jmp_highhalf:
+    // Now, we're executing at 0xC0100000, so use the virtual address for stack.
+    mov         $stack_top, %esp
+
+    // Push multiboot info (EBX) and magic number (EAX)
+    push        %ebx
+    push        %eax
+
+    // Write multiboot info pointer to memory
+    mov         %ebx, x86_multiboot_info
+
+    // Check for SSE, and if it exists, enable it
+    mov         $0x1, %eax
+    cpuid
+    test        $(1 << 25), %edx
+    jz          .noSSE
+
+    call        sse_init
+
+.noSSE:
+    // perform initializations
+    call        arch_init
+    call        platform_init
+    call        kernel_init
+
+    // jump into kernel
+    call        kernel_main
+
+    // hang forever if we return (shouldn't happen)
+    cli
+
+.Lhang:
+    hlt
+    jmp .Lhang
+
+/*
+* Enables the SSE features of the processor.
+*/
+sse_init:
+    mov         %cr0, %eax
+
+    // clear coprocessor emulation CR0.EM
+    and         $0xFFFB, %ax
+
+    // set coprocessor monitoring CR0.MP
+    or          $0x2, %ax
+    mov         %eax, %cr0
+    mov         %cr4, %eax
+
+    // set CR4.OSFXSR and CR4.OSXMMEXCPT at the same time
+    or          $(3 << 9), %ax
+    mov         %eax, %cr4
+    ret
+
+/*************************************************************************************************/
+// 128K kernel stack to use during initialization
+.section .bss
+stack_bottom:
+.skip 0x10000
+stack_top:
+
+/*************************************************************************************************/
+# Bootup page tables
+.section .entry.rodata
+
+// Map 4MB of space.
+.align 0x1000
+boot_page_table:
+    .set addr, 0
+
+    .rept 1024
+    .long addr + 0x03
+    .set addr, addr+0x1000
+    .endr
+
+// Mirror the first 4 MB throughout the address space.
+.align 0x1000
+boot_page_directory:
+    .rept 1024
+    .long (boot_page_table - 0xC0000000) + 0x07
+    .endr

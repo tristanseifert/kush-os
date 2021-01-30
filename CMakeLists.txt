@@ -23,19 +23,19 @@ set(VERSION_SHORT "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 execute_process(COMMAND git describe --tags --dirty=d OUTPUT_VARIABLE VERSION_TAG OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 ##### General defines
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-#set(CMAKE_VERBOSE_MAKEFILE ON)
+# set(CMAKE_VERBOSE_MAKEFILE ON)
 
-add_compile_options(-Wno-unknown-warning-option -Wno-unused-command-line-argument -Wall -Wextra -Werror -Wmissing-declarations -Wformat=2 -fdiagnostics-color=always -ftls-model=initial-exec)
+add_compile_options(-Wall -Werror -Wmissing-declarations -Wformat=2 -fdiagnostics-color=always -ftls-model=initial-exec)
 
 ####################
 ##### Use cross toolchain for all targets below
 
 ##### Specify options for kernel, free-standing userspace components
-add_compile_options(-g1 -fstack-protector-strong -Wno-address-of-packed-member -Wundef -Wcast-qual -Wwrite-strings -Wimplicit-fallthrough -Wno-nonnull-compare -Wno-deprecated-copy -Wno-expansion-to-defined)
+add_compile_options(-g1 -fstack-protector-strong -Wundef -Wcast-qual -Wwrite-strings)
 
 ##### Kernel
 option(BUILD_KERNEL "Build the kernel" ON)
