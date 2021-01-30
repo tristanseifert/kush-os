@@ -15,13 +15,13 @@
 
 .global _start
 _start:
-	mov $kernel_stack, %esp
-	call init
+    mov $kernel_stack, %esp
+    call init
 
 _stop:
-	cli
-	hlt
-	jmp _stop
+    cli
+    hlt
+    jmp _stop
 
 .section .bss, "aw"
 .space 8192
