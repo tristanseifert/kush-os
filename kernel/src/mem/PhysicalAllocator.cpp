@@ -34,10 +34,7 @@ PhysicalAllocator::PhysicalAllocator() {
     for(int i = 0; i < numEntries; i++) {
         uint64_t baseAddr, length;
         err = platform_phys_get_info(i, &baseAddr, &length);
-
-        if(err != 0) {
-            panic("failed to get info for physical region %d: %d", i, err);
-        }
+        REQUIRE(!err, "failed to get info for physical region %d: %d", i, err);
 
         // calculate the number of pages and size the alloc map as such
         const auto pageSz = arch_page_size();

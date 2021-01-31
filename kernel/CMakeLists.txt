@@ -26,12 +26,17 @@ add_executable(kernel
     src/c/printf.c
     src/c/string.c
     src/mem/PhysicalAllocator.cpp
+    src/runtime/CppRuntime.cpp
     src/runtime/log.c
     src/vm/Mapper.cpp
+    src/vm/Map.cpp
     ${version_file}
 )
 
 target_include_directories(kernel PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
+target_include_directories(kernel PRIVATE ${ARCH_INCLUDE_DIR})
+target_include_directories(kernel PRIVATE ${PLATFORM_INCLUDE_DIR})
+target_include_directories(kernel PRIVATE src)
 
 target_link_libraries(kernel PRIVATE ${ARCH_TARGET_NAME})
 target_link_libraries(kernel PRIVATE ${PLATFORM_TARGET_NAME})

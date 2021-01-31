@@ -1,5 +1,7 @@
 #include "Mapper.h"
+#include "Map.h"
 
+#include <platform.h>
 #include <log.h>
 
 #include <new>
@@ -8,6 +10,9 @@ using namespace vm;
 
 static char gMapperBuf[sizeof(Mapper)];
 Mapper *Mapper::gShared = (Mapper *) &gMapperBuf;
+
+static char gKernelMapBuf[sizeof(Map)];
+Map *Mapper::gKernelMap = (Map *) &gKernelMapBuf;
 
 /**
  * Runs the constructor for the statically allocated mapper struct.
@@ -21,7 +26,30 @@ void Mapper::init() {
  * kernel data (text section, as well as rw data) into the map.
  */
 Mapper::Mapper() {
+    int err;
+    uint64_t physAddr = 0;
+    uintptr_t length = 0, virtAddr = 0;
+
     // placement allocate the kernel map
+    new(gKernelMap) Map(false);
+
+    // map the text segment (R-X)
+    err = platform_section_get_info(kSectionKernelText, &physAddr, &virtAddr, &length);
+    REQUIRE(!err, "failed to get section %s", "kernel text");
+
+    err = gKernelMap->add(physAddr, length, virtAddr, Map::MapMode::kKernelExec);
+
+    // map the data segment (RW-)
+    err = platform_section_get_info(kSectionKernelData, &physAddr, &virtAddr, &length);
+    REQUIRE(!err, "failed to get section %s", "kernel data");
+
+    err = gKernelMap->add(physAddr, length, virtAddr, Map::MapMode::kKernelRW);
+
+    // map the bss segment; includes our init stack (RW-)
+    err = platform_section_get_info(kSectionKernelBss, &physAddr, &virtAddr, &length);
+    REQUIRE(!err, "failed to get section %s", "kernel bss");
+
+    err = gKernelMap->add(physAddr, length, virtAddr, Map::MapMode::kKernelRW);
 }
 
 
@@ -33,12 +61,20 @@ Mapper::Mapper() {
  * translation cache.
  */
 void Mapper::loadMap(Map *map) {
-
+    map->activate();
 }
 
 /**
  * Convenience helper to load the kernel map into the processor.
  */
 void Mapper::loadKernelMap() {
-    // loadMap(gKernelMap);
+    loadMap(gKernelMap);
+}
+
+/**
+ * Called after the initial VM map initialization took place, and we've switched over to using that
+ * map.
+ */
+void Mapper::enable() {
+    this->vmAvailable = true;
 }

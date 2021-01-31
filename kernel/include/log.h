@@ -20,4 +20,9 @@ void panic(const char *format, ...) __attribute__((format (printf, 1, 2))) __att
 #endif
 
 
+/**
+ * Ensures the given condition is true; otherwise, panics with the given message string.
+ */
+#define REQUIRE(cond, fmt, ...) {if(!cond) { panic(fmt, __VA_ARGS__); }}
+
 #endif

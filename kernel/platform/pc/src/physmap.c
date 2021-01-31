@@ -9,6 +9,8 @@
 #include <string.h>
 
 extern size_t __kern_code_start, __kern_code_end;
+extern size_t __kern_data_start, __kern_data_size;
+extern size_t __kern_bss_start, __kern_bss_size;
 extern size_t __kern_keep_start, __kern_keep_end;
 
 /// Maximum number of physical memory regions to allocate space for
@@ -135,5 +137,44 @@ int platform_phys_get_info(const size_t idx, uint64_t *addr, uint64_t *length) {
     *length = gPhysRegions[idx].length;
 
     return 0;
+}
+
+
+
+
+/**
+ * Returns the information on kernel sections.
+ *
+ * We take the knowledge that the virtual address of all sections is its load address plus the
+ * constant 0xC0000000.
+ */
+int platform_section_get_info(const platform_section_t section, uint64_t *physAddr,
+        uintptr_t *virtAddr, uintptr_t *length) {
+    switch(section) {
+        // kernel text segment
+        case kSectionKernelText:
+            *virtAddr = (uintptr_t) &__kern_code_start;
+            *physAddr = (*virtAddr) - 0xC0000000;
+            *length = ((uintptr_t) &__kern_code_end) - ((uintptr_t) &__kern_code_start);
+            return 0;
+
+        // kernel data segment
+        case kSectionKernelData:
+            *virtAddr = (uintptr_t) &__kern_data_start;
+            *physAddr = (*virtAddr) - 0xC0000000;
+            *length = (uintptr_t) &__kern_data_size;
+            return 0;
+
+        // kernel BSS segment
+        case kSectionKernelBss:
+            *virtAddr = (uintptr_t) &__kern_bss_start;
+            *physAddr = (*virtAddr) - 0xC0000000;
+            *length = (uintptr_t) &__kern_bss_size;
+            return 0;
+
+        // unsupported section
+        default:
+            return -1;
+    }
 }
 

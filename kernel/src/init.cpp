@@ -19,6 +19,7 @@ void kernel_init() {
     vm::Mapper::init();
     mem::PhysicalAllocator::vmAvailable();
     vm::Mapper::loadKernelMap();
+    vm::Mapper::lateInit();
 }
 
 /**
@@ -27,15 +28,6 @@ void kernel_init() {
  */
 void kernel_main() {
     log("kush time: PC = $%p", get_pc());
-
-    auto page1 = mem::PhysicalAllocator::alloc();
-    auto page2 = mem::PhysicalAllocator::alloc();
-    log("Allocated page1: $%p, page2: $%p", (void *) page1, (void *) page2);
-
-    mem::PhysicalAllocator::free(page1);
-
-    page1 = mem::PhysicalAllocator::alloc();
-    log("Allocated page1: $%p, page2: $%p", (void *) page1, (void *) page2);
 
     // should never get here
     while(1) {}

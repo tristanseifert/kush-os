@@ -1,6 +1,6 @@
 #include "pic.h"
 
-#include <x86_io.h>
+#include <arch/x86_io.h>
 
 /// Master PIC IO address
 #define PIC1                    0x20

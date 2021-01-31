@@ -6,9 +6,10 @@ SECTIONS {
     . = 0xC0100000;
 
     /* kernel code (immutable) section */
-    __kern_keep_start = .;
-    __kern_code_start = .;
     .text ALIGN(4K) : AT(ADDR(.text) - 0xC0000000) {
+        __kern_keep_start = .;
+        __kern_code_start = .;
+
         KEEP(*(.multiboot))
         KEEP(*(.entry))
         KEEP(*(.entry.rodata))
@@ -21,15 +22,15 @@ SECTIONS {
     __kern_code_end = .;
 
     /* kernel data (mutable) section */
-    __kern_data_start = .;
     .data ALIGN(4K) : AT(ADDR(.data) - 0xC0000000) {
+        __kern_data_start = .;
         *(*.data)
     }
     __kern_data_size = SIZEOF(.data);
 
     /* kernel data (uninitialized, mutable) and stack */
-    __kern_bss_start = .;
     .bss ALIGN(4K) : AT(ADDR(.bss) - 0xC0000000) {
+        __kern_bss_start = .;
         *(.bss)
         *(COMMON)
     }

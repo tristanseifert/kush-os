@@ -2,7 +2,7 @@
 
 #include <stdbool.h>
 #include <platform.h>
-#include <x86_io.h>
+#include <arch/x86_io.h>
 
 /**
  * IO port for serial spew
