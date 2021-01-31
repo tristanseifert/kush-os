@@ -13,3 +13,10 @@ void arch_init() {
     gdt_init();
     idt_init();
 }
+
+/**
+ * x86 page size is always 4K. There's also support for 4M (2M in PAE mode) large pages.
+ */
+size_t arch_page_size() {
+    return 4096;
+}

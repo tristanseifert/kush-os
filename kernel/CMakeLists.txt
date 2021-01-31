@@ -21,9 +21,13 @@ set(version_file "${CMAKE_CURRENT_BINARY_DIR}/version.cpp")
 
 # build the rest of the kernel
 add_executable(kernel
-    ${CMAKE_CURRENT_LIST_DIR}/src/init.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/c/stack_guard.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/c/string.c
+    src/init.cpp
+    src/c/stack_guard.c
+    src/c/printf.c
+    src/c/string.c
+    src/mem/PhysicalAllocator.cpp
+    src/runtime/log.c
+    src/vm/Mapper.cpp
     ${version_file}
 )
 
@@ -32,6 +36,12 @@ target_include_directories(kernel PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
 target_link_libraries(kernel PRIVATE ${ARCH_TARGET_NAME})
 target_link_libraries(kernel PRIVATE ${PLATFORM_TARGET_NAME})
 
+# link the compiler-specific libraries
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    target_link_libraries(kernel PRIVATE gcc)
+endif()
+
+# set filename for the resulting kernel binary
 set_target_properties(kernel PROPERTIES OUTPUT_NAME "kernel-${KERNEL_ARCH}-${KERNEL_PLATFORM}")
 set_target_properties(kernel PROPERTIES SUFFIX "${PLATFORM_KERNEL_EXTENSION}")
 

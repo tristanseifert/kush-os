@@ -4,9 +4,12 @@
 
 # platform specific code
 add_library(kernel_platform_pc OBJECT
-    ${CMAKE_CURRENT_LIST_DIR}/src/boot.S
-    ${CMAKE_CURRENT_LIST_DIR}/src/platform.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/irq/pic.c
+    src/boot.S
+    src/panic.S
+    src/physmap.c
+    src/platform.c
+    src/io/spew.c
+    src/irq/pic.c
 )
 
 target_include_directories(kernel_platform_pc PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../include)

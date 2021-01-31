@@ -75,6 +75,9 @@ jmp_highhalf:
     call        sse_init
 
 .noSSE:
+    // clear caches
+    wbinvd
+
     // perform initializations
     call        arch_init
     call        platform_init
@@ -110,13 +113,6 @@ sse_init:
     ret
 
 /*************************************************************************************************/
-// 128K kernel stack to use during initialization
-.section .bss
-stack_bottom:
-.skip 0x10000
-stack_top:
-
-/*************************************************************************************************/
 # Bootup page tables
 .section .entry.rodata
 
@@ -136,3 +132,10 @@ boot_page_directory:
     .rept 1024
     .long (boot_page_table - 0xC0000000) + 0x07
     .endr
+
+/*************************************************************************************************/
+// 32K kernel stack to use during initialization
+.section .bss
+stack_bottom:
+.skip 0x8000
+stack_top:
