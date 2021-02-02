@@ -178,7 +178,7 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t virt, const bool wr
     uint64_t *table = nullptr;
 
     // build flags (present)
-    uint64_t flags = 0b1;
+    uint64_t flags = (1 << 0);
 
     if(!execute && arch_supports_nx()) { // NX bit set if execute is not set
         flags |= (1ULL << 63);
@@ -197,8 +197,6 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t virt, const bool wr
 
     // special case if mapped
     if(this->isActive()) {
-        // log("PDE for 0xC0100000: %016llx", this->getPageDirectory(0xC0100000));
-
         // see if we need to allocate the page table
         const auto pdtEntry = this->getPageDirectory(virt);
         if(!(pdtEntry & 0b1)) {
@@ -289,6 +287,112 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t virt, const bool wr
 }
 
 /**
+ * Unmaps a page. This does not release physical memory the page pointed to; only the memory of the
+ * page table if all pages from it have been unmapped.
+ *
+ * @return 0 if the mapping was removed, 1 if no mapping was removed, or a negative error code.
+ */
+int PTEHandler::unmapPage(const uintptr_t virt) {
+    // require that we're mapped
+    if(!this->isActive()) {
+        return -1;
+    }
+
+    // check whether the page directory value; either not present, a 2M page or page table
+    const uint64_t pdtValue = this->getPageDirectory(virt);
+
+    if(!(pdtValue & 0b1)) {
+        // no mapping in this 2M region
+        return 1;
+    }
+    // if it's a 2M page, just clear the PDT entry and call it a day
+    if(pdtValue & (1 << 7)) {
+        this->setPageDirectory(virt, 0);
+        return 0;
+    }
+
+    // otherwise, read the page table entry
+    const auto pteValue = this->getPageTable(virt);
+    if(!(pteValue & (1 << 0))) {
+        // no page table entry for this 4K page
+        return 1;
+    }
+
+    // clear the page table entry
+    this->setPageTable(virt, 0);
+
+    // check whether all pages in this page table are gone
+    uintptr_t base = virt & ~0x1FFFFF;
+    for(size_t i = 0; i < 512; i++) {
+        const auto addr = base + (i * 0x1000);
+        const auto entry = this->getPageTable(addr);
+        if(entry & (1 << 0)) goto beach;
+    }
+
+    // if we get here, the page table can be deallocated; unmap it and then release it
+    this->setPageDirectory(virt, 0);
+    mem::PhysicalAllocator::free(pdtValue & ~0xFFFULL);
+
+    // done
+beach:;
+    return 0;
+}
+
+/**
+ * Gets the physical address mapped to a given virtual address.
+ *
+ * @return 1 if no mapping exists (either page table not present or page not present), 0 if there
+ * is one and its information is written to the provided variables.
+ */
+int PTEHandler::getMapping(const uintptr_t virt, uint64_t &phys, bool &write, bool &execute,
+        bool &global, bool &user) {
+    // check whether the page directory value; either not present, a 2M page or page table
+    const uint64_t pdtValue = this->getPageDirectory(virt);
+
+    if(!(pdtValue & 0b1)) {
+        // the page is not present
+        return 1;
+    }
+    // is it a 2M page?
+    if(pdtValue & (1 << 7)) {
+        const auto physBase = pdtValue & ~0x1FFFFF;
+        phys = physBase + (virt & 0x1FFFFF);
+        write = (pdtValue & (1 << 1));
+        if(arch_supports_nx()) {
+            execute = (pdtValue & (1ULL << 63)) == 0;
+        } else {
+            execute = true;
+        }
+        global = (pdtValue & (1 << 8));
+        user = (pdtValue & (1 << 2));
+        return 0;
+    }
+
+    // otherwise, we point to a page table. read its entry for the given virtual address
+    const auto pteValue = this->getPageTable(virt);
+
+    if(!(pteValue & (1 << 0))) {
+        // page not present
+        return 1;
+    }
+
+    const auto physBase = pteValue & ~0xFFF;
+    phys = physBase + (virt & 0xFFF);
+    write = (pteValue & (1 << 1));
+    if(arch_supports_nx()) {
+        execute = (pteValue & (1ULL << 63)) == 0;
+    } else {
+        execute = true;
+    }
+    global = (pteValue & (1 << 8));
+    user = (pteValue & (1 << 2));
+
+    // if we get here, a mapping was found
+    return 0;
+}
+
+
+/**
  * Sets the value of the page directory. This uses the spicy special mapped zone.
  *
  * @note You can always invoke this method. For any given PTE handler, we already allocated all
@@ -298,9 +402,11 @@ void PTEHandler::setPageDirectory(const uint32_t virt, const uint64_t value) {
     uint64_t *ptr = (uint64_t *) 0xbf600000;
     ptr[(virt >> 21)] = value;
 
-    // invalidate the virtual address region for this page directory
+    // invalidate the vm region for this page directory (and the page table access region)
     asm volatile( "invlpg (%0)" : : "b"(&ptr[(virt >> 21)]) : "memory" );
-    asm volatile( "invlpg (%0)" : : "b"(&ptr[(virt >> 9)]) : "memory" );
+
+    uint64_t *pte = (uint64_t *) (0xBF800000 + ((virt & ~0xFFF) >> 9));
+    asm volatile( "invlpg (%0)" : : "b"(pte) : "memory" );
 }
 /**
  * Gets the page directory entry for the given virtual address.
@@ -317,9 +423,18 @@ const uint64_t PTEHandler::getPageDirectory(const uint32_t virt) {
  * @note It's required to check that the page table has been allocated before.
  */
 void PTEHandler::setPageTable(const uint32_t virt, const uint64_t value) {
-    uint64_t *ptr = (uint64_t *) (0xBF800000 + (virt >> 9));
+    uint64_t *ptr = (uint64_t *) (0xBF800000 + ((virt & ~0xFFF) >> 9));
     *ptr = value;
 
     // TODO: is this always required?
     asm volatile( "invlpg (%0)" : : "b"(virt) : "memory" );
+}
+/**
+ * Gets the page table entry for the given virtual address.
+ *
+ * @note This will cause a page fault if the page table hasn't been allocated.
+ */
+const uint64_t PTEHandler::getPageTable(const uint32_t virt) {
+    uint64_t *ptr = (uint64_t *) (0xBF800000 + ((virt & ~0xFFF) >> 9));
+    return *ptr;
 }

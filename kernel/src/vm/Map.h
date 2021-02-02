@@ -48,6 +48,15 @@ class Map {
 
         int add(const uint64_t physAddr, const uintptr_t length, const uintptr_t vmAddr, 
                 const MapMode mode);
+        int remove(const uintptr_t vmAddr, const uintptr_t length);
+
+        /// Gets the physical address to which this virtual address is mapped.
+        int get(const uintptr_t virtAddr, uint64_t &phys) {
+            MapMode temp;
+            return this->get(virtAddr, phys, temp);
+        }
+        /// Gets the physical address to which this virtual address is mapped, and its flags.
+        int get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode);
 
     private:
         Map(const bool copyKernelMaps);

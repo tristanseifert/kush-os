@@ -27,6 +27,7 @@ add_executable(kernel
     src/c/string.c
     src/mem/AnonPool.cpp
     src/mem/PhysicalAllocator.cpp
+    src/mem/StackPool.cpp
     src/runtime/CppRuntime.cpp
     src/runtime/log.c
     src/vm/Mapper.cpp

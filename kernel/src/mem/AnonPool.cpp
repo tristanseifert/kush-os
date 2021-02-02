@@ -79,9 +79,18 @@ void *AnonPool::alloc(uint64_t &physAddr) {
  * Releases a given page.
  */
 void AnonPool::free(void *virtAddr) {
+    uint64_t phys;
+    int err;
+
     // get the physical page that backs it
+    auto map = vm::Mapper::getKernelMap();
+    err = map->get((uintptr_t) virtAddr, phys);
+    REQUIRE(!err, "failed to resolve phys addr: %d", err);
 
     // unmap
+    err = map->remove((uintptr_t) virtAddr, arch_page_size());
+    REQUIRE(!err, "failed to unmap anon page: %d", err);
 
     // free physical page
+    mem::PhysicalAllocator::free(phys);
 }

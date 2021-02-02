@@ -16,6 +16,10 @@ class IPTEHandler {
 
         virtual int mapPage(const uint64_t phys, const uintptr_t virt, const bool write,
                 const bool execute, const bool global, const bool user = false) = 0;
+        virtual int unmapPage(const uintptr_t virt) = 0;
+
+        virtual int getMapping(const uintptr_t virt, uint64_t &phys, bool &write, bool &execute,
+                bool &global, bool &user) = 0;
 };
 }
 

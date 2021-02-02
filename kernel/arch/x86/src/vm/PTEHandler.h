@@ -21,6 +21,10 @@ class PTEHandler: public ::vm::IPTEHandler {
 
         int mapPage(const uint64_t phys, const uintptr_t virt, const bool write,
                 const bool execute, const bool global, const bool user) override;
+        int unmapPage(const uintptr_t virt) override;
+
+        int getMapping(const uintptr_t virt, uint64_t &phys, bool &write, bool &execute,
+                bool &global, bool &user) override;
 
     private:
         void initKernel();
@@ -29,6 +33,7 @@ class PTEHandler: public ::vm::IPTEHandler {
         void setPageDirectory(const uint32_t virt, const uint64_t value);
         const uint64_t getPageDirectory(const uint32_t virt);
         void setPageTable(const uint32_t virt, const uint64_t value);
+        const uint64_t getPageTable(const uint32_t virt);
 
     private:
         // physical address of the first level page directory pointer table
