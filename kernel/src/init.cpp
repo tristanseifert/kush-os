@@ -1,7 +1,10 @@
 #include "init.h"
+#include "mem/AnonPool.h"
 #include "mem/PhysicalAllocator.h"
 #include "vm/Mapper.h"
+#include "vm/Map.h"
 
+#include <arch.h>
 #include <stdint.h>
 
 #include <printf.h>
@@ -21,6 +24,11 @@ void kernel_init() {
 
     vm::Mapper::loadKernelMap();
     vm::Mapper::lateInit();
+
+    mem::AnonPool::init();
+
+    // notify other components of VM availability
+    arch_vm_available();
 }
 
 /**

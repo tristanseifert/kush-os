@@ -1,6 +1,8 @@
 #include <arch.h>
 #include <stdbool.h>
 
+#include "vm/PDPTPool.h"
+
 #include <arch/x86_msr.h>
 
 #include "gdt.h"
@@ -31,6 +33,13 @@ void arch_init() {
     // initialize descriptors
     gdt_init();
     idt_init();
+}
+
+/**
+ * Initialize some memory pools for allocating paging structures when VM is available.
+ */
+void arch_vm_available() {
+    arch::vm::PDPTPool::init();
 }
 
 /**

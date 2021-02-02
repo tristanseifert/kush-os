@@ -1,4 +1,5 @@
 #include "PTEHandler.h"
+#include "PDPTPool.h"
 
 #include <mem/PhysicalAllocator.h>
 #include <arch.h>
@@ -20,10 +21,6 @@ using namespace arch::vm;
  * We'll start by allocating the 4-entry (32 byte) page directory pointer table, followed by the
  * four page directories it points to. That's enough to get us set up to manipulate the rest of
  * the tables as we need, by allocating the third level page tables dynamically.
- *
- * In order to later allow access to the page tables with virtual memory enabled, we use the last
- * 4 entries (8M) at the very top of the virtual address space (0xFF800000 - 0xFFFFFFFF) to
- * recursively map the PDTs. The PDPT is essentially static so we can forget it exists.
  *
  * TODO: we waste _a lot_ of physical memory; we get one page for the 32-byte PDPT. fix this?
  */
@@ -58,6 +55,11 @@ void PTEHandler::initKernel() {
     this->pdt[2][508] = this->pdtPhys[0] | 0b011;
 
     // set up PDPT
+/*    uintptr_t pdptVirt;
+    err = PDPTPool::alloc(pdptVirt, this->pdptPhys);
+    REQUIRE(!err, "failed to allocate PDPT: %d", err);
+    this->pdpt = (uint64_t *) pdptVirt;*/
+
     this->pdptPhys = mem::PhysicalAllocator::alloc();
 
     this->pdpt = (uint64_t *) this->pdptPhys;
@@ -78,6 +80,8 @@ void PTEHandler::initKernel() {
  * directory.
  */
 void PTEHandler::initCopyKernel(PTEHandler *kernel) {
+    int err;
+
     // TODO: this is likely broken lol
 
     // allocate three userspace PDTs; then copy the kernel PDT
@@ -95,11 +99,11 @@ void PTEHandler::initCopyKernel(PTEHandler *kernel) {
     this->pdt[2][508] = this->pdtPhys[0] | 0b011;
 
     // set up PDPT
-    this->pdptPhys = mem::PhysicalAllocator::alloc();
+    uintptr_t pdptVirt;
+    err = PDPTPool::alloc(pdptVirt, this->pdptPhys);
+    REQUIRE(!err, "failed to allocate PDPT: %d", err);
 
-    // TODO: correctly set this ptr to a virtual address
-    this->pdpt = (uint64_t *) this->pdptPhys;
-    memset(this->pdpt, 0, 4096);
+    this->pdpt = (uint64_t *) pdptVirt;
 
     for(size_t i = 0; i < 3; i++) {
         this->pdpt[i] = this->pdtPhys[i] | 0b001;
@@ -112,6 +116,9 @@ void PTEHandler::initCopyKernel(PTEHandler *kernel) {
 
 /**
  * Release all physical memory we allocated for page directories, tables, etc.
+ *
+ * This _will_ leak all memory for translations above 0xC0000000, but that's ok since we'll never
+ * actually deallocate those; even when shutting the system down, virtual memory just stays on.
  *
  * @note You should not delete a page table that is currently mapped.
  */
@@ -131,13 +138,14 @@ PTEHandler::~PTEHandler() {
         mem::PhysicalAllocator::free(physAddr);
     }
 
-    // release all PDTs and the PDPT
+    // release all PDTs
     for(size_t i = 0; i < 4; i++) {
         if(this->pdtPhys[i]) {
             mem::PhysicalAllocator::free(this->pdtPhys[i]);
         }
     }
 
+    // release PDPT back to the pool, otherwise we own the page and should free it
     mem::PhysicalAllocator::free(this->pdptPhys);
 }
 

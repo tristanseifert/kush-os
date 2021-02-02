@@ -4,6 +4,11 @@
 #ifndef ARCH_X86_EXCEPTIONS_H
 #define ARCH_X86_EXCEPTIONS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -36,4 +41,12 @@ int x86_exception_format_info(char *outBuf, const size_t outBufLen,
  */
 void x86_handle_pagefault(const x86_exception_info_t info);
 
+/**
+ * Handles all other (e.g. not page fault) exceptions.
+ */
+void x86_handle_exception(const x86_exception_info_t info);
+
+#ifdef __cplusplus
+}
+#endif
 #endif

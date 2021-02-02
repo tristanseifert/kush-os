@@ -25,6 +25,7 @@ add_executable(kernel
     src/c/stack_guard.c
     src/c/printf.c
     src/c/string.c
+    src/mem/AnonPool.cpp
     src/mem/PhysicalAllocator.cpp
     src/runtime/CppRuntime.cpp
     src/runtime/log.c

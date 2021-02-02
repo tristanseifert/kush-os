@@ -14,6 +14,11 @@ extern "C" {
 void arch_init();
 
 /**
+ * Notifies the architecture code that paging and virtual memory has become available.
+ */
+void arch_vm_available();
+
+/**
  * Returns the size of a page.
  */
 size_t arch_page_size();

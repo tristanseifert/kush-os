@@ -1,6 +1,10 @@
 #ifndef ARCH_X86_GDT_H
 #define ARCH_X86_GDT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 #define GDT_KERN_CODE_SEG       0x08
@@ -62,4 +66,7 @@ typedef struct i386_task_gate {
 void gdt_init();
 void gdt_set_entry(uint16_t num, uint32_t base, uint32_t limit, uint8_t flags, uint8_t gran);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

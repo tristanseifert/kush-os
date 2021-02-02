@@ -26,22 +26,29 @@
 
 \begin{document}
 
-\begin{bytefield}{32}
-	\memsection{ffff ffff}{ff80 0000}{3}{Page table self map area}\\
-		
+\begin{bytefield}{32}	
 	\begin{rightwordgroup}{internal memory}
 		\memsection{003f ffff}{002f c000}{4}{Special Function Registers}\\
 		\memsection{002f bfff}{0007 0000}{3}{-- reseved --}
 	\end{rightwordgroup}\\
 	
+	\memsection{c7ff ffff}{c300 0000}{5}{Anonymous memory pool}\\
+	
+	\memsection{c2ff ffff}{c100 0000}{3}{Kernel stacks\\1024x 32K stacks} \\
+	
+	\memsection{c0ff ffff}{c060 0000}{2}{-- reseved --}\\
 	\memsection{c05f ffff}{c040 0000}{2}{Physical memory alloc bitmaps} \\
 	
 	\memsection{c03f ffff}{c010 0000}{2}{Kernel \texttt{.text}/\texttt{.data}} \\
 	\memsection{c00f ffff}{c000 0000}{2}{-- reseved --}\\
 	
 	%%%
-	\memsection{bfff ffff}{0000 0000}{6}{\it User Space}\\
+	\memsection{bfff ffff}{bf60 0000}{3}{Page table self map area}\\
+
+	\memsection{bf5f ffff}{bf00 0000}{2}{-- reseved --}\\
+	\memsection{beff ffff}{0000 0000}{6}{\it User Space}\\
 \end{bytefield}
 
+All sections marked as reserved are currently not mapped.
 
 \end{document}  

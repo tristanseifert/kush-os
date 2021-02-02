@@ -3,13 +3,14 @@
 ###############################################################################
 
 add_library(kernel_arch_x86 OBJECT
-    src/init.c
+    src/init.cpp
     src/exceptions.c
     src/exceptions.S
     src/gdt.c
     src/gdt.S
     src/idt.c
     src/vm/PTEHandler.cpp
+    src/vm/PDPTPool.cpp
 )
 
 target_include_directories(kernel_arch_x86 PUBLIC include)
