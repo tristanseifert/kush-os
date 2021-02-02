@@ -5,7 +5,15 @@
 #include <string.h>
 #include <log.h>
 
+#include <vm/Mapper.h>
+#include <vm/Map.h>
+
 #include <new>
+
+// log found physical memory regions
+#define LOG_REGIONS             0
+// log the virtual addresses of bitmap buffers
+#define LOG_BITMAP_MAP          0
 
 using namespace mem;
 
@@ -41,7 +49,9 @@ PhysicalAllocator::PhysicalAllocator() {
         const size_t pages = length / pageSz;
         const size_t bitmapPages = ((pages / 8) + pageSz - 1) / pageSz;
 
+#if LOG_REGIONS
         log("region at %016llx, length %016llx, %ld pages, %ld bitmap pages", baseAddr, length, pages, bitmapPages);
+#endif
 
         // build the region struct. note we cap pages to be a multiple of 32
         Region r(baseAddr, length);
@@ -65,18 +75,28 @@ PhysicalAllocator::PhysicalAllocator() {
  * This should be called immediately after virtual memory becomes available.
  */
 void PhysicalAllocator::mapRegionUsageBitmaps() {
+    int err;
+
+    const auto pageSz = arch_page_size();
+    auto m = vm::Mapper::getKernelMap();
+
     for(size_t i = 0; i < this->numRegions; i++) {
         auto &region = this->regions[i];
 
         // place it in the usage bitmap region (next available)
         void *phys = region.freeMap;
-        void *virt = (void *) this->nextBitmapVmAddr;
+        const auto numBytes = region.freeMapPages * pageSz;
 
-        log("mapping phys free bitmap: %p -> %p", phys, virt);
+#if LOG_BITMAP_MAP
+        log("mapping phys free bitmap: %p -> %08lx", phys, this->nextBitmapVmAddr);
+#endif
+
+        err = m->add((uint64_t) phys, numBytes, this->nextBitmapVmAddr, vm::MapMode::kKernelRW);
+        REQUIRE(!err, "failed to map phys free bitmap: %d", err);
 
         // update for the next mapping
-        //region.freeMap = (uint32_t *) virt;
-        this->nextBitmapVmAddr += region.freeMapPages * arch_page_size();
+        region.freeMap = (uint32_t *) this->nextBitmapVmAddr;
+        this->nextBitmapVmAddr += numBytes;
     }
 }
 
@@ -134,6 +154,8 @@ search:;
 
         *freeIdx = (i * 32) + allocBit;
         this->nextFree = i;
+
+        // log("allocated at %p (%lu %lu)", &this->freeMap[i], i, allocBit);
 
         return 0;
     }

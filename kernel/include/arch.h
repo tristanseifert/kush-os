@@ -1,6 +1,7 @@
 #ifndef KERNEL_ARCH_H
 #define KERNEL_ARCH_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -16,6 +17,11 @@ void arch_init();
  * Returns the size of a page.
  */
 size_t arch_page_size();
+
+/**
+ * Whether the processor supports marking regions as no-execute.
+ */
+bool arch_supports_nx();
 
 #ifdef __cplusplus
 }

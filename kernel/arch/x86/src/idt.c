@@ -32,7 +32,7 @@ void idt_init() {
 /**
  * Sets the value of an IDT gate.
  */
-void idt_set_entry(uint8_t entry, uint32_t function, uint8_t segment, uint8_t flags) {
+void idt_set_entry(uint8_t entry, uintptr_t function, uint8_t segment, uint8_t flags) {
     idt_entry_t *ptr = (idt_entry_t *) &sys_idt;
 
     ptr[entry].offset_1 = function & 0xFFFF;

@@ -5,6 +5,9 @@
 
 using namespace vm;
 
+/// Set to 1 to log adding mappings
+#define LOG_MAP_ADD     0
+
 /**
  * Allocates a new memory map.
  *
@@ -32,12 +35,20 @@ void Map::activate() {
 }
 
 /**
+ * Determines if this map is currently loaded in the current processor.
+ */
+const bool Map::isActive() const {
+    return this->table.isActive();
+}
+
+/**
  * Adds a translation to the memory map.
  *
  * @note Length is rounded up to the nearest multiple of the page size, if it's not aligned.
  */
 int Map::add(const uint64_t physAddr, const uintptr_t _length, const uintptr_t vmAddr,
         const MapMode mode) {
+    int err;
     const auto pageSz = arch_page_size();
 
     // round up length if needed
@@ -47,9 +58,26 @@ int Map::add(const uint64_t physAddr, const uintptr_t _length, const uintptr_t v
         length += pageSz - (length % pageSz);
     }
 
+#if LOG_MAP_ADD
     log("Adding mapping to %p: $%lx -> $%llx (length $%lx, mode $%04lx)", this, vmAddr, physAddr, length,
             (uint32_t) mode);
+#endif
 
-    // if we get here, the mapping failed to be added
-    return -1;
+    // decompose the flags
+    const bool write = flags(mode & MapMode::WRITE);
+    const bool execute = flags(mode & MapMode::EXECUTE);
+    const bool global = flags(mode & MapMode::GLOBAL);
+    const bool user = flags(mode & MapMode::ACCESS_USER);
+
+    // map each of the pages
+    for(uintptr_t off = 0; off < length; off += pageSz) {
+        err = this->table.mapPage(physAddr + off, vmAddr + off, write, execute, global, user);
+
+        if(err) {
+            return err;
+        }
+    }
+
+    // all mappings completed
+    return 0;
 }

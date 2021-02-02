@@ -1,6 +1,7 @@
 #include "Mapper.h"
 #include "Map.h"
 
+#include <arch.h>
 #include <platform.h>
 #include <log.h>
 
@@ -30,6 +31,8 @@ Mapper::Mapper() {
     uint64_t physAddr = 0;
     uintptr_t length = 0, virtAddr = 0;
 
+    log("VM: NX enabled = %s", arch_supports_nx() ? "yes" : "no");
+
     // placement allocate the kernel map
     new(gKernelMap) Map(false);
 
@@ -37,19 +40,19 @@ Mapper::Mapper() {
     err = platform_section_get_info(kSectionKernelText, &physAddr, &virtAddr, &length);
     REQUIRE(!err, "failed to get section %s", "kernel text");
 
-    err = gKernelMap->add(physAddr, length, virtAddr, Map::MapMode::kKernelExec);
+    err = gKernelMap->add(physAddr, length, virtAddr, MapMode::kKernelExec | MapMode::GLOBAL);
 
     // map the data segment (RW-)
     err = platform_section_get_info(kSectionKernelData, &physAddr, &virtAddr, &length);
     REQUIRE(!err, "failed to get section %s", "kernel data");
 
-    err = gKernelMap->add(physAddr, length, virtAddr, Map::MapMode::kKernelRW);
+    err = gKernelMap->add(physAddr, length, virtAddr, MapMode::kKernelRW | MapMode::GLOBAL);
 
     // map the bss segment; includes our init stack (RW-)
     err = platform_section_get_info(kSectionKernelBss, &physAddr, &virtAddr, &length);
     REQUIRE(!err, "failed to get section %s", "kernel bss");
 
-    err = gKernelMap->add(physAddr, length, virtAddr, Map::MapMode::kKernelRW);
+    err = gKernelMap->add(physAddr, length, virtAddr, MapMode::kKernelRW | MapMode::GLOBAL);
 }
 
 

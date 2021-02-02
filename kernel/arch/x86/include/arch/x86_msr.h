@@ -3,6 +3,12 @@
 
 #include <stdint.h>
 
+/// extended feature enable register
+#define X86_MSR_EFER                    0xC0000080
+
+/// EFER flag for NX bit
+#define X86_MSR_EFER_NX                 (1 << 11)
+
 /**
  * Writes a model-specific register.
  */
@@ -26,6 +32,13 @@ static inline uint64_t x86_rdtsc() {
     asm volatile("rdtsc" : "=a" (lo), "=d" (hi));
 
     return (lo & 0xFFFFFFFF) | (((uint64_t) hi) << 0x20);
+}
+
+/**
+ * Reads a CPUID page.
+ */
+static inline void x86_cpuid(const uint32_t page, uint32_t *a, uint32_t *d) {
+    asm volatile("cpuid":"=a"(*a),"=d"(*d):"a"(page):"ecx","ebx");
 }
 
 #endif

@@ -61,7 +61,14 @@ void serial_spew_wait_txrdy() {
  * Transmits the given character to the serial spew port.
  */
 void serial_spew_tx(char ch) {
-    io_outb(SPEW_IO_BASE + 0, ch);
+    // convert newlines from CR to CR+LF
+    if(ch == '\n') {
+        io_outb(SPEW_IO_BASE + 0, '\r');
+        serial_spew_wait_txrdy();
+        io_outb(SPEW_IO_BASE + 0, ch);
+    } else {
+        io_outb(SPEW_IO_BASE + 0, ch);
+    }
 }
 
 

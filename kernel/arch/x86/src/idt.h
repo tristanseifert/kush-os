@@ -19,6 +19,6 @@ typedef struct arch_idt_descriptor {
 
 
 void idt_init();
-void idt_set_entry(uint8_t entry, uint32_t function, uint8_t segment, uint8_t flags);
+void idt_set_entry(uint8_t entry, uintptr_t function, uint8_t segment, uint8_t flags);
 
 #endif

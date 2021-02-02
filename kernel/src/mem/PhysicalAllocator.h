@@ -74,7 +74,7 @@ class PhysicalAllocator {
 
         // TODO: this must
         /// virtual address to map the next physical region allocation bitmap in
-        uint32_t nextBitmapVmAddr = 0xC1000000;
+        uint32_t nextBitmapVmAddr = 0xC0400000;
 };
 
 };

@@ -18,6 +18,7 @@ void kernel_init() {
 
     vm::Mapper::init();
     mem::PhysicalAllocator::vmAvailable();
+
     vm::Mapper::loadKernelMap();
     vm::Mapper::lateInit();
 }

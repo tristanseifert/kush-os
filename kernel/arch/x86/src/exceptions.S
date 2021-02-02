@@ -140,7 +140,7 @@ x86_exception_virtualization:
     jmp         error_common_stub
 
 
-
+.extern x86_handle_pagefault
 /**
  * Page fault handler
  */
@@ -163,7 +163,7 @@ x86_exception_pagefault:
     mov         %ax, %gs
 
     // invoke page fault handler
-    // call	paging_page_fault_handler
+    call        x86_handle_pagefault
 
     // reload the original data segment fault descriptor
     pop         %eax

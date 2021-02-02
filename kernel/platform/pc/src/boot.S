@@ -35,21 +35,26 @@
 _osentry:
     cli
 
-# Enter protected mode
+    // Enter protected mode
     mov         %cr0, %ecx
     or          $0x00000001, %ecx
     mov         %ecx, %cr0
 
-# Load page directory
-    mov         $(boot_page_directory - 0xC0000000), %ecx
+    // enable page size extension and PAE, and global pages
+    mov         %cr4, %ecx
+    or          $0x000000B0, %ecx
+    mov         %ecx, %cr4
+
+    // Load page directory
+    mov         $(boot_pae_pdpt - 0xC0000000), %ecx
     mov         %ecx, %cr3
 
-# Enable paging
+    // Enable paging
     mov         %cr0, %ecx
     or          $0x80000000, %ecx
     mov         %ecx, %cr0
 
-# jump to the higher half kernel
+    // jump to the higher half kernel
     lea         jmp_highhalf, %ecx
     jmp         *%ecx
 
@@ -116,22 +121,53 @@ sse_init:
 # Bootup page tables
 .section .entry.rodata
 
-// Map 4MB of space.
+/**
+ * PAE page directory that maps the first 1G of address space as-is.
+ */
 .align 0x1000
-boot_page_table:
-    .set addr, 0
-
-    .rept 1024
-    .long addr + 0x03
-    .set addr, addr+0x1000
+boot_pae_pdt_identity:
+    .set        addr, 0
+    .rept       512
+    .long       addr | 0b010000011
+    .long       0 // this is where the NX bit would be
+    .set        addr, addr+0x200000
     .endr
 
-// Mirror the first 4 MB throughout the address space.
+/**
+ * PAE page directory that maps the first 16M starting at 0xC0000000 to physical address 0.
+ */
 .align 0x1000
-boot_page_directory:
-    .rept 1024
-    .long (boot_page_table - 0xC0000000) + 0x07
+boot_pae_pdt_upper:
+    .set        addr, 0
+    .rept       8
+    .long       addr | 0b010000011
+    .long       0 // this is where the NX bit would be
+    .set        addr, addr+0x200000
     .endr
+
+    // remainder of the table is unmapped
+    .rept       504
+    .quad       0
+    .endr
+
+/**
+ * Page directory pointer table (PDPT); this contains 4 entries, each of which 8 bytes, pointing
+ * to a page directory describing 1G of memory.
+ *
+ * Here, the first gig of RAM is identity mapped, followed by 2 gigs of unmapped space, and then
+ * the first 16M of kernel space (at 0xC0000000) being mapped to address 0.
+ */
+.align 0x20
+boot_pae_pdpt:
+    // first 1 gig is identity mapped
+    .long        (boot_pae_pdt_identity - 0xC0000000) + 0b1
+    .long        0
+    // two unmapped spaces
+    .quad        0
+    .quad        0
+    // first 16M mapped to 0 for kernel
+    .long        (boot_pae_pdt_upper - 0xC0000000) + 0b1
+    .long        0
 
 /*************************************************************************************************/
 // 32K kernel stack to use during initialization

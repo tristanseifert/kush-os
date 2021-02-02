@@ -24,6 +24,10 @@ class Mapper {
             return gShared->vmAvailable;
         }
 
+        static Map *getKernelMap() {
+            return gKernelMap;
+        }
+
     private:
         Mapper();
 

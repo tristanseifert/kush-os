@@ -13,10 +13,22 @@ namespace arch { namespace vm {
  */
 class PTEHandler: public ::vm::IPTEHandler {
     public:
-        PTEHandler();
+        PTEHandler(::vm::IPTEHandler *kernel = nullptr);
         ~PTEHandler();
 
         void activate() override;
+        const bool isActive() const override;
+
+        int mapPage(const uint64_t phys, const uintptr_t virt, const bool write,
+                const bool execute, const bool global, const bool user) override;
+
+    private:
+        void initKernel();
+        void initCopyKernel(PTEHandler *);
+
+        void setPageDirectory(const uint32_t virt, const uint64_t value);
+        const uint64_t getPageDirectory(const uint32_t virt);
+        void setPageTable(const uint32_t virt, const uint64_t value);
 
     private:
         // physical address of the first level page directory pointer table
@@ -27,7 +39,8 @@ class PTEHandler: public ::vm::IPTEHandler {
         // physical addresses of the second level page directories
         uintptr_t pdtPhys[4] = {0, 0, 0, 0};
         // virtual addresses of the second level page directories
-        uint64_t *pdt[4] = {nullptr, nullptr, nullptr, nullptr};
+        uint64_t *pdt[4] = {(uint64_t *) 0xbf600000, (uint64_t *) 0xbf601000,
+            (uint64_t *) 0xbf602000, (uint64_t *) 0xbf603000};
 };
 }}
 

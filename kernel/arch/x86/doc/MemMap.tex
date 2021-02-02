@@ -1,0 +1,47 @@
+\documentclass[11pt]{letter}
+\usepackage[margin=2cm]{geometry}
+\geometry{letterpaper}
+%\usepackage[parfill]{parskip}    % Activate to begin paragraphs with an empty line rather than an indent
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{epstopdf}
+\usepackage{bytefield}
+\usepackage{xcolor}
+
+% facilitates the creation of memory maps. Start address at the bottom, end address at the top.
+% syntax: \memsection{end address}{start address}{height in lines}{text in box}
+\newcommand{\memsection}[4]{
+\bytefieldsetup{bitheight=#3\baselineskip}    % define the height of the memsection
+\bitbox[]{10}{
+\texttt{#1}     % print end address
+\\ \vspace{#3\baselineskip} \vspace{-2\baselineskip} \vspace{-#3pt} % do some spacing
+\texttt{#2} % print start address
+}
+\bitbox{32}{#4} % print box with caption
+}
+
+\DeclareGraphicsRule{.tif}{png}{.png}{`convert #1 `dirname #1`/`basename #1 .tif`.png}
+
+\title{\textsc{x86} Memory Map}
+
+\begin{document}
+
+\begin{bytefield}{32}
+	\memsection{ffff ffff}{ff80 0000}{3}{Page table self map area}\\
+		
+	\begin{rightwordgroup}{internal memory}
+		\memsection{003f ffff}{002f c000}{4}{Special Function Registers}\\
+		\memsection{002f bfff}{0007 0000}{3}{-- reseved --}
+	\end{rightwordgroup}\\
+	
+	\memsection{c05f ffff}{c040 0000}{2}{Physical memory alloc bitmaps} \\
+	
+	\memsection{c03f ffff}{c010 0000}{2}{Kernel \texttt{.text}/\texttt{.data}} \\
+	\memsection{c00f ffff}{c000 0000}{2}{-- reseved --}\\
+	
+	%%%
+	\memsection{bfff ffff}{0000 0000}{6}{\it User Space}\\
+\end{bytefield}
+
+
+\end{document}  

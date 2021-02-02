@@ -3,10 +3,34 @@
 
 #include <stdint.h>
 
+#include <bitflags.h>
 #include <arch/PTEHandler.h>
 
 namespace vm {
 class Mapper;
+
+/// modifier flags for mappings, defining its protection level
+ENUM_FLAGS(MapMode)
+enum class MapMode {
+    /// Allow reading from the page
+    READ                = (1 << 0),
+    /// Allow writing to the page
+    WRITE               = (1 << 1),
+    /// Allow executing from the page
+    EXECUTE             = (1 << 2),
+
+    /// User mode may access the page
+    ACCESS_USER         = (1 << 8),
+
+    /// The page should be mapped globally, e.g. it does not change between processes.
+    GLOBAL              = (1 << 12),
+
+    /// Read + execute for kernel text
+    kKernelExec         = (READ | EXECUTE | GLOBAL),
+    /// Read + write for kernel only
+    kKernelRW           = (READ | WRITE),
+};
+
 
 /**
  * Maps represent the virtual memory environment for a particular process. They hold references to
@@ -16,28 +40,10 @@ class Map {
     friend class Mapper;
 
     public:
-        /// modifier flags for mappings, defining its protection level
-        enum class MapMode: uint32_t {
-            /// Allow reading from the page
-            READ                = (1 << 0),
-            /// Allow writing to the page
-            WRITE               = (1 << 1),
-            /// Allow executing from the page
-            EXECUTE             = (1 << 2),
-
-            /// User mode may access the page
-            ACCESS_USER         = (1 << 8),
-
-            /// Read + execute for kernel only
-            kKernelExec         = (READ | EXECUTE),
-            /// Read + write for kernel only
-            kKernelRW           = (READ | WRITE),
-        };
-
-    public:
         Map() : Map(true) {};
         ~Map();
 
+        const bool isActive() const;
         void activate();
 
         int add(const uint64_t physAddr, const uintptr_t length, const uintptr_t vmAddr, 
@@ -51,9 +57,6 @@ class Map {
         arch::vm::PTEHandler table;
 };
 
-inline Map::MapMode operator &(Map::MapMode a, Map::MapMode b) {
-    return static_cast<Map::MapMode>(static_cast<int>(a) & static_cast<int>(b));
-};
 }
 
 #endif

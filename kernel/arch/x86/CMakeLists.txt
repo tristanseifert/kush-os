@@ -12,6 +12,7 @@ add_library(kernel_arch_x86 OBJECT
     src/vm/PTEHandler.cpp
 )
 
+target_include_directories(kernel_arch_x86 PUBLIC include)
 target_include_directories(kernel_arch_x86 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../include)
 target_include_directories(kernel_arch_x86 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../src)
 
