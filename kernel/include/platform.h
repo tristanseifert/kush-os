@@ -14,6 +14,11 @@ extern "C" {
 void platform_init();
 
 /**
+ * Notifies platform code that virtual memory is available.
+ */
+void platform_vm_available();
+
+/**
  * Writes a character to the platform debug spew, if any.
  */
 void platform_debug_spew(char ch);

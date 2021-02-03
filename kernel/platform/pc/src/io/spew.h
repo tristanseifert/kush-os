@@ -1,6 +1,10 @@
 #ifndef PLATFORM_PC_IO_SPEW_H
 #define PLATFORM_PC_IO_SPEW_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * Initializes the serial spew.
  */
@@ -15,5 +19,10 @@ void serial_spew_wait_txrdy();
  * Sends a character through the serial spew port.
  */
 void serial_spew_tx(char ch);
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif

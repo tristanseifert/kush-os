@@ -6,16 +6,19 @@
 add_library(kernel_platform_pc OBJECT
     src/boot.S
     src/panic.S
-    src/platform.c
-    src/multiboot.c
-    src/physmap.c
+    src/platform.cpp
+    src/multiboot.cpp
+    src/physmap.cpp
+    src/acpi/Manager.cpp
     src/io/spew.c
     src/irq/pic.c
 )
 
-target_include_directories(kernel_platform_pc PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../src)
+target_include_directories(kernel_platform_pc PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 
+target_include_directories(kernel_platform_pc PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../src)
 target_include_directories(kernel_platform_pc PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../include)
+
 target_include_directories(kernel_platform_pc PRIVATE ${ARCH_INCLUDE_DIR})
 
 set(PLATFORM_TARGET_NAME "kernel_platform_pc" CACHE STRING "Platform target name" FORCE)

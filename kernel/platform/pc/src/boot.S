@@ -22,6 +22,11 @@ multiboot_header:
     // header checksum
     .long       -(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT_ARCHITECTURE_I386 + (multiboot_header_end - multiboot_header)) & 0xFFFFFFFF
 
+// modules must be page aligned
+    .short      MULTIBOOT_HEADER_TAG_MODULE_ALIGN
+    .short      0
+    .long       8
+
 // end of tags list
     .short      MULTIBOOT_HEADER_TAG_END
     .short      0

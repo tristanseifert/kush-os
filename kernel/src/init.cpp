@@ -6,6 +6,7 @@
 #include "vm/Map.h"
 
 #include <arch.h>
+#include <platform.h>
 #include <stdint.h>
 
 #include <printf.h>
@@ -31,6 +32,8 @@ void kernel_init() {
 
     // notify other components of VM availability
     arch_vm_available();
+    platform_vm_available();
+
 }
 
 /**

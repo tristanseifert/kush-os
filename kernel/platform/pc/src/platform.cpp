@@ -7,9 +7,11 @@
 #include "multiboot.h"
 #include "irq/pic.h"
 #include "io/spew.h"
+#include "acpi/Manager.h"
 
 #include <stdint.h>
 
+using namespace platform;
 
 /**
  * Initializes the platform code.
@@ -27,4 +29,12 @@ void platform_init() {
     pic_init();
 
     // install our IRQ handlers
+}
+
+/**
+ * Once VM is available, perform some initialization. We'll parse some basic ACPI tables in order
+ * to set up interrupts.
+ */
+void platform_vm_available() {
+    acpi::Manager::vmAvailable();
 }

@@ -134,3 +134,37 @@ void *memmove(void *dest, const void *src, const size_t n) {
     memcpy(dest, tmp, n);
     return dest;
 }
+
+
+
+/*
+ * Compares n bytes of the two strings.
+ */
+int strncmp(const char* s1, const char* s2, size_t n) {
+    while(n--) {
+        if(*s1++!=*s2++) {
+            return *(const unsigned char*)(s1 - 1) - *(const unsigned char*)(s2 - 1);
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * Copies n bytes from the source string to the destination buffer, filling the
+ * destination with zeros if source ends prematurely.
+ */
+char *strncpy(char *dest, const char *src, size_t n) {
+    char *ret = dest;
+    do {
+        if (!n--) {
+            return ret;
+        }
+    } while ((*dest++ = *src++));
+
+    while (n--) {
+        *dest++ = 0;
+    }
+
+    return ret;
+}

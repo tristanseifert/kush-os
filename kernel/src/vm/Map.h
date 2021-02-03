@@ -29,6 +29,8 @@ enum class MapMode {
     kKernelExec         = (READ | EXECUTE | GLOBAL),
     /// Read + write for kernel only
     kKernelRW           = (READ | WRITE),
+    /// Read for kernel only
+    kKernelRead         = (READ),
 };
 
 
