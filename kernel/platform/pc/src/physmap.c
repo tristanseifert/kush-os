@@ -1,5 +1,5 @@
 #include "physmap.h"
-#include "multiboot.h"
+#include "multiboot2.h"
 
 #include <log.h>
 #include <platform.h>
@@ -19,61 +19,46 @@ extern size_t __kern_keep_start, __kern_keep_end;
 /// Total number of allocatable physical RAM regions
 static size_t gNumPhysRegions = 0;
 /// Info on each of the physical regions
-static physmap_region_t gPhysRegions[MAX_REGIONS];
+static physmap_region_t gPhysRegions[MAX_REGIONS] = {
+    {0, 0},
+};
 
-static void create_kernel_hole(multiboot_info_t *info);
+static void create_kernel_hole();
 
 
 
 /**
  * Parse the multiboot structure for all of the memory in the machine.
  */
-void physmap_load_from_multiboot(void *_info) {
-    // validate the info struct
-    if(!_info) {
-        panic("failed to get multiboot info");
-    }
+void physmap_load_from_multiboot(struct multiboot_tag_mmap *tag) {
+    multiboot_memory_map_t *mmap = tag->entries;
 
-    // TODO: it's possible this is outside the first 4M of RAM
-    multiboot_info_t *info = (multiboot_info_t *) _info;
-
-    if(!(info->flags & MULTIBOOT_INFO_MEM_MAP)) {
-        panic("multiboot info is missing %s", "memory map");
-    }
-
-    // parse memory map
-    const multiboot_memory_map_t *entries = (const multiboot_memory_map_t *) info->mmap_addr;
-    const uint32_t numEntries = info->mmap_length / sizeof(multiboot_memory_map_t);
-
+    // prepare our buffer
     gNumPhysRegions = 0;
     memclr(&gPhysRegions, sizeof(physmap_region_t) * MAX_REGIONS);
 
-    for(size_t i = 0; i < numEntries; i++) {
-        // ensure the entry is the proper size
-        const multiboot_memory_map_t *e = &entries[i]; 
-        if(e->size != sizeof(multiboot_memory_map_t) - offsetof(multiboot_memory_map_t, addr)) {
-            // XXX: are longer stride values allowed?
-            panic("invalid multiboot memory map entry size: %ld", e->size);
-        }
-
-        // add entries for allocatable memory
-        if(e->type == 1) {
+    // iterate over all entries
+    for(mmap = tag->entries; (uint8_t *) mmap < (uint8_t *) tag + tag->size;
+        mmap = (multiboot_memory_map_t *) ((uintptr_t) mmap + tag->entry_size)) {
+        // handle entries of the allocatable memory type
+        if(mmap->type == MULTIBOOT_MEMORY_AVAILABLE) {
             // ignore regions below the 1M mark
-            if(e->addr < 0x100000) {
-                log("Ignoring conventional memory at %016llx (size %016llx)", e->addr, e->len);
+            if(mmap->addr < 0x100000) {
+                log("Ignoring conventional memory at %016llx (size %016llx)", mmap->addr, mmap->len);
                 continue;
             }
 
-            gPhysRegions[gNumPhysRegions].start = e->addr;
-            gPhysRegions[gNumPhysRegions].length = e->len;
+            gPhysRegions[gNumPhysRegions].start = mmap->addr;
+            gPhysRegions[gNumPhysRegions].length = mmap->len;
             gNumPhysRegions++;
         } else {
-            //log("Unused Entry %02lu: addr %016llx size %016llx flags %08lx", i, e->addr, e->len, e->type);
+            // log("Unused Entry: addr %016llx size %016llx flags %08x", mmap->addr, mmap->len, mmap->type);
         }
     }
 
+
     // create holes for the kernel
-    create_kernel_hole(info);
+    create_kernel_hole();
 }
 
 /**
@@ -89,9 +74,9 @@ void physmap_load_from_multiboot(void *_info) {
  * Note that this obviously blows up pretty spectacularly if the initial assumption (re: load
  * address) is violated. qemu seems to obey it, though.
  */
-static void create_kernel_hole(multiboot_info_t *info) {
+static void create_kernel_hole() {
     // calculate physical range of kernel text
-    const size_t physStart = ((size_t) &__kern_keep_start) - 0xC0000000;
+    const size_t physStart = ((size_t) &__kern_keep_start);// - 0xC0000000;
     const size_t physEnd = ((size_t) &__kern_keep_end) - 0xC0000000;
 
     log("Kernel memory physical range: $%08lx to $%08lx", physStart, physEnd);

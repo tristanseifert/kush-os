@@ -4,14 +4,12 @@
 #include <platform.h>
 #include <log.h>
 
-#include "physmap.h"
+#include "multiboot.h"
 #include "irq/pic.h"
 #include "io/spew.h"
 
 #include <stdint.h>
 
-/// physical address of the multiboot structure
-uint32_t x86_multiboot_info = 0;
 
 /**
  * Initializes the platform code.
@@ -22,9 +20,8 @@ void platform_init() {
     // configure debug printing
     serial_spew_init();
 
-    // parse the memory regions from multiboot struct
-    physmap_load_from_multiboot((void *) x86_multiboot_info);
-
+    // parse multiboot info
+    multiboot_parse();
 
     // set up and remap the PICs and other interrupt controllers
     pic_init();

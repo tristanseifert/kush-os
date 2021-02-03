@@ -1,19 +1,23 @@
-ENTRY(osentry)
+ENTRY(_osentry)
 OUTPUT_FORMAT(elf32-i386)
 
 SECTIONS {
-    /* we're loaded to 0x100000, but then we map ourselves at 0xC0100000. */
-    . = 0xC0100000;
-
-    /* kernel code (immutable) section */
-    .text ALIGN(4K) : AT(ADDR(.text) - 0xC0000000) {
+    . = 0x100000;
+    /* multiboot header and boot code */
+    .boot ALIGN(4K) : {
         __kern_keep_start = .;
-        __kern_code_start = .;
-
         KEEP(*(.multiboot))
         KEEP(*(.entry))
         KEEP(*(.entry.rodata))
+    }
 
+    /* we're loaded to 0x100000, but then we map ourselves at 0xC0100000. */
+    . += 0xC0000000;
+    /* kernel code (immutable) section */
+    .text ALIGN(4K) : AT(ADDR(.text) - 0xC0000000) {
+        __kern_code_start = .;
+
+        *(.entry.high)
         *(.text)
         *(.text*)
         *(.rodata)

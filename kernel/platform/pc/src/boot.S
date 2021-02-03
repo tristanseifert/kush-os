@@ -5,13 +5,28 @@
 #define MAGIC    0x1BADB002
 #define CHECKSUM -(MAGIC + FLAGS)
 
+// pull in multiboot info
+#define ASM_FILE                        1
+#include "multiboot2.h"
+
 // define the multiboot header
 .section .multiboot
+.align  8
+multiboot_header:
+    // magic value
+    .long       MULTIBOOT2_HEADER_MAGIC
+    // x86 ISA
+    .long       MULTIBOOT_ARCHITECTURE_I386
+    // total length of multiboot header, including tags
+    .long       (multiboot_header_end - multiboot_header)
+    // header checksum
+    .long       -(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT_ARCHITECTURE_I386 + (multiboot_header_end - multiboot_header)) & 0xFFFFFFFF
 
-.align 4
-.long MAGIC
-.long FLAGS
-.long CHECKSUM
+// end of tags list
+    .short      MULTIBOOT_HEADER_TAG_END
+    .short      0
+    .long       8
+multiboot_header_end:
 
 /*************************************************************************************************/
 .section .entry, "ax"
@@ -23,6 +38,7 @@
 .extern platform_init
 
 .extern x86_multiboot_info
+.extern x86_multiboot_magic
 
 .globl _osentry
 .type _osentry, @function
@@ -46,7 +62,7 @@ _osentry:
     mov         %ecx, %cr4
 
     // Load page directory
-    mov         $(boot_pae_pdpt - 0xC0000000), %ecx
+    mov         $boot_pae_pdpt, %ecx
     mov         %ecx, %cr3
 
     // Enable paging
@@ -58,8 +74,8 @@ _osentry:
     lea         jmp_highhalf, %ecx
     jmp         *%ecx
 
-
-# We have rudimentary paging down here.
+# All of this code is offset in virtual memory
+.section .entry.high
 jmp_highhalf:
     // Now, we're executing at 0xC0100000, so use the virtual address for stack.
     mov         $stack_top, %esp
@@ -69,6 +85,7 @@ jmp_highhalf:
     push        %eax
 
     // Write multiboot info pointer to memory
+    mov         %eax, x86_multiboot_magic
     mov         %ebx, x86_multiboot_info
 
     // Check for SSE, and if it exists, enable it
@@ -122,6 +139,25 @@ sse_init:
 .section .entry.rodata
 
 /**
+ * Page directory pointer table (PDPT); this contains 4 entries, each of which 8 bytes, pointing
+ * to a page directory describing 1G of memory.
+ *
+ * Here, the first gig of RAM is identity mapped, followed by 2 gigs of unmapped space, and then
+ * the first 16M of kernel space (at 0xC0000000) being mapped to address 0.
+ */
+.align 0x20
+boot_pae_pdpt:
+    // first 1 gig is identity mapped
+    .long        boot_pae_pdt_identity + 0b1
+    .long        0
+    // two unmapped spaces
+    .quad        0
+    .quad        0
+    // first 16M mapped to 0 for kernel
+    .long        boot_pae_pdt_upper + 0b1
+    .long        0
+
+/**
  * PAE page directory that maps the first 1G of address space as-is.
  */
 .align 0x1000
@@ -150,24 +186,6 @@ boot_pae_pdt_upper:
     .quad       0
     .endr
 
-/**
- * Page directory pointer table (PDPT); this contains 4 entries, each of which 8 bytes, pointing
- * to a page directory describing 1G of memory.
- *
- * Here, the first gig of RAM is identity mapped, followed by 2 gigs of unmapped space, and then
- * the first 16M of kernel space (at 0xC0000000) being mapped to address 0.
- */
-.align 0x20
-boot_pae_pdpt:
-    // first 1 gig is identity mapped
-    .long        (boot_pae_pdt_identity - 0xC0000000) + 0b1
-    .long        0
-    // two unmapped spaces
-    .quad        0
-    .quad        0
-    // first 16M mapped to 0 for kernel
-    .long        (boot_pae_pdt_upper - 0xC0000000) + 0b1
-    .long        0
 
 /*************************************************************************************************/
 // 32K kernel stack to use during initialization

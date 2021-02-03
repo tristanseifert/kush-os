@@ -218,6 +218,12 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t virt, const bool wr
 #if LOG_PDE_ALLOC
             log("allocated page table (%p) for $%lx (pde entry $%016llx)", (void *) page, virt, page | flags);
 #endif
+
+            // clear all entries in the apge table
+            const auto base = virt & ~0x1FFFFF;
+            for(size_t i = 0; i < 512; i++) {
+                this->setPageTable(base + (i * 0x1000), 0);
+            }
         } else {
             // this region is mapped as a 2M page. cannot add sub-mapping
             if((pdtEntry & (1 << 7))) {

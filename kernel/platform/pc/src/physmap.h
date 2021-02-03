@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+struct multiboot_tag_mmap;
+
 /**
  * Start and length of memory regions
  */
@@ -16,6 +18,6 @@ typedef struct physmap_region {
 /**
  * Initializes the platform memory map with the given multiboot structure.
  */
-void physmap_load_from_multiboot(void *info);
+void physmap_load_from_multiboot(struct multiboot_tag_mmap *info);
 
 #endif

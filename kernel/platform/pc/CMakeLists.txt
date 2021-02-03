@@ -6,8 +6,9 @@
 add_library(kernel_platform_pc OBJECT
     src/boot.S
     src/panic.S
-    src/physmap.c
     src/platform.c
+    src/multiboot.c
+    src/physmap.c
     src/io/spew.c
     src/irq/pic.c
 )

@@ -11,6 +11,9 @@
 
 using namespace mem;
 
+// enable logging of stack section VM updates
+#define LOG_VM_UPDATE                   0
+
 static char gSharedBuf[sizeof(StackPool)];
 StackPool *StackPool::gShared = (StackPool *) &gSharedBuf;
 
@@ -72,7 +75,9 @@ void *StackPool::alloc() {
             const auto vmAddr = start + (i * pageSz);
             err = m->add(physPages[i], pageSz, vmAddr, vm::MapMode::kKernelRW);
 
+#if LOG_VM_UPDATE
             log("stack mapped phys %016llx to %08lx", physPages[i], vmAddr);
+#endif
 
             if(err) {
                 log("failed to map stack %016llx to %08lx: %d", physPages[i], vmAddr, err);
@@ -138,7 +143,9 @@ void StackPool::free(void *base) {
         err = m->remove(vmAddr, pageSz);
         REQUIRE(!err, "failed to %s stack page: %d", "unmap", err);
 
+#if LOG_VM_UPDATE
         log("stack unmapped phys %016llx to %08lx", phys, vmAddr);
+#endif
 
         // then release the physical page
         PhysicalAllocator::free(phys);
