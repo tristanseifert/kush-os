@@ -176,7 +176,7 @@ beach:;
                         }
                     }
                 }
-                // TODO: it doesn't, so iterate over the rest of list
+                // it doesn't, so iterate over the rest of list
                 page = this->over;
                 while(page) {
                     T prevValue;
