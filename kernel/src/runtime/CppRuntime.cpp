@@ -1,6 +1,8 @@
 #include <stddef.h>
 #include <log.h>
 
+#include "mem/Heap.h"
+
 extern "C" void __cxa_pure_virtual();
 
 /**
@@ -12,19 +14,17 @@ extern "C" void __cxa_pure_virtual() {
 
 /// Allocates memory
 void *operator new(size_t size) {
-    // TODO: implement
-    return (void *) 0xDEADBEEF;
+    return mem::Heap::alloc(size);
 }
 /// Allocates an array
 void *operator new[](size_t size) {
-    // TODO: implement
-    return (void *) 0xDEADBEEF;
+    return mem::Heap::alloc(size);
 }
 /// release previously allocated memory
 void operator delete(void *p) {
-    // TODO: implement
+    mem::Heap::free(p);
 }
 /// release previously allocated array memory
 void operator delete[](void *p) {
-    // TODO: implement
+    mem::Heap::free(p);
 }

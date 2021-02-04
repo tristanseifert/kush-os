@@ -78,7 +78,7 @@ void PhysicalAllocator::mapRegionUsageBitmaps() {
     int err;
 
     const auto pageSz = arch_page_size();
-    auto m = vm::Mapper::getKernelMap();
+    auto m = vm::Map::kern();
 
     for(size_t i = 0; i < this->numRegions; i++) {
         auto &region = this->regions[i];
@@ -107,11 +107,13 @@ void PhysicalAllocator::mapRegionUsageBitmaps() {
  *
  * This will try each physical allocation region in turn.
  */
-size_t PhysicalAllocator::allocPage() {
+uint64_t PhysicalAllocator::allocPage() {
     int err;
     size_t idx = 0;
 
     const auto pageSz = arch_page_size();
+
+    SPIN_LOCK_GUARD(this->bitmapLock);
 
     // try each region
     for(size_t i = 0; i < this->numRegions; i++) {
@@ -134,7 +136,7 @@ size_t PhysicalAllocator::allocPage() {
  *
  * @return -1 if error, 0 if successful.
  */
-int PhysicalAllocator::Region::alloc(size_t *freeIdx) {
+int PhysicalAllocator::Region::alloc(uintptr_t *freeIdx) {
     // start the search at the next free page
     bool first = true;
     size_t start = this->nextFree / 32;
@@ -174,8 +176,10 @@ search:;
 /**
  * Frees a previously allocated physical page.
  */
-void PhysicalAllocator::freePage(const size_t physAddr) {
+void PhysicalAllocator::freePage(const uint64_t physAddr) {
     const auto pageSz = arch_page_size();
+
+    SPIN_LOCK_GUARD(this->bitmapLock);
 
     // find the corresponding region
     for(size_t i = 0; i < this->numRegions; i++) {
@@ -193,9 +197,38 @@ void PhysicalAllocator::freePage(const size_t physAddr) {
 }
 
 /**
+ * Reserves a given memory page. This is the same as marking it as allocated, with the
+ * understanding that we'll never go and free it later.
+ *
+ * This is used for stuff like ACPI tables or other data structures the system has loaded into
+ * main memory, and we need to keep around for some time. We should strive to copy as much of these
+ * data into kernel-private buffers but for some things that is simply not feasible because system
+ * firmware expects buffers at their existing locations.
+ */
+void PhysicalAllocator::reservePage(const uint64_t physAddr) {
+    const auto pageSz = arch_page_size();
+
+    SPIN_LOCK_GUARD(this->bitmapLock);
+
+    // find the corresponding region
+    for(size_t i = 0; i < this->numRegions; i++) {
+        auto &region = this->regions[i];
+        if(!region.contains(physAddr)) continue;
+
+        // calculate page index and free it
+        const auto index = ((physAddr - region.base) / pageSz) - region.freeMapPages;
+        region.reserve(index);
+
+        return;
+    }
+
+    // if we get here, the page isn't inside the phys pool so we can ignore it
+}
+
+/**
  * Frees the page with the given index (its address being base + index * page size)
  */
-void PhysicalAllocator::Region::free(const size_t idx) {
+void PhysicalAllocator::Region::free(const uintptr_t idx) {
     // ensure index in bounds
     if(idx >= this->totalPages) {
         panic("page %lu out of bounds (max %lu)", idx, this->totalPages);

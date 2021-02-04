@@ -2,7 +2,7 @@
 
 #include "multiboot2.h"
 
-#include <vm/Mapper.h>
+#include <mem/PhysicalAllocator.h>
 #include <vm/Map.h>
 
 #include <new>
@@ -60,14 +60,16 @@ Manager::Manager(const uint64_t _rsdtPhys) : rsdtPhys(_rsdtPhys) {
 void Manager::parseTables() {
     int err;
 
-    auto m = vm::Mapper::getKernelMap();
+    auto m = vm::Map::kern();
 
     // map the RSDT and calculate checksum
-    const uint32_t rsdtVirt = 0xF8000000;
+    const uint32_t rsdtVirt = 0xF0000000;
 
     log("Mapping RSDT %016llx to %08lx", this->rsdtPhys, rsdtVirt);
     err = m->add(this->rsdtPhys & ~0xFFF, 0x1000, rsdtVirt, vm::MapMode::kKernelRead);
     REQUIRE(!err, "failed to map RSDT: %d", err);
+
+    mem::PhysicalAllocator::reserve(this->rsdtPhys & ~0xFFF);
 
     this->rsdt = reinterpret_cast<RSDT *>(rsdtVirt + (this->rsdtPhys & 0xFFF));
 
@@ -90,6 +92,7 @@ void Manager::parseTables() {
         // we need to map a separate page for this table
         else {
             // TODO: implement
+            mem::PhysicalAllocator::reserve(addr & ~0xFFF);
             panic("mapping extra SDTs is not yet supported (phys %08lx)", addr);
         }
 

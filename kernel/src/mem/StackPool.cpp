@@ -1,7 +1,6 @@
 #include "StackPool.h"
 #include "PhysicalAllocator.h"
 
-#include "vm/Mapper.h"
 #include "vm/Map.h"
 
 #include <new>
@@ -44,7 +43,10 @@ StackPool::StackPool() {
 void *StackPool::alloc() {
     int err;
     const auto pageSz = arch_page_size();
-    auto m = vm::Mapper::getKernelMap();
+    auto m = vm::Map::kern();
+
+    // get a lock on the free map
+    SPIN_LOCK_GUARD(this->freeMapLck);
 
     // search the free map
     for(size_t i = 0; i < (kNumStacks / 32); i++) {
@@ -113,7 +115,10 @@ void StackPool::free(void *base) {
     const auto pageSz = arch_page_size();
     const auto stackPages = kStackSize / pageSz;
 
-    auto m = vm::Mapper::getKernelMap();
+    auto m = vm::Map::kern();
+
+    // get a lock on the free map
+    SPIN_LOCK_GUARD(this->freeMapLck);
 
     // ensure it's marked as allocated in the map
     const uintptr_t idx = ((((uintptr_t) base) - kBaseAddr) / kStackSize) - 1;

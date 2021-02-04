@@ -2,6 +2,7 @@
 #define KERNEL_MEM_STACKPOOL_H
 
 #include <stdint.h>
+#include <arch/spinlock.h>
 
 extern "C" void kernel_init();
 
@@ -52,6 +53,8 @@ class StackPool {
         static StackPool *gShared;
 
     private:
+        /// spin lock for the entire free map
+        DECLARE_SPINLOCK(freeMapLck);
         /// bitmap for the stacks availability
         uint32_t freeMap[kNumStacks / 32];
 };

@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <arch/spinlock.h>
+
 extern "C" void kernel_init();
 
 namespace mem {
@@ -49,7 +51,7 @@ class AnonPool {
 
     private:
         /// base address of the anon pool region
-        static const uintptr_t kBaseAddr = 0xD0000000;
+        static const uintptr_t kBaseAddr = 0xC8000000;
         /// size of the anon pool region
         static const uintptr_t kRegionLength = (0xF0000000 - kBaseAddr);
 
@@ -57,6 +59,9 @@ class AnonPool {
         static AnonPool *gShared;
 
     private:
+        /// spin lock for the entire free map
+        DECLARE_SPINLOCK(freeMapLck);
+
         /// total number of allocatable virtual pages
         size_t totalPages;
         /// free bitmap

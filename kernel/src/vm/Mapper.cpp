@@ -81,3 +81,10 @@ void Mapper::loadKernelMap() {
 void Mapper::enable() {
     this->vmAvailable = true;
 }
+
+/**
+ * Returns the kernel map pointer.
+ */
+Map *Map::kern() {
+    return Mapper::gKernelMap;
+}

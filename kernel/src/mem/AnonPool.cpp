@@ -1,7 +1,6 @@
 #include "AnonPool.h"
 #include "PhysicalAllocator.h"
 
-#include "vm/Mapper.h"
 #include "vm/Map.h"
 
 #include <arch.h>
@@ -19,7 +18,7 @@ AnonPool *AnonPool::gShared = (AnonPool *) &gAllocatorBuf;
  */
 void AnonPool::init() {
     int err;
-    auto map = vm::Mapper::getKernelMap();
+    auto map = vm::Map::kern();
 
     // figure out how many pages we need
     const auto pageSz = arch_page_size();
@@ -46,7 +45,7 @@ void AnonPool::init() {
  */
 AnonPool::AnonPool(const uintptr_t allocBase, const size_t _numPages) : virtBase(allocBase) {
     int err;
-    auto map = vm::Mapper::getKernelMap();
+    auto map = vm::Map::kern();
 
     // align to 32 page multiple
     this->totalPages = _numPages & ~0x1F;
@@ -86,7 +85,7 @@ AnonPool::~AnonPool() {
     uint64_t phys;
 
     const auto pageSz = arch_page_size();
-    auto map = vm::Mapper::getKernelMap();
+    auto map = vm::Map::kern();
 
     for(size_t i = 0; i < this->totalPages; i++) {
         err = map->get(this->virtBase + (pageSz * i), phys);
@@ -104,7 +103,7 @@ void *AnonPool::allocPage(uint64_t &phys) {
     auto page = gShared->alloc(1);
 
     if(page) {
-        auto map = vm::Mapper::getKernelMap();
+        auto map = vm::Map::kern();
 
         int err = map->get((uintptr_t) page, phys);
         REQUIRE(!err, "failed to resolve phys addr: %d", err);
@@ -119,10 +118,13 @@ void *AnonPool::allocPage(uint64_t &phys) {
 void *AnonPool::alloc(const size_t numPages) {
     int err;
     const auto pageSz = arch_page_size();
-    auto map = vm::Mapper::getKernelMap();
+    auto map = vm::Map::kern();
 
     size_t allocStart = 0;
     size_t allocPages = 0;
+
+    // grab the free map lock
+    SPIN_LOCK_GUARD(this->freeMapLck);
 
     // start the search at the next free page
     bool first = true;
@@ -216,7 +218,10 @@ void AnonPool::free(void *base, const size_t numPages) {
     int err;
 
     const auto pageSz = arch_page_size();
-    auto map = vm::Mapper::getKernelMap();
+    auto map = vm::Map::kern();
+
+    // lock the free map and deallocate each page
+    SPIN_LOCK_GUARD(this->freeMapLck);
 
     for(size_t i = 0; i < numPages; i++) {
         const uintptr_t virtAddr = ((uintptr_t) base) + (i * pageSz);

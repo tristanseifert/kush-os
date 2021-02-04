@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <arch/spinlock.h>
+
 namespace mem {
 
 class PhysicalAllocator {
@@ -14,12 +16,17 @@ class PhysicalAllocator {
         }
 
         /// Returns the physical address of a newly allocated page, or 0 if no memory available
-        static size_t alloc() {
+        static uint64_t alloc() {
             return gShared->allocPage();
         }
         /// Frees a previously allocated physical page
-        static void free(const size_t physicalAddr) {
+        static void free(const uint64_t physicalAddr) {
             gShared->freePage(physicalAddr);
+        }
+
+        /// Reserves the page at the given physical address.
+        static void reserve(const uint64_t physicalAddr) {
+            gShared->reservePage(physicalAddr);
         }
 
     private:
@@ -27,8 +34,9 @@ class PhysicalAllocator {
 
         void mapRegionUsageBitmaps();
 
-        size_t allocPage();
-        void freePage(const size_t physicalAddr);
+        uint64_t allocPage();
+        void freePage(const uint64_t physicalAddr);
+        void reservePage(const uint64_t physicalAddr);
 
     private:
         struct Region {
@@ -56,9 +64,14 @@ class PhysicalAllocator {
             }
 
             /// returns the index of the next available page, and marks it allocated
-            int alloc(size_t *freeIdx);
+            int alloc(uintptr_t *freeIdx);
             /// frees a page with the given index
-            void free(const size_t index);
+            void free(const uintptr_t index);
+
+            /// reserves the page at the given index
+            void reserve(const uintptr_t index) {
+                this->freeMap[index / 32] &= ~(1 << (index % 32));
+            }
         };
 
     private:
@@ -72,9 +85,12 @@ class PhysicalAllocator {
         size_t numRegions = 0;
         Region regions[kMaxRegions];
 
-        // TODO: this must
+        // TODO: this should be retrieved from the arch/platform code
         /// virtual address to map the next physical region allocation bitmap in
         uint32_t nextBitmapVmAddr = 0xC0400000;
+
+        /// lock to protect the alloc bitmaps
+        DECLARE_SPINLOCK(bitmapLock);
 };
 
 };

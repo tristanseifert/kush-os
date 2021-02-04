@@ -2,6 +2,7 @@
 #include "mem/AnonPool.h"
 #include "mem/PhysicalAllocator.h"
 #include "mem/StackPool.h"
+#include "mem/Heap.h"
 #include "vm/Mapper.h"
 #include "vm/Map.h"
 
@@ -29,6 +30,7 @@ void kernel_init() {
 
     mem::AnonPool::init();
     mem::StackPool::init();
+    mem::Heap::init();
 
     // notify other components of VM availability
     arch_vm_available();

@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include <bitflags.h>
+#include <arch/rwlock.h>
 #include <arch/PTEHandler.h>
 
 namespace vm {
@@ -60,10 +61,16 @@ class Map {
         /// Gets the physical address to which this virtual address is mapped, and its flags.
         int get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode);
 
+        /// Returns the global kernel map
+        static Map *kern();
+
     private:
         Map(const bool copyKernelMaps);
 
     private:
+        /// protecting modifications of the table
+        DECLARE_RWLOCK(lock);
+
         /// architecture-specific page table handling
         arch::vm::PTEHandler table;
 };

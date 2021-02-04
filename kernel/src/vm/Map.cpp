@@ -51,6 +51,8 @@ int Map::add(const uint64_t physAddr, const uintptr_t _length, const uintptr_t v
     int err;
     const auto pageSz = arch_page_size();
 
+    RW_LOCK_WRITE_GUARD(this->lock);
+
     // round up length if needed
     uintptr_t length = _length;
 
@@ -89,6 +91,8 @@ int Map::remove(const uintptr_t vmAddr, const uintptr_t _length) {
     int err;
     const auto pageSz = arch_page_size();
 
+    RW_LOCK_WRITE_GUARD(this->lock);
+
     // round up length if needed
     uintptr_t length = _length;
     if(length % pageSz) {
@@ -115,6 +119,8 @@ int Map::remove(const uintptr_t vmAddr, const uintptr_t _length) {
  * @return Negative if error, 1 if there is no mapping at that location, or 0 if a mapping exists.
  */
 int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
+    RW_LOCK_READ_GUARD(this->lock);
+
     // this translation of flags is honestly a little cursed
     int err;
     bool w = false, x = false, g = false, u = false;
