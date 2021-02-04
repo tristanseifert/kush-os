@@ -34,6 +34,8 @@ add_executable(kernel
     src/runtime/log.c
     src/vm/Mapper.cpp
     src/vm/Map.cpp
+    src/sched/Scheduler.cpp
+    src/sched/Task.cpp
     ${version_file}
 )
 

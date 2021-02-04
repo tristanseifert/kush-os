@@ -33,6 +33,18 @@ void *Heap::alloc(const size_t bytes) {
     return kmalloc(bytes);
 }
 /**
+ * Allocates some items and ensures the memory is zeroed.
+ */
+void *Heap::calloc(const size_t nItems, const size_t nBytes) {
+    return kcalloc(nItems, nBytes);
+}
+/**
+ * Resizes an existing allocation.
+ */
+void *Heap::realloc(void *ptr, const size_t bytes) {
+    return krealloc(ptr, bytes);
+}
+/**
  * Frees a previous heap allocation.
  */
 void Heap::free(void *ptr) {

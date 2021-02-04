@@ -18,12 +18,13 @@
 using namespace mem;
 
 static char gAllocatorBuf[sizeof(PhysicalAllocator)];
-PhysicalAllocator *PhysicalAllocator::gShared = (PhysicalAllocator *) &gAllocatorBuf;
+PhysicalAllocator *PhysicalAllocator::gShared = nullptr;
 
 /**
  * Initializes the global physical memory allocator.
  */
 void PhysicalAllocator::init() {
+    gShared = (PhysicalAllocator *) &gAllocatorBuf;
     new(gShared) PhysicalAllocator();
 }
 

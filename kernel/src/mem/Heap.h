@@ -11,6 +11,8 @@ class Heap {
 
     public:
         static void *alloc(const size_t bytes);
+        static void *calloc(const size_t nItems, const size_t nBytes);
+        static void *realloc(void *ptr, const size_t bytes);
         static void free(void *ptr);
 
     private:

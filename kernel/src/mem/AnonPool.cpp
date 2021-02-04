@@ -8,10 +8,12 @@
 #include <string.h>
 #include <new>
 
+/// Log initialization for the memory pool
+#define LOG_INIT                        0
+
 using namespace mem;
 
-static char gAllocatorBuf[sizeof(AnonPool)];
-AnonPool *AnonPool::gShared = (AnonPool *) &gAllocatorBuf;
+AnonPool *AnonPool::gShared = nullptr;
 
 /**
  * Sets up the anon pool.
@@ -49,14 +51,16 @@ AnonPool::AnonPool(const uintptr_t allocBase, const size_t _numPages) : virtBase
 
     // align to 32 page multiple
     this->totalPages = _numPages & ~0x1F;
-    log("%p base alloc %08lx (%lu pages)", this, this->virtBase, this->totalPages);
 
     // allocate the bitmap
     const auto pageSz = arch_page_size();
     const auto bitmapBytes = this->totalPages / 32;
     const auto bitmapPages = (bitmapBytes + pageSz - 1) / pageSz;
 
+#if LOG_INIT
+    log("%p base alloc %08lx (%lu pages)", this, this->virtBase, this->totalPages);
     log("alloc bitmap requires %lu bytes (%lu pages)", bitmapBytes, bitmapPages);
+#endif
 
     // allocate the bitmap and set it
     for(size_t i = 0; i < bitmapPages; i++) {
@@ -139,6 +143,7 @@ search:;
         // get index of the first free (set) bit. can return 0 if no bits set but we guard above
         const size_t allocBit = __builtin_ffs(this->freeMap[i]) - 1;
 
+        // TODO: this might break across bounds of 32 pages
         for(size_t j = allocBit; j < 32; j++) {
             // if bit is set, add it to the set of available VM pages
             if(this->freeMap[i] & (1 << j)) {

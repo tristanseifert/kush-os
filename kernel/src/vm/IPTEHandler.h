@@ -9,7 +9,8 @@ namespace vm {
  */
 class IPTEHandler {
     public:
-        IPTEHandler(IPTEHandler *kernel = nullptr) {};
+        IPTEHandler() = delete;
+        IPTEHandler(IPTEHandler *parent) {};
 
         virtual void activate() = 0;
         virtual const bool isActive() const = 0;

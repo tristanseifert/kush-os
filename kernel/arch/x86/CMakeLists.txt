@@ -4,11 +4,11 @@
 
 add_library(kernel_arch_x86 OBJECT
     src/init.cpp
-    src/exceptions.c
+    src/exceptions.cpp
     src/exceptions.S
-    src/gdt.c
+    src/gdt.cpp
     src/gdt.S
-    src/idt.c
+    src/idt.cpp
     src/vm/PTEHandler.cpp
     src/vm/PDPTPool.cpp
 )

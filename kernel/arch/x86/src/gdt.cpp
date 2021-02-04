@@ -1,14 +1,18 @@
 #include "gdt.h"
 
+#include <mem/StackPool.h>
+
+#include <log.h>
 #include <string.h>
 
 // the descriptor table is allocated in BSS
-static gdt_descriptor_t sys_gdt[16];
+static gdt_descriptor_t sys_gdt[32];
 static gdt_task_gate_t sys_tss[GDT_NUM_TSS];
 
-
+/// loads a GDT
 static void load_gdt(void *location);
-extern void gdt_flush();
+/// external assembly routine to flush cached GDT entries
+extern "C" void gdt_flush();
 
 
 /*
@@ -31,7 +35,8 @@ void gdt_init() {
 
     // Create the correct number of TSS descriptors
     for(int i = 0; i < GDT_NUM_TSS; i++) {
-        gdt_set_entry(i+5, ((uint32_t) &sys_tss)+(i*sizeof(gdt_task_gate_t)), sizeof(gdt_task_gate_t), 0x89, 0x4F);
+        gdt_set_entry((GDT_FIRST_TSS >> 3) + i, ((uint32_t) &sys_tss)+(i*sizeof(gdt_task_gate_t)),
+                      sizeof(gdt_task_gate_t), 0x89, 0x4F);
     }
 
     load_gdt(gdt);
@@ -68,4 +73,21 @@ static void load_gdt(void *location) {
     __asm__ volatile("lgdt (%0)" : : "p"(&IDTR));
 
     gdt_flush();
+}
+
+/**
+ * Configures the task structures. This allocates stacks for them but not much more.
+ */
+void gdt_setup_tss() {
+    for(int i = 0; i < GDT_NUM_TSS; i++) {
+        // clear it
+        memset(&sys_tss[i], 0, sizeof(gdt_task_gate_t));
+
+        // allocate the stack page
+        void *stack = mem::StackPool::get();
+        REQUIRE(stack, "failed to allocate kernel stack for TSS");
+
+        sys_tss[i].ss0 = GDT_KERN_DATA_SEG;
+        sys_tss[i].esp0 = (uintptr_t) stack;
+    }
 }

@@ -28,6 +28,13 @@ size_t arch_page_size();
  */
 bool arch_supports_nx();
 
+
+
+/**
+ * Outputs a backtrace to the given string buffer.
+ */
+int arch_backtrace(void *stack, char *buf, const size_t bufLen);
+
 #ifdef __cplusplus
 }
 #endif

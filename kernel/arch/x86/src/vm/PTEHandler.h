@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include <runtime/vector.h>
 #include <vm/IPTEHandler.h>
 
 namespace arch { namespace vm {
@@ -13,7 +14,8 @@ namespace arch { namespace vm {
  */
 class PTEHandler: public ::vm::IPTEHandler {
     public:
-        PTEHandler(::vm::IPTEHandler *kernel = nullptr);
+        PTEHandler() = delete;
+        PTEHandler(::vm::IPTEHandler *parent);
         ~PTEHandler();
 
         void activate() override;
@@ -36,6 +38,9 @@ class PTEHandler: public ::vm::IPTEHandler {
         const uint64_t getPageTable(const uint32_t virt);
 
     private:
+        // parent map
+        PTEHandler *parent = nullptr;
+
         // physical address of the first level page directory pointer table
         uintptr_t pdptPhys = 0;
         // virtual address of the PDPT (if mapped)
@@ -46,6 +51,9 @@ class PTEHandler: public ::vm::IPTEHandler {
         // virtual addresses of the second level page directories
         uint64_t *pdt[4] = {(uint64_t *) 0xbf600000, (uint64_t *) 0xbf601000,
             (uint64_t *) 0xbf602000, (uint64_t *) 0xbf603000};
+
+        // list containing physical addresses of all private page tables (i.e. below 0xC0000000)
+        rt::Vector<uint64_t> physToDealloc;
 };
 }}
 

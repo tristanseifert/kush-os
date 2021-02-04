@@ -52,27 +52,26 @@ static const char *vector_name(const uint8_t vector) {
     return "Unknown";
 };
 
-
 // define the assembly exception handlers
-extern void x86_exception_div0();
-extern void x86_exception_debug();
-extern void x86_exception_nmi();
-extern void x86_exception_breakpoint();
-extern void x86_exception_overflow();
-extern void x86_exception_bounds();
-extern void x86_exception_invalid_instruction();
-extern void x86_exception_device_unavailable();
-extern void x86_exception_double_fault();
-extern void x86_exception_tss_invalid();
-extern void x86_exception_segment_missing();
-extern void x86_exception_ss_invalid();
-extern void x86_exception_gpf();
-extern void x86_exception_pagefault();
-extern void x86_exception_float();
-extern void x86_exception_alignment_check();
-extern void x86_exception_machine_check();
-extern void x86_exception_simd();
-extern void x86_exception_virtualization();
+extern "C" void x86_exception_div0();
+extern "C" void x86_exception_debug();
+extern "C" void x86_exception_nmi();
+extern "C" void x86_exception_breakpoint();
+extern "C" void x86_exception_overflow();
+extern "C" void x86_exception_bounds();
+extern "C" void x86_exception_invalid_instruction();
+extern "C" void x86_exception_device_unavailable();
+extern "C" void x86_exception_double_fault();
+extern "C" void x86_exception_tss_invalid();
+extern "C" void x86_exception_segment_missing();
+extern "C" void x86_exception_ss_invalid();
+extern "C" void x86_exception_gpf();
+extern "C" void x86_exception_pagefault();
+extern "C" void x86_exception_float();
+extern "C" void x86_exception_alignment_check();
+extern "C" void x86_exception_machine_check();
+extern "C" void x86_exception_simd();
+extern "C" void x86_exception_virtualization();
 
 
 
@@ -131,7 +130,8 @@ void x86_handle_pagefault(const x86_exception_info_t info) {
     // page fault is unhandled
     char buf[512] = {0};
     x86_exception_format_info(buf, 512, info);
-    panic("unhandled page fault: %s %s (%s) at $%08lx\n%s", 
+    panic("unhandled page fault: %s%s %s (%s) at $%08lx\n%s", 
+            ((info.errCode & 0x08) ? "reserved bit violation on " : " "),
             ((info.errCode & 0x04) ? "user" : "supervisor"),
             ((info.errCode & 0x02) ? "write" : "read"),
             ((info.errCode & 0x01) ? "present" : "not present"),

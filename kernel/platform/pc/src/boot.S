@@ -85,9 +85,8 @@ jmp_highhalf:
     // Now, we're executing at 0xC0100000, so use the virtual address for stack.
     mov         $stack_top, %esp
 
-    // Push multiboot info (EBX) and magic number (EAX)
-    push        %ebx
-    push        %eax
+    // set up a NULL stack frame, so stack unwinding can stop here
+    xor         %ebp, %ebp
 
     // Write multiboot info pointer to memory
     mov         %eax, x86_multiboot_magic

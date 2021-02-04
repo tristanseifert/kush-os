@@ -1,12 +1,26 @@
 #include "Map.h"
 
+#include <new>
 #include <arch.h>
 #include <log.h>
 
+#include "mem/SlabAllocator.h"
+
 using namespace vm;
+
+static char gAllocBuf[sizeof(mem::SlabAllocator<Map>)];
+static mem::SlabAllocator<Map> *gMapAllocator = nullptr;
 
 /// Set to 1 to log adding mappings
 #define LOG_MAP_ADD     0
+
+/**
+ * Initializes the VM mapping allocator.
+ */
+void Map::initAllocator() {
+    gMapAllocator = reinterpret_cast<mem::SlabAllocator<Map> *>(&gAllocBuf);
+    new(gMapAllocator) mem::SlabAllocator<Map>();
+}
 
 /**
  * Allocates a new memory map.
@@ -14,7 +28,9 @@ using namespace vm;
  * The high section where the kernel lives (0xC0000000 and above) is referenced by this map if
  * requested. Note that this directly points to the 
  */
-Map::Map(const bool copyKernel) {
+Map::Map(const bool copyKernel) : 
+    // this is a little cursed
+    table(arch::vm::PTEHandler((copyKernel ? (&Map::kern()->table) : nullptr))) {
 
 }
 
@@ -25,6 +41,20 @@ Map::~Map() {
     // TODO: implement
 }
 
+/**
+ * Allocates a new VM map.
+ */
+Map *Map::alloc() {
+    if(!gMapAllocator) initAllocator();
+    return gMapAllocator->alloc(true);
+}
+
+/**
+ * Frees a previously allocated VM map.
+ */
+void Map::free(Map *ptr) {
+    gMapAllocator->free(ptr);
+}
 
 
 /**

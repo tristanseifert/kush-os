@@ -5,6 +5,8 @@
 #include "mem/Heap.h"
 #include "vm/Mapper.h"
 #include "vm/Map.h"
+#include "sched/Scheduler.h"
+#include "sched/Task.h"
 
 #include <arch.h>
 #include <platform.h>
@@ -31,6 +33,8 @@ void kernel_init() {
     mem::AnonPool::init();
     mem::StackPool::init();
     mem::Heap::init();
+
+    sched::Scheduler::init();
 
     // notify other components of VM availability
     arch_vm_available();

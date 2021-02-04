@@ -14,12 +14,13 @@ using namespace mem;
 #define LOG_VM_UPDATE                   0
 
 static char gSharedBuf[sizeof(StackPool)];
-StackPool *StackPool::gShared = (StackPool *) &gSharedBuf;
+StackPool *StackPool::gShared = nullptr;
 
 /**
  * Sets up the global stack pool after VM becomes available.
  */
 void StackPool::init() {
+    gShared = (StackPool *) &gSharedBuf;
     new(gShared) StackPool();
 }
 

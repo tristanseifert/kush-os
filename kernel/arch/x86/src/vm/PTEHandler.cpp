@@ -24,8 +24,9 @@ using namespace arch::vm;
  *
  * TODO: we waste _a lot_ of physical memory; we get one page for the 32-byte PDPT. fix this?
  */
-PTEHandler::PTEHandler(::vm::IPTEHandler *_kernel) {
-    auto kernelPte = reinterpret_cast<PTEHandler *>(_kernel);
+PTEHandler::PTEHandler(::vm::IPTEHandler *_parent) : IPTEHandler(_parent) {
+    auto kernelPte = reinterpret_cast<PTEHandler *>(_parent);
+    this->parent = kernelPte;
 
     if(kernelPte) {
         this->initCopyKernel(kernelPte);
@@ -55,11 +56,6 @@ void PTEHandler::initKernel() {
     this->pdt[2][508] = this->pdtPhys[0] | 0b011;
 
     // set up PDPT
-/*    uintptr_t pdptVirt;
-    err = PDPTPool::alloc(pdptVirt, this->pdptPhys);
-    REQUIRE(!err, "failed to allocate PDPT: %d", err);
-    this->pdpt = (uint64_t *) pdptVirt;*/
-
     this->pdptPhys = mem::PhysicalAllocator::alloc();
 
     this->pdpt = (uint64_t *) this->pdptPhys;
@@ -83,10 +79,22 @@ void PTEHandler::initCopyKernel(PTEHandler *kernel) {
     int err;
 
     // TODO: this is likely broken lol
+    // TODO: this needs locking for the multi-CPU case
+    uint32_t tempVirtBase = 0xF2000000;
 
     // allocate three userspace PDTs; then copy the kernel PDT
     for(size_t i = 0; i < 3; i++) {
         this->pdtPhys[i] = mem::PhysicalAllocator::alloc();
+        REQUIRE(this->pdtPhys[i], "failed to allocate PDT physical page");
+
+        this->physToDealloc.push_back(this->pdtPhys[i]);
+
+        auto pageVirt = tempVirtBase + (i * 0x1000);
+        err = kernel->mapPage(this->pdtPhys[i], pageVirt, true, false, false, false);
+        REQUIRE(!err, "failed to add temp PDT mapping: %d", err);
+
+        this->pdt[i] = (uint64_t *) pageVirt;
+        memset(this->pdt[i], 0, 4096);
     }
 
     this->pdtPhys[3] = 0;
@@ -110,8 +118,18 @@ void PTEHandler::initCopyKernel(PTEHandler *kernel) {
     }
     this->pdpt[3] = kernel->pdtPhys[3] | 0b001;
 
-    // also map the PDPT into virtual memory (TODO: is this necessary?)
-    this->pdt[2][507] = this->pdptPhys | 3;
+    //log("PDPT %p phys %08lx; %016llx %016llx %016llx %016llx", this->pdpt, this->pdptPhys,
+    //        this->pdpt[0], this->pdpt[1], this->pdpt[2], this->pdpt[3]);
+
+    // remove temporary mappings
+    for(size_t i = 0; i < 3; i++) {
+        auto pageVirt = tempVirtBase + (i * 0x1000);
+        err = kernel->unmapPage(pageVirt);
+        REQUIRE(!err, "failed to remove temp PDT mapping: %d", err);
+
+        // TODO: do we need to.. do stuff here
+        this->pdt[i] = nullptr;
+    }
 }
 
 /**
@@ -123,30 +141,13 @@ void PTEHandler::initCopyKernel(PTEHandler *kernel) {
  * @note You should not delete a page table that is currently mapped.
  */
 PTEHandler::~PTEHandler() {
-    // release any third level page tables below 0xC0000000
-    for(size_t i = 0; i < (512*3); i++) {
-        const uint32_t virt = (i * 0x200000);
-        const uint64_t pdtValue = this->getPageDirectory(virt);
-
-        // ignore if not present
-        if(!(pdtValue & (1 << 0))) continue;
-        // ignore if it's a 2M page
-        else if(pdtValue & (1 << 7)) continue;
-
-        // otherwise, get the physical address
-        const auto physAddr = pdtValue & ~0xfff;
+    // deallocate all physical pages we allocated 
+    for(const auto physAddr : this->physToDealloc) {
         mem::PhysicalAllocator::free(physAddr);
     }
 
-    // release all PDTs
-    for(size_t i = 0; i < 4; i++) {
-        if(this->pdtPhys[i]) {
-            mem::PhysicalAllocator::free(this->pdtPhys[i]);
-        }
-    }
-
-    // release PDPT back to the pool, otherwise we own the page and should free it
-    mem::PhysicalAllocator::free(this->pdptPhys);
+    // also the PDPT
+    PDPTPool::free(this->pdptPhys);
 }
 
 /**
@@ -195,14 +196,22 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t virt, const bool wr
 
     flags |= ((uint64_t) phys);
 
-    // special case if mapped
-    if(this->isActive()) {
+    // special case if mapped, or adding kernel mapping
+    if(this->isActive() || (this->parent && virt >= 0xC0000000)) {
+#if LOG_MAP
+        log("map phys %016llx to virt %08lx", phys, virt);
+#endif
+
         // see if we need to allocate the page table
         const auto pdtEntry = this->getPageDirectory(virt);
         if(!(pdtEntry & 0b1)) {
             // allocate the table
             const auto page = mem::PhysicalAllocator::alloc();
             REQUIRE(page, "failed to allocate page table");
+
+            if(virt < 0xC0000000) {
+                this->physToDealloc.push_back(page);
+            }
 
             // flags for the pages mapped in this 2M chunk: RW and present
             uint64_t flags = 0b00000011;
@@ -234,6 +243,8 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t virt, const bool wr
         // we allocated the page table (or ensured it's valid) so write the physical page address
         this->setPageTable(virt, flags);
     } else {
+        REQUIRE(!this->parent, "cannot modify VM map that isn't mapped");
+
         // get the page directory and within it the index
         const auto pdptOff = (virt & 0xC0000000) >> 30;
         const auto pdeOff = (virt & 0x3FE00000) >> 21;

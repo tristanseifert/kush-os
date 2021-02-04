@@ -43,7 +43,13 @@ class Map {
     friend class Mapper;
 
     public:
-        Map() : Map(true) {};
+        /// Allocates a new VM map.
+        static Map *alloc();
+        /// Releases a previously allocated mapping struct.
+        static void free(Map *);
+
+    public:
+        Map(const bool copyKernelMaps);
         ~Map();
 
         const bool isActive() const;
@@ -65,7 +71,8 @@ class Map {
         static Map *kern();
 
     private:
-        Map(const bool copyKernelMaps);
+
+        static void initAllocator();
 
     private:
         /// protecting modifications of the table

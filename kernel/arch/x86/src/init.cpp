@@ -1,5 +1,7 @@
 #include <arch.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <printf.h>
 
 #include "vm/PDPTPool.h"
 
@@ -10,6 +12,12 @@
 
 static bool nxEnabled = false;
 static void update_supports_nx();
+
+/// x86 stack frame
+struct stackframe {
+    struct stackframe *ebp;
+    uint32_t eip;
+};
 
 /**
  * Performs architecture initialization.
@@ -40,6 +48,8 @@ void arch_init() {
  */
 void arch_vm_available() {
     arch::vm::PDPTPool::init();
+
+    gdt_setup_tss();
 }
 
 /**
@@ -55,6 +65,42 @@ size_t arch_page_size() {
 bool arch_supports_nx() {
     return nxEnabled;
 }
+
+
+
+/**
+ * Performs a backtrace.
+ *
+ * The stack parameter should contain the base pointer (%ebp) value, or NULL to start with this
+ * function.
+ */
+int arch_backtrace(void *stack, char *buf, const size_t bufLen) {
+    struct stackframe *stk;
+
+    if(!stack) {
+        asm volatile("movl %%ebp,%0" : "=r"(stk) ::);
+    } else {
+        stk = reinterpret_cast<struct stackframe *>(stack);
+    }
+
+    // yeet out into the buffer the frames
+    char *writePtr = buf;
+    int written;
+
+    for(size_t frame = 0; stk && frame < 50; ++frame) {
+        const auto bufAvail = bufLen - (writePtr - buf);
+        if(!bufAvail) return bufLen;
+
+        written = snprintf(writePtr, bufAvail, "%2lu %08lx\n", frame, stk->eip);
+
+        // prepare for next frame
+        writePtr += written;
+        stk = stk->ebp;
+    }
+
+    return 1;
+}
+
 
 
 
