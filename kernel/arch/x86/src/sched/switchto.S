@@ -58,7 +58,7 @@ x86_switchto_common:
  * -12: To thread
  */
 x86_switchto_save:
-    // set up stack frame and get a pointer to the from thread
+    // set up stack frame
     push        %ebp
     mov         %esp, %ebp
 
@@ -70,6 +70,7 @@ x86_switchto_save:
      * the frame to use with the proper user mode state.
      */
     pushf
+    cli
     push        %cs
     push        4(%ebp)
 

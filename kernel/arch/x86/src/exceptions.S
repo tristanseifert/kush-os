@@ -168,6 +168,9 @@ x86_exception_pagefault:
     mov         %ax, %fs
     mov         %ax, %gs
 
+    // set up a NULL stack frame, so stack unwinding can stop here
+    xor         %ebp, %ebp
+
     // invoke page fault handler
     call        x86_handle_pagefault
 
@@ -204,6 +207,8 @@ error_common_stub:
     mov         %ax, %fs
     mov         %ax, %gs
 
+    // set up a NULL stack frame, so stack unwinding can stop here
+    xor         %ebp, %ebp
     call        x86_handle_exception
 
     // restore original data segment and registers

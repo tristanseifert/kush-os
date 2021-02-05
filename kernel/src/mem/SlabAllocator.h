@@ -153,6 +153,7 @@ class SlabAllocator {
                     this->numAllocated++;
 
                     auto item = reinterpret_cast<T *>(&this->storage[off * sizeof(T)]);
+                    memset(item, 0, sizeof(T));
                     new(item) T(ctorArgs...);
 
                     return item;

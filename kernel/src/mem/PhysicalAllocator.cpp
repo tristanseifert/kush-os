@@ -11,9 +11,11 @@
 #include <new>
 
 // log found physical memory regions
-#define LOG_REGIONS             0
+#define LOG_REGIONS             1
 // log the virtual addresses of bitmap buffers
 #define LOG_BITMAP_MAP          0
+// log allocations and deallocations
+#define LOG_ALLOC               0
 
 using namespace mem;
 
@@ -124,7 +126,11 @@ uint64_t PhysicalAllocator::allocPage() {
         err = region.alloc(&idx);
         if(!err) {
             // if success, convert to physical address
-            return region.base + ((idx + region.freeMapPages) * pageSz);
+            auto addr = region.base + ((idx + region.freeMapPages) * pageSz);
+#if LOG_ALLOC
+            log("Allocated phys %016llx", addr);
+#endif
+            return addr;
         }
     }
 
@@ -190,6 +196,10 @@ void PhysicalAllocator::freePage(const uint64_t physAddr) {
         // calculate page index and free it
         const auto index = ((physAddr - region.base) / pageSz) - region.freeMapPages;
         region.free(index);
+
+#if LOG_ALLOC
+            log("Freeing phys %016llx", physAddr);
+#endif
 
         return;
     }

@@ -12,6 +12,8 @@
 typedef struct x86_spinlock {
     // actual lock flag
     volatile uint32_t count = 0;
+    // reserved memory
+    uint8_t reserved[60];
 } __attribute__((aligned(64))) x86_spinlock_t;
 
 /// Spins waiting for a lock to become available

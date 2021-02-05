@@ -24,6 +24,11 @@ void *operator new[](size_t size) {
 void operator delete(void *p) {
     mem::Heap::free(p);
 }
+/// release previously allocated memory
+void operator delete(void *p, size_t length) {
+    // TODO: can we pass the length in for sanity checking?
+    mem::Heap::free(p);
+}
 /// release previously allocated array memory
 void operator delete[](void *p) {
     mem::Heap::free(p);

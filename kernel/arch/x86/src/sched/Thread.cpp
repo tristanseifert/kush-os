@@ -73,6 +73,7 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
     // for kernel mode threads, the TSS should hold the per-CPU interrupt thread
     if(to->kernelMode) {
         // set the per-CPU kernel interrupt thread
+        tss_set_esp0(nullptr);
     }
     // otherwise, store the thread's specially allocated kernel thread
     else {
@@ -81,6 +82,7 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
 
     // save state into current thread and switch to next
     if(from) {
+        // log("old task %%esp = %p, new task %%esp = %p (stack %p)", from->regs.stackTop, to->regs.stackTop, to->stack);
         x86_switchto_save(&from->regs, &to->regs);
     }
     // no thread context to save; just switch

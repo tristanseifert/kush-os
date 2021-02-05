@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+#include <arch/spinlock.h>
+#include <runtime/Queue.h>
+
 extern "C" void kernel_init();
 
 namespace sched {
@@ -34,6 +37,12 @@ class Scheduler {
             return this->running;
         }
 
+        /// adds the given thread to the runnable queue
+        void markThreadAsRunnable(Thread *t);
+
+        /// Runs the scheduler.
+        void run() __attribute__((noreturn));
+
     private:
         /// updates the current CPU's running thread
         void setRunningThread(Thread *t) {
@@ -45,12 +54,19 @@ class Scheduler {
 
         Scheduler();
 
+        void switchToRunnable();
+
     private:
         static Scheduler *gShared;
 
     private:
         /// the thread that is currently being executed
         Thread *running = nullptr;
+
+        /// lock for the runnable threads queue
+        DECLARE_SPINLOCK(runnableLock);
+        /// runnable threads
+        rt::Queue<Thread *> runnable;
 };
 }
 
