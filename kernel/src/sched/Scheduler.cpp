@@ -1,5 +1,6 @@
 #include "Scheduler.h"
 #include "Task.h"
+#include "Thread.h"
 
 #include "mem/SlabAllocator.h"
 

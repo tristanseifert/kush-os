@@ -1,3 +1,5 @@
+#define ASM_FILE
+#include "gdt.h"
 #include "exception_types.h"
 
 .section .text
@@ -153,12 +155,14 @@ x86_exception_pagefault:
     pushl       $X86_EXC_PAGING
     pusha
 
-    // save data segment
-    mov         %ds, %ax
-    push        %eax
+    // save segment registers
+    push        %ds
+    push        %es
+    push        %fs
+    push        %gs
 
     // restore kernel data segment descriptor
-    mov         $0x10, %ax
+    mov         $GDT_KERN_DATA_SEG, %ax
     mov         %ax, %ds
     mov         %ax, %es
     mov         %ax, %fs
@@ -168,18 +172,16 @@ x86_exception_pagefault:
     call        x86_handle_pagefault
 
     // reload the original data segment fault descriptor
-    pop         %eax
-    mov         %ax, %ds
-    mov         %ax, %es
-    mov         %ax, %fs
-    mov         %ax, %gs
+    pop         %gs
+    pop         %fs
+    pop         %es
+    pop         %ds
 
-    # restore registers, clear the pushed error code and ISR numbe 
+    // restore registers, clear the pushed error code and ISR number
     popa
     add         $0x8, %esp
 
-    # re-enable interrupts
-    sti
+    // return; this will restore the interrupt flag too
     iret
 
 .extern x86_handle_exception
@@ -190,30 +192,29 @@ error_common_stub:
     // save register state, original data segment
     pusha
 
-    mov         %ds, %ax
-    push        %eax
+    push        %ds
+    push        %es
+    push        %fs
+    push        %gs
 
     // reset to kernel data segment
-    mov         $0x10, %ax
+    mov         $GDT_KERN_DATA_SEG, %ax
     mov         %ax, %ds
     mov         %ax, %es
     mov         %ax, %fs
     mov         %ax, %gs
 
-//    call	sys_restore_kern_pagetable
     call        x86_handle_exception
 
     // restore original data segment and registers
-    pop         %eax
-    mov         %ax, %ds
-    mov         %ax, %es
-    mov         %ax, %fs
-    mov         %ax, %gs
+    pop         %gs
+    pop         %fs
+    pop         %es
+    pop         %ds
 
     popa
     add         $0x8, %esp
 
-    // re-enable interrupts
-    sti
+    // return; this will restore the interrupt flag too
     iret
 

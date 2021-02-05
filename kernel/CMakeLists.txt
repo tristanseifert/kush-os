@@ -31,11 +31,12 @@ add_executable(kernel
     src/mem/Heap.cpp
     src/mem/liballoc/liballoc.cpp
     src/runtime/CppRuntime.cpp
-    src/runtime/log.c
+    src/runtime/log.cpp
     src/vm/Mapper.cpp
     src/vm/Map.cpp
     src/sched/Scheduler.cpp
     src/sched/Task.cpp
+    src/sched/Thread.cpp
     ${version_file}
 )
 

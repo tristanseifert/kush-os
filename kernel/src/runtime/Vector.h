@@ -6,9 +6,19 @@
 #include <mem/Heap.h>
 
 #include <log.h>
+#include <string.h>
 #include <new>
 
 namespace rt {
+/**
+ * A dynamically resizable array-like container for fixed size objects. Its data is stored in a
+ * single contiguous memory region, allowing O(1) access.
+ *
+ * The contents of this class should be POD-types, or simple types that can be moved by use of
+ * memmove() and friends. Constructors/destructors will, however, be invoked correctly. (What this
+ * really means is: don't hold self references/pointers to itself, and keep in mind that any
+ * existing references become invalid when the contents are modified.)
+ */
 template<class T>
 class Vector {
     private:
@@ -28,7 +38,7 @@ class Vector {
 
                 /// Advance the iterator to the next position.
                 Iterator &operator++() {
-                    ++this->i;
+                    REQUIRE(++this->i <= this->vec->numAllocated, "cannot increment iterator past end");
                     return *this;
                 }
                 /// Returns the object we point to.
@@ -129,6 +139,23 @@ class Vector {
 
             // insert at the end
             this->storage[this->numAllocated++] = value;
+        }
+        /**
+         * Removes the item at the given index.
+         */
+        void remove(const size_t index) {
+            REQUIRE(index < this->numAllocated, "vector access out of bounds: %lu", index);
+
+            // move them
+            const size_t toMove = (this->numAllocated - index) - 1;
+            log("remove idx %lu total %lu to move %lu", index, this->numAllocated, toMove);
+
+            if(toMove) {
+                memmove(&this->storage[index], &this->storage[index+1], toMove * sizeof(T));
+            }
+
+            // update counts
+            this->numAllocated--;
         }
         /**
          * Removes all objects from the vector.

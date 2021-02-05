@@ -106,15 +106,19 @@ void exception_install_handlers() {
  * @return Number of characters written
  */
 int x86_exception_format_info(char *outBuf, const size_t outBufLen,
-        const x86_exception_info_t info) {
+        const x86_exception_info_t &info) {
     return snprintf(outBuf, outBufLen, "Exception %3lu ($%08lx)\n"
-            " CS $%08lx  DS $%08lx  SS $%08lx\n"
-            "EAX $%08lx EBX $%08lx EDX $%08lx ECX $%08lx\n"
+            " CS $%08lx  DS $%08lx  ES $%08lx  FS $%08lx\n"
+            " GS $%08lx  SS $%08lx\n"
+            "EAX $%08lx EBX $%08lx ECX $%08lx EDX $%08lx\n"
             "EDI $%08lx ESI $%08lx EBP $%08lx ESP $%08lx\n"
-            "EIP $%08lx USP $%08lx ESP $%08lx EFLAGS $%08lx",
-            info.intNo, info.errCode, info.cs, info.ds, info.ss,
-            info.eax, info.ebx, info.ecx, info.edx, info.edi, info.esi, info.ebp, info.esp,
-            info.eip, info.useresp, info.esp, info.eflags
+            "EIP $%08lx EFLAGS $%08lx",
+            info.intNo, info.errCode,
+            info.cs, info.ds, info.es, info.fs, 
+            info.gs, info.ss,
+            info.eax, info.ebx, info.ecx, info.edx,
+            info.edi, info.esi, info.ebp, info.esp,
+            info.eip, info.eflags
     );
 }
 
@@ -131,7 +135,7 @@ void x86_handle_pagefault(const x86_exception_info_t info) {
     char buf[512] = {0};
     x86_exception_format_info(buf, 512, info);
     panic("unhandled page fault: %s%s %s (%s) at $%08lx\n%s", 
-            ((info.errCode & 0x08) ? "reserved bit violation on " : " "),
+            ((info.errCode & 0x08) ? "reserved bit violation on " : ""),
             ((info.errCode & 0x04) ? "user" : "supervisor"),
             ((info.errCode & 0x02) ? "write" : "read"),
             ((info.errCode & 0x01) ? "present" : "not present"),

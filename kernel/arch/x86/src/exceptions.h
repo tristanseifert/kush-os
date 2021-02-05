@@ -16,10 +16,21 @@ extern "C" {
  * Stack frame pushed by the assembly exception handler routines
  */
 typedef struct x86_exception_info {
-    uint32_t ds;                  // Data segment selector
-    uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.
-    uint32_t intNo, errCode;    // Interrupt number and error code (if applicable)
-    uint32_t eip, cs, eflags, useresp, ss; // Pushed by the processor automatically.
+    // segment selectors
+    uint32_t gs, fs, es, ds;
+
+    // registers from PUSHA; esp there is useless
+    uint32_t edi, esi, ebp, oesp, ebx, edx, ecx, eax;
+
+    // pushed by exception handler: 0-31 are exceptions
+    uint32_t intNo;
+    // pushed for exceptions; other traps push a dummy value
+    uint32_t errCode;
+
+    // pushed by processor as exception handler
+    uint32_t eip, cs, eflags;
+    // pushed by processor when crossing rings
+    uint32_t esp, ss;
 } x86_exception_info_t;
 
 
@@ -33,7 +44,7 @@ void exception_install_handlers();
  * Formats an x86 exception info blob.
  */
 int x86_exception_format_info(char *outBuf, const size_t outBufLen, 
-        const x86_exception_info_t info);
+        const x86_exception_info_t &info);
 
 
 /**

@@ -65,6 +65,7 @@ void gdt_init();
 void gdt_set_entry(uint16_t num, uint32_t base, uint32_t limit, uint8_t flags, uint8_t gran);
 
 void gdt_setup_tss();
+void tss_set_esp0(void *ptr);
 
 #endif // ASM_FILE
 #endif

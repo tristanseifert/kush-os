@@ -14,6 +14,12 @@ static void load_gdt(void *location);
 /// external assembly routine to flush cached GDT entries
 extern "C" void gdt_flush();
 
+/**
+ * Loads the task register with the TSS in the given descriptor.
+ */
+static inline void tss_load(uint16_t sel) {
+    asm volatile("ltr %0" : : "r" (sel));
+}
 
 /*
  * Builds the Global Descriptor Table with the proper code/data segments, and
@@ -68,7 +74,7 @@ static void load_gdt(void *location) {
         uint32_t base;
     } __attribute__((__packed__)) IDTR;
 
-    IDTR.length = (0x18 + (GDT_NUM_TSS * 0x08)) - 1;
+    IDTR.length = (0x20 + (GDT_NUM_TSS * 0x08)) - 1;
     IDTR.base = (uint32_t) location;
     __asm__ volatile("lgdt (%0)" : : "p"(&IDTR));
 
@@ -89,5 +95,30 @@ void gdt_setup_tss() {
 
         sys_tss[i].ss0 = GDT_KERN_DATA_SEG;
         sys_tss[i].esp0 = (uintptr_t) stack;
+
+        // allow entry to kernel mode
+        sys_tss[i].cs = GDT_KERN_CODE_SEG | 3;
+
+        sys_tss[i].ds = GDT_KERN_DATA_SEG | 3;
+        sys_tss[i].es = GDT_KERN_DATA_SEG | 3;
+        sys_tss[i].fs = GDT_KERN_DATA_SEG | 3;
+        sys_tss[i].gs = GDT_KERN_DATA_SEG | 3;
+        sys_tss[i].ss = GDT_KERN_DATA_SEG | 3;
     }
 }
+
+/**
+ * Updates the TSS for the current processor to point to the specified stack.
+ *
+ * TODO: handle multiprocessor
+ */
+void tss_set_esp0(void *ptr) {
+    // save us the work if the stack won't change (TSS loads could be slow)
+    if(sys_tss[0].esp0 == (uintptr_t) ptr) return;
+
+    // otherwise, update the TSS and then flush it
+    sys_tss[0].esp0 = (uintptr_t) ptr;
+
+    tss_load(GDT_FIRST_TSS);
+}
+

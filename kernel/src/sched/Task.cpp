@@ -3,6 +3,7 @@
 #include "vm/Map.h"
 #include "mem/SlabAllocator.h"
 
+#include <string.h>
 #include <new>
 
 using namespace sched;
@@ -56,4 +57,11 @@ Task::~Task() {
 
     // release memory maps
     vm::Map::free(this->vm);
+}
+
+/**
+ * Copies the given name string to the task's name field.
+ */
+void Task::setName(const char *newName) {
+    strncpy(this->name, newName, kNameLength);
 }

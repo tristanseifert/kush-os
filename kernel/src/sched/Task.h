@@ -6,12 +6,16 @@
 
 #include <arch/rwlock.h>
 
+#include "runtime/Vector.h"
+
+
 namespace vm {
 class Map;
 }
 
 namespace sched {
 class Scheduler;
+struct Thread;
 
 /**
  * Tasks are the basic 
@@ -56,6 +60,7 @@ struct Task {
         DECLARE_RWLOCK(lock);
 
         /// List of threads belonging to this task; must have at least one
+        rt::Vector<Thread *> threads;
 
     public:
         /// Allocates a new task from the task struct pool
@@ -65,6 +70,9 @@ struct Task {
 
         Task();
         ~Task();
+
+        /// Sets the task's name.
+        void setName(const char *name);
 
     private:
         static void initAllocator();

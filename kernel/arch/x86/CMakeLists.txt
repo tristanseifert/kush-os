@@ -11,6 +11,8 @@ add_library(kernel_arch_x86 OBJECT
     src/idt.cpp
     src/vm/PTEHandler.cpp
     src/vm/PDPTPool.cpp
+    src/sched/Thread.cpp
+    src/sched/switchto.S
 )
 
 target_include_directories(kernel_arch_x86 PUBLIC include)
