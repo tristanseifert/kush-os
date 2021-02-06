@@ -90,7 +90,7 @@ void PTEHandler::initCopyKernel(PTEHandler *kernel) {
         this->physToDealloc.push_back(this->pdtPhys[i]);
 
         auto pageVirt = tempVirtBase + (i * 0x1000);
-        err = kernel->mapPage(this->pdtPhys[i], pageVirt, true, false, false, false);
+        err = kernel->mapPage(this->pdtPhys[i], pageVirt, true, false, false, false, false);
         REQUIRE(!err, "failed to add temp PDT mapping: %d", err);
 
         this->pdt[i] = (uint64_t *) pageVirt;
@@ -175,7 +175,7 @@ const bool PTEHandler::isActive() const {
  * Maps a single 4K page.
  */
 int PTEHandler::mapPage(const uint64_t phys, const uintptr_t virt, const bool write,
-        const bool execute, const bool global, const bool user) {
+        const bool execute, const bool global, const bool user, const bool noCache) {
     uint64_t *table = nullptr;
 
     // build flags (present)
@@ -192,6 +192,9 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t virt, const bool wr
     }
     if(global) { // mark as global if set
         flags |= (1 << 8);
+    }
+    if(noCache) { // mark as cache disable if set
+        flags |= (1 << 4);
     }
 
     flags |= ((uint64_t) phys);
@@ -362,7 +365,7 @@ beach:;
  * is one and its information is written to the provided variables.
  */
 int PTEHandler::getMapping(const uintptr_t virt, uint64_t &phys, bool &write, bool &execute,
-        bool &global, bool &user) {
+        bool &global, bool &user, bool &noCache) {
     // check whether the page directory value; either not present, a 2M page or page table
     const uint64_t pdtValue = this->getPageDirectory(virt);
 
@@ -382,6 +385,7 @@ int PTEHandler::getMapping(const uintptr_t virt, uint64_t &phys, bool &write, bo
         }
         global = (pdtValue & (1 << 8));
         user = (pdtValue & (1 << 2));
+        noCache = (pdtValue & (1 << 4));
         return 0;
     }
 
@@ -403,6 +407,7 @@ int PTEHandler::getMapping(const uintptr_t virt, uint64_t &phys, bool &write, bo
     }
     global = (pteValue & (1 << 8));
     user = (pteValue & (1 << 2));
+    noCache = (pteValue & (1 << 4));
 
     // if we get here, a mapping was found
     return 0;

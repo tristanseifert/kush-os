@@ -1,6 +1,9 @@
 #include "Manager.h"
 
+#include "memmap.h"
 #include "multiboot2.h"
+
+#include "irq/Manager.h"
 
 #include <mem/PhysicalAllocator.h>
 #include <vm/Map.h>
@@ -9,6 +12,7 @@
 #include <log.h>
 #include <string.h>
 
+using namespace platform;
 using namespace platform::acpi;
 
 static char gSharedBuf[sizeof(Manager)];
@@ -63,9 +67,8 @@ void Manager::parseTables() {
     auto m = vm::Map::kern();
 
     // map the RSDT and calculate checksum
-    const uint32_t rsdtVirt = 0xF0000000;
+    const uint32_t rsdtVirt = kPlatformRegionAcpiTables;
 
-    log("Mapping RSDT %016llx to %08lx", this->rsdtPhys, rsdtVirt);
     err = m->add(this->rsdtPhys & ~0xFFF, 0x1000, rsdtVirt, vm::MapMode::kKernelRead);
     REQUIRE(!err, "failed to map RSDT: %d", err);
 
@@ -122,19 +125,24 @@ void Manager::parseTables() {
  * Parses the MADT, identified by the signature 'APIC'.
  */
 void Manager::parse(const MADT *table) {
-    log("LAPIC addr: %08lx, flags %08lx", table->lapicAddr, table->flags);
+    // determine whether we have legacy PICs to disable
+    auto irqMan = irq::Manager::get();
+    irqMan->setHasLegacyPic((table->flags & (1 << 0)));
 
     // loop over each of the tables
     const MADT::RecordHdr *record = table->records;
 
     for(; ((uintptr_t) record) < ((uintptr_t) table + table->head.length);
             record = (MADT::RecordHdr *) ((uintptr_t) record + record->length)) {
+        // per ACPI spec, ignore all > 8
+        if(record->type > 8) continue;
+
         switch(record->type) {
             // processor local APIC
             case 0: {
                 REQUIRE(record->length >= sizeof(MADT::LocalApic), "Invalid record length: type %u, length %u", record->type, record->length);
                 auto lapic = reinterpret_cast<const MADT::LocalApic *>(record);
-                this->madtRecord(lapic);
+                this->madtRecord(table, lapic);
                 break;
             }
 
@@ -142,7 +150,7 @@ void Manager::parse(const MADT *table) {
             case 1: {
                 REQUIRE(record->length >= sizeof(MADT::IoApic), "Invalid record length: type %u, length %u", record->type, record->length);
                 auto ioapic = reinterpret_cast<const MADT::IoApic *>(record);
-                this->madtRecord(ioapic);
+                this->madtRecord(table, ioapic);
                 break;
             }
 
@@ -150,7 +158,7 @@ void Manager::parse(const MADT *table) {
             case 2: {
                 REQUIRE(record->length >= sizeof(MADT::IrqSourceOverride), "Invalid record length: type %u, length %u", record->type, record->length);
                 auto irq = reinterpret_cast<const MADT::IrqSourceOverride *>(record);
-                this->madtRecord(irq);
+                this->madtRecord(table, irq);
                 break;
             }
 
@@ -158,7 +166,7 @@ void Manager::parse(const MADT *table) {
             case 4: {
                 REQUIRE(record->length >= sizeof(MADT::Nmi), "Invalid record length: type %u, length %u", record->type, record->length);
                 auto irq = reinterpret_cast<const MADT::Nmi *>(record);
-                this->madtRecord(irq);
+                this->madtRecord(table, irq);
                 break;
             }
                 break;
@@ -170,34 +178,120 @@ void Manager::parse(const MADT *table) {
 }
 
 /**
- * Handles the MADT processor-local APIC record.
+ * Handles the MADT processor-local APIC record. We'll forward the info to the IRQ manager so it
+ * can initialize the APIC.
  */
-void Manager::madtRecord(const MADT::LocalApic *record) {
-    log("Local APIC for processor %u -> %u; flags %08x", record->cpuId, record->apicId,
-            record->flags);
+void Manager::madtRecord(const MADT *table, const MADT::LocalApic *record) {
+    auto irqMan = irq::Manager::get();
+
+    const bool enabled = (record->flags & (1 << 0));
+    const bool online = (record->flags & (1 << 1));
+
+    irqMan->detectedLapic(table->lapicAddr, record->apicId, record->cpuId, enabled, online);
 }
 
 /**
  * Handles the MADT global IO APIC record.
  */
-void Manager::madtRecord(const MADT::IoApic *record) {
-    log("Global IO APIC %u at %08lx (base %08lx)", record->apicId, record->ioApicPhysAddr,
-            record->irqBase);
+void Manager::madtRecord(const MADT *, const MADT::IoApic *record) {
+    auto irqMan = irq::Manager::get();
+
+    irqMan->detectedIoapic(record->ioApicPhysAddr, record->apicId, record->irqBase);
 }
 
 /**
  * Configures a particular interrupt.
  */
-void Manager::madtRecord(const MADT::IrqSourceOverride *record) {
-    log("APIC IRQ: source (bus %02x, irq %02x) -> %08lx (flags %04x)", record->busSource,
-            record->irqSource, record->systemIrq, record->flags);
+void Manager::madtRecord(const MADT *, const MADT::IrqSourceOverride *record) {
+    auto irqMan = irq::Manager::get();
+
+    irq::IrqFlags flags = irq::IrqFlags::None;
+
+    // convert polarity flags
+    const auto polarity = (record->flags & 0b11);
+    switch(polarity) {
+        // active high
+        case 0b01:
+            flags |= irq::IrqFlags::PolarityHigh;
+            break;
+        // active low
+        case 0b11:
+            flags |= irq::IrqFlags::PolarityLow;
+            break;
+        // follows bus specifications
+        case 0b00:
+            // ISA is active high
+            if(record->busSource == 0x00) {
+                flags |= irq::IrqFlags::PolarityHigh;
+            } else {
+                panic("Unknown default polarity for bus %02x", record->busSource);
+            }
+            break;
+        // unhandled
+        default:
+            panic("Unhandled irq polarity: %x", polarity);
+    }
+
+    // configure the mapping
+    const auto trigger = (record->flags & 0b1100) >> 2;
+    switch(trigger) {
+        // edge triggered
+        case 0b01:
+            flags |= irq::IrqFlags::TriggerEdge;
+            break;
+        // level triggered
+        case 0b11:
+            flags |= irq::IrqFlags::TriggerLevel;
+            break;
+        // follows bus specifications
+        case 0b00:
+            // ISA is edge triggered
+            if(record->busSource == 0x00) {
+                flags |= irq::IrqFlags::TriggerEdge;
+            } else {
+                panic("Unknown trigger mode for bus %02x", record->busSource);
+            }
+            break;
+        // unknown trigger mode
+        default:
+            panic("Unknown irq trigger mode: %x", trigger);
+    }
+
+    irqMan->detectedOverride(record->busSource, record->irqSource, record->systemIrq, flags);
 }
 
 /**
  * Configures the non-maskable interrupt vector for a processor.
+ *
+ * NMIs are always edge triggered.
  */
-void Manager::madtRecord(const MADT::Nmi *record) {
-    log("APIC NMI: processor %u, flags %04x, LINT%d", record->cpuId, record->flags, record->lint);
+void Manager::madtRecord(const MADT *, const MADT::Nmi *record) {
+    auto irqMan = irq::Manager::get();
+
+    irq::IrqFlags flags = irq::IrqFlags::TypeNMI | irq::IrqFlags::TriggerEdge;
+
+    const auto polarity = (record->flags & 0b11);
+    switch(polarity) {
+        // active high
+        case 0b01:
+            flags |= irq::IrqFlags::PolarityHigh;
+            break;
+        // active low
+        case 0b11:
+            flags |= irq::IrqFlags::PolarityLow;
+            break;
+        // follows bus specifications
+        case 0b00:
+            // XXX: active high???
+            flags |= irq::IrqFlags::PolarityHigh;
+            break;
+        // unhandled
+        default:
+            panic("Unhandled NMI polarity: %x", polarity);
+    }
+
+    // log("APIC NMI: processor %u, flags %04x, LINT%d", record->cpuId, record->flags, record->lint);
+    irqMan->detectedNmi(record->cpuId, record->lint, flags);
 }
 
 

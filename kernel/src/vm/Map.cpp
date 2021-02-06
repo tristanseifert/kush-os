@@ -100,10 +100,11 @@ int Map::add(const uint64_t physAddr, const uintptr_t _length, const uintptr_t v
     const bool execute = flags(mode & MapMode::EXECUTE);
     const bool global = flags(mode & MapMode::GLOBAL);
     const bool user = flags(mode & MapMode::ACCESS_USER);
+    const bool nocache = flags(mode & MapMode::CACHE_DISABLE);
 
     // map each of the pages
     for(uintptr_t off = 0; off < length; off += pageSz) {
-        err = this->table.mapPage(physAddr + off, vmAddr + off, write, execute, global, user);
+        err = this->table.mapPage(physAddr + off, vmAddr + off, write, execute, global, user, nocache);
 
         if(err) {
             return err;
@@ -153,9 +154,9 @@ int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
 
     // this translation of flags is honestly a little cursed
     int err;
-    bool w = false, x = false, g = false, u = false;
+    bool w = false, x = false, g = false, u = false, c = false;
 
-    err = this->table.getMapping(virtAddr, phys, w, x, g, u);
+    err = this->table.getMapping(virtAddr, phys, w, x, g, u, c);
     if(!err) {
         MapMode temp = MapMode::READ;
 
@@ -163,6 +164,7 @@ int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
         if(x) temp |= MapMode::EXECUTE;
         if(g) temp |= MapMode::GLOBAL;
         if(u) temp |= MapMode::ACCESS_USER;
+        if(c) temp |= MapMode::CACHE_DISABLE;
 
         mode = temp;
     }

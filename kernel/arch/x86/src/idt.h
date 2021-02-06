@@ -1,11 +1,12 @@
 #ifndef ARCH_X86_IDT_H
 #define ARCH_X86_IDT_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdint.h>
+
+/// IDT flags suitable for an ISR: present, DPL=0, 32-bit interrupt gate
+#define IDT_FLAGS_ISR                   0x8E
+/// IDT flags suitable for an exception/trap: present, DPL=0, 32-bit trap gate
+#define IDT_FLAGS_TRAP                  0x8F
 
 /// Describes an interrupt descriptor entry
 typedef struct arch_idt_descriptor {
@@ -25,7 +26,4 @@ typedef struct arch_idt_descriptor {
 void idt_init();
 void idt_set_entry(uint8_t entry, uintptr_t function, uint8_t segment, uint8_t flags);
 
-#ifdef __cplusplus
-}
-#endif
 #endif

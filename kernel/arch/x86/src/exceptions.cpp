@@ -1,6 +1,7 @@
 #include "exceptions.h"
 #include "exception_types.h"
 
+#include "gdt.h"
 #include "idt.h"
 
 #include <printf.h>
@@ -79,25 +80,25 @@ extern "C" void x86_exception_virtualization();
  * Installs the default set of exception handlers.
  */
 void exception_install_handlers() {
-    idt_set_entry(X86_EXC_DIVIDE, (uintptr_t) x86_exception_div0, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_DEBUG, (uintptr_t) x86_exception_debug, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_NMI, (uintptr_t) x86_exception_nmi, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_BREAKPOINT, (uintptr_t) x86_exception_breakpoint, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_OVERFLOW, (uintptr_t) x86_exception_overflow, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_BOUNDS, (uintptr_t) x86_exception_bounds, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_ILLEGAL_OPCODE, (uintptr_t) x86_exception_invalid_instruction, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_DEVICE_UNAVAIL, (uintptr_t) x86_exception_device_unavailable, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_DOUBLE_FAULT, (uintptr_t) x86_exception_double_fault, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_INVALID_TSS, (uintptr_t) x86_exception_tss_invalid, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_SEGMENT_NP, (uintptr_t) x86_exception_segment_missing, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_SS, (uintptr_t) x86_exception_ss_invalid, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_GPF, (uintptr_t) x86_exception_gpf, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_PAGING, (uintptr_t) x86_exception_pagefault, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_FP, (uintptr_t) x86_exception_float, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_ALIGNMENT, (uintptr_t) x86_exception_alignment_check, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_MCE, (uintptr_t) x86_exception_machine_check, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_SIMD_FP, (uintptr_t) x86_exception_simd, 0x08, 0x8E);
-    idt_set_entry(X86_EXC_VIRT, (uintptr_t) x86_exception_virtualization, 0x08, 0x8E);
+    idt_set_entry(X86_EXC_DIVIDE, (uintptr_t) x86_exception_div0, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_DEBUG, (uintptr_t) x86_exception_debug, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_NMI, (uintptr_t) x86_exception_nmi, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR);
+    idt_set_entry(X86_EXC_BREAKPOINT, (uintptr_t) x86_exception_breakpoint, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_OVERFLOW, (uintptr_t) x86_exception_overflow, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_BOUNDS, (uintptr_t) x86_exception_bounds, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_ILLEGAL_OPCODE, (uintptr_t) x86_exception_invalid_instruction, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_DEVICE_UNAVAIL, (uintptr_t) x86_exception_device_unavailable, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_DOUBLE_FAULT, (uintptr_t) x86_exception_double_fault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_INVALID_TSS, (uintptr_t) x86_exception_tss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_SEGMENT_NP, (uintptr_t) x86_exception_segment_missing, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_SS, (uintptr_t) x86_exception_ss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_GPF, (uintptr_t) x86_exception_gpf, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_PAGING, (uintptr_t) x86_exception_pagefault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_FP, (uintptr_t) x86_exception_float, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_ALIGNMENT, (uintptr_t) x86_exception_alignment_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_MCE, (uintptr_t) x86_exception_machine_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_SIMD_FP, (uintptr_t) x86_exception_simd, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    idt_set_entry(X86_EXC_VIRT, (uintptr_t) x86_exception_virtualization, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
 }
 
 /**

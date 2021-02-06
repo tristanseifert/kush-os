@@ -1,4 +1,5 @@
 #include "idt.h"
+#include "gdt.h"
 #include "exceptions.h"
 
 #include <string.h>
@@ -18,7 +19,7 @@ void idt_init() {
     memset(idt, 0, sizeof(idt_entry_t)*256);
 
     for(int i = 0; i < 256; i++) {
-        // idt_set_entry(i, (uint32_t) sys_dummy_irq, 0x08, 0x8E);
+        // idt_set_entry(i, (uint32_t) sys_dummy_irq, GDT_KERN_CODE_SEG, 0x8E);
     }
 
     // install CPU exception handlers

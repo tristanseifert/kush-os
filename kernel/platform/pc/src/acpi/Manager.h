@@ -227,10 +227,10 @@ class Manager {
         void parseTables();
 
         void parse(const MADT *);
-        void madtRecord(const MADT::LocalApic *);
-        void madtRecord(const MADT::IoApic *);
-        void madtRecord(const MADT::IrqSourceOverride *);
-        void madtRecord(const MADT::Nmi *);
+        void madtRecord(const MADT *, const MADT::LocalApic *);
+        void madtRecord(const MADT *, const MADT::IoApic *);
+        void madtRecord(const MADT *, const MADT::IrqSourceOverride *);
+        void madtRecord(const MADT *, const MADT::Nmi *);
 
         void parse(const HPET *);
 

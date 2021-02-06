@@ -6,6 +6,7 @@
 
 #include "multiboot.h"
 #include "irq/pic.h"
+#include "irq/Manager.h"
 #include "io/spew.h"
 #include "acpi/Manager.h"
 
@@ -27,8 +28,6 @@ void platform_init() {
 
     // set up and remap the PICs and other interrupt controllers
     pic_init();
-
-    // install our IRQ handlers
 }
 
 /**
@@ -36,5 +35,8 @@ void platform_init() {
  * to set up interrupts.
  */
 void platform_vm_available() {
+    irq::Manager::init();
     acpi::Manager::vmAvailable();
+
+    irq::Manager::setupIrqs();
 }

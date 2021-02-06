@@ -25,6 +25,8 @@ enum class MapMode {
 
     /// The page should be mapped globally, e.g. it does not change between processes.
     GLOBAL              = (1 << 12),
+    /// The page is not cached.
+    CACHE_DISABLE       = (1 << 13),
 
     /// Read + execute for kernel text
     kKernelExec         = (READ | EXECUTE | GLOBAL),
@@ -32,6 +34,9 @@ enum class MapMode {
     kKernelRW           = (READ | WRITE),
     /// Read for kernel only
     kKernelRead         = (READ),
+
+    /// Device memory; bypass caches
+    MMIO                = (CACHE_DISABLE),
 };
 
 

@@ -1,10 +1,6 @@
 #ifndef PLATFORM_PC_IRQ_PIC_H
 #define PLATFORM_PC_IRQ_PIC_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdint.h>
 
 /**
@@ -20,9 +16,5 @@ uint16_t pic_irq_get_isr();
 uint16_t pic_irq_get_irr();
 void pic_irq_eoi(const uint8_t irq);
 void pic_irq_disable();
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

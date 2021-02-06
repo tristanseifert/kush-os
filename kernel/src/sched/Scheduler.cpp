@@ -118,7 +118,7 @@ void Scheduler::markThreadAsRunnable(Thread *t) {
     // insert it to the queue
     const auto band = this->groupForThread(t);
     t->setState(Thread::State::Runnable);
-    log("thread %p band %d/%d", t, band, kPriorityGroupMax);
+    //log("thread %p band %d/%d", t, band, kPriorityGroupMax);
 
     SPIN_LOCK_GUARD(this->runnableLock);
     this->runnable[band].push(t);

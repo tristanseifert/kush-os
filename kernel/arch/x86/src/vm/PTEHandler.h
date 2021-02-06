@@ -22,11 +22,12 @@ class PTEHandler: public ::vm::IPTEHandler {
         const bool isActive() const override;
 
         int mapPage(const uint64_t phys, const uintptr_t virt, const bool write,
-                const bool execute, const bool global, const bool user) override;
+                const bool execute, const bool global, const bool user,
+                const bool noCache) override;
         int unmapPage(const uintptr_t virt) override;
 
         int getMapping(const uintptr_t virt, uint64_t &phys, bool &write, bool &execute,
-                bool &global, bool &user) override;
+                bool &global, bool &user, bool &noCache) override;
 
     private:
         void initKernel();

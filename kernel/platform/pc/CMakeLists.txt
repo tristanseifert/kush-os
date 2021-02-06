@@ -11,7 +11,12 @@ add_library(kernel_platform_pc OBJECT
     src/physmap.cpp
     src/acpi/Manager.cpp
     src/io/spew.c
-    src/irq/pic.c
+    src/irq/handlers.S
+    src/irq/Manager.cpp
+    src/irq/pic.cpp
+    src/irq/IoApic.cpp
+    src/irq/Apic.cpp
+    src/irq/IsrDispatcher.cpp
 )
 
 target_include_directories(kernel_platform_pc PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
