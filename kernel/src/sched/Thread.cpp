@@ -1,6 +1,7 @@
 #include "Thread.h"
 #include "Scheduler.h"
 #include "Task.h"
+#include "IdleWorker.h"
 
 #include "mem/StackPool.h"
 #include "mem/SlabAllocator.h"
@@ -28,7 +29,9 @@ void Thread::initAllocator() {
  */
 Thread *Thread::kernelThread(Task *parent, void (*entry)(uintptr_t), const uintptr_t param) {
     if(!gThreadAllocator) initAllocator();
-    return gThreadAllocator->alloc(parent, (uintptr_t) entry, param, true);
+    auto thread = gThreadAllocator->alloc(parent, (uintptr_t) entry, param, true);
+
+    return thread;
 }
 
 /**
@@ -55,6 +58,11 @@ Thread::Thread(Task *_parent, const uintptr_t pc, const uintptr_t param, const b
 
     // then initialize thread state
     arch::InitThreadState(this, pc, param);
+
+    // and add to task
+    if(_parent) {
+        _parent->addThread(this);
+    }
 }
 
 /**
@@ -82,5 +90,33 @@ void Thread::switchTo() {
  * Copies the given name string to the thread's name field.
  */
 void Thread::setName(const char *newName) {
+    RW_LOCK_WRITE_GUARD(this->lock);
     strncpy(this->name, newName, kNameLength);
+}
+
+/**
+ * Call into the scheduler to yield the rest of this thread's CPU time. We'll get put back at the
+ * end of the runnable queue.
+ */
+void Thread::yield() {
+    Scheduler::get()->yield();
+}
+
+/**
+ * Terminates the calling thread.
+ *
+ * The thread will be marked as a zombie (so it won't be scheduled anymore) and submitted to the
+ * scheduler to actually be deallocated at a later time.
+ */
+void Thread::terminate() {
+    auto current = Scheduler::get()->runningThread();
+    REQUIRE(current, "cannot terminate null thread!");
+
+    current->setState(State::Zombie);
+
+    Scheduler::get()->idle->queueDestroyThread(current);
+    Scheduler::get()->switchToRunnable();
+
+    // we should not get here
+    panic("failed to terminmate thread");
 }

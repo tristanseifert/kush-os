@@ -49,6 +49,8 @@ void kernel_init() {
 void kernel_main() {
     log("kush time: PC = $%p", get_pc());
 
-    // should never get here
-    while(1) {}
+
+    // invoke the scheduler
+    sched::Scheduler::get()->run();
+    panic("scheduler returned, this should never happen");
 }

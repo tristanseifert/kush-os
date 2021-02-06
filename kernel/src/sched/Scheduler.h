@@ -9,6 +9,8 @@
 extern "C" void kernel_init();
 
 namespace sched {
+class IdleWorker;
+struct Task;
 struct Thread;
 
 /**
@@ -27,6 +29,18 @@ class Scheduler {
     friend struct Thread;
 
     public:
+        /// Defines the priority groups tasks can fall into
+        enum PriorityGroup: uint8_t {
+            Highest                         = 0,
+            AboveNormal                     = 1,
+            Normal                          = 2,
+            BelowNormal                     = 3,
+            Idle                            = 4,
+
+            kPriorityGroupMax
+        };
+
+    public:
         // return the shared scheduler instance
         static Scheduler *get() {
             return gShared;
@@ -37,11 +51,15 @@ class Scheduler {
             return this->running;
         }
 
+        /// schedules all runnable threads in the given task
+        void scheduleRunnable(Task *task);
         /// adds the given thread to the runnable queue
-        void markThreadAsRunnable(Thread *t);
+        void markThreadAsRunnable(Thread *thread);
 
         /// Runs the scheduler.
         void run() __attribute__((noreturn));
+        /// Yields the remainder of the current thread's CPU time.
+        void yield();
 
     private:
         /// updates the current CPU's running thread
@@ -49,12 +67,17 @@ class Scheduler {
             this->running = t;
         }
 
+        const PriorityGroup groupForThread(Thread *t) const;
+
+        void tickCallback();
+
     private:
         static void init();
 
         Scheduler();
+        ~Scheduler();
 
-        void switchToRunnable();
+        void switchToRunnable(Thread *ignore = nullptr);
 
     private:
         static Scheduler *gShared;
@@ -65,8 +88,11 @@ class Scheduler {
 
         /// lock for the runnable threads queue
         DECLARE_SPINLOCK(runnableLock);
-        /// runnable threads
-        rt::Queue<Thread *> runnable;
+        /// runnable threads (per priority band)
+        rt::Queue<Thread *> runnable[kPriorityGroupMax];
+
+        /// idle worker
+        IdleWorker *idle = nullptr;
 };
 }
 

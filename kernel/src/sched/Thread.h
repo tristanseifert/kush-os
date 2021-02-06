@@ -29,9 +29,14 @@ struct Thread {
 
     public:
         enum class State {
+            /// Thread can become runnable at any time, but only via an explicit API call
             Paused                      = 0,
+            /// Thread requests to be scheduled as soon as possible
             Runnable                    = 1,
+            /// Thread is waiting on some event to occur
             Blocked                     = 2,
+            /// About to be destroyed; do not schedule or access.
+            Zombie                      = 3,
         };
 
     public:
@@ -51,6 +56,18 @@ struct Thread {
          * the only difference is that kernel threads may not make system calls.
          */
         bool kernelMode = false;
+
+        /**
+         * Priority of the thread; this should be a value between -100 and 100, with negative
+         * values having the lowest priority. The scheduler internally converts this to whatever
+         * priority system it uses.
+         */
+        int16_t priority = 0;
+
+        // Number of ticks that the thread's quantum is in length. Ticks are usually 10ms.
+        uint16_t quantumTicks = 25;
+        // Ticks left in the thread's current quantum
+        uint16_t quantum = 0;
 
         /// descriptive thread name, if desired
         char name[kNameLength] = {0};
@@ -82,6 +99,16 @@ struct Thread {
 
         /// Sets the thread's name.
         void setName(const char *name);
+        /// Sets the thread's state.
+        void setState(const State newState) {
+            RW_LOCK_WRITE_GUARD(this->lock);
+            this->state = newState;
+        }
+
+        /// Give up the rest of this thread's CPU time
+        static void yield();
+        /// Terminates the thread
+        static void terminate() __attribute__((noreturn));
 
     private:
         /// next thread id

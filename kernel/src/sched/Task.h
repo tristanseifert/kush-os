@@ -73,6 +73,10 @@ struct Task {
 
         /// Sets the task's name.
         void setName(const char *name);
+        /// Adds a thread to the task.
+        void addThread(Thread *t);
+        /// Detaches the given thread from the task.
+        void detachThread(Thread *t);
 
     private:
         static void initAllocator();
