@@ -108,15 +108,18 @@ void exception_install_handlers() {
  */
 int x86_exception_format_info(char *outBuf, const size_t outBufLen,
         const x86_exception_info_t &info) {
+    uint32_t cr3;
+    asm volatile("mov %%cr3, %0" : "=r" (cr3));
+
     return snprintf(outBuf, outBufLen, "Exception %3u ($%08x)\n"
             " CS $%08x  DS $%08x  ES $%08x  FS $%08x\n"
-            " GS $%08x  SS $%08x\n"
+            " GS $%08x  SS $%08x CR3 $%08x\n"
             "EAX $%08x EBX $%08x ECX $%08x EDX $%08x\n"
             "EDI $%08x ESI $%08x EBP $%08x ESP $%08x\n"
             "EIP $%08x EFLAGS $%08x",
             info.intNo, info.errCode,
             info.cs, info.ds, info.es, info.fs, 
-            info.gs, info.ss,
+            info.gs, info.ss, cr3,
             info.eax, info.ebx, info.ecx, info.edx,
             info.edi, info.esi, info.ebp, info.esp,
             info.eip, info.eflags

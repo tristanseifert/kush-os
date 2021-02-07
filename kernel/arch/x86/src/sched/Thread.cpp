@@ -14,6 +14,8 @@
 
 using namespace arch;
 
+extern "C" void x86_thread_end() __attribute__((noreturn));
+
 extern "C" void x86_switchto(ThreadState *to) __attribute__((noreturn));
 extern "C" void x86_switchto_save(ThreadState *from, ThreadState *to);
 
@@ -42,16 +44,13 @@ void arch::InitThreadState(sched::Thread *thread, const uintptr_t pc, const uint
     frame->ds = frame->es = frame->fs = frame->gs = GDT_KERN_DATA_SEG;
 
     /**
-     * When we return to the thread code, we do so using IRET; it doesn't read the last two
-     * words off the stack frame (stack segment and stack ptr) if the privilege level doesn't
-     * change. To avoid munging around with the structs, we just place the parameter into the
-     * stack segment field, since that's where the function invoked as the thread main will
-     * read it from.
+     * Under the registers to restore, set up a stack frame for the thread to use when entering its
+     * main method. This way, we can pass one (really, an arbitrary number, but we limit it to
+     * just one) parameter to it as context.
      *
-     * This is a little hacky, and depends entirely on how the x86 C ABI works, but it should
-     * at least be stable.
+     * Note that we have some fudged offsets above to ensure the stack stays aligned.
      */
-    params[0] = 0xDEADBEEF; // bogus return address
+    params[0] = reinterpret_cast<uintptr_t>(x86_thread_end); // bogus return address
     params[1] = arg; // first argument
 
     // for threads ending up in userspace, ensure IRQs are on so they can be pre-empted
@@ -97,4 +96,13 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
         // log("new task %%esp = %p (stack %p)", to->regs.stackTop, to->stack);
         x86_switchto(&to->regs);
     }
+}
+
+/**
+ * This is the function where threads that returned from their main function will end up.
+ *
+ * For now, this is a panic; but this probably should just delete the thread and move on.
+ */
+void x86_thread_end() {
+    panic("thread returned from main");
 }

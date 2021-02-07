@@ -118,8 +118,8 @@ void PTEHandler::initCopyKernel(PTEHandler *kernel) {
     }
     this->pdpt[3] = kernel->pdtPhys[3] | 0b001;
 
-    //log("PDPT %p phys %08lx; %016llx %016llx %016llx %016llx", this->pdpt, this->pdptPhys,
-    //        this->pdpt[0], this->pdpt[1], this->pdpt[2], this->pdpt[3]);
+    // we need to map the PDPT as well
+    this->pdt[2][507] = (this->pdptPhys & ~0xFFF) | 0b011;
 
     // remove temporary mappings
     for(size_t i = 0; i < 3; i++) {
@@ -419,14 +419,18 @@ int PTEHandler::getMapping(const uintptr_t virt, uint64_t &phys, bool &write, bo
  *
  * @note You can always invoke this method. For any given PTE handler, we already allocated all
  * four of the page directories.
+ *
+ * @note We have to offset the calculated address based on the physical address offset of the PDPT;
+ * otherwise, these lookups will fail (or result incorrect data) if it's not aligned.
  */
 void PTEHandler::setPageDirectory(const uint32_t virt, const uint64_t value) {
-    uint64_t *ptr = (uint64_t *) 0xbf600000;
+    uint64_t *ptr = (uint64_t *) (0xBF600000 + (((this->pdptPhys & 0xFFF) / 0x20) * 0x4000));
     ptr[(virt >> 21)] = value;
 
     // invalidate the vm region for this page directory (and the page table access region)
     asm volatile( "invlpg (%0)" : : "b"(&ptr[(virt >> 21)]) : "memory" );
 
+    // invalidate the page table that this region maps
     uint64_t *pte = (uint64_t *) (0xBF800000 + ((virt & ~0xFFF) >> 9));
     asm volatile( "invlpg (%0)" : : "b"(pte) : "memory" );
 }
@@ -434,7 +438,7 @@ void PTEHandler::setPageDirectory(const uint32_t virt, const uint64_t value) {
  * Gets the page directory entry for the given virtual address.
  */
 const uint64_t PTEHandler::getPageDirectory(const uint32_t virt) {
-    uint64_t *ptr = (uint64_t *) 0xbf600000;
+    uint64_t *ptr = (uint64_t *) (0xBF600000 + (((this->pdptPhys & 0xFFF) / 0x20) * 0x4000));
     return ptr[(virt >> 21)];
 }
 

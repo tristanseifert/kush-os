@@ -92,6 +92,7 @@ beach:;
     REQUIRE(mem, "failed to alloc page for PDPT pool");
     REQUIRE(!(phys & 0xFFFFFFFF00000000), "PDPT page must be in low 4G of physmem");
 
+    /// XXX: uhhhhhh lmao
     Page *page = reinterpret_cast<Page *>(mem);
 
     // initialize it
