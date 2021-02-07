@@ -31,7 +31,7 @@ typedef struct x86_exception_info {
     uint32_t eip, cs, eflags;
     // pushed by processor when crossing rings
     uint32_t esp, ss;
-} x86_exception_info_t;
+} __attribute__((packed)) x86_exception_info_t;
 
 
 

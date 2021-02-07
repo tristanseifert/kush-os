@@ -64,7 +64,8 @@ void *StackPool::alloc() {
         const auto pages = kStackSize / pageSz;
         const uintptr_t start = kBaseAddr + (freeIdx * kStackSize);
 
-        uint64_t physPages[pages] = {0};
+        uint64_t physPages[pages];
+        memset(&physPages, 0, sizeof(uint64_t) * pages);
 
         for(size_t i = 1; i < pages; i++) {
             // allocate physical page
@@ -79,11 +80,11 @@ void *StackPool::alloc() {
             err = m->add(physPages[i], pageSz, vmAddr, vm::MapMode::kKernelRW);
 
 #if LOG_VM_UPDATE
-            log("stack mapped phys %016llx to %08lx", physPages[i], vmAddr);
+            log("stack mapped phys %016llx to %08x", physPages[i], vmAddr);
 #endif
 
             if(err) {
-                log("failed to map stack %016llx to %08lx: %d", physPages[i], vmAddr, err);
+                log("failed to map stack %016llx to %08x: %d", physPages[i], vmAddr, err);
                 goto failure;
             }
         }
@@ -128,7 +129,7 @@ void StackPool::free(void *base) {
     const auto index = idx / 32;
     const auto bit = idx % 32;
 
-    REQUIRE((this->freeMap[index] & (1 << bit)) == 0, "can't free unallocated stack %p (%ld)",
+    REQUIRE((this->freeMap[index] & (1 << bit)) == 0, "can't free unallocated stack %p (%d)",
             base, idx);
 
     // for each stack page, zero it, unmap it, then release the physical space
@@ -150,7 +151,7 @@ void StackPool::free(void *base) {
         REQUIRE(!err, "failed to %s stack page: %d", "unmap", err);
 
 #if LOG_VM_UPDATE
-        log("stack unmapped phys %016llx to %08lx", phys, vmAddr);
+        log("stack unmapped phys %016llx to %08x", phys, vmAddr);
 #endif
 
         // then release the physical page

@@ -18,14 +18,14 @@
 
 /// Atomic 32-bit exchange
 static inline __attribute__((always_inline)) uint32_t xchg_32(volatile void *ptr, uint32_t x) {
-    asm volatile("xchgl %0, %1" :"=r" ((uint32_t) x) :"m" (*(volatile uint32_t *) ptr), "0" (x)
+    asm volatile("xchgl %0, %1" :"=r" (x) :"m" (*(volatile uint32_t *) ptr), "0" (x)
                  :"memory");
     return x;
 }
 
 /// Atomic 16-bit exchange
 static inline __attribute__((always_inline)) uint16_t xchg_16(void *ptr, uint16_t x) {
-    asm volatile("xchgw %0,%1" : "=r" ((uint16_t) x) :"m" (*(volatile uint16_t *) ptr),
+    asm volatile("xchgw %0,%1" : "=r" (x) :"m" (*(volatile uint16_t *) ptr),
                  "0" (x) : "memory");
 
     return x;

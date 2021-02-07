@@ -38,7 +38,7 @@ void Manager::init(struct multiboot_tag_old_acpi *info) {
     for(size_t i = 0; i < sizeof(RSDPv1); i++) {
         sum += ((uint8_t *) rsdp)[i];
     }
-    REQUIRE((sum & 0xFF) == 0, "invalid checksum result: %08lx", sum);
+    REQUIRE((sum & 0xFF) == 0, "invalid checksum result: %08x", sum);
 
     // initialize it
     log("RSDP revision: %d (OEM id '%6s')", rsdp->revision, rsdp->OEMID);
@@ -79,7 +79,7 @@ void Manager::parseTables() {
     REQUIRE(this->rsdt->validateChecksum(), "invalid RSDT checksum");
 
     // look at each table
-    log("RSDT %p: signature '%4s' length %lu (OEM ID '%6s' rev '%8s')", this->rsdt,
+    log("RSDT %p: signature '%4s' length %u (OEM ID '%6s' rev '%8s')", this->rsdt,
             this->rsdt->head.signature,
             this->rsdt->head.length, this->rsdt->head.OEMID, this->rsdt->head.OEMTableID);
 
@@ -96,17 +96,17 @@ void Manager::parseTables() {
         else {
             // TODO: implement
             mem::PhysicalAllocator::reserve(addr & ~0xFFF);
-            panic("mapping extra SDTs is not yet supported (phys %08lx)", addr);
+            panic("mapping extra SDTs is not yet supported (phys %08x)", addr);
         }
 
         // invoke the appropriate handler
         if(!strncmp(tableHeader->signature, "APIC", 4)) {
-            REQUIRE(tableHeader->length >= sizeof(MADT), "invalid table size: %lu", tableHeader -> length);
+            REQUIRE(tableHeader->length >= sizeof(MADT), "invalid table size: %u", tableHeader -> length);
             auto table = reinterpret_cast<const MADT *>(tableHeader);
             this->parse(table);
         }
         else if(!strncmp(tableHeader->signature, "HPET", 4)) {
-            REQUIRE(tableHeader->length >= sizeof(HPET), "invalid table size: %lu", tableHeader -> length);
+            REQUIRE(tableHeader->length >= sizeof(HPET), "invalid table size: %u", tableHeader -> length);
             auto table = reinterpret_cast<const HPET *>(tableHeader);
             this->parse(table);
         }
@@ -114,7 +114,7 @@ void Manager::parseTables() {
             char name[5];
             memcpy(&name, tableHeader->signature, 4);
 
-            log("unhandled table %lu: %08lx (type '%4s', length %lu)", i, addr, name, tableHeader->length);
+            log("unhandled table %zu: %08x (type '%4s', length %u)", i, addr, name, tableHeader->length);
         }
     }
 }

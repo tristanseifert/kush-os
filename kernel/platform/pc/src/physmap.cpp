@@ -79,7 +79,7 @@ static void create_kernel_hole() {
     const size_t physStart = ((size_t) &__kern_keep_start);// - 0xC0000000;
     const size_t physEnd = ((size_t) &__kern_keep_end) - 0xC0000000;
 
-    log("Kernel memory physical range: $%08lx to $%08lx", physStart, physEnd);
+    log("Kernel memory physical range: $%08x to $%08x", physStart, physEnd);
 
     // first case; a physical map starts at where we're loaded
     for(size_t i = 0; i < gNumPhysRegions; i++) {

@@ -3,6 +3,8 @@
 #include "IoApic.h"
 #include "pic.h"
 
+#include "timer/LocalApicTimer.h"
+
 #include "memmap.h"
 
 #include <arch/idt.h>
@@ -18,9 +20,10 @@ static char gSharedBuf[sizeof(Manager)];
 Manager *Manager::gShared = nullptr;
 
 // external ISRs
-extern "C" void platform_isr_spurious_pic();
-extern "C" void platform_isr_spurious_pic2();
-extern "C" void platform_isr_spurious_apic();
+extern "C" void platform_isr_pic_spurious_pri();
+extern "C" void platform_isr_pic_spurious_sec();
+extern "C" void platform_isr_apic_spurious();
+extern "C" void platform_isr_apic_timer();
 
 extern "C" void platform_isr_isa_0();
 extern "C" void platform_isr_isa_1();
@@ -55,6 +58,8 @@ void Manager::setupIrqs() {
     gShared->configureOverrides();
     gShared->installHandlers();
     gShared->enable();
+
+    gShared->setupTimebase();
 }
 
 /**
@@ -184,7 +189,7 @@ void Manager::configureOverrides() {
                 }
             }
 
-            REQUIRE(remapped, "failed to find IOAPIC to remap (%u, %u) -> %lu", o.bus, o.busIrq,
+            REQUIRE(remapped, "failed to find IOAPIC to remap (%u, %u) -> %u", o.bus, o.busIrq,
                     o.irqNo);
         }
         // handle NMIs
@@ -198,7 +203,7 @@ void Manager::configureOverrides() {
                 }
             }
 
-            REQUIRE(remapped, "failed to find APIC to map NMI LIDT%u CPU %02lx", o.busIrq, o.irqNo);
+            REQUIRE(remapped, "failed to find APIC to map NMI LIDT%u CPU %02x", o.busIrq, o.irqNo);
         }
     }
 }
@@ -207,8 +212,10 @@ void Manager::configureOverrides() {
  * Installs x86 interrupt handlers for all vectors covered by the APICs.
  */
 void Manager::installHandlers() {
-    // install the APIC spurious ISR
-    idt_set_entry(0xFF, (uint32_t) platform_isr_spurious_apic, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR);
+    // install the APIC spurious and timer ISR
+    idt_set_entry(0xFF, (uint32_t) platform_isr_apic_spurious, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR);
+    idt_set_entry(timer::LocalApicTimer::kTimerVector, (uint32_t) platform_isr_apic_timer,
+            GDT_KERN_CODE_SEG, IDT_FLAGS_ISR);
 
     // install the legacy ISA handlers (first 16 IOAPIC vectors)
     const static uintptr_t kIsaIsrs[16] = {
@@ -242,13 +249,25 @@ void Manager::enable() {
 
         //idt_set_entry(0x20, (uint32_t) platform_isr_spurious_pic2, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR);
 
-        idt_set_entry(0x27, (uint32_t) platform_isr_spurious_pic, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR);
-        idt_set_entry(0x2F, (uint32_t) platform_isr_spurious_pic2, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR);
+        idt_set_entry(0x27, (uint32_t) platform_isr_pic_spurious_pri, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR);
+        idt_set_entry(0x2F, (uint32_t) platform_isr_pic_spurious_sec, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR);
     }
 
     // enable APICs
     for(auto apic : this->apics) {
         apic->enable();
+    }
+}
+
+/**
+ * Configures all APIC-local timers to act as system timebases.
+ */
+void Manager::setupTimebase() {
+    for(auto apic : this->apics) {
+        auto timer = apic->getTimer();
+        if(!timer) continue;
+
+        timer->setInterval(kTimebaseInterval);
     }
 }
 
@@ -259,14 +278,46 @@ void Manager::enable() {
  *
  * This function is invoked only for ISRs that require routing; things like spurious interrupts or
  * NMIs have their own handlers. Type codes correspond to values defined in `handlers.h`
+ *
+ * All handlers that call into the kernel do not perform IRQ acknowledgement themselves; it's
+ * expected that the system calls the platform_irq_ack() method with the type value we have
+ * been given.
  */
 void Manager::handleIsr(const uint32_t type) {
+    // APIC timer
+    if(type == ISR_APIC_TIMER) {
+        platform_kern_tick(type);
+    }
     // legacy ISA interrupts?
-    if(type >= ISR_ISA_0 && type <= ISR_ISA_15) {
+    else if(type >= ISR_ISA_0 && type <= ISR_ISA_15) {
+        /// XXX: send these IRQs properly
         const auto isaIrqNo = type - ISR_ISA_0;
-        log("ISA interrupt %lu", isaIrqNo);
-
-        // acknowledge on first APIC (XXX: fix for SMP)
+        log("ISA interrupt %u", isaIrqNo);
         this->apics[0]->endOfInterrupt();
     }
+    // unhandled isr
+    else {
+        panic("platform irq manager doesn't know how to route irq %08x", type);
+    }
+}
+
+/**
+ * Acknowledges an IRQ.
+ */
+void Manager::acknowledgeIrq(const uint32_t type) {
+    // APIC timer or legacy ISA interrupt
+    if(type == ISR_APIC_TIMER ||
+       (type >= ISR_ISA_0 && type <= ISR_ISA_15)) {
+        this->apics[0]->endOfInterrupt();
+    }
+    // unhandled isr
+    else {
+        panic("platform irq manager doesn't know how to route irq %08x", type);
+    }
+}
+
+/// Stub to forward into the irq manager
+int platform_irq_ack(const uintptr_t token) {
+    Manager::gShared->acknowledgeIrq(token);
+    return 0;
 }

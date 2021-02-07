@@ -35,21 +35,7 @@ multiboot_header_end:
 
 /*************************************************************************************************/
 .section .entry, "ax"
-
-.extern kernel_init
-.extern kernel_main
-
-.extern arch_init
-.extern platform_init
-
-.extern x86_multiboot_info
-.extern x86_multiboot_magic
-
-.globl _osentry
-.type _osentry, @function
-.set osentry, (_osentry - 0xC0000000)
-.globl osentry
-
+.global _osentry
 /**
  * Entry point for the bootloader
  */
@@ -80,7 +66,16 @@ _osentry:
     jmp         *%ecx
 
 # All of this code is offset in virtual memory
-.section .entry.high
+.section .entry.high, "ax"
+.extern kernel_init
+.extern kernel_main
+
+.extern arch_init
+.extern platform_init
+
+.extern x86_multiboot_info
+.extern x86_multiboot_magic
+
 jmp_highhalf:
     // Now, we're executing at 0xC0100000, so use the virtual address for stack.
     mov         $stack_top, %esp
@@ -93,6 +88,8 @@ jmp_highhalf:
     mov         %ebx, x86_multiboot_info
 
     // Check for SSE, and if it exists, enable it
+    fninit
+
     mov         $0x1, %eax
     cpuid
     test        $(1 << 25), %edx
@@ -143,25 +140,6 @@ sse_init:
 .section .entry.rodata
 
 /**
- * Page directory pointer table (PDPT); this contains 4 entries, each of which 8 bytes, pointing
- * to a page directory describing 1G of memory.
- *
- * Here, the first gig of RAM is identity mapped, followed by 2 gigs of unmapped space, and then
- * the first 16M of kernel space (at 0xC0000000) being mapped to address 0.
- */
-.align 0x20
-boot_pae_pdpt:
-    // first 1 gig is identity mapped
-    .long        boot_pae_pdt_identity + 0b1
-    .long        0
-    // two unmapped spaces
-    .quad        0
-    .quad        0
-    // first 16M mapped to 0 for kernel
-    .long        boot_pae_pdt_upper + 0b1
-    .long        0
-
-/**
  * PAE page directory that maps the first 1G of address space as-is.
  */
 .align 0x1000
@@ -190,6 +168,24 @@ boot_pae_pdt_upper:
     .quad       0
     .endr
 
+/**
+ * Page directory pointer table (PDPT); this contains 4 entries, each of which 8 bytes, pointing
+ * to a page directory describing 1G of memory.
+ *
+ * Here, the first gig of RAM is identity mapped, followed by 2 gigs of unmapped space, and then
+ * the first 16M of kernel space (at 0xC0000000) being mapped to address 0.
+ */
+.align 0x20
+boot_pae_pdpt:
+    // first 1 gig is identity mapped
+    .long        boot_pae_pdt_identity + 0b1
+    .long        0
+    // two unmapped spaces
+    .quad        0
+    .quad        0
+    // first 16M mapped to 0 for kernel
+    .long        boot_pae_pdt_upper + 0b1
+    .long        0
 
 /*************************************************************************************************/
 // 32K kernel stack to use during initialization

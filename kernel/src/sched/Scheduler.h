@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include <platform.h>
 #include <arch/spinlock.h>
 #include <runtime/Queue.h>
 
@@ -26,6 +27,7 @@ struct Thread;
  */
 class Scheduler {
     friend void ::kernel_init();
+    friend void ::platform_kern_tick(const uintptr_t);
     friend struct Thread;
 
     public:
@@ -62,21 +64,21 @@ class Scheduler {
         void yield();
 
     private:
+        static void init();
+
         /// updates the current CPU's running thread
         void setRunningThread(Thread *t) {
             this->running = t;
         }
 
-        const PriorityGroup groupForThread(Thread *t) const;
+        const PriorityGroup groupForThread(Thread *t, const bool withBoost = false) const;
 
-        void tickCallback();
-
-    private:
-        static void init();
+        void tickCallback(const uintptr_t irqToken);
 
         Scheduler();
         ~Scheduler();
 
+        void adjustPriorities();
         void switchToRunnable(Thread *ignore = nullptr);
 
     private:
@@ -85,6 +87,8 @@ class Scheduler {
     private:
         /// the thread that is currently being executed
         Thread *running = nullptr;
+        /// timer we increment every tick to govern when we boost threads' priorities
+        uintptr_t priorityAdjTimer = 0;
 
         /// lock for the runnable threads queue
         DECLARE_SPINLOCK(runnableLock);

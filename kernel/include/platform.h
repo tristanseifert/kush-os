@@ -67,6 +67,22 @@ typedef enum platform_section {
 int platform_section_get_info(const platform_section_t section, uint64_t *physAddr,
         uintptr_t *virtAddr, uintptr_t *length);
 
+
+
+/**
+ * Acknowledges an interrupt. The provided value is opaque and defined by the platform code. Specifically, you
+ * should not assume that 0 indicates no interrupt. Any value you receive as an interrupt token can be passed into
+ * this function without causing a panic.
+ */
+int platform_irq_ack(const uintptr_t token);
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+/// Functions below are defined by the kernel.
+extern void platform_kern_tick(const uintptr_t token);
+
+
 #ifdef __cplusplus
 }
 #endif

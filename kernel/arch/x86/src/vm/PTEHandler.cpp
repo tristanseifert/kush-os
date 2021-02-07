@@ -255,7 +255,7 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t virt, const bool wr
         auto directory = this->pdt[pdptOff];
 
         // allocate a page for the page table if needed
-        if(!directory[pdeOff] & 0b1) {
+        if(!(directory[pdeOff] & 0b1)) {
             // present and RW allowed
             uint64_t flags = 0b00000011;
 

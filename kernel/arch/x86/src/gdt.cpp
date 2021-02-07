@@ -80,7 +80,7 @@ static void load_gdt(void *location) {
 
     IDTR.length = (0x28 + (GDT_NUM_TSS * 8)) - 1;
     IDTR.base = (uint32_t) location;
-    __asm__ volatile("lgdt (%0)" : : "p"(&IDTR));
+    asm volatile("lgdt (%0)" : : "r"(&IDTR));
 
     gdt_flush();
 }

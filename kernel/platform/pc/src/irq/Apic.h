@@ -12,7 +12,12 @@
 
 #include "Manager.h"
 
-namespace platform { namespace irq {
+namespace platform {
+namespace timer {
+class LocalApicTimer;
+}
+
+namespace irq {
 /**
  * Represents a processor-local APIC (LAPIC.) Since these are local to the processor, they can
  * only be modified on that processor core.
@@ -21,6 +26,8 @@ namespace platform { namespace irq {
  * mapping between CPU IDs and APICs, and some other metadata.
  */
 class Apic {
+    friend class timer::LocalApicTimer;
+
     public:
         /// Spurious interrupt vector number
         constexpr static const uint8_t kVectorSpurious = 0xFF;
@@ -30,6 +37,7 @@ class Apic {
     public:
         Apic(void *virtBase, const uint8_t apicCpuId, const uint8_t apicId, const bool enabled,
                 const bool onlineable);
+        ~Apic();
 
         /// Enables interrupt handling via the APIC
         void enable();
@@ -48,6 +56,24 @@ class Apic {
             return this->processor;
         }
 
+        /// Gets the APIC timer, if there is one
+        auto getTimer() const {
+            return this->timer;
+        }
+
+    private:
+        /// Writes the given APIC register.
+        inline void write(const uint32_t reg, const uint32_t value) {
+            this->base[reg / 4] = value;
+        }
+        /// Reads the given APIC register.
+        inline const uint32_t read(const uint32_t reg) {
+            return this->base[reg / 4];
+        }
+
+        /// Measures the frequency of the core local timer
+        void measureTimerFreq();
+
     private:
         /// APIC ID
         uint8_t id;
@@ -58,6 +84,9 @@ class Apic {
 
         /// VM base address to APIC regs
         uint32_t *base = nullptr;
+
+        /// timer component of the APIC
+        timer::LocalApicTimer *timer = nullptr;
 };
 }}
 

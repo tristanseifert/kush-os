@@ -1,12 +1,15 @@
 #include "Apic.h"
+#include "ApicRegs.h"
 
-#include "../memmap.h"
+#include "memmap.h"
+#include "timer/LocalApicTimer.h"
 
 #include <arch/x86_msr.h>
-
+#include <arch/spinlock.h>
 #include <vm/Mapper.h>
 #include <vm/Map.h>
 #include <log.h>
+#include <cpuid.h>
 
 using namespace platform::irq;
 
@@ -34,7 +37,7 @@ static void SetApicBase(const uint32_t base) {
  */
 Apic::Apic(void *_virtBase, const uint8_t _cpuId, const uint8_t _id, const bool _enabled,
         const bool _onlineable) : id(_id), processor(_cpuId),
-        base(reinterpret_cast<uint32_t *>(_virtBase)) {
+    base(reinterpret_cast<uint32_t *>(_virtBase)) {
     REQUIRE(_virtBase, "Invalid APIC virtual base address: %p", _virtBase);
 
     log("New APIC %u (processor %u) enabled %c", this->id, this->processor, _enabled ? 'Y':'N');
@@ -42,6 +45,19 @@ Apic::Apic(void *_virtBase, const uint8_t _cpuId, const uint8_t _id, const bool 
     // check if we're a BSP
     const auto base = GetApicBase();
     this->isBsp = (base & IA32_APIC_BASE_MSR_BSP);
+}
+
+/**
+ * Cleanly shuts down the APIC.
+ */
+Apic::~Apic() {
+    // shut down the timer
+    delete this->timer;
+
+    // clear the enable bit for the APIC
+    auto reg = this->read(kApicRegSpurious);
+    reg &= ~(1 << 8); // set enable bit
+    this->write(kApicRegSpurious, reg);
 }
 
 /**
@@ -53,16 +69,19 @@ void Apic::enable() {
     SetApicBase(base);
 
     // set spurious interrupt register
-    auto reg = this->base[0xF0 / 4] & ~0xFF;
+    auto reg = this->read(kApicRegSpurious) & ~0xFF;
     reg |= 0xFF; // spurious vector is 0xFF
     reg |= (1 << 8); // set enable bit
-    this->base[0xF0 / 4] = reg;
+    this->write(kApicRegSpurious, reg);
+
+    // set up the local timer
+    this->timer = new timer::LocalApicTimer(this);
 }
 /**
  * Signals an end-of-interrupt for the APIC.
  */
 void Apic::endOfInterrupt() {
-    this->base[0xB0 / 4] = 0;
+    this->write(kApicRegEndOfInt, 0);
 }
 
 /**
@@ -78,9 +97,10 @@ void Apic::mapNmi(const uint8_t lint, const IrqFlags f) {
 
     // write it to the appropriate register
     if(lint == 0) {
-        this->base[0x350 / 4] = value;
+        this->write(kApicRegLvtLint0, value);
     } 
     else if(lint == 1) {
-        this->base[0x360 / 4] = value;
+        this->write(kApicRegLvtLint1, value);
     }
 }
+

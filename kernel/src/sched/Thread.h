@@ -63,9 +63,11 @@ struct Thread {
          * priority system it uses.
          */
         int16_t priority = 0;
+        /// Priority boost for this thread; incremented any time it's not scheduled
+        int16_t priorityBoost = 0;
 
-        // Number of ticks that the thread's quantum is in length. Ticks are usually 10ms.
-        uint16_t quantumTicks = 25;
+        // Number of ticks that the thread's quantum is in length. Ticks are usually 1ms.
+        uint16_t quantumTicks = 10;
         // Ticks left in the thread's current quantum
         uint16_t quantum = 0;
 

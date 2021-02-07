@@ -30,16 +30,16 @@ platform_isr_\name:
     isr_end
 .endm
 
-.global platform_isr_spurious_pic
-/// ISR for handling spurious interrupts received from master PIC
-platform_isr_spurious_pic:
+.global platform_isr_pic_spurious_pri
+/// ISR for handling spurious interrupts received from primary PIC
+platform_isr_pic_spurious_pri:
     isr_start   ISR_SPURIOUS_PIC
     call        platform_isr_handle
     isr_end
 
-.global platform_isr_spurious_pic2
-/// handles spurious IRQs from slave PIC; we need to send EOI to master
-platform_isr_spurious_pic2:
+.global platform_isr_pic_spurious_sec
+/// handles spurious IRQs from secondary PIC; we need to send EOI to master
+platform_isr_pic_spurious_sec:
     isr_start   ISR_SPURIOUS_PIC
     call        platform_isr_handle
 
@@ -49,13 +49,9 @@ platform_isr_spurious_pic2:
 
     isr_end
 
-.global platform_isr_spurious_apic
-/// ISR for handling spurious interrupts received from processor local APIC
-platform_isr_spurious_apic:
-    isr_start   ISR_SPURIOUS_APIC
-    call        platform_isr_handle
-    isr_end
-
+// APIC related ISRs
+define_isr apic_spurious, ISR_SPURIOUS_APIC
+define_isr apic_timer, ISR_APIC_TIMER
 
 // ISA interrupts
 define_isr isa_0, ISR_ISA_0

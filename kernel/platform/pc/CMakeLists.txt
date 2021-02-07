@@ -17,6 +17,8 @@ add_library(kernel_platform_pc OBJECT
     src/irq/IoApic.cpp
     src/irq/Apic.cpp
     src/irq/IsrDispatcher.cpp
+    src/timer/pit.cpp
+    src/timer/LocalApicTimer.cpp
 )
 
 target_include_directories(kernel_platform_pc PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)

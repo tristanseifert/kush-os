@@ -144,11 +144,10 @@ class Vector {
          * Removes the item at the given index.
          */
         void remove(const size_t index) {
-            REQUIRE(index < this->numAllocated, "vector access out of bounds: %lu", index);
+            REQUIRE(index < this->numAllocated, "vector access out of bounds: %zu", index);
 
             // move them
             const size_t toMove = (this->numAllocated - index) - 1;
-            log("remove idx %lu total %lu to move %lu", index, this->numAllocated, toMove);
 
             if(toMove) {
                 memmove(&this->storage[index], &this->storage[index+1], toMove * sizeof(T));
@@ -194,12 +193,12 @@ class Vector {
 
         /// Gets a reference to the given item
         const T& operator[](const size_t index) const {
-            REQUIRE(index < this->numAllocated, "vector access out of bounds: %lu", index);
+            REQUIRE(index < this->numAllocated, "vector access out of bounds: %zu", index);
             return this->storage[index];
         }
         /// Gets a reference to the given item
         T& operator[](const size_t index) {
-            REQUIRE(index < this->numAllocated, "vector access out of bounds: %lu", index);
+            REQUIRE(index < this->numAllocated, "vector access out of bounds: %zu", index);
             return this->storage[index];
         }
 

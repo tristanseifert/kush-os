@@ -54,5 +54,5 @@ static void load_idt(void *base, const uint16_t size) {
 
     IDTR.length = size;
     IDTR.base = (uint32_t) base;
-    asm volatile("lidt (%0)": : "p"(&IDTR));
+    asm volatile("lidt (%0)": : "r"(&IDTR));
 }

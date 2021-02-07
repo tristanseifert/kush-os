@@ -91,7 +91,7 @@ int arch_backtrace(void *stack, char *buf, const size_t bufLen) {
         const auto bufAvail = bufLen - (writePtr - buf);
         if(!bufAvail) return bufLen;
 
-        written = snprintf(writePtr, bufAvail, "%2lu %08lx\n", frame, stk->eip);
+        written = snprintf(writePtr, bufAvail, "%2zu %08x\n", frame, stk->eip);
 
         // prepare for next frame
         writePtr += written;

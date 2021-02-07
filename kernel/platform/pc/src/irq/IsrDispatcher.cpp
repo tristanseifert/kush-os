@@ -45,8 +45,13 @@ void platform_isr_handle(const uint32_t type) {
             Manager::get()->handleIsr(type);
             break;
 
+        // various timebase interrupts
+        case ISR_APIC_TIMER:
+            Manager::get()->handleIsr(type);
+            break;
+
         // unhandled (other)
         default:
-            panic("unhandled ISR type $%08lx", type);
+            panic("unhandled ISR type $%08x", type);
     }
 }

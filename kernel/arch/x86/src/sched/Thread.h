@@ -4,7 +4,7 @@
 #include "ThreadState.h"
 
 namespace sched {
-class Thread;
+struct Thread;
 }
 
 namespace arch {

@@ -13,6 +13,7 @@ add_library(kernel_arch_x86 OBJECT
     src/vm/PDPTPool.cpp
     src/sched/Thread.cpp
     src/sched/switchto.S
+    src/math.c
 )
 
 target_include_directories(kernel_arch_x86 PUBLIC include)

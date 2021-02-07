@@ -157,7 +157,7 @@ void PDPTPool::freePdpt(const uintptr_t phys) {
     }
 
     // if we get here, the address doesn't belong to the pool
-    panic("attempt to free PDPT %08lx; but not in pool", phys);
+    panic("attempt to free PDPT %08x; but not in pool", phys);
 }
 
 /**
@@ -174,7 +174,7 @@ void PDPTPool::Page::free(const uintptr_t phys) {
     const auto bit = idx % 32;
 
 #ifndef LOG_ALLOC
-    log("freeing: phys %08lx idx %d (%d, %d)", phys, idx, index, bit);
+    log("freeing: phys %08x idx %d (%d, %d)", phys, idx, index, bit);
 #endif
 
     this->freeMap[index] |= (1 << bit);

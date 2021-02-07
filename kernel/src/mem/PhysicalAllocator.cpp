@@ -53,7 +53,7 @@ PhysicalAllocator::PhysicalAllocator() {
         const size_t bitmapPages = ((pages / 8) + pageSz - 1) / pageSz;
 
 #if LOG_REGIONS
-        log("region at %016llx, length %016llx, %ld pages, %ld bitmap pages", baseAddr, length, pages, bitmapPages);
+        log("region at %016llx, length %016llx, %zd pages, %zd bitmap pages", baseAddr, length, pages, bitmapPages);
 #endif
 
         // build the region struct. note we cap pages to be a multiple of 32
@@ -242,7 +242,7 @@ void PhysicalAllocator::reservePage(const uint64_t physAddr) {
 void PhysicalAllocator::Region::free(const uintptr_t idx) {
     // ensure index in bounds
     if(idx >= this->totalPages) {
-        panic("page %lu out of bounds (max %lu)", idx, this->totalPages);
+        panic("page %zu out of bounds (max %zu)", idx, this->totalPages);
     }
 
     // set the bit

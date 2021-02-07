@@ -62,7 +62,7 @@ void panic(const char *format, ...) {
     fctprintf(_outchar, NULL, "panic: %s\npc: $%p\n", panicBuf, pc);
 
     if(thread) {
-        fctprintf(_outchar, NULL, "Active thread: %p (tid %lu) '%s'\n", thread, thread->tid,
+        fctprintf(_outchar, NULL, "Active thread: %p (tid %u) '%s'\n", thread, thread->tid,
                 thread->name);
     }
 

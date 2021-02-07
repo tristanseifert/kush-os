@@ -49,6 +49,11 @@ enum class IrqFlags {
 class Manager {
     friend void ::platform_vm_available();
     friend void ::platform_isr_handle(const uint32_t);
+    friend int ::platform_irq_ack(const uintptr_t);
+
+    public:
+        /// System timebase, in microseconds
+        constexpr static const uint32_t kTimebaseInterval = 1000;
 
     public:
         Manager();
@@ -95,9 +100,13 @@ class Manager {
         void installHandlers();
         // enables the APICs
         void enable();
+        // Configures any APIC-local timers to operate as the system timebase.
+        void setupTimebase();
 
         /// Handles an ISR.
         void handleIsr(const uint32_t type);
+        /// Acknowledges an IRQ
+        void acknowledgeIrq(const uint32_t type);
 
     private:
         static void init();

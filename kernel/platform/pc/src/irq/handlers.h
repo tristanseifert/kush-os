@@ -6,6 +6,9 @@
 /// ISR code for APIC-originated spurious interrupts
 #define ISR_SPURIOUS_APIC               0x81
 
+/// APIC originated timer interrupt (processor local)
+#define ISR_APIC_TIMER                  0xB0
+
 /// ISA interrupt: programmable timer
 #define ISR_ISA_0                       0x30
 /// ISA interrupt: keyboard

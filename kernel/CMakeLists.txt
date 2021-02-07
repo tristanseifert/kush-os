@@ -50,7 +50,8 @@ target_link_libraries(kernel PRIVATE ${ARCH_TARGET_NAME})
 target_link_libraries(kernel PRIVATE ${PLATFORM_TARGET_NAME})
 
 # link the compiler-specific libraries
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     target_link_libraries(kernel PRIVATE gcc)
 endif()
 
@@ -61,5 +62,9 @@ set_target_properties(kernel PROPERTIES SUFFIX "${PLATFORM_KERNEL_EXTENSION}")
 # configure the linker script
 message("Platform linker script: ${PLATFORM_LINKER_SCRIPT}")
 set_target_properties(kernel PROPERTIES LINK_DEPENDS ${PLATFORM_LINKER_SCRIPT})
-string(APPEND CMAKE_EXE_LINKER_FLAGS " -Wl,-T,${PLATFORM_LINKER_SCRIPT}")
 
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    target_link_options(kernel PUBLIC "-T${PLATFORM_LINKER_SCRIPT}")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    target_link_options(kernel PUBLIC "-T${PLATFORM_LINKER_SCRIPT}")
+endif()

@@ -152,8 +152,10 @@ class SlabAllocator {
                     this->freeMap[i] &= ~(1 << allocBit);
                     this->numAllocated++;
 
+                    memset(&this->storage[off * sizeof(T)], 0, sizeof(T));
+
                     auto item = reinterpret_cast<T *>(&this->storage[off * sizeof(T)]);
-                    memset(item, 0, sizeof(T));
+                    //memset(item, 0, sizeof(T));
                     new(item) T(ctorArgs...);
 
                     return item;

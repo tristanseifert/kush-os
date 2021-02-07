@@ -7,6 +7,7 @@
 #include "multiboot.h"
 #include "irq/pic.h"
 #include "irq/Manager.h"
+#include "timer/pit.h"
 #include "io/spew.h"
 #include "acpi/Manager.h"
 
@@ -28,6 +29,7 @@ void platform_init() {
 
     // set up and remap the PICs and other interrupt controllers
     pic_init();
+    timer::LegacyPIT::disable();
 }
 
 /**

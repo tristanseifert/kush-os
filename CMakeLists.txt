@@ -27,9 +27,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
-# set(CMAKE_VERBOSE_MAKEFILE ON)
+#set(CMAKE_VERBOSE_MAKEFILE ON)
 
 add_compile_options(-Wall -Werror -Wmissing-declarations -Wformat=2 -fdiagnostics-color=always -ftls-model=initial-exec)
+
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+add_compile_options(-Wno-unused-private-field)
+endif()
 
 ####################
 ##### Use cross toolchain for all targets below

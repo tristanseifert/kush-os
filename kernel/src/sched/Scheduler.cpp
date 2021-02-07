@@ -5,6 +5,7 @@
 
 #include "mem/SlabAllocator.h"
 
+#include <platform.h>
 #include <new>
 #include <log.h>
 
@@ -20,7 +21,7 @@ Task *gKernelTask = nullptr;
 void Scheduler::init() {
     gShared = new Scheduler();
 
-    log("sizes: scheduler = %lu, task = %lu, thread = %lu", sizeof(Scheduler), sizeof(Task), sizeof(Thread));
+    log("sizes: scheduler = %u, task = %u, thread = %u", sizeof(Scheduler), sizeof(Task), sizeof(Thread));
 }
 
 /**
@@ -82,6 +83,14 @@ void Scheduler::switchToRunnable(Thread *ignore) {
 
             next = queue.pop();
             if(next == ignore) {
+                // pop the next item off the queue, if any
+                if(!queue.empty()) {
+                    next = queue.pop();
+                    queue.push(ignore);
+                    goto beach;
+                }
+
+                // if none, place it back and check next priority band
                 queue.push(next);
                 continue;
             }
@@ -92,6 +101,11 @@ void Scheduler::switchToRunnable(Thread *ignore) {
 beach:;
     // switch to it
     REQUIRE(next, "failed to find thread to switch to");
+
+    if(next->priorityBoost > 0) {
+        // if it had a positive priority boost, delete it
+        next->priorityBoost = 0;
+    }
 
     next->quantum = next->quantumTicks;
     next->switchTo();
@@ -118,6 +132,7 @@ void Scheduler::markThreadAsRunnable(Thread *t) {
     // insert it to the queue
     const auto band = this->groupForThread(t);
     t->setState(Thread::State::Runnable);
+    t->priorityBoost = 0;
     //log("thread %p band %d/%d", t, band, kPriorityGroupMax);
 
     SPIN_LOCK_GUARD(this->runnableLock);
@@ -127,14 +142,23 @@ void Scheduler::markThreadAsRunnable(Thread *t) {
 /**
  * Called in response to a system timer tick. This will see if the current thread's time quantum
  * has expired, and if so, schedule the next runnable thread.
+ *
+ * We need to acknowledge the timer IRQ before we perform the context switch if a task has been
+ * pre-empted. (We need to acknowledge the IRQ in all cases, but this is especially critical since
+ * otherwise we will miss out on timer interrupts until the current task gets resumed.)
  */
-void Scheduler::tickCallback() {
+void Scheduler::tickCallback(const uintptr_t irqToken) {
     if(!this->running) return;
 
     // pre-empt it
     if(--this->running->quantum == 0) {
-        log("pre-empting %p", this->running);
+        // log("pre-empting %p", this->running);
+        // since we'll context switch, we won't return here, so acknowledge the interrupt
+        platform_irq_ack(irqToken);
+
         this->yield();
+    } else {
+        platform_irq_ack(irqToken);
     }
 }
 
@@ -164,8 +188,8 @@ void Scheduler::yield() {
  *
  * Currently, we linearly interpolate the range [-100, 100] to [4, 0] in our priority band groups.
  */
-const Scheduler::PriorityGroup Scheduler::groupForThread(Thread *t) const {
-    const auto prio = t->priority;
+const Scheduler::PriorityGroup Scheduler::groupForThread(Thread *t, const bool withBoost) const {
+    const auto prio = t->priority + (withBoost ? t->priorityBoost : 0);
 
     // idle band is [-100, -60)
     if(prio >= -100 && prio < -60) {
@@ -189,4 +213,15 @@ const Scheduler::PriorityGroup Scheduler::groupForThread(Thread *t) const {
     } else {
         panic("invalid priority for thread %p: %d", t, prio);
     }
+}
+
+
+
+/**
+ * Handle kernel time ticks.
+ *
+ * XXX: This should go somewhere better than in scheduler code.
+ */
+void platform_kern_tick(const uintptr_t irqToken) {
+    Scheduler::gShared->tickCallback(irqToken);
 }

@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include <runtime/vector.h>
+#include <runtime/Vector.h>
 #include <vm/IPTEHandler.h>
 
 namespace arch { namespace vm {
