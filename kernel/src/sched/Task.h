@@ -55,6 +55,8 @@ struct Task {
 
         /// virtual memory mappings for this task
         vm::Map *vm = nullptr;
+        /// whether we own the VM maps
+        bool ownsVm = false;
 
         /// task lock
         DECLARE_RWLOCK(lock);
@@ -64,11 +66,11 @@ struct Task {
 
     public:
         /// Allocates a new task from the task struct pool
-        static Task *alloc();
+        static Task *alloc(vm::Map *map = nullptr);
         /// Releases a previously allocated task struct
         static void free(Task *);
 
-        Task();
+        Task(vm::Map *map);
         ~Task();
 
         /// Sets the task's name.

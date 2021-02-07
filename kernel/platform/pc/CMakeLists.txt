@@ -21,10 +21,9 @@ add_library(kernel_platform_pc OBJECT
     src/timer/LocalApicTimer.cpp
 )
 
-target_include_directories(kernel_platform_pc PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
-
 target_include_directories(kernel_platform_pc PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../src)
 target_include_directories(kernel_platform_pc PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../include)
+target_include_directories(kernel_platform_pc PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 
 target_include_directories(kernel_platform_pc PRIVATE ${ARCH_INCLUDE_DIR})
 

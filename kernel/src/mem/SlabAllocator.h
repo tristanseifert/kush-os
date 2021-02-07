@@ -87,6 +87,10 @@ class SlabAllocator {
     private:
         /**
          * Slab data structure; it holds metadata _and_ the actual object storage.
+         *
+         * The actual underlying storage is aligned to a 64 byte boundary. This is the most
+         * stringent alignment requirement any of our internal types can have, so it should suit
+         * them.
          */
         struct Slab {
             /// total number of items we've storage for in the slab
@@ -103,7 +107,7 @@ class SlabAllocator {
             /// allocation bitmap: 1 = free, 0 = allocated
             uint32_t freeMap[(kNumItems + 32 - 1) / 32];
             // storage for the objects
-            uint8_t storage[sizeof(T) * kNumItems];
+            uint8_t storage[sizeof(T) * kNumItems] __attribute__((aligned(64)));
 
             /**
              * Marks all elements as allocated when the slab is allocated.

@@ -92,8 +92,13 @@ class List {
             if(index == 0) {
                 auto currentHead = this->head;
 
-                this->head = currentHead->next;
-                this->head->prev = nullptr;
+                if(currentHead->next) {
+                    currentHead->next->prev = nullptr;
+                    this->head = currentHead->next;
+                } else {
+                    this->head = nullptr;
+                    this->tail = nullptr;
+                }
 
                 delete currentHead;
             }
@@ -107,8 +112,49 @@ class List {
 
         /**
          * Iterates all items in the list, removing those that match certain criteria.
+         *
+         * The parameters to the callback function are a specified context value, the value in the
+         * list item; its return value indicates whether the item is to be removed or not.
+         *
+         * @return Number of removed items
          */
-        // void iterate();
+        template<class arg>
+        size_t removeMatching(bool (*callback)(void *, arg), void *ctx) {
+            size_t numRemoved = 0;
+
+            auto ent = this->head;
+            while(ent) {
+                REQUIRE(ent->next != ent, "invalid next ptr");
+
+                bool remove = callback(ctx, ent->value);
+                if(remove) {
+                    // update the previous item's next pointer or update head
+                    if(ent->prev) {
+                        ent->prev->next = ent->next;
+                    } else {
+                        this->head = ent->next;
+                    }
+                    // update the next item's previous pointer, or update tail
+                    if(ent->next) {
+                        ent->next->prev = ent->prev;
+                    } else {
+                        this->tail = ent->prev;
+                    }
+
+                    // delete the old item
+                    auto old = ent;
+                    ent = ent->next;
+                    delete old;
+
+                    numRemoved++;
+                    this->numElements--;
+                } else {
+                    ent = ent->next;
+                }
+            }
+
+            return numRemoved;
+        }
 
         /// Gets a reference to the given item
         const T& operator[](const size_t index) const {

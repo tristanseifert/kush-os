@@ -2,7 +2,12 @@
 
 #include <log.h>
 #include <string.h>
+
+#include <vm/Map.h>
+#include <sched/Task.h>
 #include <sched/Thread.h>
+
+#include "syscall/Handler.h"
 
 #include "../exceptions.h"
 #include "../gdt.h"
@@ -34,32 +39,24 @@ void arch::InitThreadState(sched::Thread *thread, const uintptr_t pc, const uint
     thread->regs.stackTop = frame;
 
     frame->eip = pc;
+    frame->ds = frame->es = frame->fs = frame->gs = GDT_KERN_DATA_SEG;
 
-    if(thread->kernelMode) {
-        frame->ds = frame->es = frame->fs = frame->gs = GDT_KERN_DATA_SEG;
+    /**
+     * When we return to the thread code, we do so using IRET; it doesn't read the last two
+     * words off the stack frame (stack segment and stack ptr) if the privilege level doesn't
+     * change. To avoid munging around with the structs, we just place the parameter into the
+     * stack segment field, since that's where the function invoked as the thread main will
+     * read it from.
+     *
+     * This is a little hacky, and depends entirely on how the x86 C ABI works, but it should
+     * at least be stable.
+     */
+    params[0] = 0xDEADBEEF; // bogus return address
+    params[1] = arg; // first argument
 
-        /**
-         * When we return to the thread code, we do so using IRET; it doesn't read the last two
-         * words off the stack frame (stack segment and stack ptr) if the privilege level doesn't
-         * change. To avoid munging around with the structs, we just place the parameter into the
-         * stack segment field, since that's where the function invoked as the thread main will
-         * read it from.
-         *
-         * This is a little hacky, and depends entirely on how the x86 C ABI works, but it should
-         * at least be stable.
-         *
-         * Potentially problematic is the resulting stack being 8 byte aligned rather than 16, but
-         * we don't use any SIMD code in the kernel so it should ok?
-         */
-        params[0] = 0xDEADBEEF; // bogus return address
-        params[1] = arg; // first argument
-    } else {
-        frame->ds = frame->es = frame->fs = frame->gs = GDT_USER_DATA_SEG;
-
-        // ensure IRQs will be enabled
+    // for threads ending up in userspace, ensure IRQs are on so they can be pre-empted
+    if(!thread->kernelMode) {
         frame->eflags |= (1 << 9);
-
-        // TODO: set up usermode stack?
     }
 
     // EBP must be NULL for stack unwinding to work
@@ -71,6 +68,12 @@ void arch::InitThreadState(sched::Thread *thread, const uintptr_t pc, const uint
  * switching to the correct stack, restoring registers and performing an iret.
  */
 void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
+    // switch page tables if needed
+    if((!from && to->task) ||
+       (from && from->task && to->task && from->task != to->task)) {
+        to->task->vm->activate();
+    }
+
     // for kernel mode threads, the TSS should hold the per-CPU interrupt thread
     if(to->kernelMode) {
         // set the per-CPU kernel interrupt thread
@@ -80,6 +83,9 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
     else {
         tss_set_esp0(to->stack);
     }
+
+    // update syscall handler state
+    syscall::Handler::handleCtxSwitch(to);
 
     // save state into current thread and switch to next
     if(from) {

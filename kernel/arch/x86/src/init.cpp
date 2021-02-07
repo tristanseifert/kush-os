@@ -4,8 +4,10 @@
 #include <printf.h>
 
 #include "vm/PDPTPool.h"
+#include "syscall/Handler.h"
 
 #include <arch/x86_msr.h>
+#include <cpuid.h>
 
 #include "gdt.h"
 #include "idt.h"
@@ -48,6 +50,7 @@ void arch_init() {
  */
 void arch_vm_available() {
     arch::vm::PDPTPool::init();
+    arch::syscall::Handler::init();
 
     gdt_setup_tss();
 }
@@ -110,8 +113,8 @@ int arch_backtrace(void *stack, char *buf, const size_t bufLen) {
  * For x86, we check CPUID leaf $80000001; bit 20 in EDX is set if we support NX, clear if not.
  */
 static void update_supports_nx() {
-    uint32_t eax, edx;
-    x86_cpuid(0x80000001, &eax, &edx);
+    uint32_t eax, edx, unused1, unused2;
+    __get_cpuid(0x80000001, &eax, &unused1, &unused2, &edx);
 
     nxEnabled = (edx & (1 << 20)) ? true : false;
 }

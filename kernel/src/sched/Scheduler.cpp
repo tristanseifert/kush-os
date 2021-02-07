@@ -1,8 +1,10 @@
 #include "Scheduler.h"
+#include "SchedulerBehavior.h"
 #include "Task.h"
 #include "Thread.h"
 #include "IdleWorker.h"
 
+#include "vm/Map.h"
 #include "mem/SlabAllocator.h"
 
 #include <platform.h>
@@ -31,7 +33,7 @@ void Scheduler::init() {
  */
 Scheduler::Scheduler() {
     // create kernel task
-    gKernelTask = Task::alloc();
+    gKernelTask = Task::alloc(vm::Map::kern());
     gKernelTask->setName("kernel_task");
 }
 
@@ -150,16 +152,92 @@ void Scheduler::markThreadAsRunnable(Thread *t) {
 void Scheduler::tickCallback(const uintptr_t irqToken) {
     if(!this->running) return;
 
+    // periodic priority adjustments
+    if(++this->priorityAdjTimer == 20) {
+        this->adjustPriorities();
+        this->priorityAdjTimer = 0;
+    }
+
     // pre-empt it
     if(--this->running->quantum == 0) {
-        // log("pre-empting %p", this->running);
+        // log("preempting running %p", this->running);
         // since we'll context switch, we won't return here, so acknowledge the interrupt
         platform_irq_ack(irqToken);
+
+        // somewhat boost down the priority of this task
+        if(this->running->priorityBoost < -10) {
+            this->running->priorityBoost--;
+        }
 
         this->yield();
     } else {
         platform_irq_ack(irqToken);
     }
+}
+
+/**
+ * Finds all threads that are waiting for CPU time and increments their priority boost; this will
+ * allow threads to jump a certain number of priority bands if they're starved for processor time,
+ * depending on their scheduling class.
+ *
+ * Note that we only do this on threads in priority bands lower than the one the currently
+ * executing thread is in. (This follows as there shouldn't be any higher priority runnable
+ * threads, if we're only now pre-empting this one.)
+ */
+void Scheduler::adjustPriorities() {
+    SPIN_LOCK_GUARD(this->runnableLock);
+
+    const auto band = this->groupForThread(this->running);
+    if(band == PriorityGroup::Idle) return;
+
+    for(size_t i = band; i < kPriorityGroupMax; i++) {
+        // increment priority boost and remove threads that gained enough priority to jump up
+        auto &list = this->runnable[i].getStorage();
+        list.removeMatching(UpdatePriorities, this);
+    }
+}
+
+/**
+ * Boosts the given thread's priority. Returns true if the thread jumped priority levels; in this
+ * case, we must add it into its new priority class.
+ */
+bool Scheduler::handleBoostThread(Thread *thread) {
+    RW_LOCK_READ_GUARD(thread->lock);
+
+    // ignore non-runnable threads
+    if(thread->state != Thread::State::Runnable) return false;
+
+    // determine the maximum boost for this thread
+    const auto band = this->groupForThread(thread);
+    const auto &rules = kSchedulerBehaviors[band];
+
+    // increment thread priority if allowed
+    if(thread->priorityBoost < rules.maxBoost &&
+       (thread->priority + thread->priorityBoost) < 100) {
+        // increment it's boost; and get the previous priority band
+        const auto oldBandBoosted = this->groupForThread(thread, true);
+        thread->priorityBoost++;
+
+        // did it jump priority classes?
+        const auto bandBoosted = this->groupForThread(thread, true);
+
+        // if so, add it to its new priority class
+        if(band > bandBoosted && bandBoosted != oldBandBoosted) {
+            //log("thread %p (prio %d boost %d) new level %d (old %d)", thread, thread->priority, thread->priorityBoost, (int) bandBoosted, (int) band);
+            this->runnable[bandBoosted].push(thread);
+            return true;
+        }
+    }
+
+    // do not remove
+    return false;
+}
+
+/**
+ * Jumps into the scheduler handler for updating the given thread's priorities.
+ */
+bool sched::UpdatePriorities(void *ctx, Thread *thread) {
+    return (reinterpret_cast<Scheduler *>(ctx)->handleBoostThread(thread));
 }
 
 /**

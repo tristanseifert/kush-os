@@ -14,6 +14,8 @@ class IdleWorker;
 struct Task;
 struct Thread;
 
+bool UpdatePriorities(void *ctx, Thread *t);
+
 /**
  * Scheduler is responsible for ensuring all runnable threads get CPU time. It does this by taking
  * threads from the head of each priority level's ready queue and running them until that queue is
@@ -26,6 +28,7 @@ struct Thread;
  *      machines. Probably making data structures shared is sufficient.
  */
 class Scheduler {
+    friend bool UpdatePriorities(void *, Thread *);
     friend void ::kernel_init();
     friend void ::platform_kern_tick(const uintptr_t);
     friend struct Thread;
@@ -80,6 +83,7 @@ class Scheduler {
 
         void adjustPriorities();
         void switchToRunnable(Thread *ignore = nullptr);
+        bool handleBoostThread(Thread *thread);
 
     private:
         static Scheduler *gShared;

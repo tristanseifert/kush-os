@@ -34,11 +34,4 @@ static inline uint64_t x86_rdtsc() {
     return (lo & 0xFFFFFFFF) | (((uint64_t) hi) << 0x20);
 }
 
-/**
- * Reads a CPUID page.
- */
-static inline void x86_cpuid(const uint32_t page, uint32_t *a, uint32_t *d) {
-    asm volatile("cpuid":"=a"(*a),"=d"(*d):"a"(page):"ecx","ebx");
-}
-
 #endif

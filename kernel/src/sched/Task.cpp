@@ -23,9 +23,9 @@ void Task::initAllocator() {
 /**
  * Allocates a new task.
  */
-Task *Task::alloc() {
+Task *Task::alloc(vm::Map *map) {
     if(!gTaskAllocator) initAllocator();
-    return gTaskAllocator->alloc();
+    return gTaskAllocator->alloc(map);
 }
 
 /**
@@ -40,9 +40,15 @@ void Task::free(Task *ptr) {
 /**
  * Initializes the task structure.
  */
-Task::Task() {
+Task::Task(vm::Map *_map) {
     // set up the virtual memory mappings
-    this->vm = vm::Map::alloc();
+    if(_map) {
+        this->vm = _map;
+        this->ownsVm = false;
+    } else {
+        this->vm = vm::Map::alloc();
+        this->ownsVm = true;
+    }
 }
 
 /**
@@ -62,7 +68,9 @@ Task::~Task() {
     }
 
     // release memory maps
-    vm::Map::free(this->vm);
+    if(this->ownsVm) {
+        vm::Map::free(this->vm);
+    }
 }
 
 /**
