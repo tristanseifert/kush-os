@@ -25,8 +25,10 @@ extern "C" void x86_switchto_save(ThreadState *from, ThreadState *to);
  */
 void arch::InitThreadState(sched::Thread *thread, const uintptr_t pc, const uintptr_t arg) {
     // make space for the exception frame and initialize it
-    const auto frameSz = sizeof(x86_exception_info_t);
-    auto frame = reinterpret_cast<x86_exception_info_t *>((uintptr_t) thread->stack - frameSz - sizeof(arg));
+    /// XXX: the +8 allows us to build a stack frame to enter the main function
+    const auto frameSz = sizeof(CpuRegs);
+    uintptr_t *params = reinterpret_cast<uintptr_t *>((uintptr_t) thread->stack - 20);
+    auto frame = reinterpret_cast<CpuRegs *>((uintptr_t) thread->stack - frameSz - 20);
 
     memset(frame, 0, frameSz);
     thread->regs.stackTop = frame;
@@ -34,8 +36,7 @@ void arch::InitThreadState(sched::Thread *thread, const uintptr_t pc, const uint
     frame->eip = pc;
 
     if(thread->kernelMode) {
-        frame->cs = GDT_KERN_CODE_SEG;
-        frame->ds = frame->es = frame->fs = frame->gs = frame->ss = GDT_KERN_DATA_SEG;
+        frame->ds = frame->es = frame->fs = frame->gs = GDT_KERN_DATA_SEG;
 
         /**
          * When we return to the thread code, we do so using IRET; it doesn't read the last two
@@ -50,10 +51,10 @@ void arch::InitThreadState(sched::Thread *thread, const uintptr_t pc, const uint
          * Potentially problematic is the resulting stack being 8 byte aligned rather than 16, but
          * we don't use any SIMD code in the kernel so it should ok?
          */
-        frame->ss = arg;
+        params[0] = 0xDEADBEEF; // bogus return address
+        params[1] = arg; // first argument
     } else {
-        frame->cs = GDT_USER_CODE_SEG | 3;
-        frame->ds = frame->es = frame->fs = frame->gs = frame->ss = GDT_USER_DATA_SEG | 3;
+        frame->ds = frame->es = frame->fs = frame->gs = GDT_USER_DATA_SEG;
 
         // ensure IRQs will be enabled
         frame->eflags |= (1 << 9);

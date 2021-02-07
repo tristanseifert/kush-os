@@ -35,6 +35,20 @@ struct ThreadState {
     /// number of times we've taken an FPU fault in this thread
     size_t fpuFaults = 0;
 };
+
+/**
+ * Registers for a kernel thread as saved on the stack.
+ */
+struct CpuRegs {
+    // segment selectors
+    uint32_t gs, fs, es, ds;
+    // registers from PUSHA; esp there is useless
+    uint32_t edi, esi, ebp, oesp, ebx, edx, ecx, eax;
+    // CPU flags
+    uint32_t eflags;
+    // and the instruction pointer/return address. kernel always uses the same code seg
+    uint32_t eip;
+} __attribute__((packed));
 }
 
 // ensure the manually defined offsets are right

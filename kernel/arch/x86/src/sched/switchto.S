@@ -39,12 +39,12 @@ x86_switchto_common:
     pop         %es
     pop         %ds
 
-    // restore registers, clear the pushed error code and ISR number
+    // restore registers and CPU state
     popa
-    add         $0x8, %esp
+    popf
 
-    // return; this will restore the interrupt flag too
-    iret
+    // return to caller
+    ret
 
 
 
@@ -56,28 +56,23 @@ x86_switchto_common:
  *  -4: Return address
  *  -8: From thread
  * -12: To thread
+ *
+ * Note that we actually return to a little return stub; this pops off the base pointer to undo
+ * the stack frame we set up to access the parameters passed to this function. Yet another fun
+ * idiosyncrasies (emphasis on idiot) of x86 :D
  */
 x86_switchto_save:
     // set up stack frame
     push        %ebp
     mov         %esp, %ebp
 
-    /*
-     * Build the IRET stack frame. Since we're returning to this function, which by definition must
-     * always be in the kernel code segment, we can skip pushing the esp/ss pieces.
-     *
-     * If we're an user mode thread, there'll be the "real" interrupt frame somewhere further down
-     * the frame to use with the proper user mode state.
-     */
+    // push the instruction pointer and flags
+    push        $x86_switchto_swap_stub
+
     pushf
     cli
-    push        %cs
-    push        4(%ebp)
 
-    // push fake error codes, GP registers and the segment descriptors
-    pushl       $0x0
-    pushl       $0x0
-
+    // push GP registers and the segment descriptors
     pusha
 
     push        %ds
@@ -103,3 +98,10 @@ x86_switchto_save:
 
     // restoring the thread state is the exact same as normal
     jmp         x86_switchto_common
+
+/**
+ * Stub for returning to a task lol
+ */
+x86_switchto_swap_stub:
+    pop         %ebp
+    ret
