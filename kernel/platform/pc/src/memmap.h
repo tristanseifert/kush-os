@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+using namespace platform;
+
 /**
  * Address of the ACPI table region. This is 0x1000000 bytes long.
  */

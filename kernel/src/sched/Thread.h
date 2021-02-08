@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <arch/thread.h>
+#include <arch/ThreadState.h>
 #include <arch/rwlock.h>
 
 namespace sched {
@@ -98,6 +98,8 @@ struct Thread {
 
         /// Context switches to this thread.
         void switchTo();
+        /// Returns to user mode, with the specified program counter and stack.
+        void returnToUser(const uintptr_t pc, const uintptr_t stack) __attribute__((noreturn));
 
         /// Sets the thread's name.
         void setName(const char *name);

@@ -7,6 +7,7 @@
 #include "multiboot.h"
 #include "irq/pic.h"
 #include "irq/Manager.h"
+#include "timer/Manager.h"
 #include "timer/pit.h"
 #include "io/spew.h"
 #include "acpi/Manager.h"
@@ -39,6 +40,6 @@ void platform_init() {
 void platform_vm_available() {
     irq::Manager::init();
     acpi::Manager::vmAvailable();
-
     irq::Manager::setupIrqs();
+    timer::Manager::init();
 }

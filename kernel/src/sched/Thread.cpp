@@ -87,6 +87,14 @@ void Thread::switchTo() {
 }
 
 /**
+ * Call into architecture code to return to user mode.
+ */
+void Thread::returnToUser(const uintptr_t pc, const uintptr_t stack) {
+    arch::ReturnToUser(pc, stack);
+}
+
+
+/**
  * Copies the given name string to the thread's name field.
  */
 void Thread::setName(const char *newName) {

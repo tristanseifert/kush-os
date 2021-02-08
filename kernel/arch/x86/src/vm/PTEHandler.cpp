@@ -449,8 +449,8 @@ const uint64_t PTEHandler::getPageDirectory(const uint32_t virt) {
  * @note It's required to check that the page table has been allocated before.
  */
 void PTEHandler::setPageTable(const uint32_t virt, const uint64_t value) {
-    uint64_t *ptr = (uint64_t *) (0xBF800000 + ((virt & ~0xFFF) >> 9));
-    *ptr = value;
+    auto ptr = reinterpret_cast<uint64_t *>(0xBF800000);
+    ptr[((virt & ~0xFFF) >> 9) / sizeof(uint64_t)] = value;
 
     // TODO: is this always required?
     asm volatile( "invlpg (%0)" : : "b"(virt) : "memory" );
@@ -461,6 +461,6 @@ void PTEHandler::setPageTable(const uint32_t virt, const uint64_t value) {
  * @note This will cause a page fault if the page table hasn't been allocated.
  */
 const uint64_t PTEHandler::getPageTable(const uint32_t virt) {
-    uint64_t *ptr = (uint64_t *) (0xBF800000 + ((virt & ~0xFFF) >> 9));
-    return *ptr;
+    auto ptr = reinterpret_cast<uint64_t *>(0xBF800000);
+    return ptr[((virt & ~0xFFF) >> 9) / sizeof(uint64_t)];
 }

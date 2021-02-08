@@ -3,6 +3,7 @@
 #include "IoApic.h"
 #include "pic.h"
 
+#include "timer/Manager.h"
 #include "timer/LocalApicTimer.h"
 
 #include "memmap.h"
@@ -286,6 +287,7 @@ void Manager::setupTimebase() {
 void Manager::handleIsr(const uint32_t type) {
     // APIC timer
     if(type == ISR_APIC_TIMER) {
+        timer::Manager::gShared->tick(kTimebaseInterval * 1000, type);
         platform_kern_tick(type);
     }
     // legacy ISA interrupts?

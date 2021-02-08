@@ -1,3 +1,6 @@
+#define ASM_FILE
+#include "Handler.h"
+
 /// Macro to save state for syscall
 .macro state_save
     push        %ebp
@@ -23,21 +26,32 @@
 .align 0x40 // align to cache line
 arch_syscall_entry:
     // test for slow path
-    bt          %ax, 15
-    jc          arch_syscall_slow
+    cmp         $SYSCALL_FAST_MAX, %eax
+    jge         arch_syscall_slow
 
 arch_msgsend_fast:
+    // fall back to slow path
+    jmp         arch_msgsend_slow
+
     // get destination port
-
     // is there a thread blocking on it?
-
     // context switch to it
+
+    // we shouldn't get here?
+    jmp         arch_syscall_exit
 
 /**
  * Slow path for message sending
  */
 arch_msgsend_slow:
     state_save
+    xor         %ebp, %ebp
+
+    // call handler
+    push        %eax
+    call        arch_syscall_msgsend_slow
+
+    add         $0x4, %esp
 
     // restore state and exit
     state_restore
@@ -73,4 +87,5 @@ arch_syscall_slow:
  * use a stack that's not mapped for that process.
  */
 arch_syscall_exit:
+    sti
     sysexit

@@ -1,5 +1,6 @@
 #include "Thread.h"
 
+#include <arch.h>
 #include <log.h>
 #include <string.h>
 
@@ -14,10 +15,6 @@
 
 using namespace arch;
 
-extern "C" void x86_thread_end() __attribute__((noreturn));
-
-extern "C" void x86_switchto(ThreadState *to) __attribute__((noreturn));
-extern "C" void x86_switchto_save(ThreadState *from, ThreadState *to);
 
 /**
  * Initializes a thread's state. Execution will begin at the given address, passing the given
@@ -96,6 +93,18 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
         // log("new task %%esp = %p (stack %p)", to->regs.stackTop, to->stack);
         x86_switchto(&to->regs);
     }
+}
+
+/**
+ * Builds up a stack frame for use with IRET to return to ring 3.
+ */
+void arch::ReturnToUser(const uintptr_t pc, const uintptr_t stack) {
+    // validate ranges
+    REQUIRE(pc < 0xC0000000, "invalid user pc: %08x", pc);
+    REQUIRE(stack < 0xC0000000, "invalid user stack: %08x", pc);
+
+    // switchyboi time
+    x86_ring3_return(pc, stack);
 }
 
 /**

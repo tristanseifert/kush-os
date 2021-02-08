@@ -4,14 +4,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
  * Performs platform-specific initialization.
  */
-void platform_init();
+extern "C" void platform_init();
 
 /**
  * Notifies platform code that virtual memory is available.
@@ -26,7 +22,7 @@ void platform_debug_spew(char ch);
 /**
  * Panic callback; this should disable interrupts, then halt the machine.
  */
-void platform_panic_handler() __attribute__((noreturn));
+extern "C" void platform_panic_handler() __attribute__((noreturn));
 
 
 
@@ -78,13 +74,36 @@ int platform_irq_ack(const uintptr_t token);
 
 
 
+/**
+ * Gets the current system timestamp.
+ *
+ * System time is kept as the number of nanoseconds since boot-up.
+ */
+uint64_t platform_timer_now();
+
+/**
+ * Registers a new timer callback.
+ *
+ * The given function is invoked at (or after -- there is no guarantee made as to the resolution of
+ * the underlying hardware timers) the given time, in nanoseconds since system boot.
+ *
+ * Returned is an opaque token that can be used to cancel the timer before it fires. Timers are
+ * always one shot.
+ *
+ * @note The callbacks may be invoked in an interrupt context; you should do as little work as
+ * possible there.
+ *
+ * @return An opaque timer token, or 0 in case an error occurs.
+ */
+uintptr_t platform_timer_add(const uint64_t at, void (*callback)(const uintptr_t, void *), void *ctx);
+
+/**
+ * Removes a previously created timer, if it has not fired yet.
+ */
+void platform_timer_remove(const uintptr_t token);
+
 ////////////////////////////////////////////////////////////////////////////////
 /// Functions below are defined by the kernel.
 extern void platform_kern_tick(const uintptr_t token);
-
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

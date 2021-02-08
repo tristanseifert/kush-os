@@ -1,6 +1,7 @@
 #ifndef ARCH_X86_SYSCALL_HANDLER_H
 #define ARCH_X86_SYSCALL_HANDLER_H
 
+#ifndef ASM_FILE
 #include <stdint.h>
 
 #include <sched/Thread.h>
@@ -8,6 +9,7 @@
 #include <arch/x86_msr.h>
 
 extern "C" uintptr_t arch_syscall_handle(const uintptr_t eax);
+extern "C" uintptr_t arch_syscall_msgsend_slow(const uintptr_t eax);
 
 namespace arch { namespace syscall {
 /**
@@ -43,5 +45,9 @@ class Handler {
         static Handler *gShared;
 };
 }}
+#endif
+
+/// Last syscall number that uses the fast path (all calls incl+above this use slow path)
+#define SYSCALL_FAST_MAX                0x10
 
 #endif

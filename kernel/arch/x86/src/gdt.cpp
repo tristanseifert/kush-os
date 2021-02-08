@@ -111,13 +111,15 @@ void gdt_setup_tss() {
         gTss[i].fs = GDT_KERN_DATA_SEG | 3;
         gTss[i].gs = GDT_KERN_DATA_SEG | 3;
         gTss[i].ss = GDT_KERN_DATA_SEG | 3;
+
+        gTss[i].iomap = sizeof(gdt_task_gate_t);
     }
 }
 
 /**
  * Updates the TSS for the current processor to point to the specified stack.
  *
- * TODO: handle multiprocessor
+ * TODO: handle multiprocessor. we also just force clear the BUSY flag -- is this ok?
  */
 void tss_set_esp0(void *ptr) {
     const auto tssIdx = 0;
@@ -130,6 +132,10 @@ void tss_set_esp0(void *ptr) {
 
     // otherwise, update the TSS and then flush it
     gTss[tssIdx].esp0 = (uintptr_t) ptr;
+
+    // reset the BUSY flag of the TSS
+    gdt_set_entry((GDT_FIRST_TSS >> 3) + tssIdx, ((uint32_t) &gTss[tssIdx]),
+                      sizeof(gdt_task_gate_t), 0x89, 0x4F);
 
     tss_load(GDT_FIRST_TSS + (tssIdx * 8));
 }

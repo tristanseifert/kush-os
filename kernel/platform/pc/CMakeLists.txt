@@ -10,13 +10,14 @@ add_library(kernel_platform_pc OBJECT
     src/multiboot.cpp
     src/physmap.cpp
     src/acpi/Manager.cpp
-    src/io/spew.c
+    src/io/spew.cpp
     src/irq/handlers.S
     src/irq/Manager.cpp
     src/irq/pic.cpp
     src/irq/IoApic.cpp
     src/irq/Apic.cpp
     src/irq/IsrDispatcher.cpp
+    src/timer/Manager.cpp
     src/timer/pit.cpp
     src/timer/LocalApicTimer.cpp
 )

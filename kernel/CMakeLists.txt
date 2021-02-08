@@ -32,6 +32,7 @@ add_executable(kernel
     src/mem/liballoc/liballoc.cpp
     src/runtime/CppRuntime.cpp
     src/runtime/log.cpp
+    src/runtime/Hash.cpp
     src/vm/Mapper.cpp
     src/vm/Map.cpp
     src/sched/Scheduler.cpp

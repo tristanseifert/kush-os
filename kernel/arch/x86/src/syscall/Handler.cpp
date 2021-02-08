@@ -42,3 +42,11 @@ uintptr_t arch_syscall_handle(const uintptr_t code) {
     log("Syscall: %08lx", code);
     return 0;
 }
+
+/**
+ * Slow path for the msgsend-family of functions.
+ */
+uintptr_t arch_syscall_msgsend_slow(const uintptr_t type) {
+    log("Slow path for msgsend (type %08x)", type);
+    return -1;
+}

@@ -36,17 +36,31 @@ class List {
 
             private:
                 /// Sets up the iterator
-                Iterator(List *_list, const Element *_item) : list(_list) , element(_item){}
+                Iterator(const List *_list, const Element *_item) : list(_list) , element(_item){}
 
             public:
                 /// This does nothing but we must declare it anyways
                 ~Iterator() = default;
 
+                /// Advance the iterator to the next position.
+                Iterator &operator++() {
+                    this->element = element->next;
+                    return *this;
+                }
+                /// Returns the object we point to.
+                const T &operator*() const {
+                    return this->element->value;
+                }
+                /// Is this iterator at the same position as another?
+                bool operator !=(const Iterator &it) {
+                    return (it.element != this->element);
+                }
+
             private:
                 /// List we're referencing data on
-                List *list = nullptr;
+                const List *list = nullptr;
                 /// Element that this iterator points to (nullptr = end)
-                Element *element = nullptr;
+                const Element *element = nullptr;
         };
 
     public:
@@ -183,6 +197,15 @@ class List {
         /// Number of items in the list
         const size_t size() const {
             return this->numElements;
+        }
+
+        /// Gets an iterator to the start of the list
+        Iterator begin() const {
+            return Iterator(this, this->head);
+        }
+        /// Gets an iterator to the end of the list
+        Iterator end() const {
+            return Iterator(this, nullptr);
         }
     private:
         /// Head of list, or null if empty

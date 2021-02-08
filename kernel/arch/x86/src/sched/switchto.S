@@ -1,7 +1,11 @@
 #define ASM_FILE
 #include "ThreadState.h"
+#include "gdt.h"
 
-.globl x86_switchto
+.global x86_switchto
+.global x86_switchto_save
+.global x86_ring3_return
+
 /**
  * Performs a context switch to a thread; context is NOT saved.
  *
@@ -48,7 +52,6 @@ x86_switchto_common:
 
 
 
-.globl x86_switchto_save
 /**
  * Performs a context switch, saving the current thread state.
  *
@@ -105,3 +108,51 @@ x86_switchto_save:
 x86_switchto_swap_stub:
     pop         %ebp
     ret
+
+/**
+ * Builds a stack frame suitable for use with IRET to return to ring 3. Additionally, all of the
+ * general purpose registers are cleared.
+ *
+ *  8: Program counter
+ * 12: Stack address
+ */
+x86_ring3_return:
+    // to prevent interruptions
+    cli
+
+    // set up stack frame
+    push        %ebp
+    mov         %esp, %ebp
+
+    // program counter
+    pushl       $GDT_USER_DATA_SEG|0x3
+    pushl       12(%ebp)
+
+    // flags: always enable interrupts
+    xor         %eax, %eax
+    or          $0x002, %eax // reserved bit, always 1
+    or          $0x200, %eax
+    push        %eax
+
+    // the stack we're returning with
+    pushl       $GDT_USER_CODE_SEG|0x3
+    pushl       8(%ebp)
+
+    // set up segment registers
+    mov         $GDT_USER_DATA_SEG|0x3, %eax
+    mov         %ax, %ds
+    mov         %ax, %es
+    mov         %ax, %fs
+    mov         %ax, %gs
+
+    // clear registers
+    xor         %eax, %eax
+    xor         %ebx, %ebx
+    xor         %ecx, %ecx
+    xor         %edx, %edx
+    xor         %ebp, %ebp
+    xor         %esi, %esi
+    xor         %edi, %edi
+
+    // and finally do the return
+    iret
