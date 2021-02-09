@@ -1,5 +1,6 @@
 #include "Thread.h"
 
+#include <platform.h>
 #include <arch.h>
 #include <log.h>
 #include <string.h>
@@ -10,8 +11,8 @@
 
 #include "syscall/Handler.h"
 
-#include "../exceptions.h"
-#include "../gdt.h"
+#include "exceptions.h"
+#include "gdt.h"
 
 using namespace arch;
 
@@ -51,7 +52,7 @@ void arch::InitThreadState(sched::Thread *thread, const uintptr_t pc, const uint
     params[1] = arg; // first argument
 
     // for threads ending up in userspace, ensure IRQs are on so they can be pre-empted
-    if(!thread->kernelMode) {
+    if(!thread->kernelMode || true) {
         frame->eflags |= (1 << 9);
     }
 
@@ -64,6 +65,19 @@ void arch::InitThreadState(sched::Thread *thread, const uintptr_t pc, const uint
  * switching to the correct stack, restoring registers and performing an iret.
  */
 void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
+    bool yes = true, no = false;
+
+    /*
+     * Disable interrupts. When we return to the thread, we'll re-enable them, but this prevents
+     * the stack from getting munged with from interrupts during a context switch.
+     *
+     * At the same time, we'll lower the irql back down to passive so that interrupts can get
+     * queued again; but since they're disabled, we won't receive them until after the context
+     * switch has completed.
+     */
+    asm volatile("cli" ::: "memory");
+    platform_lower_irql(platform::Irql::Passive);
+
     // switch page tables if needed
     if((!from && to->task) ||
        (from && from->task && to->task && from->task != to->task)) {
@@ -87,7 +101,6 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
     if(from) {
         // log("old task %%esp = %p, new task %%esp = %p (stack %p)", from->regs.stackTop, to->regs.stackTop, to->stack);
         // set the running flags
-        bool yes = true, no = false;
 
         __atomic_store(&from->isActive, &no, __ATOMIC_RELEASE);
         __atomic_store(&to->isActive, &yes, __ATOMIC_RELEASE);
@@ -97,7 +110,6 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
     // no thread context to save; just switch
     else {
         // log("new task %%esp = %p (stack %p)", to->regs.stackTop, to->stack);
-        bool yes = true;
         __atomic_store(&to->isActive, &yes, __ATOMIC_RELEASE);
 
         x86_switchto(&to->regs);

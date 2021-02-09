@@ -123,7 +123,7 @@ struct Thread {
         void *stack = nullptr;
 
         /// architecture-specific thread state
-        arch::ThreadState regs;
+        arch::ThreadState regs __attribute__((aligned(16)));
 
     public:
         /// Allocates a new kernel space thread

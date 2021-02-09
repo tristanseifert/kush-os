@@ -13,9 +13,6 @@
  * ThreadState struct.
  */
 x86_switchto:
-    // disable interrupts
-    cli
-
     // set up stack frame and get parameter
     push        %ebp
     mov         %esp, %ebp
@@ -48,7 +45,6 @@ x86_switchto_common:
     popf
 
     // return to caller
-    sti
     ret
 
 
@@ -74,7 +70,6 @@ x86_switchto_save:
     push        $x86_switchto_swap_stub
 
     pushf
-    cli
 
     // push GP registers and the segment descriptors
     pusha
@@ -108,6 +103,7 @@ x86_switchto_save:
  */
 x86_switchto_swap_stub:
     pop         %ebp
+    sti
     ret
 
 /**

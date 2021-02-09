@@ -19,6 +19,7 @@ struct Thread;
  * Basically, this is a thread at the lowest priority level that's always ready to run.
  */
 class IdleWorker {
+    friend class Scheduler;
     friend void IdleEntry(uintptr_t);
 
     private:

@@ -4,6 +4,40 @@
 #include <stdint.h>
 #include <stddef.h>
 
+namespace platform {
+/**
+ * Defines an IRQ level, which is another way to talk about the priority of a given processor
+ * core. Lower priority interrupts (whether they come from devices or are generated in software)
+ * are pended until higher priority interrupts return.
+ */
+enum class Irql {
+    /**
+     * Critical sections
+     */
+    CriticalSection                     = 7,
+    /**
+     * General interprocessor interupt
+     */
+    IPI                                 = 6,
+    /**
+     * Time keeping interrupt
+     */
+    Clock                               = 5,
+    /**
+     * Device interrupts
+     */
+    DeviceIrq                           = 4,
+    /**
+     * Scheduler level; you may only call into the scheduler at this level or below.
+     */
+    Scheduler                           = 3,
+    /**
+     * All higher priority interrupts are permitted.
+     */
+    Passive                             = 0,
+};
+}
+
 /**
  * Performs platform-specific initialization.
  */
@@ -72,6 +106,24 @@ int platform_section_get_info(const platform_section_t section, uint64_t *physAd
  */
 int platform_irq_ack(const uintptr_t token);
 
+/**
+ * Raises the interrupt priority level of the current processor.
+ */
+void platform_raise_irql(const platform::Irql irql);
+/**
+ * Lowers the interrupt priority level of the current processor.
+ */
+void platform_lower_irql(const platform::Irql irql);
+/**
+ * Gets the current irql of the processor.
+ */
+const platform::Irql platform_get_irql();
+
+/**
+ * Requests a dispatch IPI to be sent to the current processor.
+ */
+void platform_request_dispatch();
+
 
 
 /**
@@ -106,8 +158,8 @@ void platform_timer_remove(const uintptr_t token);
 /// Functions below are defined by the kernel.
 
 /// Indicates to the kernel a time tick has taken place.
-extern void platform_kern_tick(const uintptr_t token);
-/// Performs context switch to the next highest priority thread, if any.
-extern void platform_kern_scheduler_update();
+extern void platform_kern_tick(const uintptr_t irqToken);
+/// Invokes the scheduler, in response to a scheduler IPI.
+extern void platform_kern_scheduler_update(const uintptr_t irqToken);
 
 #endif

@@ -26,6 +26,8 @@ void Manager::init() {
  */
 uintptr_t Manager::add(const uint64_t deadline, void (*callback)(const uintptr_t, void *),
         void *ctx) {
+    DECLARE_CRITICAL();
+
     // deadline mayn't be in the past
     if(deadline < now()) {
         return 0;
@@ -57,6 +59,8 @@ uintptr_t Manager::add(const uint64_t deadline, void (*callback)(const uintptr_t
  * Removes a previously allocated timer, if it hasn't fired yet.
  */
 void Manager::remove(const uintptr_t token) {
+    DECLARE_CRITICAL();
+
     CRITICAL_ENTER();
     RW_LOCK_WRITE(&this->timersLock);
 
@@ -115,16 +119,14 @@ void Manager::tick(const uint64_t ns, const uintptr_t irqToken) {
 
     RW_UNLOCK_WRITE(&this->timersLock);
 
-    // update scheduler if any timers happened
-    if(info.numFired) {
-        platform_kern_scheduler_update();
-    }
+    // do not request scheduler update yet; the system tick handler will do that
 }
 
 /**
  * Returns the nanoseconds since the last time the current time variable was updated.
  */
 uint64_t Manager::nsSinceTick() {
+    if(!gShared->timebase) return 0;
     return gShared->timebase->nsInTick();
 }
 

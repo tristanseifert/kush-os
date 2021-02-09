@@ -52,6 +52,7 @@ platform_isr_pic_spurious_sec:
 // APIC related ISRs
 define_isr apic_spurious, ISR_SPURIOUS_APIC
 define_isr apic_timer, ISR_APIC_TIMER
+define_isr apic_dispatch, ISR_APIC_DISPATCH_IPI
 
 // ISA interrupts
 define_isr isa_0, ISR_ISA_0

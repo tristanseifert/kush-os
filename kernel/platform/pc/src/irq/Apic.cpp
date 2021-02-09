@@ -13,6 +13,8 @@
 
 using namespace platform::irq;
 
+static Irql gIrql = Irql::Passive;
+
 /**
  * Reads out the APIC base MSR.
  */
@@ -104,3 +106,89 @@ void Apic::mapNmi(const uint8_t lint, const IrqFlags f) {
     }
 }
 
+/**
+ * Sends a dispatch IPI to ourselves.
+ *
+ * This will send a fixed priority interrupt to only ourselves.
+ */
+void Apic::sendDispatchIpi() {
+    uint32_t command = kVectorDispatch;
+    command |= (1 << 14); // level is always 1
+    command |= (0b01 << 18); // shorthand = self
+
+    this->write(kApicRegInterruptCmdLow, command);
+}
+
+/**
+ * Update the APIC task priority register.
+ */
+void Apic::updateTpr(const Irql irql) {
+    uint8_t priority;
+
+    switch(irql) {
+        case Irql::CriticalSection:
+            priority = 0xFF;
+            break;
+        case Irql::IPI:
+            priority = 0xC0;
+            break;
+        case Irql::Clock:
+            priority = 0xB0;
+            break;
+        case Irql::DeviceIrq:
+            priority = 0x30;
+            break;
+        case Irql::Scheduler:
+            priority = 0x20;
+            break;
+        case Irql::Passive:
+            priority = 0;
+            break;
+
+        default:
+            panic("unhandled irql %d", (int) irql);
+    }
+
+    this->write(kApicRegTaskPriority, (uint32_t) priority);
+}
+
+/**
+ * Raises the interrupt priority level of the current processor.
+ */
+void platform_raise_irql(const Irql irql) {
+    asm volatile("cli");
+    REQUIRE(irql >= gIrql, "cannot %s irql: current %d, requested %d", "raise", (int) gIrql,
+            (int) irql);
+    gIrql = irql;
+
+    Manager::currentProcessorApic()->updateTpr(irql);
+    asm volatile("sti");
+}
+
+/**
+ * Lowers the interrupt priority level of the current processor.
+ */
+void platform_lower_irql(const platform::Irql irql) {
+    asm volatile("cli");
+    REQUIRE(irql <= gIrql, "cannot %s irql: current %d, requested %d", "lower", (int) gIrql,
+            (int) irql);
+    gIrql = irql;
+
+    Manager::currentProcessorApic()->updateTpr(irql);
+    asm volatile("sti");
+}
+
+/**
+ * Returns the current irql.
+ */
+const platform::Irql platform_get_irql() {
+    return gIrql;
+}
+
+/**
+ * Requests a dispatch IPI to be sent to the current processor.
+ */
+void platform_request_dispatch() {
+    auto apic = Manager::currentProcessorApic();
+    apic->sendDispatchIpi();
+}

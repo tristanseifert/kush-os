@@ -55,7 +55,7 @@ class Manager {
 
     public:
         /// System timebase, in microseconds
-        constexpr static const uint32_t kTimebaseInterval = 1000;
+        constexpr static const uint32_t kTimebaseInterval = 2000;
 
     public:
         Manager();
@@ -83,6 +83,12 @@ class Manager {
         static Manager *get() {
             return gShared;
         }
+
+        /// Returns a reference to the APIC of the currently running processor.
+        static Apic *currentProcessorApic() {
+            // TODO: do this properly
+            return gShared->apics[0];
+        };
 
     private:
         /// Info on a single IRQ override

@@ -37,6 +37,8 @@ class Manager {
     public:
         /// Returns the current timestamp value
         static inline const uint64_t now() {
+            if(!gShared) return 0;
+
             uint64_t temp;
             __atomic_load(&gShared->currentTime, &temp, __ATOMIC_CONSUME);
             return temp + nsSinceTick();

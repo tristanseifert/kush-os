@@ -6,6 +6,8 @@
 /// ISR code for APIC-originated spurious interrupts
 #define ISR_SPURIOUS_APIC               0x81
 
+/// APIC originated scheduler dispatch interrupt
+#define ISR_APIC_DISPATCH_IPI           0x2E
 /// APIC originated timer interrupt (processor local)
 #define ISR_APIC_TIMER                  0xB0
 

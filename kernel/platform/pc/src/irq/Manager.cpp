@@ -25,6 +25,7 @@ extern "C" void platform_isr_pic_spurious_pri();
 extern "C" void platform_isr_pic_spurious_sec();
 extern "C" void platform_isr_apic_spurious();
 extern "C" void platform_isr_apic_timer();
+extern "C" void platform_isr_apic_dispatch();
 
 extern "C" void platform_isr_isa_0();
 extern "C" void platform_isr_isa_1();
@@ -218,6 +219,19 @@ void Manager::installHandlers() {
     idt_set_entry(timer::LocalApicTimer::kTimerVector, (uint32_t) platform_isr_apic_timer,
             GDT_KERN_CODE_SEG, IDT_FLAGS_ISR);
 
+    // register for the scheduler dispatch IPIs
+    idt_set_entry(Apic::kVectorDispatch, (uint32_t) platform_isr_apic_dispatch, GDT_KERN_CODE_SEG,
+            IDT_FLAGS_ISR);
+
+    const auto token = this->addHandler(ISR_APIC_DISPATCH_IPI, [](void *ctx, const uint32_t type) {
+        platform_raise_irql(Irql::Scheduler);
+        platform_kern_scheduler_update(type);
+        platform_lower_irql(Irql::Passive);
+
+        return true;
+    }, this);
+    REQUIRE(token, "failed to register dispatch IPI");
+
     // install the legacy ISA handlers (first 16 IOAPIC vectors)
     const static uintptr_t kIsaIsrs[16] = {
         (uintptr_t) platform_isr_isa_0,  (uintptr_t) platform_isr_isa_1,
@@ -275,10 +289,12 @@ void Manager::setupTimebase() {
 
         // register an interrupt handler as well
         const auto token = this->addHandler(ISR_APIC_TIMER, [](void *ctx, const uint32_t type) {
+            platform_raise_irql(Irql::Clock);
+
             timer::Manager::gShared->tick(kTimebaseInterval * 1000, type);
             platform_kern_tick(type);
 
-            // if we return here, handle the ISR. the scheduler may have switched away
+            platform_lower_irql(Irql::Passive);
             return true;
         }, apic);
 
@@ -337,6 +353,7 @@ void Manager::removeHandler(const uintptr_t token) {
  * interrupt internally.
  */
 void Manager::handleIsr(const uint32_t type) {
+    // handle normal interrupts
     RW_LOCK_READ_GUARD(this->handlersLock);
 
     bool ack = true;
@@ -344,10 +361,9 @@ void Manager::handleIsr(const uint32_t type) {
 
     for(const auto &handler : this->handlers) {
         if(handler.irq == type) {
+            handled = true;
             const bool temp = handler.callback(handler.callbackCtx, type);
             if(!temp) ack = temp;
-
-            handled = true;
         }
     }
 
@@ -367,11 +383,15 @@ void Manager::acknowledgeIrq(const uint32_t type) {
     // APIC timer or legacy ISA interrupt
     if(type == ISR_APIC_TIMER ||
        (type >= ISR_ISA_0 && type <= ISR_ISA_15)) {
-        this->apics[0]->endOfInterrupt();
+        currentProcessorApic()->endOfInterrupt();
+    }
+    // IPIs 
+    else if(type == ISR_APIC_DISPATCH_IPI) {
+        currentProcessorApic()->endOfInterrupt();
     }
     // unhandled isr
     else {
-        panic("platform irq manager doesn't know how to route irq %08x", type);
+        panic("platform irq manager doesn't know how to ack irq %08x", type);
     }
 }
 

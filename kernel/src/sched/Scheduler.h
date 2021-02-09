@@ -24,6 +24,10 @@ bool UpdatePriorities(void *ctx, Thread *t);
  * In essence, the scheduler implements a round-robin scheduling scheme inside priority bands, but
  * ensures that a higher priority task will ALWAYS receive CPU time before a lower priority one.
  *
+ * Pre-emption works by having a tick handler that queues scheduler invocations and increments a
+ * flag to indicate the number of ticks that took place. Likewise, unblocking threads will simply
+ * add them to a queue and request a scheduler update.
+ *
  * XXX: This will require a fair bit of re-architecting when we want to support multiprocessor
  *      machines. Probably making data structures shared is sufficient.
  */
@@ -31,7 +35,7 @@ class Scheduler {
     friend bool UpdatePriorities(void *, Thread *);
     friend void ::kernel_init();
     friend void ::platform_kern_tick(const uintptr_t);
-    friend void ::platform_kern_scheduler_update();
+    friend void ::platform_kern_scheduler_update(const uintptr_t);
     friend struct Thread;
 
     public:
@@ -67,7 +71,9 @@ class Scheduler {
         /// Runs the scheduler.
         void run() __attribute__((noreturn));
         /// Yields the remainder of the current thread's CPU time.
-        void yield();
+        void yield() {
+            yield(nullptr, nullptr);
+        }
 
     private:
         static void init();
@@ -82,16 +88,21 @@ class Scheduler {
 
         const PriorityGroup groupForThread(Thread *t, const bool withBoost = false) const;
 
-        void tickCallback(const uintptr_t irqToken);
+        void tickCallback();
 
         Scheduler();
         ~Scheduler();
 
+        void yield(void (*willSwitch)(void*), void *willSwitchCtx = nullptr);
+        void requeueRunnable(Thread *);
+
         void adjustPriorities();
-        void switchToRunnable(Thread *ignore = nullptr);
+        void switchToRunnable(Thread *ignore = nullptr, bool requeueRunning = false,
+                void (*willSwitch)(void*) = nullptr, void *willSwitchCtx = nullptr);
         bool handleBoostThread(Thread *thread);
 
-        void handleDeferredUpdates();
+        bool handleDeferredUpdates();
+        void receivedDispatchIpi(const uintptr_t);
 
     private:
         /// Info on a thread that is runnable
@@ -113,6 +124,9 @@ class Scheduler {
         Thread *running = nullptr;
         /// timer we increment every tick to govern when we boost threads' priorities
         uintptr_t priorityAdjTimer = 0;
+
+        /// number of time ticks we have to handle for the next deferred update cycle
+        uintptr_t ticksToHandle = 0;
 
         /// lock for the runnable threads queue
         DECLARE_SPINLOCK(runnableLock);

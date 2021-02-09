@@ -4,6 +4,12 @@
 #include <stdint.h>
 
 /**
+ * Task priority register; write in this the lowest interrupt vector that you want to receive on
+ * this processor.
+ */
+constexpr static const uint32_t kApicRegTaskPriority    = 0x080;
+
+/**
  * End of interrupt register.
  *
  * This is write-only; you must write a '0' to it to end an interrupt.
@@ -14,6 +20,11 @@ constexpr static const uint32_t kApicRegEndOfInt        = 0x0B0;
  * Spurious interrupt and enable register
  */
 constexpr static const uint32_t kApicRegSpurious        = 0x0F0;
+
+/**
+ * Low half of the interrupt command register
+ */
+constexpr static const uint32_t kApicRegInterruptCmdLow = 0x300;
 
 /**
  * LVT entry for the core local timer

@@ -28,6 +28,7 @@ void log(const char *format, ...) {
     va_list va;
     va_start(va, format);
 
+    fctprintf(_outchar, NULL, "[%16llu] ", platform_timer_now());
     fctvprintf(_outchar, NULL, format, va);
 
     va_end(va);

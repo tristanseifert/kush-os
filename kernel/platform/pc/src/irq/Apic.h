@@ -26,9 +26,13 @@ namespace irq {
  * mapping between CPU IDs and APICs, and some other metadata.
  */
 class Apic {
+    friend void ::platform_raise_irql(const Irql);
+    friend void ::platform_lower_irql(const Irql);
     friend class timer::LocalApicTimer;
 
     public:
+        /// Dispatch IPI vector
+        constexpr static const uint8_t kVectorDispatch = 0x2E;
         /// Spurious interrupt vector number
         constexpr static const uint8_t kVectorSpurious = 0xFF;
         /// NMI interrupt vector
@@ -61,6 +65,9 @@ class Apic {
             return this->timer;
         }
 
+        /// Sends a dispatcher IPI.
+        void sendDispatchIpi();
+
     private:
         /// Writes the given APIC register.
         inline void write(const uint32_t reg, const uint32_t value) {
@@ -73,6 +80,8 @@ class Apic {
 
         /// Measures the frequency of the core local timer
         void measureTimerFreq();
+        /// Updates the allowed interrupt priority levels.
+        void updateTpr(const Irql);
 
     private:
         /// APIC ID
