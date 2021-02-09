@@ -59,6 +59,7 @@ void IoApic::mapIsaIrqs() {
     // default ISA interrupt flags:
     RedirectionEntry r;
     r.lower = r.upper = 0;
+    r.mask = 1;
 
     // send to CPU 0 as a regular interrupt
     r.destination = 0;
@@ -66,8 +67,7 @@ void IoApic::mapIsaIrqs() {
 
     for(size_t i = 0; i < 16; i++) {
         r.vector = kFirstVector + i;
-        this->write(IOAPICREDTBL(i), r.lower);
-        this->write(IOAPICREDTBL(i)+1, r.upper);
+        this->setRedirEntry(i, r);
     }
 }
 
@@ -87,6 +87,9 @@ void IoApic::remap(const uint8_t irq, const uint32_t dest, const IrqFlags f) {
 
     r.vector = kFirstVector + irq;
 
+    // IRQs are masked by default
+    r.mask = 1;
+
     // currently, all IRQs go to CPU 0
     r.destination = 0;
     r.destMode = 0; // physical mode: APIC ID
@@ -101,12 +104,46 @@ void IoApic::remap(const uint8_t irq, const uint32_t dest, const IrqFlags f) {
     }
 
     // write to IOAPIC
-    this->write(IOAPICREDTBL(idx), r.lower);
-    this->write(IOAPICREDTBL(idx)+1, r.upper);
+    this->setRedirEntry(idx, r);
 
 #if LOG_IRQ_REMAP
     log("remapping IOAPIC relative irq %lu (system irq %lu) to %u (%08lx %08lx)", idx, dest, irq,
             r.upper, r.lower);
 #endif
+}
+
+/**
+ * Sets the mask state of the given interrupt.
+ */
+void IoApic::setIrqMasked(const uint8_t irq, const bool masked) {
+    // read the redirection entry
+    const auto idx = irq - this->irqBase;
+    auto r = this->getRedirEntry(idx);
+
+    // write it back wit hthe right bit set
+    r.mask = masked ? 1 : 0;
+    this->setRedirEntry(idx, r);
+}
+
+
+
+/**
+ * Reads an irq redirection entry.
+ */
+const IoApic::RedirectionEntry IoApic::getRedirEntry(const size_t offset) {
+    RedirectionEntry r;
+
+    r.lower = this->read(IOAPICREDTBL(offset));
+    r.upper = this->read(IOAPICREDTBL(offset)+1);
+
+    return r;
+}
+
+/**
+ * Writes the redirection entry to the given interrupt index.
+ */
+void IoApic::setRedirEntry(const size_t offset, const RedirectionEntry &entry) {
+    this->write(IOAPICREDTBL(offset), entry.lower);
+    this->write(IOAPICREDTBL(offset)+1, entry.upper);
 }
 

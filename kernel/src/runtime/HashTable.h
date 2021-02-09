@@ -39,6 +39,14 @@ class HashTable {
             return (*keyPtr == entry.key);
         }
 
+        /// info struct for iteration
+        struct IterInfo {
+            /// callback function
+            bool (*callback)(void *, const KeyType &, ValueType &);
+            /// context pointer for callback
+            void *ctx = nullptr;
+        };
+
     public:
         /**
          * Inserts an item with the given key. If such an object already exists, it is replaced.
@@ -103,6 +111,29 @@ class HashTable {
 
             // not found
             panic("hash table key not found");
+        }
+
+        /**
+         * Iterates all items in the table.
+         *
+         * You can return false from the callback to remove that element.
+         */
+        void iterate(bool (*callback)(void *, const KeyType &, ValueType &), void *ctx) {
+            // prepare the info we pass to the iteration
+            IterInfo info;
+            info.callback = callback;
+            info.ctx = ctx;
+
+            // iterate each bucket
+            for(size_t i = 0; i < NumBuckets; i++) {
+                auto &list = this->storage[i];
+
+                list.removeMatching([](void *ctx, BucketEntry &entry) {
+                    const auto info = reinterpret_cast<IterInfo *>(ctx);
+
+                    return info->callback(info->ctx, entry.key, entry.value);
+                }, &info);
+            }
         }
 
         /// Gets the total number of items in the table.

@@ -10,10 +10,6 @@
  */
 void pic_init();
 
-void pic_irq_set_mask(uint8_t IRQline);
-void pic_irq_clear_mask(uint8_t IRQline);
-uint16_t pic_irq_get_isr();
-uint16_t pic_irq_get_irr();
 void pic_irq_eoi(const uint8_t irq);
 void pic_irq_disable();
 

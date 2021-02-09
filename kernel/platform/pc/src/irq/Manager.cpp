@@ -17,7 +17,7 @@
 
 using namespace platform::irq;
 
-static char gSharedBuf[sizeof(Manager)];
+static char gSharedBuf[sizeof(Manager)] __attribute__((aligned(64)));
 Manager *Manager::gShared = nullptr;
 
 // external ISRs
@@ -264,13 +264,65 @@ void Manager::enable() {
  * Configures all APIC-local timers to act as system timebases.
  */
 void Manager::setupTimebase() {
+    // TODO: fix this for SMP
     for(auto apic : this->apics) {
         auto timer = apic->getTimer();
         if(!timer) continue;
 
         timer->setInterval(kTimebaseInterval);
+
+        timer::Manager::gShared->timebase = timer;
+
+        // register an interrupt handler as well
+        const auto token = this->addHandler(ISR_APIC_TIMER, [](void *ctx, const uint32_t type) {
+            timer::Manager::gShared->tick(kTimebaseInterval * 1000, type);
+            platform_kern_tick(type);
+
+            // if we return here, handle the ISR. the scheduler may have switched away
+            return true;
+        }, apic);
+
+        log("irq handler for apic %p (timer %p) = %08x", apic, timer, token);
     }
 }
+
+/**
+ * Registers a new irq handler.
+ */
+uintptr_t Manager::addHandler(const uint32_t irq, bool (*callback)(void *, const uint32_t), void *ctx) {
+    REQUIRE(callback, "invalid callback pointer");
+
+    // set up the handler
+    Handler handler(irq);
+    handler.callback = callback;
+    handler.callbackCtx = ctx;
+
+    // yeet it
+    RW_LOCK_WRITE_GUARD(this->handlersLock);
+    const auto token = this->nextHandlerToken++;
+    handler.token = token;
+
+    this->handlers.push_back(handler);
+
+    return token;
+}
+
+/**
+ * Removes an existing irq handler by its token.
+ */
+void Manager::removeHandler(const uintptr_t token) {
+    RW_LOCK_WRITE_GUARD(this->handlersLock);
+
+    for(size_t i = 0; i < this->handlers.size(); i++) {
+        if(this->handlers[i].token == token) {
+            this->handlers.remove(i);
+            return;
+        }
+    }
+
+    panic("no irq handler with token %08x", token);
+}
+
 
 
 
@@ -280,26 +332,31 @@ void Manager::setupTimebase() {
  * This function is invoked only for ISRs that require routing; things like spurious interrupts or
  * NMIs have their own handlers. Type codes correspond to values defined in `handlers.h`
  *
- * All handlers that call into the kernel do not perform IRQ acknowledgement themselves; it's
- * expected that the system calls the platform_irq_ack() method with the type value we have
- * been given.
+ * We will only acknowledge the interrupt (at the controller) ourselves if all callbacks invoked
+ * for the IRQ indicate that this is their wish, or if no handlers are found, or we handle the
+ * interrupt internally.
  */
 void Manager::handleIsr(const uint32_t type) {
-    // APIC timer
-    if(type == ISR_APIC_TIMER) {
-        timer::Manager::gShared->tick(kTimebaseInterval * 1000, type);
-        platform_kern_tick(type);
+    RW_LOCK_READ_GUARD(this->handlersLock);
+
+    bool ack = true;
+    bool handled = false;
+
+    for(const auto &handler : this->handlers) {
+        if(handler.irq == type) {
+            const bool temp = handler.callback(handler.callbackCtx, type);
+            if(!temp) ack = temp;
+
+            handled = true;
+        }
     }
-    // legacy ISA interrupts?
-    else if(type >= ISR_ISA_0 && type <= ISR_ISA_15) {
-        /// XXX: send these IRQs properly
-        const auto isaIrqNo = type - ISR_ISA_0;
-        log("ISA interrupt %u", isaIrqNo);
-        this->apics[0]->endOfInterrupt();
-    }
-    // unhandled isr
-    else {
-        panic("platform irq manager doesn't know how to route irq %08x", type);
+
+    // ensure something handled the irq
+    REQUIRE(handled, "platform irq manager doesn't know how to handle irq %08x", type);
+
+    // acknwledge irq if desired
+    if(ack) {
+        this->acknowledgeIrq(type);
     }
 }
 

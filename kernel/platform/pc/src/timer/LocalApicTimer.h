@@ -27,6 +27,11 @@ class LocalApicTimer {
             return this->freq;
         }
 
+        /// Reads out the number of ticks remaining in the count.
+        const uint64_t ticksRemaining();
+        /// Returns the number of nanoseconds that have elapsed in the tick.
+        const uint64_t nsInTick();
+
         /// Sets the interval at which this timer fires an interrupt.
         const float setInterval(const float usecs);
 
@@ -39,6 +44,10 @@ class LocalApicTimer {
         /// APIC that this timer is a part of
         irq::Apic *apic = nullptr;
 
+        /// ticks for the interval
+        uint32_t ticksForInterval = 0;
+        /// currently configured interval (in nanoseconds)
+        uint64_t intervalNs = 0;
         /// input frequency of the timer (in kHz)
         float freq = 0;
 };

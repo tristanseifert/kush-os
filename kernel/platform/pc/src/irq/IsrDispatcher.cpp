@@ -25,33 +25,8 @@ void platform_isr_handle(const uint32_t type) {
             log("spurious APIC interrupt");
             break;
 
-        // legacy ISA interrupts
-        case ISR_ISA_0:
-        case ISR_ISA_1:
-        case ISR_ISA_2:
-        case ISR_ISA_3:
-        case ISR_ISA_4:
-        case ISR_ISA_5:
-        case ISR_ISA_6:
-        case ISR_ISA_7:
-        case ISR_ISA_8:
-        case ISR_ISA_9:
-        case ISR_ISA_10:
-        case ISR_ISA_11:
-        case ISR_ISA_12:
-        case ISR_ISA_13:
-        case ISR_ISA_14:
-        case ISR_ISA_15:
-            Manager::get()->handleIsr(type);
-            break;
-
-        // various timebase interrupts
-        case ISR_APIC_TIMER:
-            Manager::get()->handleIsr(type);
-            break;
-
-        // unhandled (other)
+        // forward all other interrupts to the usual handler
         default:
-            panic("unhandled ISR type $%08x", type);
+            Manager::get()->handleIsr(type);
     }
 }

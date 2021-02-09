@@ -38,7 +38,6 @@
 
 
 static void pic_irq_remap(const uint8_t offset1, const uint8_t offset2);
-static uint16_t pic_get_irq_reg(const uint8_t ocw3);
 
 /**
  * Initialize the PIC.
@@ -82,69 +81,6 @@ static void pic_irq_remap(const uint8_t offset1, const uint8_t offset2) {
 
     io_outb(PIC1_DATA, a1); // restore saved masks.
     io_outb(PIC2_DATA, a2);
-}
-
-/**
- * Masks an interrupt on the PIC.
- */
-void pic_irq_set_mask(uint8_t IRQline) {
-    uint16_t port;
-    uint8_t value;
-
-    if(IRQline < 8) {
-        port = PIC1_DATA;
-    } else {
-        port = PIC2_DATA;
-        IRQline -= 8;
-    }
-
-    value = io_inb(port) | (1 << IRQline);
-    io_outb(port, value);
-}
- 
-/**
- * Unmasks an interrupt on the PIC.
- */
-void pic_irq_clear_mask(uint8_t IRQline) {
-    uint16_t port;
-    uint8_t value;
-
-    if(IRQline < 8) {
-        port = PIC1_DATA;
-    } else {
-        port = PIC2_DATA;
-        IRQline -= 8;
-    }
-
-    value = io_inb(port) & ~(1 << IRQline);
-    io_outb(port, value);
-}
-
-/*
- * Helper method to read the IRQ registers
- */
-static uint16_t pic_get_irq_reg(const uint8_t ocw3) {
-    /* OCW3 to PIC CMD to get the register values.  PIC2 is chained, and
-     * represents IRQs 8-15.  PIC1 is IRQs 0-7, with 2 being the chain */
-    io_outb(PIC1_COMMAND, ocw3);
-    io_outb(PIC2_COMMAND, ocw3);
-    io_wait();
-
-    return (io_inb(PIC1_COMMAND) << 8) | io_inb(PIC2_COMMAND);
-}
-
-/*
- * Reads cascaded PIC interrupt request register,
- */
-uint16_t pic_irq_get_irr() {
-    return pic_get_irq_reg(PIC_READ_IRR);
-}
-
-/*
- * Reads cascaded PIC in-service register,
- */
-uint16_t pic_irq_get_isr() {
-    return pic_get_irq_reg(PIC_READ_ISR);
 }
 
 /*

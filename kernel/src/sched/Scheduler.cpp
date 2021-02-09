@@ -146,8 +146,8 @@ void Scheduler::markThreadAsRunnable(Thread *t) {
  * has expired, and if so, schedule the next runnable thread.
  *
  * We need to acknowledge the timer IRQ before we perform the context switch if a task has been
- * pre-empted. (We need to acknowledge the IRQ in all cases, but this is especially critical since
- * otherwise we will miss out on timer interrupts until the current task gets resumed.)
+ * pre-empted. If we do not directly context switch now and return to the caller, it will
+ * acknowledge the interrupt for us.
  */
 void Scheduler::tickCallback(const uintptr_t irqToken) {
     if(!this->running) return;
@@ -170,8 +170,6 @@ void Scheduler::tickCallback(const uintptr_t irqToken) {
         }
 
         this->yield();
-    } else {
-        platform_irq_ack(irqToken);
     }
 }
 

@@ -25,6 +25,8 @@ class IoApic {
 
         /// Remaps an irq
         void remap(const uint8_t irq, const uint32_t dest, const IrqFlags flags);
+        /// Configures whether an irq is masked
+        void setIrqMasked(const uint8_t irq, const bool masked);
 
     private:
         /// Format of the 64-bit redirection entries
@@ -51,16 +53,21 @@ class IoApic {
 
     private:
         /// Reads the IOAPIC register at the given offset
-        uint32_t read(const size_t regOff) {
+        inline uint32_t read(const size_t regOff) {
             *((uint32_t volatile*) this->baseAddr) = regOff;
             return *(uint32_t volatile *) (this->baseAddr + 0x10);
         }
 
         /// Writes the IOAPIC register at the given offset
-        void write(const size_t regOff, const uint32_t data) {
+        inline void write(const size_t regOff, const uint32_t data) {
             *((uint32_t volatile*) this->baseAddr) = regOff;
             *((uint32_t volatile *) (this->baseAddr + 0x10)) = data;
         }
+
+        /// Reads a redirection entry from the APIC.
+        const RedirectionEntry getRedirEntry(const size_t offset);
+        /// Writes a redirection entry.
+        void setRedirEntry(const size_t offset, const RedirectionEntry &entry);
 
         void mapIsaIrqs();
 

@@ -40,6 +40,6 @@ void platform_init() {
 void platform_vm_available() {
     irq::Manager::init();
     acpi::Manager::vmAvailable();
-    irq::Manager::setupIrqs();
     timer::Manager::init();
+    irq::Manager::setupIrqs();
 }

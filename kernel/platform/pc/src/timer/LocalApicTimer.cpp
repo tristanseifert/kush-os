@@ -83,6 +83,7 @@ const float LocalApicTimer::setInterval(const float usecs) {
     // write the timer configuration
     this->apic->write(kApicRegTimerDivide, 0b0011); // divide by 16
     this->apic->write(kApicRegTimerInitial, ticks);
+    this->ticksForInterval = ticks;
 
     // unmask timer interrupt
     uint32_t lvtValue = kTimerVector;
@@ -90,6 +91,24 @@ const float LocalApicTimer::setInterval(const float usecs) {
     this->apic->write(kApicRegLvtTimer, lvtValue);
 
     // return what we've actually achieved
+    this->intervalNs = (ticks * nsPerTick * divisor);
     return (ticks * nsPerTick * divisor) / 1000.;
 }
 
+/**
+ * Reads out the current value and determines how many ticks remain.
+ */
+const uint64_t LocalApicTimer::ticksRemaining() {
+    const auto current = this->apic->read(kApicRegTimerCurrent);
+    return current;
+}
+
+/**
+ * Returns the number of nanoseconds since the start of the tick.
+ */
+const uint64_t LocalApicTimer::nsInTick() {
+    const auto current = this->apic->read(kApicRegTimerCurrent);
+    const auto elapsed = this->ticksForInterval - current;
+
+    return (elapsed * (this->intervalNs / this->ticksForInterval));
+}

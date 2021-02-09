@@ -7,6 +7,8 @@
 #include <bitflags.h>
 #include <runtime/Vector.h>
 
+#include <arch/rwlock.h>
+
 namespace platform { namespace irq {
 class Apic;
 class IoApic;
@@ -72,6 +74,11 @@ class Manager {
         /// Adds a detected NMI configuration.
         void detectedNmi(const uint8_t cpus, const uint8_t lint, const IrqFlags flags);
 
+        /// Registers an interrupt handler for the given interrupt.
+        uintptr_t addHandler(const uint32_t irq, bool (*callback)(void *, const uint32_t), void *ctx);
+        /// Removes an irq handler.
+        void removeHandler(const uintptr_t token);
+
         /// Gets the global IRQ manager instance.
         static Manager *get() {
             return gShared;
@@ -89,6 +96,22 @@ class Manager {
             uint32_t irqNo;
             /// IRQ trigger level and mode
             IrqFlags flags;
+        };
+
+        /// Registered IRQ handler
+        struct Handler {
+            /// registration token
+            uintptr_t token = 0;
+            /// IRQ number
+            uint32_t irq = 0;
+
+            /// function to invoke; return true to acknowledge the irq
+            bool (*callback)(void *, const uint32_t) = nullptr;
+            /// context pointer to provide to callback
+            void *callbackCtx = nullptr;
+
+            Handler() = default;
+            Handler(uint32_t _irq) : irq(_irq) {}
         };
 
     private:
@@ -115,6 +138,14 @@ class Manager {
         static Manager *gShared;
 
     private:
+        /// lock on irq handlers
+        DECLARE_RWLOCK(handlersLock);
+        /// list of all installed handlers (TODO: this could be stored more efficiently)
+        rt::Vector<Handler> handlers;
+        /// token for the next irq handler
+        uintptr_t nextHandlerToken = 1;
+
+
         /// all IOAPICs in the system (usually, only one)
         rt::Vector<IoApic *> ioapics;
         /// all APICs in the system (one per CPU core)

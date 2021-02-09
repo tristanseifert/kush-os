@@ -66,6 +66,8 @@ void panic(const char *format, ...) {
                 thread->name);
     }
 
+    fctprintf(_outchar, NULL, "nanoseconds since boot: %llu\n", platform_timer_now());
+
     // try to get a backtrace as well
     int err = arch_backtrace(NULL, panicBuf, kPanicBufSz);
     if(err) {

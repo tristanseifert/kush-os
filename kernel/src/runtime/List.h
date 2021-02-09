@@ -36,7 +36,9 @@ class List {
 
             private:
                 /// Sets up the iterator
-                Iterator(const List *_list, const Element *_item) : list(_list) , element(_item){}
+                Iterator(const List *_list, const Element *_item) : list(const_cast<List *>(_list)), 
+                    element(const_cast<Element *>(_item)) {}
+                Iterator(List *_list, Element *_item) : list(_list) , element(_item){}
 
             public:
                 /// This does nothing but we must declare it anyways
@@ -46,6 +48,10 @@ class List {
                 Iterator &operator++() {
                     this->element = element->next;
                     return *this;
+                }
+                /// Returns the object we point to.
+                T &operator*() {
+                    return this->element->value;
                 }
                 /// Returns the object we point to.
                 const T &operator*() const {
@@ -58,9 +64,9 @@ class List {
 
             private:
                 /// List we're referencing data on
-                const List *list = nullptr;
+                List *list = nullptr;
                 /// Element that this iterator points to (nullptr = end)
-                const Element *element = nullptr;
+                Element *element = nullptr;
         };
 
     public:
@@ -133,7 +139,7 @@ class List {
          * @return Number of removed items
          */
         template<class arg>
-        size_t removeMatching(bool (*callback)(void *, arg), void *ctx) {
+        size_t _removeMatching(bool (*callback)(void *, arg), void *ctx) {
             size_t numRemoved = 0;
 
             auto ent = this->head;
@@ -168,6 +174,13 @@ class List {
             }
 
             return numRemoved;
+        }
+
+        size_t removeMatching(bool (*callback)(void *, T), void *ctx) {
+            return _removeMatching(callback, ctx);
+        }
+        size_t removeMatching(bool (*callback)(void *, T &), void *ctx) {
+            return _removeMatching(callback, ctx);
         }
 
         /// Gets a reference to the given item

@@ -14,6 +14,8 @@ namespace irq {
 class Manager;
 }
 namespace timer {
+class LocalApicTimer;
+
 /**
  * Provides a sort of HAL interface around the system's timers.
  *
@@ -37,7 +39,7 @@ class Manager {
         static inline const uint64_t now() {
             uint64_t temp;
             __atomic_load(&gShared->currentTime, &temp, __ATOMIC_CONSUME);
-            return temp;
+            return temp + nsSinceTick();
         }
 
         /// Registers a new timer
@@ -62,10 +64,22 @@ class Manager {
             void *callbackCtx = nullptr;
         };
 
+        /// Info for iterating
+        struct IterInfo {
+            const uint64_t time;
+            Manager *mgr = nullptr;
+
+            /// number of timers that fired during this iteration
+            size_t numFired = 0;
+
+            IterInfo(const uint64_t clock) : time(clock) {}
+        };
+
         friend const uint32_t rt::hash(TimerInfo &in, const uint32_t);
 
     private:
         static void init();
+        static uint64_t nsSinceTick();
 
         void tick(const uint64_t ns, const uintptr_t irqToken);
 
@@ -74,6 +88,8 @@ class Manager {
     private:
         /// number of nanoseconds since system boot-up
         uint64_t __attribute__((aligned(8))) currentTime = 0;
+        /// Timebase we're using
+        LocalApicTimer *timebase = nullptr;
 
         /// next free timer value (TODO: handle rollover)
         uintptr_t nextTimerId = 1;
