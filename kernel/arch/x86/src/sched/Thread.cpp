@@ -86,11 +86,20 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
     // save state into current thread and switch to next
     if(from) {
         // log("old task %%esp = %p, new task %%esp = %p (stack %p)", from->regs.stackTop, to->regs.stackTop, to->stack);
+        // set the running flags
+        bool yes = true, no = false;
+
+        __atomic_store(&from->isActive, &no, __ATOMIC_RELEASE);
+        __atomic_store(&to->isActive, &yes, __ATOMIC_RELEASE);
+
         x86_switchto_save(&from->regs, &to->regs);
     }
     // no thread context to save; just switch
     else {
         // log("new task %%esp = %p (stack %p)", to->regs.stackTop, to->stack);
+        bool yes = true;
+        __atomic_store(&to->isActive, &yes, __ATOMIC_RELEASE);
+
         x86_switchto(&to->regs);
     }
 }

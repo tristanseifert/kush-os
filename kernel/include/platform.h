@@ -104,6 +104,10 @@ void platform_timer_remove(const uintptr_t token);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Functions below are defined by the kernel.
+
+/// Indicates to the kernel a time tick has taken place.
 extern void platform_kern_tick(const uintptr_t token);
+/// Performs context switch to the next highest priority thread, if any.
+extern void platform_kern_scheduler_update();
 
 #endif

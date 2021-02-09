@@ -4,10 +4,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <runtime/Vector.h>
+
 #include <arch/ThreadState.h>
 #include <arch/rwlock.h>
 
 namespace sched {
+class Blockable;
 struct Task;
 
 /**
@@ -24,6 +27,8 @@ struct Task;
  * runnable to blocked if they're not currently executing.)
  */
 struct Thread {
+    friend class Blockable;
+
     /// Length of thread names
     constexpr static const size_t kNameLength = 32;
 
@@ -58,6 +63,16 @@ struct Thread {
         bool kernelMode = false;
 
         /**
+         * Flag set when the scheduler has assigned the thread to a processor and it is executing;
+         * it will be cleared immediately after the thread is switched out.
+         *
+         * This flag is the responsibility of the arch context switching code.
+         */
+        bool isActive = false;
+        /// Timestamp at which the thread was switched to
+        uint64_t lastSwitchedTo = 0;
+
+        /**
          * Priority of the thread; this should be a value between -100 and 100, with negative
          * values having the lowest priority. The scheduler internally converts this to whatever
          * priority system it uses.
@@ -70,6 +85,30 @@ struct Thread {
         uint16_t quantumTicks = 10;
         // Ticks left in the thread's current quantum
         uint16_t quantum = 0;
+
+        /**
+         * Number of nanoseconds this thread has been executing on the CPU.
+         */
+        uint64_t cpuTime = 0;
+
+        /**
+         * Notification value and mask for the thread.
+         *
+         * Notifications are an asynchronous signalling mechanism that can be used to signal a
+         * thread that a paritcular event occurred, without any additional auxiliary information;
+         * this makes it ideal for things like interrupt handlers.
+         *
+         * Each thread defines a notification mask, which indicates on which bits (set) of the
+         * notification set the thread is interested in; when the notification mask is updated, it
+         * is compared against the mask, and if any bits are set, the thread can be unblocked.
+         */
+        uintptr_t notifications = 0;
+        uintptr_t notificationMask = 0;
+
+        /**
+         * Objects this thread is currently blocking on
+         */
+        rt::Vector<Blockable *> blockingOn;
 
         /// descriptive thread name, if desired
         char name[kNameLength] = {0};
@@ -109,6 +148,13 @@ struct Thread {
             this->state = newState;
         }
 
+        /// Blocks the thread on the given object.
+        int blockOn(Blockable *b);
+
+        /// Returns a handle to the currently executing thread.
+        static Thread *current();
+        /// Blocks the current thread for the given number of nanoseconds.
+        static void sleep(const uint64_t nanos);
         /// Give up the rest of this thread's CPU time
         static void yield();
         /// Terminates the thread
@@ -120,6 +166,11 @@ struct Thread {
 
     private:
         static void initAllocator();
+
+    private:
+        void unblock(Blockable *b);
+        /// Called when this thread is switching out
+        void switchFrom();
 };
 }
 

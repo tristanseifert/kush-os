@@ -42,6 +42,7 @@ add_executable(kernel
     ${version_file}
 )
 
+
 target_include_directories(kernel PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
 target_include_directories(kernel PRIVATE ${ARCH_INCLUDE_DIR})
 target_include_directories(kernel PRIVATE ${PLATFORM_INCLUDE_DIR})
@@ -66,6 +67,7 @@ set_target_properties(kernel PROPERTIES LINK_DEPENDS ${PLATFORM_LINKER_SCRIPT})
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     target_link_options(kernel PUBLIC "-T${PLATFORM_LINKER_SCRIPT}")
+    target_link_options(kernel PUBLIC "-Map=kernel.map")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     target_link_options(kernel PUBLIC "-T${PLATFORM_LINKER_SCRIPT}")
 endif()

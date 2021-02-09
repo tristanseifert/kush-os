@@ -58,7 +58,7 @@ class IdleWorker {
         /// Queues the given thread for deletion
         void queueDestroyThread(Thread *thread) {
             SPIN_LOCK_GUARD(this->workLock);
-            this->work.push(WorkItem::destroyThread(thread));
+            this->work.push_back(WorkItem::destroyThread(thread));
         }
 
     private:

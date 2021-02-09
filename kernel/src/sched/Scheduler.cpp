@@ -71,7 +71,12 @@ void Scheduler::run() {
  */
 void Scheduler::switchToRunnable(Thread *ignore) {
     Thread *next = nullptr;
+    bool hasUpdated = false;
 
+    // XXX: disable interrupts here; we really should just raise the priority level to block stuff
+    asm volatile("cli" ::: "memory");
+
+again:;
     // get the thread
     {
         SPIN_LOCK_GUARD(this->runnableLock);
@@ -88,12 +93,12 @@ void Scheduler::switchToRunnable(Thread *ignore) {
                 // pop the next item off the queue, if any
                 if(!queue.empty()) {
                     next = queue.pop();
-                    queue.push(ignore);
+                    queue.push_back(ignore);
                     goto beach;
                 }
 
                 // if none, place it back and check next priority band
-                queue.push(next);
+                queue.push_back(next);
                 continue;
             }
             goto beach;
@@ -101,6 +106,13 @@ void Scheduler::switchToRunnable(Thread *ignore) {
     }
 
 beach:;
+    // perform deferred updates if no thread
+    if(!next && !hasUpdated) {
+        this->handleDeferredUpdates();
+        hasUpdated = true;
+        goto again;
+    }
+
     // switch to it
     REQUIRE(next, "failed to find thread to switch to");
 
@@ -121,24 +133,24 @@ void Scheduler::scheduleRunnable(Task *task) {
 
     RW_LOCK_READ_GUARD(task->lock);
     for(auto thread : task->threads) {
-        this->markThreadAsRunnable(thread);
+        this->markThreadAsRunnable(thread, false, true);
     }
 }
 
 /**
  * Adds the given thread to the end of the run queue.
  */
-void Scheduler::markThreadAsRunnable(Thread *t) {
-    // mark thread as scheduled
+void Scheduler::markThreadAsRunnable(Thread *t, const bool atHead, const bool immediate) {
+    RunnableInfo info(t);
+    info.atFront = atHead;
 
-    // insert it to the queue
-    const auto band = this->groupForThread(t);
-    t->setState(Thread::State::Runnable);
-    t->priorityBoost = 0;
-    //log("thread %p band %d/%d", t, band, kPriorityGroupMax);
+    SPIN_LOCK_GUARD(this->newlyRunnableLock);
 
-    SPIN_LOCK_GUARD(this->runnableLock);
-    this->runnable[band].push(t);
+    if(atHead) {
+        this->newlyRunnable.push_front(info);
+    } else {
+        this->newlyRunnable.push_back(info);
+    }
 }
 
 /**
@@ -158,6 +170,9 @@ void Scheduler::tickCallback(const uintptr_t irqToken) {
         this->priorityAdjTimer = 0;
     }
 
+    // handle deferred updates
+    this->handleDeferredUpdates();
+
     // pre-empt it
     if(--this->running->quantum == 0) {
         // log("preempting running %p", this->running);
@@ -170,6 +185,28 @@ void Scheduler::tickCallback(const uintptr_t irqToken) {
         }
 
         this->yield();
+    }
+}
+
+/**
+ * Handles deferred updates, i.e. threads that became runnable since the last scheduler
+ * invocation.
+ */
+void Scheduler::handleDeferredUpdates() {
+    SPIN_LOCK_GUARD(this->newlyRunnableLock);
+
+    while(!this->newlyRunnable.empty()) {
+        const RunnableInfo info = this->newlyRunnable.pop();
+
+        const auto band = this->groupForThread(info.thread);
+        info.thread->setState(Thread::State::Runnable);
+        info.thread->priorityBoost = 0;
+
+        if(info.atFront) {
+            this->runnable[band].push_front(info.thread);
+        } else {
+            this->runnable[band].push_back(info.thread);
+        }
     }
 }
 
@@ -222,7 +259,7 @@ bool Scheduler::handleBoostThread(Thread *thread) {
         // if so, add it to its new priority class
         if(band > bandBoosted && bandBoosted != oldBandBoosted) {
             //log("thread %p (prio %d boost %d) new level %d (old %d)", thread, thread->priority, thread->priorityBoost, (int) bandBoosted, (int) band);
-            this->runnable[bandBoosted].push(thread);
+            this->runnable[bandBoosted].push_back(thread);
             return true;
         }
     }
@@ -247,13 +284,13 @@ void Scheduler::yield() {
     REQUIRE(thread, "cannot yield without running thread");
 
     // insert it to the back of the runnable queue for its group
-    const auto band = this->groupForThread(thread);
+    if(thread->state == Thread::State::Runnable) {
+        const auto band = this->groupForThread(thread);
 
-    SPIN_LOCK(this->runnableLock);
-    this->runnable[band].push(thread);
-    SPIN_UNLOCK(this->runnableLock);
-
-    thread->setState(Thread::State::Runnable);
+        SPIN_LOCK(this->runnableLock);
+        this->runnable[band].push_back(thread);
+        SPIN_UNLOCK(this->runnableLock);
+    }
 
     // pick next thread
     this->switchToRunnable(thread);
@@ -300,4 +337,11 @@ const Scheduler::PriorityGroup Scheduler::groupForThread(Thread *t, const bool w
  */
 void platform_kern_tick(const uintptr_t irqToken) {
     Scheduler::gShared->tickCallback(irqToken);
+}
+
+/**
+ * Performs deferred scheduler updates if needed.
+ */
+void platform_kern_scheduler_update() {
+    Scheduler::gShared->handleDeferredUpdates();
 }

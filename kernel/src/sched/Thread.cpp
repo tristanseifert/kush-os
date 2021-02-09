@@ -1,11 +1,15 @@
 #include "Thread.h"
+#include "Blockable.h"
 #include "Scheduler.h"
 #include "Task.h"
 #include "IdleWorker.h"
 
+#include "TimerBlocker.h"
+
 #include "mem/StackPool.h"
 #include "mem/SlabAllocator.h"
 
+#include <platform.h>
 #include <string.h>
 
 using namespace sched;
@@ -74,6 +78,23 @@ Thread::~Thread() {
 }
 
 /**
+ * Returns the currently executing thread.
+ */
+Thread *Thread::current() {
+    return Scheduler::get()->runningThread();
+}
+
+/**
+ * Updates internal tracking structures when the thread is context switched out.
+ */
+void Thread::switchFrom() {
+    if(this->lastSwitchedTo) {
+        const auto ran = platform_timer_now() - this->lastSwitchedTo;
+        __atomic_fetch_add(&this->cpuTime, ran, __ATOMIC_RELEASE);
+    }
+}
+
+/**
  * Performs a context switch to this thread.
  *
  * If we're currently executing on a thread, its state is saved, and the function will return when
@@ -81,8 +102,14 @@ Thread::~Thread() {
  */
 void Thread::switchTo() {
     auto current = Scheduler::get()->runningThread();
-
     Scheduler::get()->setRunningThread(this);
+
+    this->lastSwitchedTo = platform_timer_now();
+
+    if(current) {
+        current->switchFrom();
+    }
+
     arch::RestoreThreadState(current, this);
 }
 
@@ -117,14 +144,83 @@ void Thread::yield() {
  * scheduler to actually be deallocated at a later time.
  */
 void Thread::terminate() {
-    auto current = Scheduler::get()->runningThread();
-    REQUIRE(current, "cannot terminate null thread!");
+    auto thread = current();
+    REQUIRE(thread, "cannot terminate null thread!");
 
-    current->setState(State::Zombie);
+    thread->setState(State::Zombie);
 
-    Scheduler::get()->idle->queueDestroyThread(current);
+    Scheduler::get()->idle->queueDestroyThread(thread);
     Scheduler::get()->switchToRunnable();
 
     // we should not get here
     panic("failed to terminmate thread");
+}
+
+
+
+/**
+ * Sleeps the calling thread for the given number of nanoseconds.
+ *
+ * @note The actual sleep time may be less or more than what is provided; it's merely taken as a
+ * "best effort" hint to the actual sleep time.
+ */
+void Thread::sleep(const uint64_t nanos) {
+    auto thread = current();
+    int err;
+
+    // create the timer blockable
+    TimerBlocker block(nanos);
+
+    // wait on it
+    err = thread->blockOn(&block);
+
+    // clean up
+}
+
+/**
+ * Blocks the thread on the given object.
+ *
+ * @return 0 if the block completed, or an error code if the block was interrupted (because the
+ * thread was woken for another reason, for example.)
+ */
+int Thread::blockOn(Blockable *b) {
+    // prepare blockable and inscrete it
+    b->willBlockOn(this);
+
+    RW_LOCK_WRITE(&this->lock);
+    this->blockingOn.push_back(b);
+
+    this->state = State::Blocked;
+
+    RW_UNLOCK_WRITE(&this->lock);
+
+    // yield the rest of the CPU time
+    Scheduler::get()->yield();
+
+    // get state from the blockable
+    bool signaled = b->isSignalled();
+    b->reset();
+
+    // return whether the thread woke correctly or nah
+    return (signaled ? 0 : -1);
+}
+
+/**
+ * Unblocks the thread.
+ */
+void Thread::unblock(Blockable *b) {
+    // clear the blockable list
+    RW_LOCK_WRITE(&this->lock);
+
+    for(auto blockable : this->blockingOn) {
+        blockable->didUnblock();
+    }
+    this->blockingOn.clear();
+
+    // finish setting state
+    this->state = State::Runnable;
+    RW_UNLOCK_WRITE(&this->lock);
+
+    // queue in scheduler
+    Scheduler::get()->markThreadAsRunnable(this, true);
 }

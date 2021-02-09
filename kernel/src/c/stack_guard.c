@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+#include <log.h>
+
 #if UINT32_MAX == UINTPTR_MAX
 #define STACK_CHK_GUARD 0xe2dee396
 #else
@@ -7,7 +9,7 @@
 #endif
 
 /// Define the stack protector value
-uintptr_t __stack_chk_guard = STACK_CHK_GUARD;
+uintptr_t __attribute__((used)) __stack_chk_guard = STACK_CHK_GUARD;
 
 void __stack_chk_fail(void);
 
@@ -16,7 +18,7 @@ void __stack_chk_fail(void);
  * Invoked when stack bounds check fails; this just panics the machine
  */
 __attribute__((noreturn)) void __stack_chk_fail(void) {
-    // panic("Stack smashing detected");
     asm volatile("cli");
+    panic("Stack smashing detected");
     while(1) {};
 }

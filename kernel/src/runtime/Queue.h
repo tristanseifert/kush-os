@@ -22,8 +22,14 @@ class Queue {
         /**
          * Inserts an element at the end of the list.
          */
-        void push(const T &value) {
+        void push_back(const T &value) {
             this->storage.append(value);
+        }
+        /**
+         * Inserts an element at the front of the queue.
+         */
+        void push_front(const T &value) {
+            this->storage.prepend(value);
         }
 
         /**

@@ -4,6 +4,8 @@
 #include <log.h>
 #include <new>
 
+#include <arch/critical.h>
+
 using namespace platform::timer;
 
 static uint8_t gSharedBuf[sizeof(Manager)] __attribute__((aligned(64)));
@@ -37,12 +39,17 @@ uintptr_t Manager::add(const uint64_t deadline, void (*callback)(const uintptr_t
     info.callbackCtx = ctx;
 
     // insert it
-    RW_LOCK_WRITE_GUARD(this->timersLock);
+    CRITICAL_ENTER();
+    RW_LOCK_WRITE(&this->timersLock);
 
     const auto id = this->nextTimerId++;
     info.token = id;
 
     this->timers.insert(id, info);
+
+    RW_UNLOCK_WRITE(&this->timersLock);
+    CRITICAL_EXIT();
+
     return id;
 }
 
@@ -50,7 +57,8 @@ uintptr_t Manager::add(const uint64_t deadline, void (*callback)(const uintptr_t
  * Removes a previously allocated timer, if it hasn't fired yet.
  */
 void Manager::remove(const uintptr_t token) {
-    RW_LOCK_WRITE_GUARD(this->timersLock);
+    CRITICAL_ENTER();
+    RW_LOCK_WRITE(&this->timersLock);
 
     if(this->timers.contains(token)) {
         const auto &timer = this->timers[token];
@@ -58,6 +66,9 @@ void Manager::remove(const uintptr_t token) {
 
         this->timers.remove(token);
     }
+
+    RW_UNLOCK_WRITE(&this->timersLock);
+    CRITICAL_EXIT();
 }
 
 
@@ -106,7 +117,7 @@ void Manager::tick(const uint64_t ns, const uintptr_t irqToken) {
 
     // update scheduler if any timers happened
     if(info.numFired) {
-        // TODO: do stuff
+        platform_kern_scheduler_update();
     }
 }
 

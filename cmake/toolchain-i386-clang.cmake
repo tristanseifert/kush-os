@@ -10,7 +10,8 @@ SET(CMAKE_SYSTEM_NAME generic)
 #SET(CMAKE_SYSTEM_VERSION 1)
 
 SET(TARGET_TRIPLE "i386-pc-none-elf")
-SET(ARCH_FLAGS "-march=i686")
+SET(ARCH_FLAGS "-march=pentium3")
+SET(C_CXX_FLAGS "-g -fstack-protector-strong")
 
 SET(TOOLCHAIN_BASE ~/Tools/toolchain/llvm)
 get_filename_component(TOOLCHAIN_BASE ${TOOLCHAIN_BASE} ABSOLUTE)
@@ -36,8 +37,8 @@ SET(CMAKE_LINKER "${TOOLS_BASE}/ld.lld")
 
 # default arguments
 SET(CMAKE_ASM_FLAGS "-target ${TARGET_TRIPLE} ${ARCH_FLAGS}" CACHE STRING "" FORCE)
-SET(CMAKE_C_FLAGS "-static -target ${TARGET_TRIPLE} ${ARCH_FLAGS} -ffreestanding" CACHE STRING "" FORCE)
-SET(CMAKE_CXX_FLAGS "-static -target ${TARGET_TRIPLE} ${ARCH_FLAGS} -ffreestanding -fno-exceptions -fno-rtti" CACHE STRING "" FORCE)
+SET(CMAKE_C_FLAGS "-static ${C_CXX_FLAGS} -target ${TARGET_TRIPLE} ${ARCH_FLAGS} -ffreestanding" CACHE STRING "" FORCE)
+SET(CMAKE_CXX_FLAGS "-static ${C_CXX_FLAGS} -target ${TARGET_TRIPLE} ${ARCH_FLAGS} -ffreestanding -fno-exceptions -fno-rtti" CACHE STRING "" FORCE)
 SET(CMAKE_EXE_LINKER_FLAGS_INIT "--static --no-pie --nostdlib")
 
 # skip testing compilers

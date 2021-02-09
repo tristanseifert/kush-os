@@ -48,6 +48,7 @@ x86_switchto_common:
     popf
 
     // return to caller
+    sti
     ret
 
 

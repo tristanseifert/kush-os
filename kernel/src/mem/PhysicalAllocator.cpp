@@ -19,7 +19,7 @@
 
 using namespace mem;
 
-static char gAllocatorBuf[sizeof(PhysicalAllocator)];
+static char gAllocatorBuf[sizeof(PhysicalAllocator)] __attribute__((aligned(64)));
 PhysicalAllocator *PhysicalAllocator::gShared = nullptr;
 
 /**

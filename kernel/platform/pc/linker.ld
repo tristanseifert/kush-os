@@ -29,6 +29,7 @@ SECTIONS {
     .data ALIGN(4K) : AT(ADDR(.data) - 0xC0000000) {
         __kern_data_start = .;
         *(*.data)
+        *(*.data*)
     }
     __kern_data_size = SIZEOF(.data);
 
@@ -36,19 +37,16 @@ SECTIONS {
     .bss ALIGN(4K) : AT(ADDR(.bss) - 0xC0000000) {
         __kern_bss_start = .;
         *(.bss)
+        *(.bss*)
         *(COMMON)
     }
 
     __kern_bss_size = SIZEOF(.bss);
+    __kern_bss_size_dwords = SIZEOF(.bss)/4;
     __kern_size = __kern_bss_start - __kern_code_start;
 
     /* align to a page boundary */
     __kern_keep_end = (. + 4095) & ~ 4095;
-
-    /* miscellaneous info (we can skip mapping this) */
-    .eh_frame ALIGN(4K) (NOLOAD) : AT(ADDR(.eh_frame) - 0xC0000000) {
-        *(.eh_frame*)
-    }
 
     __kern_end = .;
 }

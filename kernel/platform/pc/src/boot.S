@@ -83,8 +83,17 @@ jmp_highhalf:
     // set up a NULL stack frame, so stack unwinding can stop here
     xor         %ebp, %ebp
 
+    // clear BSS
+    mov         %eax, %edx
+
+    mov         $__kern_bss_start, %edi
+    xor         %eax, %eax
+    mov         $__kern_bss_size_dwords-1, %ecx
+    cld
+    rep stosb
+
     // Write multiboot info pointer to memory
-    mov         %eax, x86_multiboot_magic
+    mov         %edx, x86_multiboot_magic
     mov         %ebx, x86_multiboot_info
 
     // Check for SSE, and if it exists, enable it

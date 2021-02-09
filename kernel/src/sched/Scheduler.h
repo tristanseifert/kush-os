@@ -31,6 +31,7 @@ class Scheduler {
     friend bool UpdatePriorities(void *, Thread *);
     friend void ::kernel_init();
     friend void ::platform_kern_tick(const uintptr_t);
+    friend void ::platform_kern_scheduler_update();
     friend struct Thread;
 
     public:
@@ -59,7 +60,9 @@ class Scheduler {
         /// schedules all runnable threads in the given task
         void scheduleRunnable(Task *task);
         /// adds the given thread to the runnable queue
-        void markThreadAsRunnable(Thread *thread);
+        void markThreadAsRunnable(Thread *thread) {
+            this->markThreadAsRunnable(thread, false);
+        }
 
         /// Runs the scheduler.
         void run() __attribute__((noreturn));
@@ -68,6 +71,9 @@ class Scheduler {
 
     private:
         static void init();
+
+        // marks a thread as runnable, possibly by inserting it at the head of the run queue
+        void markThreadAsRunnable(Thread *thread, const bool atHead, const bool immediate = false);
 
         /// updates the current CPU's running thread
         void setRunningThread(Thread *t) {
@@ -85,6 +91,20 @@ class Scheduler {
         void switchToRunnable(Thread *ignore = nullptr);
         bool handleBoostThread(Thread *thread);
 
+        void handleDeferredUpdates();
+
+    private:
+        /// Info on a thread that is runnable
+        struct RunnableInfo {
+            /// When set, the thread should be inserted at the head of the runnable queue
+            bool atFront = false;
+            /// Pointer to thread
+            Thread *thread = nullptr;
+
+            RunnableInfo() = default;
+            RunnableInfo(Thread *_thread) : thread(_thread) {}
+        };
+
     private:
         static Scheduler *gShared;
 
@@ -98,6 +118,11 @@ class Scheduler {
         DECLARE_SPINLOCK(runnableLock);
         /// runnable threads (per priority band)
         rt::Queue<Thread *> runnable[kPriorityGroupMax];
+
+        /// lock protecting the below queueueuueueu
+        DECLARE_SPINLOCK(newlyRunnableLock);
+        /// queue of threads that have become runnable
+        rt::Queue<RunnableInfo> newlyRunnable;
 
         /// idle worker
         IdleWorker *idle = nullptr;

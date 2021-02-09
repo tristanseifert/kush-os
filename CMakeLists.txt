@@ -29,9 +29,6 @@ set(CMAKE_CXX_EXTENSIONS ON)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
-# disable C++ exceptions
-add_compile_options(-fno-exceptions -fstack-protector-strong)
-
 # configure warnings
 add_compile_options(-Wall -Wno-format -Werror -Wmissing-declarations -Wformat=2 -fdiagnostics-color=always -ftls-model=initial-exec -Wno-address-of-packed-member -Wundef -Wcast-qual -Wwrite-strings -Wimplicit-fallthrough -Wno-deprecated-copy -Wno-expansion-to-defined)
 

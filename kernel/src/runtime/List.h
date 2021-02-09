@@ -83,6 +83,27 @@ class List {
         }
 
         /**
+         * Inserts an item at the head of the list.
+         */
+        void prepend(const T &value) {
+            auto el = new Element(value);
+
+            // if we have a head element, replace it.
+            if(this->head) {
+                this->head->prev = el;
+                el->next = this->head;
+                this->head = el;
+            }
+            // otherwise, the list is empty
+            else {
+                this->tail = el;
+                this->head = el;
+            }
+
+            this->numElements++;
+        }
+
+        /**
          * Appends an item to the end of the list.
          */
         void append(const T &value) {

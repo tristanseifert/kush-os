@@ -60,7 +60,7 @@ class SpinLockGuard {
 }}
 
 
-#define SPIN_INIT { .count = 0 }
+#define SPIN_INIT { .count = 0, .reserved = {} }
 #define DECLARE_SPINLOCK(name) x86_spinlock_t name = SPIN_INIT
 #define DECLARE_SPINLOCK_S(name) static x86_spinlock_t name = SPIN_INIT
 
