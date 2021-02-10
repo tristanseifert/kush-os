@@ -70,7 +70,7 @@ class Scheduler {
         void run() __attribute__((noreturn));
         /// Yields the remainder of the current thread's CPU time.
         void yield(const Thread::State state = Thread::State::Runnable) {
-            yield(state, nullptr, nullptr);
+            yield(nullptr, nullptr);
         }
 
     private:
@@ -91,9 +91,10 @@ class Scheduler {
         Scheduler();
         ~Scheduler();
 
-        void yield(const Thread::State, void (*willSwitch)(void*), void *willSwitchCtx = nullptr);
+        void yield(const platform::Irql restoreIrql);
+        void yield(void (*willSwitch)(void*), void *willSwitchCtx = nullptr);
 
-        void switchToRunnable(Thread *ignore = nullptr, bool requeueRunning = false,
+        bool switchToRunnable(Thread *ignore = nullptr, bool requeueRunning = false,
                 void (*willSwitch)(void*) = nullptr, void *willSwitchCtx = nullptr);
 
         bool handleDeferredUpdates();
@@ -129,6 +130,7 @@ class Scheduler {
         /// queue of threads that have become runnable
         rt::Queue<RunnableInfo> newlyRunnable;
 
+    public:
         /// idle worker
         IdleWorker *idle = nullptr;
 };

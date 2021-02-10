@@ -86,7 +86,7 @@ yeet:;
  * We don't call into the scheduler here; we assume that whoever invoked us will call that next and
  * whatever tasks became runnable will be scheduled.
  */
-void Manager::tick(const uint64_t ns, const uintptr_t irqToken) {
+void Manager::tick(const uint64_t ns) {
     // update the clock value
     __atomic_fetch_add(&this->currentTime, ns, __ATOMIC_ACQUIRE);
 }
@@ -118,55 +118,7 @@ void Manager::checkTimers() {
         return false;
     }, &info);
 
-
-    /*for(auto &timer : this->timers) {
-        if(timer.deadline <= clock) {
-            __atomic_store(&timer.fired, &yes, __ATOMIC_RELEASE);
-
-            // invoke the callback
-            timer.callback(timer.token, timer.callbackCtx);
-        }
-    }
-
-    // remove all expired timers
-    iterinfo ctx(clock);
-    ctx.mgr = this;
-
-    auto info = reinterpret_cast<iterinfo *>(&ctx);
-
-    size_t i = 0;
-    while(i != this->timers.size()) {
-        const auto &timer = this->timers[i];
-        if(timer.deadline <= clock) {
-            this->timers.remove(i);
-            continue;
-        }
-
-        i++;
-    }*/
-
-    /*    this->timers.iterate([](void *ctx, const uintptr_t &key, TimerInfo &timer) {
-        bool yes = true;
-        bool remove = false;
-        auto info = reinterpret_cast<IterInfo *>(ctx);
-
-        if(timer.deadline <= info->time) {
-            __atomic_store(&timer.fired, &yes, __ATOMIC_RELEASE);
-            info->numFired++;
-
-            // invoke the callback
-            timer.callback(timer.token, timer.callbackCtx);
-
-            // ensure it's removed
-            remove = true;
-        }
-
-        return remove;
-    }, &info);*/
-
     RW_UNLOCK_WRITE(&this->timersLock);
-
-    // do not request scheduler update yet; the system tick handler will do that
 }
 
 /**

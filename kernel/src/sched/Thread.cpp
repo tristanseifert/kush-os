@@ -172,24 +172,14 @@ void Thread::sleep(const uint64_t nanos) {
     int err;
 
     // create the timer blockable
-    auto block = new TimerBlocker(nanos);
+    TimerBlocker block(nanos);
 
     // wait on it
-    err = thread->blockOn(block);
+    err = thread->blockOn(&block);
 
     if(err) {
         log("sleep failed: %d state %d", err, (int) thread->state);
-
-/*        if(thread->state != State::Runnable) {
-            if(thread->blockingOn) {
-                thread->blockingOn->didUnblock();
-            }
-            thread->blockingOn = nullptr;
-            thread->state = State::Runnable;
-        }*/
     }
-
-    delete block;
 }
 
 /**
@@ -197,15 +187,19 @@ void Thread::sleep(const uint64_t nanos) {
  *
  * @return 0 if the block completed, or an error code if the block was interrupted (because the
  * thread was woken for another reason, for example.)
+ *
+ * Note that we raise the IRQL, but do not ever lower it; this is because when we get switched back
+ * in, the IRQL will be lowered again to the Passive level, i.e. what most threads that are running
+ * will be using.
  */
 int Thread::blockOn(Blockable *b) {
-    DECLARE_CRITICAL();
-
     REQUIRE(b, "invalid blockable %p", b);
     REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
 
-    // prepare blockable and inscrete it
-    CRITICAL_ENTER();
+    // raise IRQL to scheduler level (to prevent being preempted)
+    platform_raise_irql(platform::Irql::Scheduler);
+
+    // update thread state
     RW_LOCK_WRITE(&this->lock);
 
     REQUIRE(this->state == State::Runnable, "Cannot %s thread %p with state: %d (blockable %p)",
@@ -214,14 +208,12 @@ int Thread::blockOn(Blockable *b) {
             this, b, this->blockingOn);
 
     this->blockingOn = b;
+    this->setState(State::Blocked);
 
     RW_UNLOCK_WRITE(&this->lock);
-    CRITICAL_EXIT();
-
-    b->willBlockOn(this);
 
     // yield the rest of the CPU time
-    Scheduler::get()->yield(State::Blocked);
+    Scheduler::get()->yield();
 
     // get state from the blockable
     bool signaled = b->isSignalled();
@@ -229,6 +221,14 @@ int Thread::blockOn(Blockable *b) {
 
     // return whether the thread woke correctly or nah
     return (signaled ? 0 : -1);
+}
+
+/**
+ * Prepares any objects that we're blocking on.
+ */
+void Thread::prepareBlocks() {
+    REQUIRE(this->blockingOn, "no blocking objects");
+    this->blockingOn->willBlockOn(this);
 }
 
 /**
@@ -247,11 +247,10 @@ void Thread::unblock(Blockable *b) {
     REQUIRE(b == this->blockingOn, "thread not blocking on %p! (is %p)", b, this->blockingOn);
 
     // finish setting state
-    auto run = State::Runnable;
-    __atomic_store(&this->state, &run, __ATOMIC_RELEASE);
-
     this->blockingOn->didUnblock();
     this->blockingOn = nullptr;
+
+    this->setState(State::Runnable);
 
     RW_UNLOCK_WRITE(&this->lock);
     CRITICAL_EXIT();

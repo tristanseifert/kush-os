@@ -288,7 +288,7 @@ void Manager::setupTimebase() {
         const auto token = this->addHandler(ISR_APIC_TIMER, [](void *ctx, const uint32_t type) {
             const auto prevIrql = platform_raise_irql(Irql::Clock);
 
-            timer::Manager::gShared->tick(kTimebaseInterval * 1000, type);
+            timer::Manager::gShared->tick(kTimebaseInterval * 1000);
             platform_kern_tick(type);
 
             platform_lower_irql(prevIrql);
@@ -355,14 +355,14 @@ void Manager::handleIsr(const uint32_t type) {
 
     // special handling for scheduler IPI
     if(type == ISR_APIC_DISPATCH_IPI) {
-        platform_raise_irql(Irql::Scheduler);
+        const auto prevIrql = platform_raise_irql(Irql::Scheduler);
 
         // first, invoke timer callbacks
         timer::Manager::gShared->checkTimers();
         // then actually update the scheduler
         platform_kern_scheduler_update(type);
 
-        platform_lower_irql(Irql::Passive);
+        platform_lower_irql(prevIrql);
 
         ack = true;
         goto beach;

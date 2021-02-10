@@ -13,7 +13,11 @@ namespace sched {
 class Blockable {
     public:
         // this does nothing
-        virtual ~Blockable() = default;
+        virtual ~Blockable() {
+            REQUIRE(!this->blocker, "cannot deallocate blockable %p while thread %p is waiting",
+                    this, this->blocker);
+            this->blocker = nullptr;
+        }
 
         /**
          * Returns whether this blockable object has been signalled, i.e. whether any blocking
@@ -64,7 +68,6 @@ class Blockable {
             this->blocker->unblock(this);
         }
 
-    private:
         /// thread currently blocking on us, if any
         Thread *blocker = nullptr;
 };

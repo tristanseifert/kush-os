@@ -27,6 +27,7 @@ struct Task;
  * runnable to blocked if they're not currently executing.)
  */
 struct Thread {
+    friend class Scheduler;
     friend class Blockable;
 
     /// Length of thread names
@@ -144,7 +145,10 @@ struct Thread {
         void setName(const char *name);
         /// Sets the thread's state.
         void setState(State newState) {
-            RW_LOCK_WRITE_GUARD(this->lock);
+            if(newState == State::Runnable) {
+                REQUIRE(!this->blockingOn, "cannot be runnable while blocking");
+            }
+
             __atomic_store(&this->state, &newState, __ATOMIC_RELEASE);
         }
 
@@ -171,6 +175,9 @@ struct Thread {
         void unblock(Blockable *b);
         /// Called when this thread is switching out
         void switchFrom();
+
+        /// Invoked by the scheduler when a thread that is blocked yields
+        void prepareBlocks();
 };
 }
 

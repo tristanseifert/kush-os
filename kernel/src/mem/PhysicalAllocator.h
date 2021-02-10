@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <log.h>
 #include <arch/spinlock.h>
 
 namespace mem {
@@ -17,15 +18,18 @@ class PhysicalAllocator {
 
         /// Returns the physical address of a newly allocated page, or 0 if no memory available
         static uint64_t alloc() {
+            REQUIRE(gShared, "invalid allocator");
             return gShared->allocPage();
         }
         /// Frees a previously allocated physical page
         static void free(const uint64_t physicalAddr) {
+            REQUIRE(gShared, "invalid allocator");
             gShared->freePage(physicalAddr);
         }
 
         /// Reserves the page at the given physical address.
         static void reserve(const uint64_t physicalAddr) {
+            REQUIRE(gShared, "invalid allocator");
             gShared->reservePage(physicalAddr);
         }
 

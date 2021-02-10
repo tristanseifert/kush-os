@@ -86,7 +86,7 @@ class Manager {
 
         /// calls any expired timers
         void checkTimers();
-        void tick(const uint64_t ns, const uintptr_t irqToken);
+        void tick(const uint64_t ns);
 
         static Manager *gShared;
 

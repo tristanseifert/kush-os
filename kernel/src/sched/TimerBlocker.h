@@ -8,14 +8,10 @@
 #include <platform.h>
 
 namespace sched {
-static void _TBTimerExpired(const uintptr_t, void *);
-
 /**
  * Blocks a thread for a certain amount of time, based on the system time tick.
  */
 class TimerBlocker: public Blockable {
-    friend void _TBTimerExpired(const uintptr_t, void *);
-
     public:
         /**
          * Creates a new timer blocker, with the given number of nanoseconds set in the future.
@@ -44,10 +40,13 @@ class TimerBlocker: public Blockable {
         void willBlockOn(Thread *t) override {
             Blockable::willBlockOn(t);
 
-            // set the timer
-            const auto deadline = platform_timer_now() + this->interval;
-            this->timer = platform_timer_add(deadline, [](const uintptr_t, void *ctx) {
-                reinterpret_cast<TimerBlocker *>(ctx)->timerFired();
+            // set the timer (multiples of 10ms). include a fudge factor
+            //const auto interval = (this->interval / 10000000ULL) * 10000000ULL;
+            const auto interval = this->interval;
+            const auto deadline = platform_timer_now() + interval + 10000ULL;
+
+            this->timer = platform_timer_add(deadline, [](const uintptr_t tok, void *ctx) {
+                reinterpret_cast<TimerBlocker *>(ctx)->timerFired(tok);
             }, this);
 
             REQUIRE(this->timer, "failed to allocate timer");
@@ -57,7 +56,7 @@ class TimerBlocker: public Blockable {
         /**
          * Unblocks the task when the timer has fired.
          */
-        void timerFired() {
+        void timerFired(const uintptr_t tok) {
             // set the flag
             bool yes = true;
             __atomic_store(&this->hasFired, &yes, __ATOMIC_RELEASE);
@@ -75,11 +74,6 @@ class TimerBlocker: public Blockable {
         /// interval for the timer (in ns)
         uint64_t interval = 0;
 };
-
-/// Simply forward into a class member function
-static inline void _TBTimerExpired(const uintptr_t, void *ctx) {
-    reinterpret_cast<TimerBlocker *>(ctx)->timerFired();
-}
 }
 
 #endif

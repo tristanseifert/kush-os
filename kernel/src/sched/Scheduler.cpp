@@ -66,13 +66,22 @@ void Scheduler::run() {
 }
 
 /**
- * Schedules all runnable threads in the given task that aren't already scheduled.
+ * Schedules all threads in the given task that aren't already scheduled. Any threads that are in
+ * the paused state will become runnable. (Other states aren't changed.)
  */
 void Scheduler::scheduleRunnable(Task *task) {
     // TODO: check which threas are scheduled already
 
     RW_LOCK_READ_GUARD(task->lock);
-    for(auto thread : task->threads) {
+    for(Thread *thread : task->threads) {
+        // become runnable if needed
+        if(thread->state == Thread::State::Paused) {
+            thread->setState(Thread::State::Runnable);
+        }
+
+        // ignore if not runnable; otherwise, add it to the "possibly runnable" queue
+        if(thread->state != Thread::State::Runnable) continue;
+
         this->markThreadAsRunnable(thread, false, true);
     }
 }
@@ -81,6 +90,8 @@ void Scheduler::scheduleRunnable(Task *task) {
  * Adds the given thread to the end of the run queue.
  */
 void Scheduler::markThreadAsRunnable(Thread *t, const bool atHead, const bool immediate) {
+    REQUIRE(t->state == Thread::State::Runnable, "cannot add thread %p to run queue: invalid state %d",
+            t, (int) t->state);
     DECLARE_CRITICAL();
 
     // prepare info
@@ -124,8 +135,10 @@ void Scheduler::tickCallback() {
  * acknowledging an interrupt.
  *
  * @param requeueRunning When set, the currently running thread is placed back on the run queue.
+ *
+ * @return Whether a context switch was performed
  */
-void Scheduler::switchToRunnable(Thread *ignore, bool requeueRunning, void (*willSwitchCb)(void *), void *willSwitchCbCtx) {
+bool Scheduler::switchToRunnable(Thread *ignore, bool requeueRunning, void (*willSwitchCb)(void *), void *willSwitchCbCtx) {
     Thread *next = nullptr;
 
     /*
@@ -182,11 +195,13 @@ beach:;
 
     // switch to it
     REQUIRE(next, "failed to find thread to switch to");
+    REQUIRE(next->state == Thread::State::Runnable, "Thread %p in ready queue but has state %d",
+            next, (int) next->state);
 
     // do not perform a context switch into an already running thread
     if(next == this->running) {
         platform_lower_irql(prevIrql);
-        return;
+        return false;
     }
 
     // ensure the thread we're switching from will get CPU time again
@@ -205,6 +220,7 @@ beach:;
     }
 
     next->switchTo();
+    return true;
 }
 
 /**
@@ -252,7 +268,11 @@ beach:;
     }
 
     /*
-     * Perform a context switch if the runnable thread has not been pre-empted.
+     * Perform a context switch; this can happen if the currently running thread is being preempted
+     * because it's finished its CPU quantum, or because we added new threads to the run queue.
+     *
+     * If neither of those happened, we can simply return out of the dispatch IPI and let whatever
+     * thread is currently running resume.
      */
     if(needsSwitch) {
         this->switchToRunnable(toIgnore, requeueThread, ackFxn,
@@ -278,9 +298,9 @@ bool Scheduler::handleDeferredUpdates() {
         const RunnableInfo info = this->newlyRunnable.pop();
 
         const auto band = this->groupForThread(info.thread);
-        info.thread->setState(Thread::State::Runnable);
-        info.thread->priorityBoost = 0;
+        REQUIRE(info.thread->state == Thread::State::Runnable, "invalid runnable thread: %p (state %d)", info.thread, (int) info.thread->state);
 
+        // insert at front or back of run queue
         if(info.atFront) {
             this->runnable[band].push_front(info.thread);
         } else {
@@ -299,31 +319,31 @@ bool Scheduler::handleDeferredUpdates() {
  * Yields the remainder of the processor time allocated to the current thread. This will run the
  * next available thread. The current thread is pushed to the back of its run queue.
  */
-void Scheduler::yield(const Thread::State threadState, void (*willSwitch)(void*), void *willSwitchCtx) {
+void Scheduler::yield(void (*willSwitch)(void*), void *willSwitchCtx) {
     auto thread = this->running;
     REQUIRE(thread, "cannot yield without running thread");
     REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
 
     // raise to the scheduler level
-    const auto prevIpl = platform_raise_irql(platform::Irql::Scheduler);
+    const auto prevIrql = platform_raise_irql(platform::Irql::Scheduler);
 
     // queue it to run again during the next scheduler invocation
-    thread->setState(threadState);
     if(thread->state == Thread::State::Runnable) {
-        DECLARE_CRITICAL(runqueue);
-        CRITICAL_ENTER(runqueue);
-
         const auto band = groupForThread(thread);
         this->runnable[band].push_back(thread);
-
-        CRITICAL_EXIT(runqueue);
+    }
+    // if the thread is blocking, prepare it
+    else if(thread->state == Thread::State::Blocked) {
+        thread->prepareBlocks();
     }
 
     // since we're at scheduler IPL, we can context switch now
-    this->switchToRunnable(thread, false, willSwitch, willSwitchCtx);
+    const bool switched = this->switchToRunnable(thread, false, willSwitch, willSwitchCtx);
 
-    // if we return, there was no thread to switch to. exit to previous IPL
-    platform_lower_irql(prevIpl);
+    // if we return, there was no thread to switch to. exit to previous IRQL
+    if(!switched) {
+        platform_lower_irql(prevIrql);
+    }
 }
 
 

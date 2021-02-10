@@ -21,8 +21,10 @@ IdleWorker::IdleWorker(Scheduler *_sched) : sched(_sched) {
     this->thread->priority = kThreadPriority;
     this->thread->setName("Idle worker");
 
+    this->thread->setState(Thread::State::Runnable);
+
     // add it to the scheduler
-    sched->markThreadAsRunnable(this->thread);
+    //sched->markThreadAsRunnable(this->thread);
 }
 
 /**
