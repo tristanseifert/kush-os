@@ -3,6 +3,7 @@
 #include <platform.h>
 #include <printf.h>
 
+#include <arch/critical.h>
 #include <arch/spinlock.h>
 
 #include "sched/Scheduler.h"

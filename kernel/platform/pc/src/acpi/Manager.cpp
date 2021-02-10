@@ -15,7 +15,7 @@
 using namespace platform;
 using namespace platform::acpi;
 
-static char gSharedBuf[sizeof(Manager)];
+static char gSharedBuf[sizeof(Manager)] __attribute__((aligned(64)));
 Manager *Manager::gShared = (Manager *) &gSharedBuf;
 
 

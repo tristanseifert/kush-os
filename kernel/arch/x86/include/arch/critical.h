@@ -14,8 +14,7 @@ struct CriticalSection {
 
     /// enters the critical section
     inline void enter() {
-        this->lastIrql = platform_get_irql();
-        platform_raise_irql(platform::Irql::CriticalSection);
+        this->lastIrql = platform_raise_irql(platform::Irql::CriticalSection);
     }
     /// returns the irql to the previous level
     inline void exit() {

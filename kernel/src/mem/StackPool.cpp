@@ -13,7 +13,7 @@ using namespace mem;
 // enable logging of stack section VM updates
 #define LOG_VM_UPDATE                   0
 
-static char gSharedBuf[sizeof(StackPool)];
+static char gSharedBuf[sizeof(StackPool)] __attribute__((aligned(64)));
 StackPool *StackPool::gShared = nullptr;
 
 /**

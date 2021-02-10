@@ -66,97 +66,6 @@ void Scheduler::run() {
 }
 
 /**
- * Selects the next runnable thread.
- *
- * The thread provided as an argument will be ignored for purposes of getting scheduled; this can
- * be used so that if a thread yields, we'll try to schedule other, possibly lower-priority threads
- * again.
- *
- * An optional callback may be invoked immediately before context switching to perform task such as
- * acknowledging an interrupt.
- *
- * @param requeueRunning When set, the currently running thread is placed back on the run queue.
- */
-void Scheduler::switchToRunnable(Thread *ignore, bool requeueRunning, void (*willSwitchCb)(void *), void *willSwitchCbCtx) {
-    Thread *next = nullptr;
-
-    /*
-     * Fake entering a critical section by raising the irql to the critical section level; this
-     * ensures we're not interrupted until we finish switching to the thread, where the arch code
-     * will lower the irql again, after it has masked interrupts to prepare for switching context.
-     *
-     * This is a bit heavy handed but if the code below is reasonably fast (in that we find a
-     * runnable thread quickly) it shouldn't be too bad, but definitely a target for later
-     * optimizations.
-     */
-    platform_raise_irql(platform::Irql::CriticalSection);
-    //SPIN_LOCK(this->runnableLock);
-
-    // check priority bands from highest to lowest
-    for(size_t i = 0; i < kPriorityGroupMax; i++) {
-        auto &queue = this->runnable[i];
-        if(queue.empty()) continue;
-
-        next = queue.pop();
-        if(next == ignore || next == this->running) {
-            // pop the next item off the queue, if any
-            if(!queue.empty()) {
-                next = queue.pop();
-                queue.push_back(ignore);
-                goto beach;
-            }
-
-            // if none, place it back and check next priority band
-            queue.push_back(next);
-            continue;
-        }
-
-        // switch to this thread
-        goto beach;
-    }
-
-beach:;
-    // if still no thread found, schedule idle worker
-    if(!next) {
-        next = this->idle->thread;
-    }
-
-    // switch to it
-    //SPIN_UNLOCK(this->runnableLock);
-    REQUIRE(next, "failed to find thread to switch to");
-
-    // do not perform a context switch into an already running thread
-    if(next == this->running) {
-        platform_lower_irql(platform::Irql::Passive);
-        return;
-    }
-
-    // ensure the thread we're switching from will get CPU time again
-    if(requeueRunning && this->running && this->running->state == Thread::State::Runnable) {
-        const auto band = this->groupForThread(this->running);
-
-        //SPIN_LOCK(this->runnableLock);
-        log("preserving thread %s (pre-empted)", this->running->name);
-        this->runnable[band].push_back(this->running);
-        //SPIN_UNLOCK(this->runnableLock);
-    }
-
-    // otherwise, reset its boost, quantum and switch
-    if(next->priorityBoost > 0) {
-        // if it had a positive priority boost, delete it
-        next->priorityBoost = 0;
-    }
-
-    next->quantum = next->quantumTicks;
-
-    if(willSwitchCb) {
-        willSwitchCb(willSwitchCbCtx);
-    }
-
-    next->switchTo();
-}
-
-/**
  * Schedules all runnable threads in the given task that aren't already scheduled.
  */
 void Scheduler::scheduleRunnable(Task *task) {
@@ -180,7 +89,6 @@ void Scheduler::markThreadAsRunnable(Thread *t, const bool atHead, const bool im
 
     // insert it
     CRITICAL_ENTER();
-    SPIN_LOCK(this->newlyRunnableLock);
 
     if(atHead) {
         this->newlyRunnable.push_front(info);
@@ -188,7 +96,6 @@ void Scheduler::markThreadAsRunnable(Thread *t, const bool atHead, const bool im
         this->newlyRunnable.push_back(info);
     }
 
-    SPIN_UNLOCK(this->newlyRunnableLock);
     CRITICAL_EXIT();
 }
 
@@ -207,6 +114,100 @@ void Scheduler::tickCallback() {
 }
 
 /**
+ * Selects the next runnable thread.
+ *
+ * The thread provided as an argument will be ignored for purposes of getting scheduled; this can
+ * be used so that if a thread yields, we'll try to schedule other, possibly lower-priority threads
+ * again.
+ *
+ * An optional callback may be invoked immediately before context switching to perform task such as
+ * acknowledging an interrupt.
+ *
+ * @param requeueRunning When set, the currently running thread is placed back on the run queue.
+ */
+void Scheduler::switchToRunnable(Thread *ignore, bool requeueRunning, void (*willSwitchCb)(void *), void *willSwitchCbCtx) {
+    Thread *next = nullptr;
+
+    /*
+     * Fake entering a critical section by raising the irql to the critical section level; this
+     * ensures we're not interrupted until we finish switching to the thread, where the arch code
+     * will lower the irql again, after it has masked interrupts to prepare for switching context.
+     *
+     * This is a bit heavy handed but if the code below is reasonably fast (in that we find a
+     * runnable thread quickly) it shouldn't be too bad, but definitely a target for later
+     * optimizations.
+     */
+    const auto prevIrql = platform_raise_irql(platform::Irql::CriticalSection, false);
+
+    // check priority bands from highest to lowest
+    for(size_t i = 0; i < kPriorityGroupMax; i++) {
+        // skip empty priority bands
+        auto &queue = this->runnable[i];
+
+again:;
+        if(queue.empty()) continue;
+
+        // check the head of this priority queue
+        next = queue.pop();
+
+        // is it the currently running thread?
+        if(next == this->running) {
+            // if so, ignore it.
+            goto again;
+        }
+        // is it the thread we're ignoring; or is it not runnable?
+        else if(next == ignore || next->state != Thread::State::Runnable) {
+            // pop the next item off the queue, if any
+            if(!queue.empty()) {
+                auto oldNext = next;
+                next = queue.pop();
+                queue.push_back(oldNext);
+                goto beach;
+            }
+
+            // if none, place it back and check next priority band
+            queue.push_back(next);
+            continue;
+        }
+
+        // switch to this thread
+        goto beach;
+    }
+
+beach:;
+    // if still no thread found, schedule idle worker
+    if(!next) {
+        next = this->idle->thread;
+    }
+
+    // switch to it
+    REQUIRE(next, "failed to find thread to switch to");
+
+    // do not perform a context switch into an already running thread
+    if(next == this->running) {
+        platform_lower_irql(prevIrql);
+        return;
+    }
+
+    // ensure the thread we're switching from will get CPU time again
+    if(requeueRunning && this->running && this->running->state == Thread::State::Runnable) {
+        const auto band = this->groupForThread(this->running);
+
+        // log("preserving thread %s (pre-empted)", this->running->name);
+        this->runnable[band].push_back(this->running);
+    }
+
+    // otherwise, reset its boost, quantum and switch
+    next->quantum = next->quantumTicks;
+
+    if(willSwitchCb) {
+        willSwitchCb(willSwitchCbCtx);
+    }
+
+    next->switchTo();
+}
+
+/**
  * Handles the dispatch IPI, i.e. request to update internal state and schedule the next runnable
  * thread.
  *
@@ -215,7 +216,10 @@ void Scheduler::tickCallback() {
  * has become available to run.
  */
 void Scheduler::receivedDispatchIpi(const uintptr_t irqToken) {
-    bool needsSwitch = false;
+    REQUIRE_IRQL(platform::Irql::Scheduler);
+
+    bool needsSwitch = false, requeueThread = true;
+    Thread *toIgnore = nullptr;
 
     // define the callback for irq acknowledgement
     auto ackFxn = [](void *ctx) {
@@ -229,12 +233,6 @@ void Scheduler::receivedDispatchIpi(const uintptr_t irqToken) {
     // perform all elapsed ticks
     if(this->ticksToHandle) {
         while(this->ticksToHandle--) {
-            // periodic priority adjustments
-            if(++this->priorityAdjTimer == 20) {
-                this->adjustPriorities();
-                this->priorityAdjTimer = 0;
-            }
-
             // does the running thread need to be pre-empted?
             if(--this->running->quantum == 0) {
                 // somewhat boost down the priority of this task
@@ -242,11 +240,14 @@ void Scheduler::receivedDispatchIpi(const uintptr_t irqToken) {
                     this->running->priorityBoost--;
                 }
 
-                // ensure we acknowledge the interrupt if switching away
-                this->yield(ackFxn, reinterpret_cast<void *>(irqToken));
+                // switch away from it to the next runnable task
+                toIgnore = this->running;
+                needsSwitch = true;
+                goto beach;
             }
         }
 
+beach:;
         this->ticksToHandle = 0;
     }
 
@@ -254,11 +255,9 @@ void Scheduler::receivedDispatchIpi(const uintptr_t irqToken) {
      * Perform a context switch if the runnable thread has not been pre-empted.
      */
     if(needsSwitch) {
-        this->switchToRunnable(nullptr, true, ackFxn, reinterpret_cast<void *>(irqToken));
+        this->switchToRunnable(toIgnore, requeueThread, ackFxn,
+                reinterpret_cast<void *>(irqToken));
     }
-
-    // no context switching was performed, so acknowledge the irq now
-    platform_irq_ack(irqToken);
 }
 
 /**
@@ -266,21 +265,21 @@ void Scheduler::receivedDispatchIpi(const uintptr_t irqToken) {
  * invocation.
  */
 bool Scheduler::handleDeferredUpdates() {
+    if(this->running) {
+        REQUIRE_IRQL(platform::Irql::Scheduler);
+    }
+
     DECLARE_CRITICAL();
-    bool hadUpdates = false;
+    size_t numUpdates = 0;
 
     CRITICAL_ENTER();
-    SPIN_LOCK(this->newlyRunnableLock);
 
     while(!this->newlyRunnable.empty()) {
-        hadUpdates = true;
         const RunnableInfo info = this->newlyRunnable.pop();
 
         const auto band = this->groupForThread(info.thread);
         info.thread->setState(Thread::State::Runnable);
         info.thread->priorityBoost = 0;
-
-        //SPIN_LOCK(this->runnableLock);
 
         if(info.atFront) {
             this->runnable[band].push_front(info.thread);
@@ -288,128 +287,45 @@ bool Scheduler::handleDeferredUpdates() {
             this->runnable[band].push_back(info.thread);
         }
 
-        //SPIN_UNLOCK(this->runnableLock);
+        numUpdates++;
     }
 
-    SPIN_UNLOCK(this->newlyRunnableLock);
     CRITICAL_EXIT();
 
-    return hadUpdates;
-}
-
-/**
- * Finds all threads that are waiting for CPU time and increments their priority boost; this will
- * allow threads to jump a certain number of priority bands if they're starved for processor time,
- * depending on their scheduling class.
- *
- * Note that we only do this on threads in priority bands lower than the one the currently
- * executing thread is in. (This follows as there shouldn't be any higher priority runnable
- * threads, if we're only now pre-empting this one.)
- */
-void Scheduler::adjustPriorities() {
-    DECLARE_CRITICAL();
-    CRITICAL_ENTER();
-
-    //SPIN_LOCK(this->runnableLock);
-
-    const auto band = this->groupForThread(this->running);
-    if(band == PriorityGroup::Idle) goto done;
-
-    for(size_t i = band; i < kPriorityGroupMax; i++) {
-        // increment priority boost and remove threads that gained enough priority to jump up
-        auto &list = this->runnable[i].getStorage();
-        list.removeMatching(UpdatePriorities, this);
-    }
-
-done:;
-    //SPIN_UNLOCK(this->runnableLock);
-    CRITICAL_EXIT();
-}
-
-/**
- * Boosts the given thread's priority. Returns true if the thread jumped priority levels; in this
- * case, we must add it into its new priority class.
- */
-bool Scheduler::handleBoostThread(Thread *thread) {
-    RW_LOCK_READ_GUARD(thread->lock);
-
-    // ignore non-runnable threads
-    if(thread->state != Thread::State::Runnable) return false;
-
-    // determine the maximum boost for this thread
-    const auto band = this->groupForThread(thread);
-    const auto &rules = kSchedulerBehaviors[band];
-
-    // increment thread priority if allowed
-    if(thread->priorityBoost < rules.maxBoost &&
-       (thread->priority + thread->priorityBoost) < 100) {
-        // increment it's boost; and get the previous priority band
-        const auto oldBandBoosted = this->groupForThread(thread, true);
-        thread->priorityBoost++;
-
-        // did it jump priority classes?
-        const auto bandBoosted = this->groupForThread(thread, true);
-
-        // if so, add it to its new priority class
-        if(band > bandBoosted && bandBoosted != oldBandBoosted) {
-            //log("thread %p (prio %d boost %d) new level %d (old %d)", thread, thread->priority, thread->priorityBoost, (int) bandBoosted, (int) band);
-            this->runnable[bandBoosted].push_back(thread);
-            return true;
-        }
-    }
-
-    // do not remove
-    return false;
-}
-
-/**
- * Jumps into the scheduler handler for updating the given thread's priorities.
- */
-bool sched::UpdatePriorities(void *ctx, Thread *thread) {
-    return (reinterpret_cast<Scheduler *>(ctx)->handleBoostThread(thread));
+    return (numUpdates != 0);
 }
 
 /**
  * Yields the remainder of the processor time allocated to the current thread. This will run the
  * next available thread. The current thread is pushed to the back of its run queue.
  */
-void Scheduler::yield(void (*willSwitch)(void*), void *willSwitchCtx) {
+void Scheduler::yield(const Thread::State threadState, void (*willSwitch)(void*), void *willSwitchCtx) {
     auto thread = this->running;
     REQUIRE(thread, "cannot yield without running thread");
+    REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
 
-    // yeet
-    platform_raise_irql(platform::Irql::CriticalSection);
-    //REQUIRE(platform_get_irql() <= platform::Irql::Scheduler, "Scheduler: invalid irql");
+    // raise to the scheduler level
+    const auto prevIpl = platform_raise_irql(platform::Irql::Scheduler);
 
-    // insert it to the back of the runnable queue for its group
+    // queue it to run again during the next scheduler invocation
+    thread->setState(threadState);
     if(thread->state == Thread::State::Runnable) {
-        this->requeueRunnable(thread);
+        DECLARE_CRITICAL(runqueue);
+        CRITICAL_ENTER(runqueue);
+
+        const auto band = groupForThread(thread);
+        this->runnable[band].push_back(thread);
+
+        CRITICAL_EXIT(runqueue);
     }
 
-    // pick next thread
+    // since we're at scheduler IPL, we can context switch now
     this->switchToRunnable(thread, false, willSwitch, willSwitchCtx);
+
+    // if we return, there was no thread to switch to. exit to previous IPL
+    platform_lower_irql(prevIpl);
 }
 
-/**
- * Adds a thread back to the runnable queue. Invoke this when the thread gives up CPU time (or is
- * pre-empted because another higher priority task awoke, but is still runnable) to place it back
- * on the run queue.
- */
-void Scheduler::requeueRunnable(Thread *thread) {
-    DECLARE_CRITICAL();
-
-    // get the band to place it in
-    const auto band = this->groupForThread(thread);
-
-    // insert in a critical section
-    CRITICAL_ENTER();
-    // SPIN_LOCK(this->runnableLock);
-
-    this->runnable[band].push_back(thread);
-
-    // SPIN_UNLOCK(this->runnableLock);
-    CRITICAL_EXIT();
-}
 
 /**
  * Returns the priority group that a particular thread belongs to.

@@ -7,14 +7,13 @@
 #include <arch/spinlock.h>
 #include <runtime/Queue.h>
 
+#include "Thread.h"
+
 extern "C" void kernel_init();
 
 namespace sched {
 class IdleWorker;
 struct Task;
-struct Thread;
-
-bool UpdatePriorities(void *ctx, Thread *t);
 
 /**
  * Scheduler is responsible for ensuring all runnable threads get CPU time. It does this by taking
@@ -32,7 +31,6 @@ bool UpdatePriorities(void *ctx, Thread *t);
  *      machines. Probably making data structures shared is sufficient.
  */
 class Scheduler {
-    friend bool UpdatePriorities(void *, Thread *);
     friend void ::kernel_init();
     friend void ::platform_kern_tick(const uintptr_t);
     friend void ::platform_kern_scheduler_update(const uintptr_t);
@@ -71,8 +69,8 @@ class Scheduler {
         /// Runs the scheduler.
         void run() __attribute__((noreturn));
         /// Yields the remainder of the current thread's CPU time.
-        void yield() {
-            yield(nullptr, nullptr);
+        void yield(const Thread::State state = Thread::State::Runnable) {
+            yield(state, nullptr, nullptr);
         }
 
     private:
@@ -93,13 +91,10 @@ class Scheduler {
         Scheduler();
         ~Scheduler();
 
-        void yield(void (*willSwitch)(void*), void *willSwitchCtx = nullptr);
-        void requeueRunnable(Thread *);
+        void yield(const Thread::State, void (*willSwitch)(void*), void *willSwitchCtx = nullptr);
 
-        void adjustPriorities();
         void switchToRunnable(Thread *ignore = nullptr, bool requeueRunning = false,
                 void (*willSwitch)(void*) = nullptr, void *willSwitchCtx = nullptr);
-        bool handleBoostThread(Thread *thread);
 
         bool handleDeferredUpdates();
         void receivedDispatchIpi(const uintptr_t);
@@ -113,7 +108,9 @@ class Scheduler {
             Thread *thread = nullptr;
 
             RunnableInfo() = default;
-            RunnableInfo(Thread *_thread) : thread(_thread) {}
+            RunnableInfo(Thread *_thread) : atFront(false), thread(_thread) {}
+            RunnableInfo(Thread *_thread, const bool _atFront) : atFront(_atFront), 
+                thread(_thread) {}
         };
 
     private:
@@ -122,19 +119,13 @@ class Scheduler {
     private:
         /// the thread that is currently being executed
         Thread *running = nullptr;
-        /// timer we increment every tick to govern when we boost threads' priorities
-        uintptr_t priorityAdjTimer = 0;
 
         /// number of time ticks we have to handle for the next deferred update cycle
         uintptr_t ticksToHandle = 0;
 
-        /// lock for the runnable threads queue
-        DECLARE_SPINLOCK(runnableLock);
         /// runnable threads (per priority band)
         rt::Queue<Thread *> runnable[kPriorityGroupMax];
 
-        /// lock protecting the below queueueuueueu
-        DECLARE_SPINLOCK(newlyRunnableLock);
         /// queue of threads that have become runnable
         rt::Queue<RunnableInfo> newlyRunnable;
 

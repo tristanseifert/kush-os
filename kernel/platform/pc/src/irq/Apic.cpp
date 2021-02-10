@@ -155,27 +155,37 @@ void Apic::updateTpr(const Irql irql) {
 /**
  * Raises the interrupt priority level of the current processor.
  */
-void platform_raise_irql(const Irql irql) {
+platform::Irql platform_raise_irql(const Irql irql, const bool enableIrq) {
+    Irql prev, newVal = irql;
+
     asm volatile("cli");
     REQUIRE(irql >= gIrql, "cannot %s irql: current %d, requested %d", "raise", (int) gIrql,
             (int) irql);
-    gIrql = irql;
+    __atomic_exchange(&gIrql, &newVal, &prev, __ATOMIC_ACQUIRE);
 
     Manager::currentProcessorApic()->updateTpr(irql);
-    asm volatile("sti");
+
+    if(enableIrq) {
+        asm volatile("sti");
+    }
+
+    return prev;
 }
 
 /**
  * Lowers the interrupt priority level of the current processor.
  */
-void platform_lower_irql(const platform::Irql irql) {
+void platform_lower_irql(const platform::Irql irql, const bool enableIrq) {
     asm volatile("cli");
     REQUIRE(irql <= gIrql, "cannot %s irql: current %d, requested %d", "lower", (int) gIrql,
             (int) irql);
     gIrql = irql;
 
     Manager::currentProcessorApic()->updateTpr(irql);
-    asm volatile("sti");
+
+    if(enableIrq) {
+        asm volatile("sti");
+    }
 }
 
 /**

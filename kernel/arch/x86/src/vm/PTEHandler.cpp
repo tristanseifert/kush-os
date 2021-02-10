@@ -113,6 +113,8 @@ void PTEHandler::initCopyKernel(PTEHandler *kernel) {
 
     this->pdpt = (uint64_t *) pdptVirt;
 
+    // log("PDPT alloc for %p: %p (phys %08x)", this, this->pdpt, this->pdptPhys);
+
     for(size_t i = 0; i < 3; i++) {
         this->pdpt[i] = this->pdtPhys[i] | 0b001;
     }
@@ -428,6 +430,7 @@ void PTEHandler::setPageDirectory(const uint32_t virt, const uint64_t value) {
     ptr[(virt >> 21)] = value;
 
     // invalidate the vm region for this page directory (and the page table access region)
+    asm volatile( "invlpg (%0)" : : "b"(ptr) : "memory" );
     asm volatile( "invlpg (%0)" : : "b"(&ptr[(virt >> 21)]) : "memory" );
 
     // invalidate the page table that this region maps

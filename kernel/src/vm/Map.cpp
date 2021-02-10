@@ -8,7 +8,7 @@
 
 using namespace vm;
 
-static char gAllocBuf[sizeof(mem::SlabAllocator<Map>)];
+static char gAllocBuf[sizeof(mem::SlabAllocator<Map>)] __attribute__((aligned(64)));
 static mem::SlabAllocator<Map> *gMapAllocator = nullptr;
 
 /// Set to 1 to log adding mappings

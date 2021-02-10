@@ -50,6 +50,9 @@ struct Thread {
         /// task that owns us
         Task *task = nullptr;
 
+        /// descriptive thread name, if desired
+        char name[kNameLength] = {0};
+
         /// current thread state
         State state = State::Paused;
         /**
@@ -108,10 +111,7 @@ struct Thread {
         /**
          * Objects this thread is currently blocking on
          */
-        rt::Vector<Blockable *> blockingOn;
-
-        /// descriptive thread name, if desired
-        char name[kNameLength] = {0};
+        Blockable *blockingOn = nullptr;
 
         /**
          * The thread can be accessed read-only by multiple processes, but the scheduler will
@@ -143,9 +143,9 @@ struct Thread {
         /// Sets the thread's name.
         void setName(const char *name);
         /// Sets the thread's state.
-        void setState(const State newState) {
+        void setState(State newState) {
             RW_LOCK_WRITE_GUARD(this->lock);
-            this->state = newState;
+            __atomic_store(&this->state, &newState, __ATOMIC_RELEASE);
         }
 
         /// Blocks the thread on the given object.

@@ -76,7 +76,9 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
      * switch has completed.
      */
     asm volatile("cli" ::: "memory");
-    platform_lower_irql(platform::Irql::Passive);
+    platform_lower_irql(platform::Irql::Passive, false);
+
+    REQUIRE(from != to, "cannot context switch same thread");
 
     // switch page tables if needed
     if((!from && to->task) ||
@@ -99,9 +101,8 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
 
     // save state into current thread and switch to next
     if(from) {
-        // log("old task %%esp = %p, new task %%esp = %p (stack %p)", from->regs.stackTop, to->regs.stackTop, to->stack);
+        //log("old task %%esp = %p, new task %%esp = %p (stack %p)", from->regs.stackTop, to->regs.stackTop, to->stack);
         // set the running flags
-
         __atomic_store(&from->isActive, &no, __ATOMIC_RELEASE);
         __atomic_store(&to->isActive, &yes, __ATOMIC_RELEASE);
 

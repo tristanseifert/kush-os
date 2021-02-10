@@ -11,13 +11,14 @@ using namespace arch::vm;
 #define LOG_ALLOC                       0
 
 /// shared pool instance
-static char gSharedBuf[sizeof(PDPTPool)];
-PDPTPool *PDPTPool::gShared = (PDPTPool *) &gSharedBuf;
+static char gSharedBuf[sizeof(PDPTPool)] __attribute__((aligned(64)));
+PDPTPool *PDPTPool::gShared = nullptr;
 
 /**
  * Runs the constructor for the statically allocated pool.
  */
 void PDPTPool::init() {
+    gShared = (PDPTPool *) &gSharedBuf;
     new(gShared) PDPTPool();
 }
 

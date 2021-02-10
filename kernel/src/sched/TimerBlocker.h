@@ -20,15 +20,7 @@ class TimerBlocker: public Blockable {
         /**
          * Creates a new timer blocker, with the given number of nanoseconds set in the future.
          */
-        TimerBlocker(const uint64_t nanos) {
-            // set the timer
-            const auto deadline = platform_timer_now() + nanos;
-            this->timer = platform_timer_add(deadline, [](const uintptr_t, void *ctx) {
-                reinterpret_cast<TimerBlocker *>(ctx)->timerFired();
-            }, this);
-
-            REQUIRE(this->timer, "failed to allocate timer");
-        }
+        TimerBlocker(const uint64_t nanos) : interval(nanos) {}
 
         /**
          * Ensures the timer is deallocated if it hasn't fired.
@@ -46,6 +38,19 @@ class TimerBlocker: public Blockable {
         /// Do nothing, since this is a one shot timer.
         void reset() override {
 
+        }
+
+        /// When we're going to start blocking, actually install the timer.
+        void willBlockOn(Thread *t) override {
+            Blockable::willBlockOn(t);
+
+            // set the timer
+            const auto deadline = platform_timer_now() + this->interval;
+            this->timer = platform_timer_add(deadline, [](const uintptr_t, void *ctx) {
+                reinterpret_cast<TimerBlocker *>(ctx)->timerFired();
+            }, this);
+
+            REQUIRE(this->timer, "failed to allocate timer");
         }
 
     private:
@@ -66,6 +71,9 @@ class TimerBlocker: public Blockable {
         uintptr_t timer = 0;
         /// whether the timer has fired or not
         bool hasFired = false;
+
+        /// interval for the timer (in ns)
+        uint64_t interval = 0;
 };
 
 /// Simply forward into a class member function

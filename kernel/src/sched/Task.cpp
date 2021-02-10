@@ -9,7 +9,7 @@
 
 using namespace sched;
 
-static char gAllocBuf[sizeof(mem::SlabAllocator<Task>)];
+static char gAllocBuf[sizeof(mem::SlabAllocator<Task>)] __attribute__((aligned(64)));
 static mem::SlabAllocator<Task> *gTaskAllocator = nullptr;
 
 /**

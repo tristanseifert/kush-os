@@ -7,6 +7,7 @@
 #include <stdint.h>
 
 #include <arch/rwlock.h>
+#include <runtime/List.h>
 #include <runtime/HashTable.h>
 
 namespace platform {
@@ -83,6 +84,8 @@ class Manager {
         static void init();
         static uint64_t nsSinceTick();
 
+        /// calls any expired timers
+        void checkTimers();
         void tick(const uint64_t ns, const uintptr_t irqToken);
 
         static Manager *gShared;
@@ -99,7 +102,8 @@ class Manager {
         /// lock over the timers
         DECLARE_RWLOCK(timersLock);
         /// all assigned timers
-        rt::HashTable<uintptr_t, TimerInfo> timers;
+        rt::List<TimerInfo> timers;
+        // rt::HashTable<uintptr_t, TimerInfo> timers;
 };
 }}
 

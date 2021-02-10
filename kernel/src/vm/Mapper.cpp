@@ -9,10 +9,10 @@
 
 using namespace vm;
 
-static char gMapperBuf[sizeof(Mapper)];
+static char gMapperBuf[sizeof(Mapper)] __attribute__((aligned(64)));
 Mapper *Mapper::gShared = (Mapper *) &gMapperBuf;
 
-static char gKernelMapBuf[sizeof(Map)];
+static char gKernelMapBuf[sizeof(Map)] __attribute__((aligned(64)));
 Map *Mapper::gKernelMap = (Map *) &gKernelMapBuf;
 
 /**

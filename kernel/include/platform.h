@@ -107,13 +107,13 @@ int platform_section_get_info(const platform_section_t section, uint64_t *physAd
 int platform_irq_ack(const uintptr_t token);
 
 /**
- * Raises the interrupt priority level of the current processor.
+ * Raises the interrupt priority level of the current processor. The previous irql is returned.
  */
-void platform_raise_irql(const platform::Irql irql);
+platform::Irql platform_raise_irql(const platform::Irql irql, const bool enableIrq = true);
 /**
  * Lowers the interrupt priority level of the current processor.
  */
-void platform_lower_irql(const platform::Irql irql);
+void platform_lower_irql(const platform::Irql irql, const bool enableIrq = true);
 /**
  * Gets the current irql of the processor.
  */
@@ -123,6 +123,23 @@ const platform::Irql platform_get_irql();
  * Requests a dispatch IPI to be sent to the current processor.
  */
 void platform_request_dispatch();
+
+/**
+ * Ensures we're at the given IRQL.
+ */
+#define REQUIRE(cond, ...) {if(!(cond)) { panic(__VA_ARGS__); }}
+#define REQUIRE_IRQL(irql, ...) { \
+    const auto current = platform_get_irql(); \
+    if(current != irql) { \
+        panic("invalid irql (%d) expected = %d", (int) current, irql); \
+    } \
+}
+#define REQUIRE_IRQL_LEQ(irql, ...) { \
+    const auto current = platform_get_irql(); \
+    if(current > irql) { \
+        panic("invalid irql (%d) expected <= %d", (int) current, irql); \
+    } \
+}
 
 
 

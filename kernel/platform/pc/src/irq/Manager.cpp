@@ -224,9 +224,6 @@ void Manager::installHandlers() {
             IDT_FLAGS_ISR);
 
     const auto token = this->addHandler(ISR_APIC_DISPATCH_IPI, [](void *ctx, const uint32_t type) {
-        platform_raise_irql(Irql::Scheduler);
-        platform_kern_scheduler_update(type);
-        platform_lower_irql(Irql::Passive);
 
         return true;
     }, this);
@@ -289,12 +286,12 @@ void Manager::setupTimebase() {
 
         // register an interrupt handler as well
         const auto token = this->addHandler(ISR_APIC_TIMER, [](void *ctx, const uint32_t type) {
-            platform_raise_irql(Irql::Clock);
+            const auto prevIrql = platform_raise_irql(Irql::Clock);
 
             timer::Manager::gShared->tick(kTimebaseInterval * 1000, type);
             platform_kern_tick(type);
 
-            platform_lower_irql(Irql::Passive);
+            platform_lower_irql(prevIrql);
             return true;
         }, apic);
 
@@ -353,11 +350,27 @@ void Manager::removeHandler(const uintptr_t token) {
  * interrupt internally.
  */
 void Manager::handleIsr(const uint32_t type) {
-    // handle normal interrupts
-    RW_LOCK_READ_GUARD(this->handlersLock);
-
     bool ack = true;
     bool handled = false;
+
+    // special handling for scheduler IPI
+    if(type == ISR_APIC_DISPATCH_IPI) {
+        platform_raise_irql(Irql::Scheduler);
+
+        // first, invoke timer callbacks
+        timer::Manager::gShared->checkTimers();
+        // then actually update the scheduler
+        platform_kern_scheduler_update(type);
+
+        platform_lower_irql(Irql::Passive);
+
+        ack = true;
+        goto beach;
+    }
+
+    // handle normal interrupts
+    RW_LOCK_READ(&this->handlersLock);
+    //log("ISR %08x", type);
 
     for(const auto &handler : this->handlers) {
         if(handler.irq == type) {
@@ -367,9 +380,12 @@ void Manager::handleIsr(const uint32_t type) {
         }
     }
 
+    RW_UNLOCK_READ(&this->handlersLock);
+
     // ensure something handled the irq
     REQUIRE(handled, "platform irq manager doesn't know how to handle irq %08x", type);
 
+beach:;
     // acknwledge irq if desired
     if(ack) {
         this->acknowledgeIrq(type);

@@ -9,12 +9,14 @@
 #include "mem/StackPool.h"
 #include "mem/SlabAllocator.h"
 
+#include <arch/critical.h>
+
 #include <platform.h>
 #include <string.h>
 
 using namespace sched;
 
-static char gAllocBuf[sizeof(mem::SlabAllocator<Thread>)];
+static char gAllocBuf[sizeof(mem::SlabAllocator<Thread>)] __attribute__((aligned(64)));
 static mem::SlabAllocator<Thread> *gThreadAllocator = nullptr;
 
 /// Thread id for the next thread
@@ -102,14 +104,15 @@ void Thread::switchFrom() {
  */
 void Thread::switchTo() {
     auto current = Scheduler::get()->runningThread();
-    Scheduler::get()->setRunningThread(this);
-
-    this->lastSwitchedTo = platform_timer_now();
 
     if(current) {
         current->switchFrom();
     }
 
+    this->lastSwitchedTo = platform_timer_now();
+
+    //log("switching to %s (from %s)", this->name, current ? (current->name) : "<null>");
+    Scheduler::get()->setRunningThread(this);
     arch::RestoreThreadState(current, this);
 }
 
@@ -169,12 +172,24 @@ void Thread::sleep(const uint64_t nanos) {
     int err;
 
     // create the timer blockable
-    TimerBlocker block(nanos);
+    auto block = new TimerBlocker(nanos);
 
     // wait on it
-    err = thread->blockOn(&block);
+    err = thread->blockOn(block);
 
-    // clean up
+    if(err) {
+        log("sleep failed: %d state %d", err, (int) thread->state);
+
+/*        if(thread->state != State::Runnable) {
+            if(thread->blockingOn) {
+                thread->blockingOn->didUnblock();
+            }
+            thread->blockingOn = nullptr;
+            thread->state = State::Runnable;
+        }*/
+    }
+
+    delete block;
 }
 
 /**
@@ -184,18 +199,29 @@ void Thread::sleep(const uint64_t nanos) {
  * thread was woken for another reason, for example.)
  */
 int Thread::blockOn(Blockable *b) {
+    DECLARE_CRITICAL();
+
+    REQUIRE(b, "invalid blockable %p", b);
+    REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
+
     // prepare blockable and inscrete it
-    b->willBlockOn(this);
-
+    CRITICAL_ENTER();
     RW_LOCK_WRITE(&this->lock);
-    this->blockingOn.push_back(b);
 
-    this->state = State::Blocked;
+    REQUIRE(this->state == State::Runnable, "Cannot %s thread %p with state: %d (blockable %p)",
+            "block", this, (int) this->state, b);
+    REQUIRE(!this->blockingOn, "cannot block thread %p (object %p) while already blocking (%p)",
+            this, b, this->blockingOn);
+
+    this->blockingOn = b;
 
     RW_UNLOCK_WRITE(&this->lock);
+    CRITICAL_EXIT();
+
+    b->willBlockOn(this);
 
     // yield the rest of the CPU time
-    Scheduler::get()->yield();
+    Scheduler::get()->yield(State::Blocked);
 
     // get state from the blockable
     bool signaled = b->isSignalled();
@@ -209,17 +235,26 @@ int Thread::blockOn(Blockable *b) {
  * Unblocks the thread.
  */
 void Thread::unblock(Blockable *b) {
+    REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
+    REQUIRE(this->state == State::Blocked, "Cannot %s thread %p with state: %d (blockable %p)",
+            "unblock", this, (int) this->state, b);
+
+    DECLARE_CRITICAL();
+    CRITICAL_ENTER();
+
     // clear the blockable list
     RW_LOCK_WRITE(&this->lock);
-
-    for(auto blockable : this->blockingOn) {
-        blockable->didUnblock();
-    }
-    this->blockingOn.clear();
+    REQUIRE(b == this->blockingOn, "thread not blocking on %p! (is %p)", b, this->blockingOn);
 
     // finish setting state
-    this->state = State::Runnable;
+    auto run = State::Runnable;
+    __atomic_store(&this->state, &run, __ATOMIC_RELEASE);
+
+    this->blockingOn->didUnblock();
+    this->blockingOn = nullptr;
+
     RW_UNLOCK_WRITE(&this->lock);
+    CRITICAL_EXIT();
 
     // queue in scheduler
     Scheduler::get()->markThreadAsRunnable(this, true);

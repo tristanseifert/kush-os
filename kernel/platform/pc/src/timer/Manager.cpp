@@ -28,11 +28,6 @@ uintptr_t Manager::add(const uint64_t deadline, void (*callback)(const uintptr_t
         void *ctx) {
     DECLARE_CRITICAL();
 
-    // deadline mayn't be in the past
-    if(deadline < now()) {
-        return 0;
-    }
-
     // build up a struct for it
     TimerInfo info;
 
@@ -44,10 +39,12 @@ uintptr_t Manager::add(const uint64_t deadline, void (*callback)(const uintptr_t
     CRITICAL_ENTER();
     RW_LOCK_WRITE(&this->timersLock);
 
+again:;
     const auto id = this->nextTimerId++;
+    if(!id) goto again;
     info.token = id;
 
-    this->timers.insert(id, info);
+    this->timers.append(info);
 
     RW_UNLOCK_WRITE(&this->timersLock);
     CRITICAL_EXIT();
@@ -64,13 +61,15 @@ void Manager::remove(const uintptr_t token) {
     CRITICAL_ENTER();
     RW_LOCK_WRITE(&this->timersLock);
 
-    if(this->timers.contains(token)) {
+    for(size_t i = 0; i < this->timers.size(); i++) {
         const auto &timer = this->timers[token];
-        if(timer.fired) return;
-
-        this->timers.remove(token);
+        if(timer.token == token) {
+            this->timers.remove(token);
+            goto yeet;
+        }
     }
 
+yeet:;
     RW_UNLOCK_WRITE(&this->timersLock);
     CRITICAL_EXIT();
 }
@@ -88,17 +87,65 @@ void Manager::remove(const uintptr_t token) {
  * whatever tasks became runnable will be scheduled.
  */
 void Manager::tick(const uint64_t ns, const uintptr_t irqToken) {
-    // update the timer
+    // update the clock value
     __atomic_fetch_add(&this->currentTime, ns, __ATOMIC_ACQUIRE);
+}
+
+/**
+ * Invokes handlers for any timers that have expired.
+ */
+void Manager::checkTimers() {
+    REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
     const auto clock = now();
 
     // handle all software timers to see if any expired
+    RW_LOCK_WRITE(&this->timersLock);
+
     IterInfo info(clock);
     info.mgr = this;
 
-    RW_LOCK_WRITE(&this->timersLock);
+    this->timers.removeMatching([](void *ctx, TimerInfo &timer) {
+        bool yes = true;
+        auto info = reinterpret_cast<IterInfo *>(ctx);
 
-    this->timers.iterate([](void *ctx, const uintptr_t &key, TimerInfo &timer) {
+        if(timer.deadline <= info->time) {
+            __atomic_store(&timer.fired, &yes, __ATOMIC_RELEASE);
+            timer.callback(timer.token, timer.callbackCtx);
+
+            return true;
+        }
+
+        return false;
+    }, &info);
+
+
+    /*for(auto &timer : this->timers) {
+        if(timer.deadline <= clock) {
+            __atomic_store(&timer.fired, &yes, __ATOMIC_RELEASE);
+
+            // invoke the callback
+            timer.callback(timer.token, timer.callbackCtx);
+        }
+    }
+
+    // remove all expired timers
+    iterinfo ctx(clock);
+    ctx.mgr = this;
+
+    auto info = reinterpret_cast<iterinfo *>(&ctx);
+
+    size_t i = 0;
+    while(i != this->timers.size()) {
+        const auto &timer = this->timers[i];
+        if(timer.deadline <= clock) {
+            this->timers.remove(i);
+            continue;
+        }
+
+        i++;
+    }*/
+
+    /*    this->timers.iterate([](void *ctx, const uintptr_t &key, TimerInfo &timer) {
         bool yes = true;
         bool remove = false;
         auto info = reinterpret_cast<IterInfo *>(ctx);
@@ -115,7 +162,7 @@ void Manager::tick(const uint64_t ns, const uintptr_t irqToken) {
         }
 
         return remove;
-    }, &info);
+    }, &info);*/
 
     RW_UNLOCK_WRITE(&this->timersLock);
 

@@ -68,7 +68,6 @@ x86_switchto_save:
 
     // push the instruction pointer and flags
     push        $x86_switchto_swap_stub
-
     pushf
 
     // push GP registers and the segment descriptors

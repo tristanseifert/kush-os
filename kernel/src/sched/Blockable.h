@@ -42,6 +42,7 @@ class Blockable {
          * We're about to block the current thread on this object.
          */
         virtual void willBlockOn(Thread *t) {
+            //this->blocker = t;
             __atomic_store(&this->blocker, &t, __ATOMIC_RELEASE);
         }
 
@@ -59,6 +60,7 @@ class Blockable {
          * thread waiting on it.
          */
         virtual void unblock() {
+            REQUIRE(this->blocker, "cannot unblock object without blocker");
             this->blocker->unblock(this);
         }
 
