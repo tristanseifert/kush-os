@@ -1,0 +1,252 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2cm]{geometry}
+\geometry{a4paper}
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{epstopdf}
+\usepackage{bytefield}
+\usepackage{xcolor}
+
+% facilitates the creation of memory maps. Start address at the bottom, end address at the top.
+% syntax: \memsection{end address}{start address}{height in lines}{text in box}
+\newcommand{\memsection}[4]{
+\bytefieldsetup{bitheight=#3\baselineskip}    % define the height of the memsection
+\bitbox[]{10}{
+\texttt{#1}     % print end address
+\\ \vspace{#3\baselineskip} \vspace{-2\baselineskip} \vspace{-#3pt} % do some spacing
+\texttt{#2} % print start address
+}
+\bitbox{32}{#4} % print box with caption
+}
+
+
+\DeclareGraphicsRule{.tif}{png}{.png}{`convert #1 `dirname #1`/`basename #1 .tif`.png}
+
+\title{Syscalls}
+
+\begin{document}
+
+This document describes the syscalls exported by the kernel. Each syscall is identified by an integer number, that serves as its index in the kernel syscall table.
+
+\tableofcontents
+\newpage
+
+%%%%%%%%%%%%%%%
+\section{Calling Conventions}
+Each architecture may define a different calling convention for syscalls.
+
+\subsection{x86 (32-bit)}
+For kernel entry, the IA32 specific \texttt{SYSENTER} instruction should be used; specifically, the kernel syscall trampoline, mapped into all processes, should be used to perform the syscall. It performs some special handling to ensure the stack pointer can be restored as required (it copies the stack pointer to restore to the \texttt{\%esi} register, which the kernel will in turn restore that register to \texttt{\%ecx} before exiting from the syscall with \texttt{SYSEXIT}.
+
+The syscall number is placed in \texttt{\%ax}; the high 16 bits of the \texttt{\%eax} register are unused and may be interpreted by the syscall as a 16-bit set of flags. Following the syscall number, a maximum of four 32-bit arguments may be passed in the \texttt{\%ebx}, \texttt{\%ecx}, \texttt{\%edx} and \texttt{\%edi} registers. The call's result is placed in \texttt{\%eax}.
+
+%%%%%%%%%%%%%%%
+\section{Handles}
+Handles are opaque userspace identifiers for kernel objects. They take the form of positive integers, and are globally valid across the system. Any time a userspace process wishes to interact with a kernel object, it does so by using handles.
+
+Userspace processes \textit{should not} under any circumstances attempt to decode or otherwise reason about the contents of a handle; the only exception to this rule is to determine whether a syscall return value could be a handle, by checking its sign bit. Valid handles are always positive, non-zero values.
+
+\subsection{32-bit Handles}
+On 32-bit platforms, we're a little starved for space to encode all the information we need to:
+
+\begin{bytefield}[bitheight=\widthof{~Sign~},bitwidth=1.3em]{32} \\
+\bitheader{0,1,4,5,11,12,31} \\
+\bitbox{1}{\rotatebox{90}{Sign}}
+\bitbox{4}{Type}
+\bitbox{7}{Epoch}
+\bitbox{20}{Object Table Index}
+\end{bytefield}
+
+Encoded in each handle is an "object type," which identifies in which table the actual object can be found, as well as what its type is. Valid object types are:
+
+\begin{itemize}
+\item \texttt{0x01}: Task
+\item \texttt{0x02}: Thread
+\item \texttt{0x03}: Port
+\item \texttt{0x04}: Virtual memory region
+\end{itemize}
+
+The epoch value is a monotonically increasing value; it starts off at zero the first time a handle is assigned, and is decremented every time a given handle index (for that particular object type) is re-assigned. This allows the kernel to detect stale handles.
+
+%%%%%%%%%%%%%%%
+\section{Syscalls}
+This section lists all syscalls by their numerical identifier, as well as any arguments that they take. If arguments are specified, they should be assigned to successive parameter slots: i.e. a syscall with two arguments will use the first two registers identified by the calling convention.
+
+%%%%%%%%%%
+\subsection{Common Conventions}
+All system calls return status information; this takes the form of a status code. A value of 0 indicates success, whereas negative values indicate some sort of system error; positive values are reserved for the system call. Some calls deviate from this specification; they are specifically marked as such.
+
+Some calls may accept a timeout parameter; all timeouts to the kernel are specified in full, integer microseconds ($\mu s$,) while a value of 0 means no timeout (i.e. return immediately if not ready) while the maximum value of the parameter type ($2^{32}-1$ or $2^{64}-1$ for 32- and 64-bit two's complements platforms) indicates an infinite timeout (i.e. to block forever waiting for the call to complete.)
+
+There are a few syscalls that may take more than the four arguments allowed to be passed quickly; in these cases, the syscall will take a single argument, which is the address of a syscall-specific information structure. In this document, these are shown as they would be on a 32-bit platform; for 64-bit, all fields are extended to 64-bit, unless stated otherwise.
+
+%%%%%%%%%%
+\subsection{Message Passing}
+%%%%%
+\subsubsection{{\tt 0x00}: Wait for message}
+\textbf{Arguments:} (4) Port handle, received message structure, receive struct length, timeout \\
+\textbf{Flags:} None \\
+\textbf{Returns:} Number of message bytes read, or a negative error code \\
+
+Blocks the calling thread, and waits for a message to be received on the specified port. The message contents (and some additional metadata, such as its origin and actual length) are written into the specified structure by the kernel.
+
+The parameter of receive struct length serves as an upper bound on the number of message bytes that may be written, after subtracting the space consumed by the fixed message struct header fields.
+
+The received message struct has the following format:
+
+\begin{bytefield}{32} \\
+\bitheader{0,15,16,31} \\
+\bitbox{32}{Sender thread handle} \\
+\bitbox{16}{Flags} & \bitbox{16}{Message length (bytes)} \\
+\wordbox[lrt]{1}{Message payload} \\
+\skippedwords
+\end{bytefield}
+
+Message structures should be aligned on a 16-byte boundary.
+
+%%%%%
+\subsubsection{{\tt 0x01}: Send message}
+\textbf{Arguments:} (4) Port handle, message data, message length, timeout \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success, or a negative error code \\
+
+Sends a message to the given port. The kernel automatically provides the receiver with information on the origin of the message (i.e. our thread/task handles.) Message data must be aligned to a 16-byte boundary.
+
+For non-zero timeout values, the call may block the caller if there is nobody waiting to receive from the port; if the timeout is zero, the call will instead fail if there's nobody waiting to receive.
+
+%%%%%
+\subsubsection{{\tt 0x02}: Send with receive}
+\textbf{Arguments:} (1) Address of info structure \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success, or a negative error code \\
+
+Performs a message send, followed by a receive, as one atomic operation. This is especially suited for RPC-style invocations, where a client sends a message and waits to receive a reply. The message data to send, and receive message structure, must be aligned to a 16-byte boundary.
+
+For non-zero timeout values, the call will block if there is nobody receiving on the destination port, or if there is nobody waiting to send to our receive port.
+
+The info structure has the following format:
+
+\begin{bytefield}{32} \\
+\bitheader{0,31} \\
+\bitbox{32}{Send port} \\
+\bitbox{32}{Send message buffer address} \\
+\bitbox{32}{Send message length} \\
+\bitbox{32}{Send timeout} \\
+
+\bitbox{32}{Receive port} \\
+\bitbox{32}{Receive message struct address} \\
+\bitbox{32}{Receive message struct length} \\
+\bitbox{32}{Receive timeout} \\
+\end{bytefield}
+
+%%%%%%%%%%
+\subsection{Notifications}
+%%%%%
+\subsubsection{{\tt 0x08}: Wait for notification}
+\textbf{Arguments:} (2) Notification mask, timeout \\
+\textbf{Flags:} None \\
+\textbf{Returns:} Received notifications, or 0 in case of error \\
+
+Blocks the calling thread, and waits for one or more of its notification bits to be set. The thread will unblock (and this call return) only if the bitwise \texttt{AND} of the thread's current notification value and the provided mask is non-zero; or the timeout value expires.
+
+Upon return from this function in the non-timeout case, the thread's notification mask is returned, and all notification bits included in the specified mask are cleared. The returned notification value may have bits set that were not set in the provided mask; this is intended behavior, and should be dealt with gracefully by callers.
+
+%%%%%
+\subsubsection{{\tt 0x09}: Notify thread}
+\textbf{Arguments:} (2) Thread handle, notification to send \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success, or negative error code \\
+
+Sets the provided notification bits on the specified thread. The thread may be woken up if it is blocking on these notification bits. Bits that are cleared in the provided notification value are left as-is in the thread's notification value.
+
+%%%%%%%%%%
+\subsection{Scheduler}
+%%%%%
+\subsubsection{{\tt 0x10}: Get current thread handle}
+\textbf{Arguments:} None \\
+\textbf{Flags:} None \\
+\textbf{Returns:} Thread handle ($>0$) or error code ($\leq0$) \\
+
+Retrieves a kernel handle representing the currently executing thread.
+
+%%%%%
+\subsubsection{{\tt 0x11}: Yield remaining time quantum}
+\textbf{Arguments:} None \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success or negative error code \\
+
+Gives up the remainder of the thread's time quantum. It will remain on the ready queue.
+
+%%%%%
+\subsubsection{{\tt 0x12}: Sleep}
+\textbf{Arguments:} (1) Sleep duration (in $\mu s$) \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success or negative error code \\
+
+Blocks the thread for the specified amount of time. The kernel makes no guarantee that the thread will sleep for the precise amount specified; it should instead be considered a hint the kernel will make a \textit{best effort} to satisfy. This means this call may return immediately without blocking the thread, before the duration specified has elapsed, or even at some point significantly thereafter.
+
+%%%%%
+\subsubsection{{\tt 0x13}: Create thread}
+\textbf{Arguments:} (3) Thread entry point; entry point argument; initial stack pointer \\
+\textbf{Flags:} None \\
+\textbf{Returns:} Thread handle ($>0$) or error code ($\leq0$) \\
+
+Creates a new thread and attaches it to the running task. The caller must have set up a region of memory for the thread's stack. After the associated kernel thread has been initialized, the thread will execute a return to user mode with the given stack and program counter value. It will be invoked as if it were a function declared as \texttt{void ThreadEntry(const uintptr\_t param)}.
+
+By default, the thread is created in a suspended state. You must resume it before it will execute.
+
+It is undefined behavior to return from the user thread entry routine. (Doing so will probably just crash the task; however, runtime libraries may wish to wrap thread entry points such that returning from threads will terminate them, or do something else more desirable.)
+
+%%%%%
+\subsubsection{{\tt 0x14}: Join with thread}
+\textbf{Arguments:} (2) Thread handle, timeout (in $\mu s$) \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success, 1 on timeout, or negative error code \\
+
+Waits for the specified thread to terminate, for up to the given amount of time.
+
+%%%%%
+\subsubsection{{\tt 0x15}: Destroy thread}
+\textbf{Arguments:} (1) Thread handle \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success or negative error code \\
+
+Cleans up all resources associated with a thread. This call returns as soon as the request has been received; if you need to wait for the thread to actually be terminated, you need to wait on it.
+
+\textbf{Note:} This call will affect the specified thread the next time it enters kernel mode; at the latest, this is at the next scheduler invocation. You should not use this call for anything other than destroying threads when you are no longer using them; it is \textit{not} a suitable replacement for proper inter-thread communication to signal an orderly shutdown.
+
+%%%%%
+\subsubsection{{\tt 0x16}: Set thread state}
+\textbf{Arguments:} (2) Thread handle, new thread state \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success or negative error code \\
+
+Sets the state of the given thread; the thread state can be one of the following: \texttt{0} = paused, \texttt{1} = running. A running thread will transition to the paused state the next time it calls into the kernel.
+
+%%%%%
+\subsubsection{{\tt 0x17}: Set thread priority}
+\textbf{Arguments:} (2) Thread handle, new priority value \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success, or negative error code \\
+
+Updates the thread's base priority value. Valid priority values are in $[-100, 100]$, where a priority of $0$ indicates the standard (normal) priority level.
+
+%%%%%
+\subsubsection{{\tt 0x18}: Set thread notification mask}
+\textbf{Arguments:} (2) Thread handle, new notification mask \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success, or negative error code \\
+
+Updates the thread's notification mask. Any bits that are cleared in the mask will be ignored when the thread is waiting on notifications.
+
+\textbf{Note:} The result of using this call on a thread that is currently blocked waiting on notifications is \textit{undefined.}
+
+%%%%%
+\subsubsection{{\tt 0x19}: Set thread name}
+\textbf{Arguments:} (3) Thread handle, address of new name, length of new name (in bytes) \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success, or negative error code \\
+
+Updates the thread's name with the contents of the specified string buffer; if the buffer is zero terminated, the terminator is not included in the byte count. The thread name is used purely for informational purposes. 
+
+\end{document}  

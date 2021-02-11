@@ -22,7 +22,7 @@
  * 16 bits of %eax are reserved for syscall-specific use. On return, %eax contains the syscall
  * status code.
  *
- * Syscalls may have up to 4 arguments, passed in the %ebx, %edx, %edi and %esi registers,
+ * Syscalls may have up to 4 arguments, passed in the %ebx, %ecx, %edx and %edi registers,
  * respectively.
  */
 .global arch_syscall_entry
@@ -74,9 +74,9 @@ arch_syscall_slow:
     xor         %ebp, %ebp
 
     // stack the args (in reverse order)
-    push        %esi
     push        %edi
     push        %edx
+    push        %ecx
     push        %ebx
 
     // push syscall info and invoke the handler
