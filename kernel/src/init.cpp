@@ -7,6 +7,7 @@
 #include "vm/Map.h"
 #include "sched/Scheduler.h"
 #include "sched/Task.h"
+#include "sys/Syscall.h"
 
 #include <arch.h>
 #include <platform.h>
@@ -34,10 +35,15 @@ void kernel_init() {
     mem::StackPool::init();
     mem::Heap::init();
 
+    sys::Syscall::init();
+
+    // notify architecture we've got VM
+    arch_vm_available();
+
+    // set up scheduler (platform code may set up threads)
     sched::Scheduler::init();
 
     // notify other components of VM availability
-    arch_vm_available();
     platform_vm_available();
 
 }

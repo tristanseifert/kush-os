@@ -39,6 +39,7 @@ add_executable(kernel
     src/sched/Task.cpp
     src/sched/Thread.cpp
     src/sched/IdleWorker.cpp
+    src/sys/Syscall.cpp
     ${version_file}
 )
 

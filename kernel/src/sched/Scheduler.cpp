@@ -353,9 +353,7 @@ void Scheduler::yield(void (*willSwitch)(void*), void *willSwitchCtx) {
  * Currently, we linearly interpolate the range [-100, 100] to [4, 0] in our priority band groups.
  */
 const Scheduler::PriorityGroup Scheduler::groupForThread(Thread *t, const bool withBoost) const {
-    return PriorityGroup::Highest;
-
-/*    const auto prio = t->priority + (withBoost ? t->priorityBoost : 0);
+    const auto prio = t->priority + (withBoost ? t->priorityBoost : 0);
 
     // idle band is [-100, -60)
     if(prio >= -100 && prio < -60) {
@@ -378,7 +376,7 @@ const Scheduler::PriorityGroup Scheduler::groupForThread(Thread *t, const bool w
         return PriorityGroup::Highest;
     } else {
         panic("invalid priority for thread %p: %d", t, prio);
-    }*/
+    }
 }
 
 

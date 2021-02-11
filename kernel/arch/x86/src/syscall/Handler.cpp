@@ -5,6 +5,8 @@
 #include <log.h>
 #include <new>
 
+#include <sys/Syscall.h>
+
 using namespace arch::syscall;
 
 char gSharedBuf[sizeof(Handler)] __attribute__((aligned(64)));
@@ -38,8 +40,15 @@ Handler::Handler() {
 /**
  * Handles the given syscall.
  */
-uintptr_t arch_syscall_handle(const uintptr_t code) {
-    log("Syscall: %08lx", code);
+uintptr_t arch_syscall_handle(const uintptr_t number, const void *_args) {
+    const auto args = reinterpret_cast<const sys::Syscall::Args *>(_args);
+
+    // handle platform specific syscalls
+
+    // handle HW specific syscalls
+
+    // kernel syscalls
+    return sys::Syscall::handle(args, number);
     return 0;
 }
 

@@ -21,10 +21,18 @@
  * The syscall number is passed in %ax; values with the high bit set take the slow path. The high
  * 16 bits of %eax are reserved for syscall-specific use. On return, %eax contains the syscall
  * status code.
+ *
+ * Syscalls may have up to 4 arguments, passed in the %ebx, %edx, %edi and %esi registers,
+ * respectively.
  */
 .global arch_syscall_entry
 .align 0x40 // align to cache line
 arch_syscall_entry:
+    /// XXX: implement fast path
+    jmp         arch_syscall_slow
+
+
+
     // test for slow path
     cmp         $SYSCALL_FAST_MAX, %eax
     jge         arch_syscall_slow
@@ -65,11 +73,20 @@ arch_syscall_slow:
     state_save
     xor         %ebp, %ebp
 
+    // stack the args (in reverse order)
+    push        %esi
+    push        %edi
+    push        %edx
+    push        %ebx
+
     // push syscall info and invoke the handler
+    push        %esp
     push        %eax
+
     call        arch_syscall_handle
 
-    add         $4, %esp
+    // clear stack frame
+    add         $8+16, %esp
 
     // restore state and exit
     state_restore

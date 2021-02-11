@@ -41,25 +41,25 @@ void multiboot_parse() {
         switch(tag->type) {
             // kernel command line
             case MULTIBOOT_TAG_TYPE_CMDLINE: {
-                struct multiboot_tag_string *str = (struct multiboot_tag_string *) tag;
+                auto str = (struct multiboot_tag_string *) tag;
                 strncpy(x86_cmdline_buf, str->string, kCmdlineLen);
                 break;
             }
             // bootloader name
             case MULTIBOOT_TAG_TYPE_BOOT_LOADER_NAME: {
-                struct multiboot_tag_string *str = (struct multiboot_tag_string *) tag;
+                auto str = (struct multiboot_tag_string *) tag;
                 strncpy(x86_loader_name, str->string, kLoaderNameLen);
                 break;
             }
             // memory map
             case MULTIBOOT_TAG_TYPE_MMAP: {
-                struct multiboot_tag_mmap *mmap = (struct multiboot_tag_mmap *) tag;
+                auto mmap = (struct multiboot_tag_mmap *) tag;
                 physmap_load_from_multiboot(mmap);
                 break;
             }
             // ACPI info (32-bit RSDP)
             case MULTIBOOT_TAG_TYPE_ACPI_OLD: {
-                struct multiboot_tag_old_acpi *info = (struct multiboot_tag_old_acpi *) tag;
+                auto info = (struct multiboot_tag_old_acpi *) tag;
                 acpi::Manager::init(info);
                 break;
             }

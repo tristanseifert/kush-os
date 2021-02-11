@@ -8,7 +8,7 @@
 #include <arch.h>
 #include <arch/x86_msr.h>
 
-extern "C" uintptr_t arch_syscall_handle(const uintptr_t eax);
+extern "C" uintptr_t arch_syscall_handle(const uintptr_t number, const void *args);
 extern "C" uintptr_t arch_syscall_msgsend_slow(const uintptr_t eax);
 
 namespace arch { namespace syscall {
