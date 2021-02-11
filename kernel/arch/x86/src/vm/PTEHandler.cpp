@@ -8,6 +8,9 @@
 
 using namespace arch::vm;
 
+/// Pointer to the kernel PTE
+arch::vm::PTEHandler *gArchKernelPte = nullptr;
+
 // log the modification of page directories
 #define LOG_PDE_UPDATE          0
 // log allocation of page directories
@@ -67,6 +70,9 @@ void PTEHandler::initKernel() {
 
     // also map the PDPT into virtual memory (TODO: is this necessary?)
     this->pdt[2][507] = this->pdptPhys | 0b011;
+
+    // set the shared pointer
+    gArchKernelPte = this;
 }
 
 /**
@@ -116,9 +122,9 @@ void PTEHandler::initCopyKernel(PTEHandler *kernel) {
     // log("PDPT alloc for %p: %p (phys %08x)", this, this->pdpt, this->pdptPhys);
 
     for(size_t i = 0; i < 3; i++) {
-        this->pdpt[i] = this->pdtPhys[i] | 0b001;
+        this->pdpt[i] = (this->pdtPhys[i] & ~0xFFF) | 0b001;
     }
-    this->pdpt[3] = kernel->pdtPhys[3] | 0b001;
+    this->pdpt[3] = (kernel->pdtPhys[3] & ~0xFFF) | 0b001;
 
     // we need to map the PDPT as well
     this->pdt[2][507] = (this->pdptPhys & ~0xFFF) | 0b011;
@@ -153,9 +159,32 @@ PTEHandler::~PTEHandler() {
 }
 
 /**
+ * Maps the PDPTE at 0xf3000000.
+ */
+void PTEHandler::earlyMapPdpte() {
+    int err;
+    err = this->mapPage(this->pdptPhys, 0xF3000000, true, false, false, false, false);
+    REQUIRE(!err, "Failed to map kernel PDPTE: %d", err);
+
+    this->pdpt = reinterpret_cast<uint64_t *>(0xF3000000);
+}
+
+/**
  * Updates the processor's translation table register to use our translation tables.
  */
 void PTEHandler::activate() {
+    // clean up PDPT reserved bits if needed
+    if(this->pdpteDirty) {
+        // mask off the reserved bits on all 4 entries
+        for(size_t i = 0; i < 4; i++) {
+            this->pdpt[i] &= ~0b111100110ULL;
+        }
+
+        // clear the flag
+        bool no = false;
+        __atomic_store(&this->pdpteDirty, &no, __ATOMIC_RELEASE);
+    }
+
     // set the PDPT
     // log("switching to PDPT $%016lx", this->pdptPhys);
     asm volatile("movl %0, %%cr3" :: "r" (this->pdptPhys));
@@ -206,6 +235,9 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t virt, const bool wr
 #if LOG_MAP
         log("map phys %016llx to virt %08lx", phys, virt);
 #endif
+
+        // we'll munge up the PDPTE entries here
+        this->markPdpteDirty();
 
         // see if we need to allocate the page table
         const auto pdtEntry = this->getPageDirectory(virt);
@@ -320,6 +352,8 @@ int PTEHandler::unmapPage(const uintptr_t virt) {
         return -1;
     }
 
+    this->markPdpteDirty();
+
     // check whether the page directory value; either not present, a 2M page or page table
     const uint64_t pdtValue = this->getPageDirectory(virt);
 
@@ -368,6 +402,8 @@ beach:;
  */
 int PTEHandler::getMapping(const uintptr_t virt, uint64_t &phys, bool &write, bool &execute,
         bool &global, bool &user, bool &noCache) {
+    this->markPdpteDirty();
+
     // check whether the page directory value; either not present, a 2M page or page table
     const uint64_t pdtValue = this->getPageDirectory(virt);
 

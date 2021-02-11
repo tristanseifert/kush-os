@@ -5,6 +5,7 @@
 #include <log.h>
 #include <string.h>
 
+#include <vm/Mapper.h>
 #include <vm/Map.h>
 #include <sched/Task.h>
 #include <sched/Thread.h>
@@ -83,7 +84,16 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
     // switch page tables if needed
     if((!from && to->task) ||
        (from && from->task && to->task && from->task != to->task)) {
-        to->task->vm->activate();
+        auto destVm = to->task->vm;
+
+        /*
+         * Skips activating the page table set if we're going to be switching to the kernel task
+         * page table. Since kernel mappings are always shared, this saves us a pretty expensive
+         * TLB flush the MOV to CR3 operation causes.
+         */
+        //if(::vm::Mapper::getKernelMap() != destVm) {
+            destVm->activate();
+        //}
     }
 
     // for kernel mode threads, the TSS should hold the per-CPU interrupt thread

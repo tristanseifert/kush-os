@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <printf.h>
 
+#include "vm/PTEHandler.h"
 #include "vm/PDPTPool.h"
 #include "syscall/Handler.h"
 
@@ -14,6 +15,8 @@
 
 static bool nxEnabled = false;
 static void update_supports_nx();
+
+extern arch::vm::PTEHandler *gArchKernelPte;
 
 /// x86 stack frame
 struct stackframe {
@@ -49,6 +52,8 @@ void arch_init() {
  * Initialize some memory pools for allocating paging structures when VM is available.
  */
 void arch_vm_available() {
+    gArchKernelPte->earlyMapPdpte();
+
     arch::vm::PDPTPool::init();
     arch::syscall::Handler::init();
 
