@@ -7,6 +7,7 @@
 
 #include <vm/Mapper.h>
 #include <vm/Map.h>
+#include <sched/Scheduler.h>
 #include <sched/Task.h>
 #include <sched/Thread.h>
 
@@ -138,6 +139,59 @@ void arch::ReturnToUser(const uintptr_t pc, const uintptr_t stack) {
     // switchyboi time
     x86_ring3_return(pc, stack);
 }
+
+/**
+ * Pushes a stack frame to the top of the thread's stack that will cause a context switch to return
+ * to the DPC handler routine, rather than the previous thread state.
+ *
+ * On return from the DPC handler, we perform another context switch to the real state of the
+ * thread.
+ *
+ * We require that the thread cannot be scheduled during this time, and may not be running.
+ */
+int arch::PushDpcHandlerFrame(sched::Thread *thread) {
+
+    // allocate stack space and get the previous restore frame if there is one
+    const auto frameSz = sizeof(CpuRegs);
+
+    CpuRegs *oldFrame = nullptr;
+    auto frame = reinterpret_cast<CpuRegs *>((uintptr_t) thread->regs.stackTop - frameSz);
+
+    if((uintptr_t) thread->stack < ((uintptr_t) thread->regs.stackTop + frameSz)) {
+        oldFrame = reinterpret_cast<CpuRegs *>((uintptr_t) thread->regs.stackTop);
+    }
+
+    memset(frame, 0, frameSz);
+    thread->regs.stackTop = frame;
+
+    // fill it
+    frame->eip = (uintptr_t) x86_dpc_stub;
+    frame->ds = frame->es = frame->fs = frame->gs = GDT_KERN_DATA_SEG;
+
+    // copy some data from the previous stack frame (if there is one)
+    if(oldFrame) {
+        frame->ebp = oldFrame->ebp;
+        frame->eflags = oldFrame->eflags;
+
+        log("previous frame %p eip %08x", oldFrame, oldFrame->eip);
+    }
+
+    // clean up
+    return 0;
+}
+
+/**
+ * Invokes DPCs on the current thread.
+ */
+extern "C" void x86_dpc_handler() {
+    const auto irql = platform_raise_irql(platform::Irql::Dpc);
+
+    auto thread = sched::Scheduler::get()->runningThread();
+    thread->runDpcs();
+
+    platform_lower_irql(irql);
+}
+
 
 /**
  * This is the function where threads that returned from their main function will end up.

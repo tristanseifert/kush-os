@@ -41,7 +41,12 @@ void Manager::init(struct multiboot_tag_old_acpi *info) {
     REQUIRE((sum & 0xFF) == 0, "invalid checksum result: %08x", sum);
 
     // initialize it
-    log("RSDP revision: %d (OEM id '%6s')", rsdp->revision, rsdp->OEMID);
+    char OEMID[8];
+    memset(&OEMID, 0, 8);
+
+    strncpy(OEMID, rsdp->OEMID, 8);
+
+    log("RSDP revision: %d (OEM id '%6s') RSDT @ %08x", rsdp->revision, OEMID, rsdp->rsdtPhysAddr);
 
     new(gShared) Manager(rsdp->rsdtPhysAddr);
 }

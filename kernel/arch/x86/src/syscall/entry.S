@@ -106,3 +106,18 @@ arch_syscall_slow:
 arch_syscall_exit:
     sti
     sysexit
+
+
+.align 0x10
+.global syscall_bitch
+syscall_bitch:
+    mov         $0x11, %eax // syscall number
+    mov         $(1000*500), %ebx // first parameter
+    mov         %esp, %ecx
+    mov         $0x800013, %edx // weed load address
+
+    sysenter
+
+weed:
+    jmp         syscall_bitch
+    jmp         weed

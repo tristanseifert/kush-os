@@ -1,4 +1,5 @@
 #include "Syscall.h"
+#include "Handlers.h"
 
 #include "sched/Thread.h"
 
@@ -13,7 +14,7 @@ Syscall *Syscall::gShared = nullptr;
 /**
  * Global syscall table
  */
-static int (* const gSyscalls[])(const Syscall::Args *, const size_t) = {
+static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
     nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 
@@ -30,7 +31,10 @@ static int (* const gSyscalls[])(const Syscall::Args *, const size_t) = {
         // call sleep handler
         sched::Thread::sleep(sleepNs);
         return 0;
-    }
+    },
+
+    // 0x32: Initialize task
+    TaskInitialize,
 };
 static const size_t gNumSyscalls = 32;
 

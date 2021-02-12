@@ -4,6 +4,7 @@
 #ifndef ASM_FILE
 #include <stdint.h>
 
+#include <sched/Task.h>
 #include <sched/Thread.h>
 #include <arch.h>
 #include <arch/x86_msr.h>
@@ -26,6 +27,11 @@ class Handler {
         /// SYSENTER kernel entry point MSR (IA32_SYSENTER_EIP)
         constexpr static const uintptr_t kSysenterEipMsr = 0x176;
 
+        /// Kernel VM address for the syscall stub page
+        constexpr static const uintptr_t kStubKernelVmAddr = 0xF3001000;
+        /// Userspace VM address for the syscall stub page
+        constexpr static const uintptr_t kStubUserVmAddr = 0xBF5F0000;
+
     public:
         /**
          * Handles a context switch to the given thread. We'll update the syscall entry stack to
@@ -36,13 +42,22 @@ class Handler {
             x86_msr_write(kSysenterEspMsr, reinterpret_cast<uintptr_t>(thread->stack), 0);
         }
 
+        /// Prepares the given task
+        static inline void taskCreated(sched::Task *task) {
+            gShared->mapSyscallStub(task);
+        }
+
     private:
         static void init();
 
         Handler();
+        void mapSyscallStub(sched::Task *);
 
     private:
         static Handler *gShared;
+
+        // physical page holding the stub
+        uint64_t stubPage = 0;
 };
 }}
 #endif

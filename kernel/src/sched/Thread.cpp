@@ -94,6 +94,14 @@ void Thread::switchFrom() {
         const auto ran = platform_timer_now() - this->lastSwitchedTo;
         __atomic_fetch_add(&this->cpuTime, ran, __ATOMIC_RELEASE);
     }
+
+    // if we've DPCs, execute them
+    bool haveDpcs;
+    __atomic_load(&this->dpcsPending, &haveDpcs, __ATOMIC_CONSUME);
+
+    if(haveDpcs) {
+        this->runDpcs();
+    }
 }
 
 /**
@@ -257,4 +265,75 @@ void Thread::unblock(Blockable *b) {
 
     // queue in scheduler
     Scheduler::get()->markThreadAsRunnable(this, true);
+}
+
+
+
+/**
+ * Inserts a new deferred procedure call (DPC) into this thread's call. The next time the thread is
+ * context switched in, it will execute all DPCs queued on it.
+ *
+ * To accomplish this, when we add a DPC to a thread that does not have any DPCs queued, we add a
+ * "fake" context switch stack frame to the top of the thread's stack, which will return to the
+ * DPC handler. This will then invoke all DPCs, and then perform another context switch with the
+ * actual saved state of the thread.
+ */
+int Thread::addDpc(void (*handler)(Thread *, void *), void *context) {
+    int err = 0;
+
+    DECLARE_CRITICAL();
+    bool needsDpcReturnFrame = false;
+
+    // build info struct
+    DpcInfo info;
+    info.handler = handler;
+    info.context = context;
+
+    // insert it
+    CRITICAL_ENTER();
+    RW_LOCK_WRITE(&this->lock);
+
+    this->dpcs.push_back(info);
+    needsDpcReturnFrame = (this->dpcs.size() == 1);
+
+    RW_UNLOCK_WRITE(&this->lock);
+
+    // push the fake return frame if needed
+    if(!this->isActive && needsDpcReturnFrame) {
+        err = arch::PushDpcHandlerFrame(this);
+    }
+
+    // set the "have DPCs" flag
+    bool yee = true;
+    __atomic_store(&this->dpcsPending, &yee, __ATOMIC_RELEASE);
+
+    CRITICAL_EXIT();
+
+    // assume success
+    return err;
+}
+
+/**
+ * Runs all pending DPCs.
+ */
+void Thread::runDpcs() {
+    DECLARE_CRITICAL();
+
+    // set up queue access
+    CRITICAL_ENTER();
+    RW_LOCK_WRITE(&this->lock);
+
+    // queue loop
+    while(!this->dpcs.empty()) {
+        auto dpc = this->dpcs.pop();
+        dpc.handler(this, dpc.context);
+    }
+
+    // clear the "have DPCs" flag
+    bool no = false;
+    __atomic_store(&this->dpcsPending, &no, __ATOMIC_RELEASE);
+
+    // release queue access
+    RW_UNLOCK_WRITE(&this->lock);
+    CRITICAL_EXIT();
 }

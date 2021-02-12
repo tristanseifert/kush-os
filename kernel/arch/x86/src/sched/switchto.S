@@ -5,6 +5,7 @@
 .global x86_switchto
 .global x86_switchto_save
 .global x86_ring3_return
+.global x86_dpc_stub
 
 /**
  * Performs a context switch to a thread; context is NOT saved.
@@ -34,6 +35,7 @@ x86_switchto_common:
     // switch back to the appropriate stack
     mov         TS_OFF_STACKTOP(%eax), %esp
 
+x86_switchto_common_stacked:
     // reload the original data segment fault descriptor
     pop         %gs
     pop         %fs
@@ -152,3 +154,18 @@ x86_ring3_return:
 
     // and finally do the return
     iret
+
+/**
+ * Invokes the DPC handler, then does a context switch to the thread state currently on the stack.
+ */
+x86_dpc_stub:
+    // set up stack frame
+    push        %ebp
+    mov         %esp, %ebp
+
+    // run the handlers
+    call        x86_dpc_handler
+
+    // clean up stack and perform the context switch
+    add         $4, %esp
+    jmp         x86_switchto_common_stacked

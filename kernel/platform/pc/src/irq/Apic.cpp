@@ -138,6 +138,7 @@ void Apic::updateTpr(const Irql irql) {
         case Irql::DeviceIrq:
             priority = 0x30;
             break;
+        case Irql::Dpc:
         case Irql::Scheduler:
             priority = 0x20;
             break;

@@ -43,14 +43,29 @@ int arch_backtrace(void *stack, char *buf, const size_t bufLen);
 }
 
 namespace sched {
+struct Task;
 struct Thread;
 }
 
 namespace arch {
 /**
+ * The kernel invokes this method when a newly created task is about to start executing for the
+ * first time.
+ *
+ * When invoked, we're executing in the task's context, and its virtual memory mappings will be
+ * active.
+ */
+void TaskWillStart(sched::Task *task);
+
+/**
  * Initializes a thread's state so that it will begin executing at the given address.
  */
 void InitThreadState(sched::Thread *thread, const uintptr_t pc, const uintptr_t arg);
+
+/**
+ * Adds a dpc handler frame to the thread's stack.
+ */
+int PushDpcHandlerFrame(sched::Thread *thread);
 
 /**
  * Restores thread state.

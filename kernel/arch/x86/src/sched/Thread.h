@@ -10,4 +10,6 @@ extern "C" void x86_switchto_save(arch::ThreadState *from, arch::ThreadState *to
 
 extern "C" void x86_ring3_return(const uintptr_t pc, const uintptr_t stack) __attribute__((noreturn));
 
+extern "C" void x86_dpc_stub() __attribute__((noreturn));
+
 #endif

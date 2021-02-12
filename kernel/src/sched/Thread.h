@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <runtime/Queue.h>
 #include <runtime/Vector.h>
 
 #include <arch/ThreadState.h>
@@ -32,6 +33,13 @@ struct Thread {
 
     /// Length of thread names
     constexpr static const size_t kNameLength = 32;
+
+    private:
+        /// Info on a DPC to execute
+        struct DpcInfo {
+            void (*handler)(Thread *, void *);
+            void *context = nullptr;
+        };
 
     public:
         enum class State {
@@ -120,6 +128,11 @@ struct Thread {
          */
         DECLARE_RWLOCK(lock);
 
+        /// DPCs queued for the thread
+        rt::Queue<DpcInfo> dpcs;
+        /// When set, there are DPCs pending.
+        bool dpcsPending = false;
+
         /// bottom of the kernel stack of this thread
         void *stack = nullptr;
 
@@ -154,6 +167,11 @@ struct Thread {
 
         /// Blocks the thread on the given object.
         int blockOn(Blockable *b);
+
+        /// Adds a DPC to the thread's queue.
+        int addDpc(void (*handler)(Thread *, void *), void *context);
+        /// Drains the DPC queue.
+        void runDpcs();
 
         /// Returns a handle to the currently executing thread.
         static Thread *current();

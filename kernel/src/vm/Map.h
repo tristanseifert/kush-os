@@ -35,6 +35,9 @@ enum class MapMode {
     /// Read for kernel only
     kKernelRead         = (READ),
 
+    /// Userspace text segments
+    kUserExec           = (READ | EXECUTE | ACCESS_USER),
+
     /// Device memory; bypass caches
     MMIO                = (CACHE_DISABLE),
 };

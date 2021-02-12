@@ -32,6 +32,10 @@ enum class Irql {
      */
     Scheduler                           = 3,
     /**
+     * Deferred procedure calls are currently executing.
+     */
+    Dpc                                 = 1,
+    /**
      * All higher priority interrupts are permitted.
      */
     Passive                             = 0,
