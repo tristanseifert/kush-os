@@ -76,13 +76,17 @@ int sys::TaskInitialize(const Syscall::Args *args, const uintptr_t number) {
     int err;
 
     // get the task handle
-    sched::Task *task = nullptr;
+    auto task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
+    if(!task) {
+        return Errors::InvalidHandle;
+    }
 
     auto info = new InitTaskDpcInfo(args->args[1], args->args[2]);
 
     // set up the main thread
     auto main = sched::Thread::kernelThread(task, &UserspaceThreadStub, (uintptr_t) info);
     main->setName("Main Thread");
+    main->kernelMode = false;
 
     // queue a DPC to perform last minute setup
     err = main->addDpc([](sched::Thread *thread, void *ctx) {
