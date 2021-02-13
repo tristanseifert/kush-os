@@ -45,6 +45,7 @@ void panic(const char *format, ...) {
 
     // take panic lock
     SPIN_LOCK(gPanicLock);
+    platform_raise_irql(platform::Irql::CriticalSection, false);
 
     // get current thread
     auto thread = sched::Scheduler::get()->runningThread();

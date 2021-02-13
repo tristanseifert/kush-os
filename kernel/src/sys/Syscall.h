@@ -1,6 +1,7 @@
 #ifndef KERNEL_SYS_SYSCALL_H
 #define KERNEL_SYS_SYSCALL_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 extern "C" void kernel_init();
@@ -28,6 +29,9 @@ class Syscall {
         static int handle(const Args *args, const uintptr_t callNo) {
             return gShared->_handle(args, callNo);
         }
+
+        /// Validates whether the entire range of [base, base+length) is accessible
+        static bool validateUserPtr(const void *address, const size_t length);
 
     private:
         static void init();

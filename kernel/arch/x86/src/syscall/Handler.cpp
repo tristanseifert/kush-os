@@ -51,7 +51,7 @@ Handler::Handler() {
     REQUIRE(!err, "failed to map syscall stub: %d", err);
 
     // copy over the code
-    log("syscall stub %d bytes at %p", SIZE_OF_STUB, _binary_syscall_stub_start);
+    memset((void *) kStubKernelVmAddr, 0, 0x1000);
     memcpy((void *) kStubKernelVmAddr, _binary_syscall_stub_start, SIZE_OF_STUB);
 
     // TODO: unmap it from kernel again
@@ -100,7 +100,7 @@ uintptr_t arch_syscall_msgsend_slow(const uintptr_t type) {
 /**
  * Maps the syscall stub page into the given task.
  */
-void TaskWillStart(sched::Task *task) {
+void arch::TaskWillStart(sched::Task *task) {
     Handler::taskCreated(task);
 }
 

@@ -76,9 +76,18 @@ Task::~Task() {
 /**
  * Copies the given name string to the task's name field.
  */
-void Task::setName(const char *newName) {
+void Task::setName(const char *newName, const size_t _inLength) {
     RW_LOCK_WRITE_GUARD(this->lock);
-    strncpy(this->name, newName, kNameLength);
+
+    memset(this->name, 0, kNameLength);
+
+    if(_inLength) {
+        strncpy(this->name, newName, kNameLength);
+    } else {
+        const auto toCopy = (_inLength >= kNameLength) ? kNameLength : _inLength;
+        memcpy(this->name, newName, toCopy);
+    }
+
 }
 
 /**
@@ -101,7 +110,7 @@ void Task::addThread(Thread *t) {
  */
 void Task::detachThread(Thread *t) {
     REQUIRE(t->state == Thread::State::Paused || t->state == Thread::State::Zombie,
-            "invalid thread state");
+            "invalid thread state for detach: %d", (int) t->state);
 
     RW_LOCK_WRITE_GUARD(this->lock);
     for(size_t i = 0; i < this->threads.size(); i++) {

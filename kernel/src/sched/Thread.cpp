@@ -102,6 +102,11 @@ void Thread::switchFrom() {
     if(haveDpcs) {
         this->runDpcs();
     }
+
+    // terminate
+    if(this->needsToDie) {
+        this->deferredTerminate();
+    }
 }
 
 /**
@@ -135,9 +140,17 @@ void Thread::returnToUser(const uintptr_t pc, const uintptr_t stack) {
 /**
  * Copies the given name string to the thread's name field.
  */
-void Thread::setName(const char *newName) {
+void Thread::setName(const char *newName, const size_t _inLength) {
     RW_LOCK_WRITE_GUARD(this->lock);
-    strncpy(this->name, newName, kNameLength);
+
+    memset(this->name, 0, kNameLength);
+
+    if(_inLength) {
+        strncpy(this->name, newName, kNameLength);
+    } else {
+        const auto toCopy = (_inLength >= kNameLength) ? kNameLength : _inLength;
+        memcpy(this->name, newName, toCopy);
+    }
 }
 
 /**
@@ -150,21 +163,58 @@ void Thread::yield() {
 
 /**
  * Terminates the calling thread.
- *
- * The thread will be marked as a zombie (so it won't be scheduled anymore) and submitted to the
- * scheduler to actually be deallocated at a later time.
  */
-void Thread::terminate() {
+void Thread::die() {
     auto thread = current();
     REQUIRE(thread, "cannot terminate null thread!");
 
-    thread->setState(State::Zombie);
-
-    Scheduler::get()->idle->queueDestroyThread(thread);
-    Scheduler::get()->switchToRunnable();
+    thread->terminate();
 
     // we should not get here
     panic("failed to terminmate thread");
+}
+
+/**
+ * Terminates the thread.
+ *
+ * If not active, we'll set it as a zombie and deal with it accordingly. Otherwise, we'll set some
+ * flags, then context switch and the deferred work will occur then.
+ */
+void Thread::terminate() {
+    DECLARE_CRITICAL();
+
+    // update state
+    CRITICAL_ENTER();
+
+    bool isRunning;
+    __atomic_load(&this->isActive, &isRunning, __ATOMIC_ACQUIRE);
+
+    if(!isRunning) {
+        this->setState(State::Zombie);
+    } else {
+        bool yes = true;
+        __atomic_store(&this->needsToDie, &yes, __ATOMIC_RELEASE);
+    }
+
+    CRITICAL_EXIT();
+
+    // if running, context switch away
+    if(isRunning) {
+        yield();
+    } 
+    // delete it right away since the thread isn't running
+    else {
+        Scheduler::get()->idle->queueDestroyThread(this);
+    }
+}
+
+/**
+ * Performs a deferred thread termination.
+ */
+void Thread::deferredTerminate() {
+    this->setState(State::Zombie);
+
+    Scheduler::get()->idle->queueDestroyThread(this);
 }
 
 

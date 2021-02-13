@@ -104,6 +104,11 @@ arch_syscall_slow:
  * use a stack that's not mapped for that process.
  */
 arch_syscall_exit:
+    // restore values
+    mov         %ebp, %ecx
+    mov         $0xBF5F0005, %edx
+
+    // return from interrupt
     sti
     sysexit
 
@@ -113,10 +118,9 @@ arch_syscall_exit:
 syscall_bitch:
     mov         $0x11, %eax // syscall number
     mov         $(1000*500), %ebx // first parameter
-    mov         %esp, %ecx
-    mov         $0x800013, %edx // weed load address
 
-    sysenter
+    mov         $0xBF5F0000, %edi
+    call        *%edi
 
 weed:
     jmp         syscall_bitch

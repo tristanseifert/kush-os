@@ -328,7 +328,7 @@ void Scheduler::yield(void (*willSwitch)(void*), void *willSwitchCtx) {
     const auto prevIrql = platform_raise_irql(platform::Irql::Scheduler);
 
     // queue it to run again during the next scheduler invocation
-    if(thread->state == Thread::State::Runnable) {
+    if(thread->state == Thread::State::Runnable && !thread->needsToDie) {
         const auto band = groupForThread(thread);
         this->runnable[band].push_back(thread);
     }

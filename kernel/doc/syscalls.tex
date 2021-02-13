@@ -374,11 +374,11 @@ Updates the thread's name with the contents of the specified string buffer; if t
 \textbf{Flags:} None \\
 \textbf{Returns:} Task handle ($>0$) or error code ($\leq0$) \\
 
-Creates a new task with a single thread, executing in kernel space. The task's parent is set to either the task specified, or the current task if the task handle is zero. You should use the "initialize task" call to kick this main thread into user space once you have finished setting up the memory map of the task.
+Creates a new task with a single thread. The task's parent is set to either the task specified, or the current task if the task handle is zero. You should use the "initialize task" call to kick this main thread into user space once you have finished setting up the memory map of the task.
 
-This creates the kernel structures for the task and all required virtual memory structures. The task's main thread (and corresponding kernel stack) are allocated as well, but start in a suspended state.
+This creates the kernel structures for the task and all required virtual memory structures. The task's main thread (and corresponding kernel stack) are allocated as well, and perform the required kernel structure initialization, and will then block. To continue the thread, you should invoke the "initialize task" system call.
 
-At this point, the task will have no memory mapped in userspace. It's the responsibility of the caller to build up the task's virtual memory space, load executable code, set up stacks, and so forth. This process is typically encapsulated by a runtime library.
+At this point, the task will have no memory mapped in userspace (with the exception of any read-only data mapped by the architecture/platform code.) It's the responsibility of the caller to build up the task's virtual memory space, load executable code, set up stacks, and so forth. This process is typically encapsulated by a runtime library.
 
 %%%%%
 \subsubsection{{\tt 0x31}: Terminate task}

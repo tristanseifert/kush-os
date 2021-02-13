@@ -81,6 +81,8 @@ struct Thread {
          * This flag is the responsibility of the arch context switching code.
          */
         bool isActive = false;
+        /// when set, this thread should kill itself when switched out
+        bool needsToDie = false;
         /// Timestamp at which the thread was switched to
         uint64_t lastSwitchedTo = 0;
 
@@ -155,7 +157,7 @@ struct Thread {
         void returnToUser(const uintptr_t pc, const uintptr_t stack) __attribute__((noreturn));
 
         /// Sets the thread's name.
-        void setName(const char *name);
+        void setName(const char *name, const size_t length = 0);
         /// Sets the thread's state.
         void setState(State newState) {
             if(newState == State::Runnable) {
@@ -169,9 +171,12 @@ struct Thread {
         int blockOn(Blockable *b);
 
         /// Adds a DPC to the thread's queue.
-        int addDpc(void (*handler)(Thread *, void *), void *context);
+        int addDpc(void (*handler)(Thread *, void *), void *context = nullptr);
         /// Drains the DPC queue.
         void runDpcs();
+
+        /// Terminates this thread.
+        void terminate();
 
         /// Returns a handle to the currently executing thread.
         static Thread *current();
@@ -179,8 +184,8 @@ struct Thread {
         static void sleep(const uint64_t nanos);
         /// Give up the rest of this thread's CPU time
         static void yield();
-        /// Terminates the thread
-        static void terminate() __attribute__((noreturn));
+        /// Terminates the calling thread
+        static void die() __attribute__((noreturn));
 
     private:
         /// next thread id
@@ -196,6 +201,9 @@ struct Thread {
 
         /// Invoked by the scheduler when a thread that is blocked yields
         void prepareBlocks();
+
+        /// Called on context switch out to complete termination.
+        void deferredTerminate();
 };
 }
 

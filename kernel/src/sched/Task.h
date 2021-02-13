@@ -74,7 +74,7 @@ struct Task {
         ~Task();
 
         /// Sets the task's name.
-        void setName(const char *name);
+        void setName(const char *name, const size_t length = 0);
         /// Adds a thread to the task.
         void addThread(Thread *t);
         /// Detaches the given thread from the task.
