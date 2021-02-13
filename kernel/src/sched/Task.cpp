@@ -49,6 +49,9 @@ Task::Task(vm::Map *_map) {
         this->vm = vm::Map::alloc();
         this->ownsVm = true;
     }
+
+    // allocate a handle
+    this->handle = handle::Manager::makeTaskHandle(this);
 }
 
 /**
@@ -61,6 +64,9 @@ Task::Task(vm::Map *_map) {
  */
 Task::~Task() {
     RW_LOCK_WRITE_GUARD(this->lock);
+
+    // invalidate the handle
+    handle::Manager::releaseTaskHandle(this->handle);
 
     // release all threads
     for(auto thread : this->threads) {

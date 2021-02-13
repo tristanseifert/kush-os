@@ -6,6 +6,7 @@
 
 #include <runtime/Queue.h>
 #include <runtime/Vector.h>
+#include <handle/Manager.h>
 
 #include <arch/ThreadState.h>
 #include <arch/rwlock.h>
@@ -59,6 +60,9 @@ struct Thread {
         /// task that owns us
         Task *task = nullptr;
 
+        /// handle to the thread
+        Handle handle;
+
         /// descriptive thread name, if desired
         char name[kNameLength] = {0};
 
@@ -103,7 +107,7 @@ struct Thread {
         /**
          * Number of nanoseconds this thread has been executing on the CPU.
          */
-        uint64_t cpuTime = 0;
+        uint64_t cpuTime __attribute__((aligned(8))) = 0;
 
         /**
          * Notification value and mask for the thread.

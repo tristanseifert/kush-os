@@ -8,6 +8,7 @@
 #include "sched/Scheduler.h"
 #include "sched/Task.h"
 #include "sys/Syscall.h"
+#include "handle/Manager.h"
 
 #include <arch.h>
 #include <platform.h>
@@ -35,6 +36,7 @@ void kernel_init() {
     mem::StackPool::init();
     mem::Heap::init();
 
+    handle::Manager::init();
     sys::Syscall::init();
 
     // notify architecture we've got VM

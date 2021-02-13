@@ -6,7 +6,8 @@
 
 #include <arch/rwlock.h>
 
-#include "runtime/Vector.h"
+#include <runtime/Vector.h>
+#include <handle/Manager.h>
 
 
 namespace vm {
@@ -57,6 +58,9 @@ struct Task {
         vm::Map *vm = nullptr;
         /// whether we own the VM maps
         bool ownsVm = false;
+
+        /// handle to the task
+        Handle handle;
 
         /// task lock
         DECLARE_RWLOCK(lock);

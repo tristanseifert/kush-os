@@ -1,7 +1,9 @@
 #include "Handlers.h"
 
-#include <sched/Scheduler.h>
-#include <sched/Task.h>
+#include "sched/Scheduler.h"
+#include "sched/Task.h"
+
+#include "handle/Manager.h"
 
 #include <arch.h>
 #include <log.h>
@@ -47,8 +49,10 @@ int sys::TaskTerminate(const Syscall::Args *args, const uintptr_t number) {
     if(!args->args[0]) {
         task = sched::Thread::current()->task;
     } else {
-        // TODO: look up handle
-        return Errors::InvalidHandle;
+        task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
+        if(!task) {
+            return Errors::InvalidHandle;
+        }
     }
 
     // terminate it aye
@@ -103,8 +107,10 @@ int sys::TaskSetName(const Syscall::Args *args, const uintptr_t number) {
     if(!args->args[0]) {
         task = sched::Thread::current()->task;
     } else {
-        // TODO: look up handle
-        return Errors::InvalidHandle;
+        task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
+        if(!task) {
+            return Errors::InvalidHandle;
+        }
     }
 
     // validate the user pointer

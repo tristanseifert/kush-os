@@ -69,12 +69,18 @@ Thread::Thread(Task *_parent, const uintptr_t pc, const uintptr_t param, const b
     if(_parent) {
         _parent->addThread(this);
     }
+
+    // allocate a handle
+    this->handle = handle::Manager::makeThreadHandle(this);
 }
 
 /**
  * Destroys all resources associated with this thread.
  */
 Thread::~Thread() {
+    // invalidate the handle
+    handle::Manager::releaseThreadHandle(this->handle);
+
     // release kernel stack
     mem::StackPool::release(this->stack);
 }
