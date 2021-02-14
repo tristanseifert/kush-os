@@ -28,11 +28,37 @@ LIBC_EXPORT int ThreadYield();
 LIBC_EXPORT int ThreadUsleep(const uintptr_t usecs);
 
 /**
- * Terminates the specified process.
+ * Sets the name of the current thread.
+ */
+LIBC_EXPORT int ThreadSetName(const uintptr_t handle, const char *name);
+
+
+
+/**
+ * Gets the task handle for the currently executing task.
+ *
+ * @return Task handle (>0) or error code
+ */
+LIBC_EXPORT int TaskGetHandle();
+
+/**
+ * Terminates the specified task.
  *
  * A handle value of zero terminates the currently running task.
  */
-LIBC_EXPORT int ProcessExit(const uintptr_t handle, const uintptr_t returnCode);
+LIBC_EXPORT int TaskExit(const uintptr_t handle, const uintptr_t returnCode);
+
+/**
+ * Sets the name of the current task.
+ */
+LIBC_EXPORT int TaskSetName(const uintptr_t handle, const char *name);
+
+
+
+/**
+ * Writes the given string to the debug output stream for the process.
+ */
+LIBC_EXPORT int DbgOut(const char *string, const size_t length);
 
 #ifdef __cplusplus
 }

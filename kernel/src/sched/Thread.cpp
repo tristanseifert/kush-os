@@ -151,7 +151,7 @@ void Thread::setName(const char *newName, const size_t _inLength) {
 
     memset(this->name, 0, kNameLength);
 
-    if(_inLength) {
+    if(!_inLength) {
         strncpy(this->name, newName, kNameLength);
     } else {
         const auto toCopy = (_inLength >= kNameLength) ? kNameLength : _inLength;

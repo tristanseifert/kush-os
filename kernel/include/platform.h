@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+namespace sched {
+struct Task;
+}
+
 namespace platform {
 /**
  * Defines an IRQ level, which is another way to talk about the priority of a given processor
@@ -174,6 +178,14 @@ uintptr_t platform_timer_add(const uint64_t at, void (*callback)(const uintptr_t
  * Removes a previously created timer, if it has not fired yet.
  */
 void platform_timer_remove(const uintptr_t token);
+
+
+
+/**
+ * Initializes the root server task.
+ */
+sched::Task *platform_init_rootsrv();
+
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Functions below are defined by the kernel.

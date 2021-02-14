@@ -10,6 +10,16 @@
 namespace sys {
 
 /**
+ * Sets the descriptive name of the thread.
+ *
+ * The first argument is a thread handle (or zero for current thread,) followed by the userspace
+ * address of the name and its length, in bytes.
+ */
+int ThreadSetName(const Syscall::Args *args, const uintptr_t number);
+
+
+
+/**
  * Implements the create task syscall.
  */
 int TaskCreate(const Syscall::Args *args, const uintptr_t number);
@@ -38,6 +48,8 @@ int TaskInitialize(const Syscall::Args *args, const uintptr_t number);
  * address of the name and its length, in bytes.
  */
 int TaskSetName(const Syscall::Args *args, const uintptr_t number);
+
+int TaskDbgOut(const Syscall::Args *args, const uintptr_t number);
 
 }
 

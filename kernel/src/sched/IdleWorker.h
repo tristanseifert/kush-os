@@ -69,6 +69,7 @@ class IdleWorker {
         void destroyThread(Thread *);
 
     private:
+    public:
         /// scheduler that owns us
         Scheduler *sched = nullptr;
         /// actual worker thread

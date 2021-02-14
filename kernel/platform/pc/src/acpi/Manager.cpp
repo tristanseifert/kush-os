@@ -16,7 +16,7 @@ using namespace platform;
 using namespace platform::acpi;
 
 static char gSharedBuf[sizeof(Manager)] __attribute__((aligned(64)));
-Manager *Manager::gShared = (Manager *) &gSharedBuf;
+Manager *Manager::gShared = nullptr;
 
 
 /**
@@ -48,6 +48,7 @@ void Manager::init(struct multiboot_tag_old_acpi *info) {
 
     log("RSDP revision: %d (OEM id '%6s') RSDT @ %08x", rsdp->revision, OEMID, rsdp->rsdtPhysAddr);
 
+    gShared = reinterpret_cast<Manager *>(&gSharedBuf);
     new(gShared) Manager(rsdp->rsdtPhysAddr);
 }
 

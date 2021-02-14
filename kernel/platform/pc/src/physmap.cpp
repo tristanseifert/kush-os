@@ -4,6 +4,7 @@
 #include <log.h>
 #include <platform.h>
 
+#include <arch.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -22,6 +23,9 @@ static size_t gNumPhysRegions = 0;
 static physmap_region_t gPhysRegions[MAX_REGIONS] = {
     {0, 0},
 };
+
+/// end address of the modules region
+static uintptr_t gModulesEnd = 0;
 
 static void create_kernel_hole();
 
@@ -77,7 +81,12 @@ void physmap_load_from_multiboot(struct multiboot_tag_mmap *tag) {
 static void create_kernel_hole() {
     // calculate physical range of kernel text
     const size_t physStart = ((size_t) &__kern_keep_start);// - 0xC0000000;
-    const size_t physEnd = ((size_t) &__kern_keep_end) - 0xC0000000;
+    size_t physEnd = ((size_t) &__kern_keep_end) - 0xC0000000;
+
+    if(gModulesEnd > physEnd) {
+        log("wasting %d bytes for modules!", (gModulesEnd - physEnd));
+        physEnd = gModulesEnd;
+    }
 
     log("Kernel memory physical range: $%08x to $%08x", physStart, physEnd);
 
@@ -160,6 +169,20 @@ int platform_section_get_info(const platform_section_t section, uint64_t *physAd
         // unsupported section
         default:
             return -1;
+    }
+}
+
+
+/**
+ * Reserves memory for a module.
+ */
+void physmap_module_reserve(const uintptr_t start, const uintptr_t end) {
+    if(end > gModulesEnd) {
+        // round up to nearest page size
+        const auto pageSz = arch_page_size();
+        const size_t roundedUpAddr = ((end + pageSz - 1) / pageSz) * pageSz;
+
+        gModulesEnd = roundedUpAddr;
     }
 }
 

@@ -27,9 +27,21 @@ LIBC_INTERNAL int __do_syscall4(const uintptr_t number, const uintptr_t arg0, co
 #define SYS_THREAD_GET_HANDLE           0x20
 #define SYS_THREAD_YIELD                0x21
 #define SYS_THREAD_SLEEP                0x22
+#define SYS_THREAD_CREATE               0x23
+#define SYS_THREAD_JOIN                 0x24
+#define SYS_THREAD_DESTROY              0x25
+#define SYS_THREAD_SET_STATE            0x26
+#define SYS_THREAD_SET_PRIORITY         0x27
+#define SYS_THREAD_SET_NOTEMASK         0x28
 #define SYS_THREAD_RENAME               0x29
 
-#define SYS_TASK_TERMINATE              0x31
-#define SYS_TASK_RENAME                 0x33
- 
+#define SYS_TASK_GET_HANDLE             0x30
+#define SYS_TASK_CREATE                 0x31
+#define SYS_TASK_TERMINATE              0x32
+#define SYS_TASK_INIT                   0x33
+#define SYS_TASK_RENAME                 0x34
+#define SYS_TASK_WAIT                   0x35
+
+#define SYS_TASK_DBG_OUT                0x36
+
 #endif

@@ -10,15 +10,16 @@
 using namespace vm;
 
 static char gMapperBuf[sizeof(Mapper)] __attribute__((aligned(64)));
-Mapper *Mapper::gShared = (Mapper *) &gMapperBuf;
+Mapper *Mapper::gShared = nullptr;
 
 static char gKernelMapBuf[sizeof(Map)] __attribute__((aligned(64)));
-Map *Mapper::gKernelMap = (Map *) &gKernelMapBuf;
+Map *Mapper::gKernelMap = nullptr;
 
 /**
  * Runs the constructor for the statically allocated mapper struct.
  */
 void Mapper::init() {
+    gShared = reinterpret_cast<Mapper *>(&gMapperBuf);
     new(gShared) Mapper();
 }
 
@@ -34,6 +35,7 @@ Mapper::Mapper() {
     log("VM: NX enabled = %s", arch_supports_nx() ? "yes" : "no");
 
     // placement allocate the kernel map
+    gKernelMap = reinterpret_cast<Map *>(&gKernelMapBuf);
     new(gKernelMap) Map(false);
 
     // map the text segment (R-X)

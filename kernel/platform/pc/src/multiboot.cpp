@@ -1,6 +1,6 @@
 #include "multiboot.h"
 #include "multiboot2.h"
-
+#include "InitTask.h"
 #include "physmap.h"
 
 #include "acpi/Manager.h"
@@ -67,6 +67,19 @@ void multiboot_parse() {
                 panic("New style ACPI table not supported");
                 break;
 
+            // modules provided by bootloader
+            case MULTIBOOT_TAG_TYPE_MODULE: {
+                auto info = reinterpret_cast<struct multiboot_tag_module *>(tag);
+                // figure out the module type
+                uint32_t type = 0;
+                strncpy(reinterpret_cast<char *>(&type), info->cmdline, sizeof(type));
+
+                type = __builtin_bswap32(type);
+
+                InitHandleModule(type, info->mod_start, info->mod_end, info->cmdline);
+                break;
+            }
+
             // unknown tag
             default:
                 // log("unhandled multiboot type %d (len %d)", tag->type, tag->size);
@@ -74,3 +87,4 @@ void multiboot_parse() {
         }
     }
 }
+

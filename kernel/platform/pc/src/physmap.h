@@ -20,4 +20,9 @@ typedef struct physmap_region {
  */
 void physmap_load_from_multiboot(struct multiboot_tag_mmap *info);
 
+/**
+ * Reserves memory for a module.
+ */
+void physmap_module_reserve(const uintptr_t start, const uintptr_t end);
+
 #endif

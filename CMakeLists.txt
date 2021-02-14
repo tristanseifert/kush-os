@@ -25,6 +25,7 @@ execute_process(COMMAND git describe --tags --dirty=d OUTPUT_VARIABLE VERSION_TA
 ##### Options for what to be compiled
 option(BUILD_KERNEL "Build the kernel" ON)
 option(BUILD_USER_LIBS "Build userspace libraries" ON)
+option(BUILD_SYSTEM_SERVERS "Build core system servers" ON)
 
 ##### General defines
 set(CMAKE_CXX_STANDARD 17)
@@ -57,3 +58,7 @@ if(BUILD_USER_LIBS)
     add_subdirectory(user/libc)
 endif()
 
+##### System servers (init, drivers, core system services)
+if(BUILD_SYSTEM_SERVERS)
+    add_subdirectory(user/rootsrv)
+endif()

@@ -14,6 +14,10 @@ enum Errors: int {
     InvalidPointer                      = -2,
     /// The provided handle was invalid
     InvalidHandle                       = -3,
+    /// A provided argument was invalid
+    InvalidArgument                     = -4,
+    /// The syscall requested is unavailable
+    InvalidSyscall                      = -5,
 };
 }
 

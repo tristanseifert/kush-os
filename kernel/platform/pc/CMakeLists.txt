@@ -9,6 +9,7 @@ add_library(kernel_platform_pc OBJECT
     src/platform.cpp
     src/multiboot.cpp
     src/physmap.cpp
+    src/InitTask.cpp
     src/acpi/Manager.cpp
     src/io/spew.cpp
     src/irq/handlers.S

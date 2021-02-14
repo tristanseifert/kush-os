@@ -130,6 +130,19 @@ int sys::TaskSetName(const Syscall::Args *args, const uintptr_t number) {
     return Errors::Success;
 }
 
+int sys::TaskDbgOut(const Syscall::Args *args, const uintptr_t number) {
+    // validate the user pointer
+    auto namePtr = reinterpret_cast<const char *>(args->args[0]);
+    const auto nameLen = args->args[1];
+    if(!Syscall::validateUserPtr(namePtr, nameLen)) {
+        return Errors::InvalidPointer;
+    }
+
+    // set it
+    log("%15s) %s", sched::Thread::current()->name, namePtr);
+
+    return Errors::Success;
+}
 
 
 

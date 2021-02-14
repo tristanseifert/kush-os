@@ -147,7 +147,7 @@ struct Thread {
 
     public:
         /// Allocates a new kernel space thread
-        static Thread *kernelThread(Task *task, void (*entry)(uintptr_t), const uintptr_t param);
+        static Thread *kernelThread(Task *task, void (*entry)(uintptr_t), const uintptr_t param = 0);
         /// Releases a previously allocated thread struct
         static void free(Thread *);
 

@@ -12,6 +12,9 @@
 
 using namespace sys;
 
+// if set, logging about each user pointer validation is performed
+#define LOG_PTR_VALIDATE                0
+
 static uint8_t gSharedBuf[sizeof(Syscall)] __attribute__((aligned(64)));
 Syscall *Syscall::gShared = nullptr;
 
@@ -19,34 +22,76 @@ Syscall *Syscall::gShared = nullptr;
  * Global syscall table
  */
 static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
+    // 0x00-0x07: Message passing IPC
+    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    // 0x08-0x0F: Notifications
+    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+
+    // 0x10-0x1F: VM calls (reserved)
     nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
     nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 
-    // 0x10: yield remainder of CPU time
-    [](auto, auto) {
-        sched::Thread::yield();
-        return 0;
+    // 0x20: Return current thread handle
+    [](auto, auto) -> int {
+        auto thread = sched::Thread::current();
+        if(!thread) {
+            return Errors::GeneralError;
+        }
+        return static_cast<int>(thread->handle);
     },
-    // 0x11: sleeps the thread for the number of microseconds in arg0
-    [](auto args, auto) {
+    // 0x21: Give up remaining CPU quantum
+    [](auto, auto) -> int {
+        sched::Thread::yield();
+        return Errors::Success;
+    },
+    // 0x22: Microsecond granularity sleep
+    [](auto args, auto) -> int {
         // validate args
         const uint64_t sleepNs = 1000ULL * args->args[0];
-        if(!sleepNs) return 0;
+        if(!sleepNs) return Errors::InvalidArgument;
         // call sleep handler
         sched::Thread::sleep(sleepNs);
-        return 0;
+        return Errors::Success;
     },
+    // 0x23: Create thread
+    nullptr,
+    // 0x24: Join with thread
+    nullptr,
+    // 0x25: Destroy thread
+    nullptr,
+    // 0x26: Set thread state 
+    nullptr,
+    // 0x27: Set thread priority 
+    nullptr,
+    // 0x28: Set thread notification mask
+    nullptr,
+    // 0x29: Set thread name
+    ThreadSetName,
+    // 0x2A-0x2F: reserved
+    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 
-    // 0x30: Create task
+    // 0x30: Get task handle
+    [](auto, auto) -> int {
+        auto thread = sched::Thread::current();
+        if(!thread || !thread->task) {
+            return Errors::GeneralError;
+        }
+        return static_cast<int>(thread->task->handle);
+    },
+    // 0x31: Create task
     TaskCreate,
-    // 0x31: Terminate task,
+    // 0x32: Terminate task,
     TaskTerminate,
-    // 0x32: Initialize task
+    // 0x33: Initialize task
     TaskInitialize,
-    // 0x33: Set task name
+    // 0x34: Set task name
     TaskSetName,
+    // 0x35: Wait on task
+    nullptr,
+    // 0x36: Debug printing
+    TaskDbgOut,
 };
-static const size_t gNumSyscalls = 32;
+static const size_t gNumSyscalls = 0x37;
 
 /**
  * Initializes the syscall handler.
@@ -63,7 +108,7 @@ int Syscall::_handle(const Args *args, const uintptr_t code) {
     // validate syscall number
     const size_t syscallIdx = (code & 0xFFFF);
     if(syscallIdx >= gNumSyscalls) {
-        return -1;
+        return Errors::InvalidSyscall;
     }
 
     // invoke it
@@ -99,7 +144,9 @@ bool Syscall::validateUserPtr(const void *address, const size_t _length) {
     }
 
     const uintptr_t base = reinterpret_cast<uintptr_t>(address) & ~(pageSz - 1);
+#if LOG_PTR_VALIDATE
     log("buffer %p -> base %08x", address, base);
+#endif
 
     // check each page referenced by the buffer
     for(size_t i = 0; i < (length / pageSz); i++) {

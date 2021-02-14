@@ -23,8 +23,15 @@ add_library(c STATIC
     src/stack/stack_guard.c
 )
 
+# allow the C library to have link time optimization
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    target_compile_options(c PRIVATE "-flto")
+endif()
+
+# set required compiler flags
 target_compile_definitions(c PRIVATE BUILDING_LIBC=1)
 
+# specify the include directories
 target_include_directories(c PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 target_include_directories(c PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 

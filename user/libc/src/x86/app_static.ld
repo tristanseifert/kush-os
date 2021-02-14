@@ -7,14 +7,11 @@ SECTIONS {
 
     /* code (immutable) section */
     .text ALIGN(4K) : {
-        __text_start = .;
-
         *(.text)
         *(.text*)
         *(.rodata)
         *(.rodata*)
     }
-    __text_size = SIZEOF(.text);
 
     /* data (mutable) section */
     .data ALIGN(4K) : {

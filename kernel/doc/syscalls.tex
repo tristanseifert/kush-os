@@ -369,7 +369,15 @@ Updates the thread's name with the contents of the specified string buffer; if t
 \newpage
 \subsection{Tasks}
 %%%%%
-\subsubsection{{\tt 0x30}: Create task}
+\subsubsection{{\tt 0x30}: Get current task handle}
+\textbf{Arguments:} None \\
+\textbf{Flags:} None \\
+\textbf{Returns:} Task handle ($>0$) or error code ($\leq0$) \\
+
+Retrieves a kernel handle representing the currently executing task.
+
+%%%%%
+\subsubsection{{\tt 0x31}: Create task}
 \textbf{Arguments:} (1) Parent task handle \\
 \textbf{Flags:} None \\
 \textbf{Returns:} Task handle ($>0$) or error code ($\leq0$) \\
@@ -381,7 +389,7 @@ This creates the kernel structures for the task and all required virtual memory 
 At this point, the task will have no memory mapped in userspace (with the exception of any read-only data mapped by the architecture/platform code.) It's the responsibility of the caller to build up the task's virtual memory space, load executable code, set up stacks, and so forth. This process is typically encapsulated by a runtime library.
 
 %%%%%
-\subsubsection{{\tt 0x31}: Terminate task}
+\subsubsection{{\tt 0x32}: Terminate task}
 \textbf{Arguments:} (2) Task handle, exit code \\
 \textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, negative error code otherwise. \\
@@ -389,7 +397,7 @@ At this point, the task will have no memory mapped in userspace (with the except
 Terminates the task (and all threads within it) as identified by the given task handle. If the task handle is not specified (i.e. it is zero) the currently executing task will be terminated; the call will not return control back to the caller before the task is destroyed.
 
 %%%%%
-\subsubsection{{\tt 0x32}: Initialize task}
+\subsubsection{{\tt 0x33}: Initialize task}
 \textbf{Arguments:} (3) Task handle, entry point address, stack address \\
 \textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, negative error code otherwise. \\
@@ -399,7 +407,7 @@ Sets up the task's main thread to return to userspace with the specified stack a
 You can only make this call on a freshly created task handle. Attempts to execute it against already initialized tasks will fail.
 
 %%%%%
-\subsubsection{{\tt 0x33}: Set task name}
+\subsubsection{{\tt 0x34}: Set task name}
 \textbf{Arguments:} (3) Task handle, address of new name, length of new name (in bytes) \\
 \textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, or negative error code \\
@@ -407,7 +415,7 @@ You can only make this call on a freshly created task handle. Attempts to execut
 Updates the task's name with the contents of the specified string buffer; if the buffer is zero terminated, the terminator is not included in the byte count. The task name is used purely for informational purposes.
 
 %%%%%
-\subsubsection{{\tt 0x34}: Wait on task}
+\subsubsection{{\tt 0x35}: Wait on task}
 \textbf{Arguments:} (2) Task handle, timeout \\
 \textbf{Flags:} None \\
 \textbf{Returns:} Task exit code ($\geq0$) or error code ($<0$) \\

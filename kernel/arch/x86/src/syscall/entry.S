@@ -112,16 +112,3 @@ arch_syscall_exit:
     sti
     sysexit
 
-
-.align 0x10
-.global syscall_bitch
-syscall_bitch:
-    mov         $0x11, %eax // syscall number
-    mov         $(1000*500), %ebx // first parameter
-
-    mov         $0xBF5F0000, %edi
-    call        *%edi
-
-weed:
-    jmp         syscall_bitch
-    jmp         weed

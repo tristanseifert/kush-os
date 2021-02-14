@@ -17,7 +17,8 @@
 #include <printf.h>
 #include <log.h>
 
-static void *get_pc () { return __builtin_return_address(0); }
+/// root init server
+sched::Task *gRootServer = nullptr;
 
 /**
  * Early kernel initialization
