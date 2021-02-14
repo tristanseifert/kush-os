@@ -54,11 +54,11 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
         return Errors::Success;
     },
     // 0x23: Create thread
-    nullptr,
+    ThreadCreate,
     // 0x24: Join with thread
     nullptr,
     // 0x25: Destroy thread
-    nullptr,
+    ThreadDestroy,
     // 0x26: Set thread state 
     nullptr,
     // 0x27: Set thread priority 

@@ -31,7 +31,7 @@ class Syscall {
         }
 
         /// Validates whether the entire range of [base, base+length) is accessible
-        static bool validateUserPtr(const void *address, const size_t length);
+        static bool validateUserPtr(const void *address, const size_t length = 0x1000);
 
     private:
         static void init();

@@ -28,6 +28,11 @@ LIBC_EXPORT int ThreadYield();
 LIBC_EXPORT int ThreadUsleep(const uintptr_t usecs);
 
 /**
+ * Creates a new thread.
+ */
+LIBC_EXPORT int ThreadCreate(void (*entry)(uintptr_t), const uintptr_t entryArg, const uintptr_t stack);
+
+/**
  * Sets the name of the current thread.
  */
 LIBC_EXPORT int ThreadSetName(const uintptr_t handle, const char *name);

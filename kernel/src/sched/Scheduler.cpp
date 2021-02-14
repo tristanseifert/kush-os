@@ -195,8 +195,8 @@ beach:;
 
     // switch to it
     REQUIRE(next, "failed to find thread to switch to");
-    REQUIRE(next->state == Thread::State::Runnable, "Thread %p in ready queue but has state %d",
-            next, (int) next->state);
+    REQUIRE(next->state == Thread::State::Runnable, "Thread %p '%s' in ready queue but has state %d",
+            next, next->name, (int) next->state);
 
     // do not perform a context switch into an already running thread
     if(next == this->running) {

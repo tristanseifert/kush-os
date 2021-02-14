@@ -41,6 +41,8 @@ if(${KERNEL_ARCH} STREQUAL "x86")
         src/x86/syscall_impl.c
         src/x86/start.S
         src/x86/div64.c
+        src/x86/threads.c
+        src/x86/thread_start.S
     )
 
     # export settings to build statically linked executables

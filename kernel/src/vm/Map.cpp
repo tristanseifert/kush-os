@@ -11,6 +11,9 @@ using namespace vm;
 static char gAllocBuf[sizeof(mem::SlabAllocator<Map>)] __attribute__((aligned(64)));
 static mem::SlabAllocator<Map> *gMapAllocator = nullptr;
 
+/// pointer to the currently active map
+Map *Map::gCurrentMap = nullptr;
+
 /// Set to 1 to log adding mappings
 #define LOG_MAP_ADD     0
 
@@ -62,6 +65,7 @@ void Map::free(Map *ptr) {
  */
 void Map::activate() {
     this->table.activate();
+    gCurrentMap = this;
 }
 
 /**

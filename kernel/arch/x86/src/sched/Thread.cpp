@@ -130,14 +130,16 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
 
 /**
  * Builds up a stack frame for use with IRET to return to ring 3.
+ *
+ * We make sure that on entry to the function, %edi contains the argument.
  */
-void arch::ReturnToUser(const uintptr_t pc, const uintptr_t stack) {
+void arch::ReturnToUser(const uintptr_t pc, const uintptr_t _stack, const uintptr_t arg) {
     // validate ranges
     REQUIRE(pc < 0xC0000000, "invalid user pc: %08x", pc);
-    REQUIRE(stack < 0xC0000000, "invalid user stack: %08x", pc);
+    REQUIRE(_stack < 0xC0000000, "invalid user stack: %08x", pc);
 
     // switchyboi time
-    x86_ring3_return(pc, stack);
+    x86_ring3_return(pc, _stack, arg);
 }
 
 /**

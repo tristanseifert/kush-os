@@ -138,8 +138,8 @@ void Thread::switchTo() {
 /**
  * Call into architecture code to return to user mode.
  */
-void Thread::returnToUser(const uintptr_t pc, const uintptr_t stack) {
-    arch::ReturnToUser(pc, stack);
+void Thread::returnToUser(const uintptr_t pc, const uintptr_t stack, const uintptr_t arg) {
+    arch::ReturnToUser(pc, stack, arg);
 }
 
 

@@ -77,8 +77,13 @@ class Map {
 
         /// Returns the global kernel map
         static Map *kern();
+        /// Returns the currently activated map
+        static Map *current() {
+            return gCurrentMap;
+        }
 
     private:
+        static Map *gCurrentMap;
 
         static void initAllocator();
 

@@ -158,7 +158,7 @@ struct Thread {
         /// Context switches to this thread.
         void switchTo();
         /// Returns to user mode, with the specified program counter and stack.
-        void returnToUser(const uintptr_t pc, const uintptr_t stack) __attribute__((noreturn));
+        void returnToUser(const uintptr_t pc, const uintptr_t stack, const uintptr_t arg = 0) __attribute__((noreturn));
 
         /// Sets the thread's name.
         void setName(const char *name, const size_t length = 0);

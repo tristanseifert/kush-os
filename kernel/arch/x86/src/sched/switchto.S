@@ -113,6 +113,7 @@ x86_switchto_swap_stub:
  *
  *  8: Program counter
  * 12: Stack address
+ * 16: Argument
  */
 x86_ring3_return:
     // to prevent interruptions
@@ -122,7 +123,7 @@ x86_ring3_return:
     push        %ebp
     mov         %esp, %ebp
 
-    // program counter
+    // the stack we're returning with
     pushl       $GDT_USER_DATA_SEG|0x3
     pushl       12(%ebp)
 
@@ -132,7 +133,7 @@ x86_ring3_return:
     or          $0x200, %eax
     push        %eax
 
-    // the stack we're returning with
+    // program counter
     pushl       $GDT_USER_CODE_SEG|0x3
     pushl       8(%ebp)
 
@@ -143,6 +144,9 @@ x86_ring3_return:
     mov         %ax, %fs
     mov         %ax, %gs
 
+    // restore the argument
+    mov         16(%ebp), %edi
+
     // clear registers
     xor         %eax, %eax
     xor         %ebx, %ebx
@@ -150,7 +154,6 @@ x86_ring3_return:
     xor         %edx, %edx
     xor         %ebp, %ebp
     xor         %esi, %esi
-    xor         %edi, %edi
 
     // and finally do the return
     iret

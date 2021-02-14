@@ -91,8 +91,11 @@ void RestoreThreadState(sched::Thread *from, sched::Thread *to);
  *
  * Implementations of this function should assert that both the stack and program counter values
  * do not fall into kernel regions.
+ *
+ * @param arg An argument to push on the stack (or otherwise pass to) the entry point function
+ * specified.
  */
-void ReturnToUser(const uintptr_t pc, const uintptr_t stack) __attribute__((noreturn));
+void ReturnToUser(const uintptr_t pc, const uintptr_t stack, const uintptr_t arg = 0) __attribute__((noreturn));
 }
 #endif
 #endif

@@ -10,6 +10,16 @@
 namespace sys {
 
 /**
+ * Creates a new userspace thread.
+ */
+int ThreadCreate(const Syscall::Args *args, const uintptr_t number);
+
+/**
+ * Destroys an userspace thread.
+ */
+int ThreadDestroy(const Syscall::Args *args, const uintptr_t number);
+
+/**
  * Sets the descriptive name of the thread.
  *
  * The first argument is a thread handle (or zero for current thread,) followed by the userspace

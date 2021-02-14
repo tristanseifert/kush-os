@@ -2,6 +2,8 @@
 #include "PhysicalAllocator.h"
 
 #include "vm/Map.h"
+#include "sched/Task.h"
+#include "sched/Thread.h"
 
 #include <new>
 #include <arch.h>
@@ -44,7 +46,13 @@ StackPool::StackPool() {
 void *StackPool::alloc() {
     int err;
     const auto pageSz = arch_page_size();
-    auto m = vm::Map::kern();
+
+    vm::Map *m = vm::Map::current();;
+    if(!m) {
+        m = vm::Map::kern();
+    }
+
+    REQUIRE(m, "failed to get current VM map");
 
     // get a lock on the free map
     SPIN_LOCK_GUARD(this->freeMapLck);
