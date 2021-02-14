@@ -78,6 +78,11 @@ Thread::Thread(Task *_parent, const uintptr_t pc, const uintptr_t param, const b
  * Destroys all resources associated with this thread.
  */
 Thread::~Thread() {
+    // remove all objects we're blocking on
+    if(this->blockingOn) {
+        this->blockingOn->reset();
+    }
+
     // invalidate the handle
     handle::Manager::releaseThreadHandle(this->handle);
 

@@ -31,8 +31,6 @@ int sys::ThreadCreate(const Syscall::Args *args, const uintptr_t number) {
         return Errors::GeneralError;
     }
 
-    log("running %p vm %p active %d", running, running->task->vm, running->task->vm->isActive());
-
     // validate the stack and entry point addresses
     auto stackPtr = reinterpret_cast<const char *>(args->args[2]);
     if(!Syscall::validateUserPtr(stackPtr)) {
@@ -128,6 +126,5 @@ static void CreateThreadEntryStub(uintptr_t _ctx) {
     delete info;
 
     // perform return to userspace
-    log("created thred %p; return to %08x arg %08x (sp %08x)", thread, pc, arg, sp);
     thread->returnToUser(pc, sp, arg);
 }

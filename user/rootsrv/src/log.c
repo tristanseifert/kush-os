@@ -2,6 +2,7 @@
 
 #include <printf.h>
 #include <sys/syscalls.h>
+#include <string.h>
 
 /**
  * Writes the message to the kernel log.
@@ -15,15 +16,17 @@ void log(const char *format, ...) {
 
     static const size_t kLogBufSz = 2048;
     static char logBuf[2048];
+    memset(logBuf, 0, kLogBufSz);
+
     int written = vsnprintf(logBuf, kLogBufSz, format, va);
 
     va_end(va);
 
     // add a newline
-    if(written < kLogBufSz) {
+    /*if(written < kLogBufSz) {
         logBuf[written] = '\n';
         written++;
-    }
+    }*/
 
     // do debug print
     DbgOut(logBuf, written);

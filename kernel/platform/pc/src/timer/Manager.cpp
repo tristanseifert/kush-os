@@ -62,9 +62,9 @@ void Manager::remove(const uintptr_t token) {
     RW_LOCK_WRITE(&this->timersLock);
 
     for(size_t i = 0; i < this->timers.size(); i++) {
-        const auto &timer = this->timers[token];
+        const auto &timer = this->timers[i];
         if(timer.token == token) {
-            this->timers.remove(token);
+            this->timers.remove(i);
             goto yeet;
         }
     }

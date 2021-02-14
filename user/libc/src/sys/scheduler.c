@@ -44,6 +44,17 @@ int ThreadCreate(void (*entry)(uintptr_t), const uintptr_t entryArg, const uintp
 }
 
 /**
+ * Destroys the specified thread. It will be deleted immediately if not running, or on the next
+ * trip into the kernel otherwise. If it's the currently running thread however, it will be deleted
+ * immediately.
+ *
+ * @param handle Thread handle, or 0 for the current thread
+ */
+int ThreadDestroy(const uintptr_t handle) {
+    return __do_syscall1(SYS_THREAD_DESTROY, handle);
+}
+
+/**
  * Updates the thread's priority value.
  *
  * @param thread Thread handle, or 0 for the current thread.

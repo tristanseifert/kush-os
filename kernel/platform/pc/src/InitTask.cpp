@@ -120,7 +120,6 @@ static void RootSrvEntry(const uintptr_t) {
     // prepare the fixed mappings
     const auto entry = MapSrvSegments();
     REQUIRE(entry, "failed to locate root server entry point");
-    log("entry point for root server: %08x", entry);
 
     // set up a 64K stack
     constexpr static const uintptr_t kStackTop    = 0x003F0000;

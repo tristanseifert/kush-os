@@ -12,5 +12,5 @@ __ThreadTrampoline:
     call    *%ebx
 
     # destroy thread
-    #pushl   $0
-    #call    ThreadDestroy
+    pushl   $0
+    call    ThreadDestroy

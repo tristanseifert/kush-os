@@ -22,18 +22,18 @@ class TimerBlocker: public Blockable {
          * Ensures the timer is deallocated if it hasn't fired.
          */
         ~TimerBlocker() {
-            if(!this->hasFired) {
-                platform_timer_remove(this->timer);
-            }
+            this->reset();
         }
 
         /// We're signaled once the timer has fired.
         bool isSignalled() override {
             return this->hasFired;
         }
-        /// Do nothing, since this is a one shot timer.
+        /// Disables the timer, if set.
         void reset() override {
-
+            if(!this->hasFired) {
+                platform_timer_remove(this->timer);
+            }
         }
 
         /// When we're going to start blocking, actually install the timer.
@@ -46,6 +46,7 @@ class TimerBlocker: public Blockable {
             const auto deadline = platform_timer_now() + interval + 10000ULL;
 
             this->timer = platform_timer_add(deadline, [](const uintptr_t tok, void *ctx) {
+                if(!ctx) return;
                 reinterpret_cast<TimerBlocker *>(ctx)->timerFired(tok);
             }, this);
 

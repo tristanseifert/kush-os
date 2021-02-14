@@ -182,7 +182,7 @@ class Manager {
         T *get(const Handle h, const rt::Vector<HandleInfo<T>> &handles) {
             // validate index
             const auto index = getIndex(h);
-            if(index >= gShared->taskHandles.size()) {
+            if(index >= handles.size()) {
                 return nullptr;
             }
 

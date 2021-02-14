@@ -6,6 +6,7 @@
 #include "handle/Manager.h"
 
 #include <arch.h>
+#include <arch/critical.h>
 #include <log.h>
 
 using namespace sys;
@@ -138,8 +139,16 @@ int sys::TaskDbgOut(const Syscall::Args *args, const uintptr_t number) {
         return Errors::InvalidPointer;
     }
 
+    // copy the message
+    char message[1024];
+    memset(&message, 0, 1024);
+    strncpy(message, namePtr, 1024);
+
     // set it
-    log("%15s) %s", sched::Thread::current()->name, namePtr);
+    DECLARE_CRITICAL();
+    CRITICAL_ENTER();
+    log("%15s) %s", sched::Thread::current()->name, message);
+    CRITICAL_EXIT();
 
     return Errors::Success;
 }

@@ -296,7 +296,10 @@ bool Scheduler::handleDeferredUpdates() {
 
     while(!this->newlyRunnable.empty()) {
         const RunnableInfo info = this->newlyRunnable.pop();
+        // ignore threads that have since becoming runnable, been deleted
+        if(info.thread->state == Thread::State::Zombie) continue;
 
+        // otherwise, schedule it
         const auto band = this->groupForThread(info.thread);
         REQUIRE(info.thread->state == Thread::State::Runnable, "invalid runnable thread: %p (state %d)", info.thread, (int) info.thread->state);
 
@@ -327,14 +330,16 @@ void Scheduler::yield(void (*willSwitch)(void*), void *willSwitchCtx) {
     // raise to the scheduler level
     const auto prevIrql = platform_raise_irql(platform::Irql::Scheduler);
 
-    // queue it to run again during the next scheduler invocation
-    if(thread->state == Thread::State::Runnable && !thread->needsToDie) {
-        const auto band = groupForThread(thread);
-        this->runnable[band].push_back(thread);
-    }
-    // if the thread is blocking, prepare it
-    else if(thread->state == Thread::State::Blocked) {
-        thread->prepareBlocks();
+    if(!thread->needsToDie) {
+        // queue it to run again during the next scheduler invocation
+        if(thread->state == Thread::State::Runnable) {
+            const auto band = groupForThread(thread);
+            this->runnable[band].push_back(thread);
+        }
+        // if the thread is blocking, prepare it
+        else if(thread->state == Thread::State::Blocked) {
+            thread->prepareBlocks();
+        }
     }
 
     // since we're at scheduler IPL, we can context switch now
