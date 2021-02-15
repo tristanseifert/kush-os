@@ -56,7 +56,8 @@ int sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
     const auto length = args->args[2];
 
     if(!vmAddr || (vmAddr + length) >= 0xC0000000 || (length % pageSz)) {
-        return Errors::InvalidArgument;
+        // must specify virtual address entirely in user region, and length must be aligned
+        return Errors::InvalidAddress;
     }
 
     if(!(flags & (kPermissionRead | kPermissionWrite | kPermissionExecute))) {
@@ -66,8 +67,6 @@ int sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
 
     // set up the mapping
     const auto mapFlags = ConvertFlags(flags);
-
-    log("flags %08x %08x", flags, mapFlags);
 
     region = vm::MapEntry::makePhys(physAddr, vmAddr, length, mapFlags);
     if(!region) {
@@ -109,7 +108,7 @@ int sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
     }
 
     if(vmAddr + length >= 0xC0000000) {
-        return Errors::InvalidArgument;
+        return Errors::InvalidAddress;
     }
     if(length % pageSz) {
         return Errors::InvalidArgument;
@@ -187,25 +186,30 @@ int sys::VmRegionMap(const Syscall::Args *args, const uintptr_t number) {
     sched::Task *task = nullptr;
 
     // get the task handle
-    if(!args->args[0]) {
+    if(!args->args[1]) {
         task = sched::Thread::current()->task;
     } else {
-        task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
+        task = handle::Manager::getTask(static_cast<Handle>(args->args[1]));
         if(!task) {
             return Errors::InvalidHandle;
         }
     }
 
     // get the VM map
-    auto map = handle::Manager::getVmObject(static_cast<Handle>(args->args[1]));
-    if(!map) {
+    auto region = handle::Manager::getVmObject(static_cast<Handle>(args->args[0]));
+    if(!region) {
         return Errors::InvalidHandle;
     }
 
-    // perform the mapping
-    log("add mapping %p to task %p", map, task);
+    // validate the base address
+    const auto base = args->args[2];
+    if(base && (base + region->getLength()) >= 0xC0000000) {
+        return Errors::InvalidAddress;
+    }
 
-    return -1;
+    // perform the mapping
+    int err = task->vm->add(region, base);
+    return (!err ? Errors::Success : Errors::GeneralError);
 }
 
 /**
@@ -215,24 +219,24 @@ int sys::VmRegionUnmap(const Syscall::Args *args, const uintptr_t number) {
     sched::Task *task = nullptr;
 
     // get the task handle
-    if(!args->args[0]) {
+    if(!args->args[1]) {
         task = sched::Thread::current()->task;
     } else {
-        task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
+        task = handle::Manager::getTask(static_cast<Handle>(args->args[1]));
         if(!task) {
             return Errors::InvalidHandle;
         }
     }
 
     // get the VM map
-    auto map = handle::Manager::getVmObject(static_cast<Handle>(args->args[1]));
-    if(!map) {
+    auto region = handle::Manager::getVmObject(static_cast<Handle>(args->args[0]));
+    if(!region) {
         return Errors::InvalidHandle;
     }
 
     // perform the unmapping
-    log("remove mapping %p to task %p", map, task);
-    return -1;
+    int err = task->vm->remove(region);
+    return (!err ? Errors::Success : Errors::GeneralError);
 }
 
 

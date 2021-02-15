@@ -201,24 +201,31 @@ void MapEntry::faultInPage(const uintptr_t address, Map *map) {
  * If it is backed by anonymous memory, we map all pages that have been faulted in so far;
  * otherwise, we map the entire region.
  */
-void MapEntry::addedToMap(Map *map) {
-    RW_LOCK_READ_GUARD(this->lock);
+void MapEntry::addedToMap(Map *map, const uintptr_t _base) {
+    RW_LOCK_READ(&this->lock);
+
+    const auto baseAddr = (_base ? _base : this->base);
 
     // map all allocated physical anon pages
-    log("mapping %p to %p", this, map);
     if(this->isAnon) {
-        this->mapAnonPages(map);
+        this->mapAnonPages(map, baseAddr);
     }
     // otherwise, map the whole thing
     else {
-        this->mapPhysMem(map);
+        this->mapPhysMem(map, baseAddr);
     }
+    RW_UNLOCK_READ(&this->lock);
+
+    // insert owner info
+    RW_LOCK_WRITE(&this->lock);
+    this->maps.append(MapInfo(map, baseAddr));
+    RW_UNLOCK_WRITE(&this->lock);
 }
 
 /**
  * Maps all allocated physical pages.
  */
-void MapEntry::mapAnonPages(Map *map) {
+void MapEntry::mapAnonPages(Map *map, const uintptr_t base) {
     int err;
 
     const auto pageSz = arch_page_size();
@@ -229,7 +236,7 @@ void MapEntry::mapAnonPages(Map *map) {
     // map the pages
     for(const auto &page : this->physOwned) {
         // calculate the address
-        const auto vmAddr = this->base + (page.pageOff * pageSz);
+        const auto vmAddr = base + (page.pageOff * pageSz);
 
         // map it
         err = map->add(page.physAddr, pageSz, vmAddr, mode);
@@ -241,25 +248,44 @@ void MapEntry::mapAnonPages(Map *map) {
 /**
  * Maps the entire underlying physical memory range.
  */
-void MapEntry::mapPhysMem(Map *map) {
+void MapEntry::mapPhysMem(Map *map, const uintptr_t base) {
     int err;
 
     const auto mode = ConvertVmMode(this->flags);
-    err = map->add(this->physBase, this->length, this->base, mode);
+    err = map->add(this->physBase, this->length, base, mode);
 
     REQUIRE(!err, "failed to map vm object %p ($%08x'h) addr $%08x %d", this, this->handle,
             this->base, err);
 }
 
+struct RemoveCtxInfo {
+    MapEntry *entry;
+    Map *map;
+
+    RemoveCtxInfo(MapEntry *_entry, Map *_map) : entry(_entry), map(_map) {};
+};
+
 /**
  * Unmaps the address range of this map entry.
  */
 void MapEntry::removedFromMap(Map *map) {
-    int err;
+    RemoveCtxInfo info(this, map);
 
-    // simply unmap the entire range
-    err = map->remove(this->base, this->length);
-    REQUIRE(!err, "failed to unmap vm object %p ($%08x'h): %d", this, this->handle, err);
+    // iterate the maps info dict to get our true base address
+    RW_LOCK_WRITE(&this->lock);
+    this->maps.removeMatching([](void *_ctx, auto &info) -> bool {
+        // ensure it's the map we're after
+        auto ctx = reinterpret_cast<RemoveCtxInfo *>(_ctx);
+        if(info.mapPtr != ctx->map) return false;
+
+        // unmap the range
+        int err = ctx->map->remove(info.base, ctx->entry->length);
+        REQUIRE(!err, "failed to unmap vm object: %d", err);
+
+        // done; we want to remove it.
+        return true;
+    }, &info);
+    RW_UNLOCK_WRITE(&this->lock);
 }
 
 

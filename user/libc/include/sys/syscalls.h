@@ -10,8 +10,17 @@
 extern "C" {
 #endif
 
+LIBC_EXPORT int AllocVirtualAnonRegion(const uintptr_t virtualAddr, const uintptr_t size,
+        const uintptr_t inFlags, uintptr_t *outHandle);
 LIBC_EXPORT int AllocVirtualRegion(const uint64_t physAddr, const uintptr_t virtualAddr,
         const uintptr_t size, const uintptr_t inFlags, uintptr_t *outHandle);
+LIBC_EXPORT int MapVirtualRegion(const uintptr_t regionHandle);
+LIBC_EXPORT int MapVirtualRegionAt(const uintptr_t regionHandle, const uintptr_t baseAddr);
+LIBC_EXPORT int MapVirtualRegionTo(const uintptr_t regionHandle, const uintptr_t taskHandle);
+LIBC_EXPORT int MapVirtualRegionAtTo(const uintptr_t regionHandle, const uintptr_t taskHandle,
+        const uintptr_t baseAddr);
+LIBC_EXPORT int UnmapVirtualRegion(const uintptr_t regionHandle);
+LIBC_EXPORT int UnmapVirtualRegionFrom(const uintptr_t regionHandle, const uintptr_t taskHandle);
 
 LIBC_EXPORT int ThreadGetHandle(uintptr_t *outHandle);
 LIBC_EXPORT int ThreadYield();

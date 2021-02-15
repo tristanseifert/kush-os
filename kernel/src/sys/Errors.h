@@ -18,6 +18,8 @@ enum Errors: int {
     InvalidArgument                     = -4,
     /// The syscall requested is unavailable
     InvalidSyscall                      = -5,
+    /// A virtual address specified is invalid
+    InvalidAddress                      = -6,
 };
 }
 

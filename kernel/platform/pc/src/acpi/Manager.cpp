@@ -18,6 +18,9 @@ using namespace platform::acpi;
 static char gSharedBuf[sizeof(Manager)] __attribute__((aligned(64)));
 Manager *Manager::gShared = nullptr;
 
+// enable to log found ACPI tables
+#define LOG_TABLES                       0
+
 
 /**
  * Initializes the ACPI handler using Multiboot-provided old style RSDP.
@@ -46,7 +49,9 @@ void Manager::init(struct multiboot_tag_old_acpi *info) {
 
     strncpy(OEMID, rsdp->OEMID, 8);
 
+#if LOG_TABLES
     log("RSDP revision: %d (OEM id '%6s') RSDT @ %08x", rsdp->revision, OEMID, rsdp->rsdtPhysAddr);
+#endif
 
     gShared = reinterpret_cast<Manager *>(&gSharedBuf);
     new(gShared) Manager(rsdp->rsdtPhysAddr);
@@ -84,10 +89,12 @@ void Manager::parseTables() {
 
     REQUIRE(this->rsdt->validateChecksum(), "invalid RSDT checksum");
 
+#if LOG_TABLES
     // look at each table
     log("RSDT %p: signature '%4s' length %u (OEM ID '%6s' rev '%8s')", this->rsdt,
             this->rsdt->head.signature,
             this->rsdt->head.length, this->rsdt->head.OEMID, this->rsdt->head.OEMTableID);
+#endif
 
     const size_t numTables = (this->rsdt->head.length - sizeof(SdtHeader)) / sizeof(uint32_t);
     for(size_t i = 0; i < numTables; i++) {
@@ -120,7 +127,9 @@ void Manager::parseTables() {
             char name[5];
             memcpy(&name, tableHeader->signature, 4);
 
+#if LOG_TABLES
             log("unhandled table %zu: %08x (type '%4s', length %u)", i, addr, name, tableHeader->length);
+#endif
         }
     }
 }
@@ -306,10 +315,12 @@ void Manager::madtRecord(const MADT *, const MADT::Nmi *record) {
  * Parses the HPET table.
  */
 void Manager::parse(const HPET *table) {
+#if LOG_TABLES
     log("HPET rev %d; have %d %d-bit comparators (HPET num %u) min tick %u protection %02x "
             "address %llx (addr space %d, reg width %d, offset %d)",
             table->hwRev, table->numComparators, table->counter64 ? 64 : 32, table->hpetNo,
             table->minTick, table->pageProtection,
             table->address.physAddr, (int) table->address.spaceId, table->address.regWidth,
             table->address.regOffset);
+#endif
 }

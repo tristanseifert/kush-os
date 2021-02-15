@@ -143,7 +143,8 @@ int Map::remove(const uintptr_t vmAddr, const uintptr_t _length) {
     for(uintptr_t off = 0; off < length; off += pageSz) {
         err = this->table.unmapPage(vmAddr + off);
 
-        if(err) {
+        // ignore the case where there's no mapping at the address
+        if(err && err != 1) {
             return err;
         }
     }
@@ -189,7 +190,7 @@ int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
  *
  * @return 0 on success
  */
-int Map::add(MapEntry *_entry) {
+int Map::add(MapEntry *_entry, const uintptr_t base) {
     RW_LOCK_WRITE(&this->lock);
 
     // retain entry
@@ -208,7 +209,7 @@ int Map::add(MapEntry *_entry) {
     // allow the performing of mapping modifications by the entry
     RW_UNLOCK_WRITE(&this->lock);
 
-    entry->addedToMap(this);
+    entry->addedToMap(this, base);
     return 0;
 
 fail:;
@@ -224,7 +225,9 @@ fail:;
  * Removes the given entry from this map.
  */
 int Map::remove(MapEntry *_entry) {
-    RW_LOCK_WRITE_GUARD(this->lock);
+    MapEntry *removed = nullptr;
+
+    RW_LOCK_WRITE(&this->lock);
 
     // iterate over all entries...
     for(size_t i = 0; i < this->entries.size(); i++) {
@@ -232,18 +235,26 @@ int Map::remove(MapEntry *_entry) {
 
         // we've found it! so invoke its removal callback
         if(entry == _entry) {
-            entry->removedFromMap(this);
-
             // then remove it
             this->entries.remove(i);
-            entry->release();
-
-            return 0;
+            removed = entry;
+            goto beach;
         }
     }
 
     // if we get here, the entry wasn't found
+    RW_UNLOCK_WRITE(&this->lock);
     return -1;
+
+beach:;
+    // finish the removal
+    RW_UNLOCK_WRITE(&this->lock);
+    REQUIRE(removed, "wtf");
+
+    removed->removedFromMap(this);
+    removed->release();
+
+    return 0;
 }
 
 
@@ -258,17 +269,26 @@ int Map::remove(MapEntry *_entry) {
  * Any other type of fault will cause a signal to be sent to the process.
  */
 bool Map::handlePagefault(const uintptr_t virtAddr, const bool present, const bool write) {
-    RW_LOCK_READ_GUARD(this->lock);
+    MapEntry *region = nullptr;
+
+    RW_LOCK_READ(&this->lock);
 
     // test all our regions
     for(auto entry : this->entries) {
         // this one contains it :D
         if(entry->contains(virtAddr)) {
-            return entry->handlePagefault(virtAddr, present, write);
+            region = entry;
+            goto beach;
         }
     }
+    RW_UNLOCK_READ(&this->lock);
 
     // if we get here, no region contains the address
     return false;
+
+beach:;
+    RW_UNLOCK_READ(&this->lock);
+    // we found a region to handle it
+    return region->handlePagefault(virtAddr, present, write);
 }
 

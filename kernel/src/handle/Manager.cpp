@@ -25,5 +25,5 @@ void Manager::init() {
  * Initializes the handle manager.
  */
 Manager::Manager() {
-    log("initializing handle manager %p", this);
+    // does anything need to be done here?
 }

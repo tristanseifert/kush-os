@@ -222,16 +222,8 @@ Allocation size must be a multiple of the platform-specific minimum page size, o
 \item \texttt{1 << 10}: Allow read access to the memory region.
 \item \texttt{1 << 11}: Allow write access to the memory region.
 \item \texttt{1 << 12}: Allow code execution from the memory region. (This flag may not be supported on all architectures; on those that do not support it, all virtual maps are executable, so you should pass this flag to ensure your code works correctly where the flag is considered.)
-\item \texttt{1 << 15}: Create the VM object, but do not add it to the calling process' address space. (This is useful to create the memory map of a new task. You will leak kernel resources if you create such an object, and do not either explicitly map it.)
+\item \texttt{1 << 15}: Create the VM object, but do not add it to the calling process' address space. (Even when all tasks unmap the range, its kernel object will hang around until the task that created it terminates. Consider this a side effect of the implementation, rather than a feature.)
 \end{itemize}
-
-%%%%%
-\subsubsection{{\tt 0x12}: Destroy VM region}
-\textbf{Arguments:} (1) VM object handle \\
-\textbf{Flags:} None \\
-\textbf{Returns:} 0 on success, or negative error code \\
-
-Destroys a previously allocated virtual memory region. If the region was anonymous (i.e. it is backed by real physical memory) all of its pages will be freed when its reference count reaches zero.
 
 %%%%%
 \subsubsection{{\tt 0x13}: Update VM region permissions}
@@ -267,11 +259,13 @@ Only the task that created a VM object can resize it.
 
 %%%%%
 \subsubsection{{\tt 0x15}: Map VM region}
-\textbf{Arguments:} (2) VM object handle, destination task handle \\
+\textbf{Arguments:} (3) VM object handle, destination task handle, destination VM base \\
 \textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
 Maps the specified virtual memory object into the address space of the specified task, if possible; possible failure reasons include a conflicting mapping in the destination address space.
+
+If desired, a different base address can be specified where the region should be mapped in the destination task. Specify a value of \texttt{0} to map it at the base address specified when the mapping was created.
 
 Specify a task handle of \texttt{0} to use the currently running task.
 

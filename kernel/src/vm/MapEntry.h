@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <bitflags.h>
+#include <runtime/List.h>
 #include <runtime/Vector.h>
 #include <handle/Manager.h>
 
@@ -103,6 +104,12 @@ class MapEntry {
         const Handle getHandle() const {
             return this->handle;
         }
+        /// Returns the length of the region
+        const uintptr_t getLength() const {
+            uintptr_t temp;
+            __atomic_load(&this->length, &temp, __ATOMIC_RELAXED);
+            return temp;
+        }
 
         /// Attempts to resize the VM object
         int resize(const size_t newSize);
@@ -120,9 +127,20 @@ class MapEntry {
         /// Info on a physical page we own
         struct AnonPageInfo {
             /// offset of this page from start of region
-            uintptr_t pageOff;
+            uintptr_t pageOff = 0;
             /// physical address of page
-            uint64_t physAddr;
+            uint64_t physAddr = 0;
+        };
+
+        /// Reference to a map in which we're mapped
+        struct MapInfo {
+            /// Pointer to the map
+            Map *mapPtr = nullptr;
+            /// Virtual base address in that map; if 0, we use the base value in the map entry
+            uintptr_t base = 0;
+
+            MapInfo() = default;
+            MapInfo(Map *map, const uintptr_t _base = 0) : mapPtr(map), base(_base) {};
         };
 
     private:
@@ -133,11 +151,11 @@ class MapEntry {
         static void initAllocator();
 
         /// The entry was added to a mapping.
-        void addedToMap(Map *);
+        void addedToMap(Map *, const uintptr_t base = 0);
         /// Maps all physical pages we've allocated (for anonymous mappings)
-        void mapAnonPages(Map *);
+        void mapAnonPages(Map *, const uintptr_t);
         /// Directly maps the underlying physical page.
-        void mapPhysMem(Map *);
+        void mapPhysMem(Map *, const uintptr_t);
 
         /// The entry was removed from a mapping.
         void removedFromMap(Map *);
@@ -162,6 +180,8 @@ class MapEntry {
 
         /// physical pages we own
         rt::Vector<AnonPageInfo> physOwned;
+        /// all maps that we exist in
+        rt::List<MapInfo> maps;
 
         /// flags for the mapping
         MappingFlags flags;
