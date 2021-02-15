@@ -160,8 +160,17 @@ struct Thread {
         /// Returns to user mode, with the specified program counter and stack.
         void returnToUser(const uintptr_t pc, const uintptr_t stack, const uintptr_t arg = 0) __attribute__((noreturn));
 
+        /// Updates the notification mask; set bits are unmasked (i.e. will occur)
+        inline void setNotificationMask(uintptr_t newMask) {
+            __atomic_store(&this->notificationMask, &newMask, __ATOMIC_RELEASE);
+        }
+
         /// Sets the thread's name.
         void setName(const char *name, const size_t length = 0);
+        /// Sets the thread's scheduling priority
+        inline void setPriority(int16_t priority) {
+            __atomic_store(&this->priority, &priority, __ATOMIC_RELEASE);
+        }
         /// Sets the thread's state.
         void setState(State newState) {
             if(newState == State::Runnable) {

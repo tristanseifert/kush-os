@@ -126,7 +126,7 @@ inline T&	operator	^=	(T& x, T y)		{	x = x ^ y;	return x;	};
 
 #if(USE_ENUM_FLAGS_FUNCTION)
     #define ENUM_FLAGS_EX(T,INT_T) ENUM_FLAGS_EX_NO_FLAGS_FUNC(T,INT_T) \
-    inline bool			flags(T x)			{	return static_cast<INT_T>(x) != 0;};
+    inline bool			TestFlags(T x)			{	return static_cast<INT_T>(x) != 0;};
 #else
     #define ENUM_FLAGS_EX(T,INT_T) ENUM_FLAGS_EX_NO_FLAGS_FUNC(T,INT_T) 
 #endif

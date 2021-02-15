@@ -35,6 +35,7 @@ add_executable(kernel
     src/runtime/Hash.cpp
     src/vm/Mapper.cpp
     src/vm/Map.cpp
+    src/vm/MapEntry.cpp
     src/sched/Scheduler.cpp
     src/sched/Task.cpp
     src/sched/Thread.cpp
@@ -42,6 +43,7 @@ add_executable(kernel
     src/sys/Syscall.cpp
     src/sys/Task.cpp
     src/sys/Thread.cpp
+    src/sys/VM.cpp
     src/handle/Manager.cpp
     ${version_file}
 )

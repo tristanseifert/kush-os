@@ -6,12 +6,14 @@
 
 #include <arch/rwlock.h>
 
+#include <runtime/List.h>
 #include <runtime/Vector.h>
 #include <handle/Manager.h>
 
 
 namespace vm {
 class Map;
+class MapEntry;
 }
 
 namespace sched {
@@ -67,6 +69,8 @@ struct Task {
 
         /// List of threads belonging to this task; must have at least one
         rt::Vector<Thread *> threads;
+        /// VM objects we own
+        rt::List<vm::MapEntry *> ownedRegions;
 
     public:
         /// Allocates a new task from the task struct pool
@@ -77,6 +81,9 @@ struct Task {
         Task(vm::Map *map);
         ~Task();
 
+        /// Adds the given VM map object to the list
+        void addOwnedVmRegion(vm::MapEntry *region);
+
         /// Sets the task's name.
         void setName(const char *name, const size_t length = 0);
         /// Adds a thread to the task.
@@ -86,6 +93,8 @@ struct Task {
 
     private:
         static void initAllocator();
+
+        static uint32_t nextPid;
 };
 };
 

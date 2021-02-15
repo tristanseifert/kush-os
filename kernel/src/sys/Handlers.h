@@ -9,15 +9,38 @@
 
 namespace sys {
 
+/// Allocates a virtual memory region backed by physical memory
+int VmAlloc(const Syscall::Args *args, const uintptr_t number);
+/// Allocate a virtual memory region backed by anonymous memory
+int VmAllocAnon(const Syscall::Args *args, const uintptr_t number);
+/// Update permissions (R/W/X flags) of a VM region
+int VmRegionUpdatePermissions(const Syscall::Args *args, const uintptr_t number);
+/// Resizes a VM region
+int VmRegionResize(const Syscall::Args *args, const uintptr_t number);
+/// Maps a VM region into a task.
+int VmRegionMap(const Syscall::Args *args, const uintptr_t number);
+/// Unmaps a VM region.
+int VmRegionUnmap(const Syscall::Args *args, const uintptr_t number);
+
+
 /**
  * Creates a new userspace thread.
  */
 int ThreadCreate(const Syscall::Args *args, const uintptr_t number);
-
 /**
  * Destroys an userspace thread.
  */
 int ThreadDestroy(const Syscall::Args *args, const uintptr_t number);
+
+/**
+ * Sets the thread priority.
+ */
+int ThreadSetPriority(const Syscall::Args *args, const uintptr_t number);
+
+/**
+ * Sets the thread's notification mask.
+ */
+int ThreadSetNoteMask(const Syscall::Args *args, const uintptr_t number);
 
 /**
  * Sets the descriptive name of the thread.
@@ -26,7 +49,6 @@ int ThreadDestroy(const Syscall::Args *args, const uintptr_t number);
  * address of the name and its length, in bytes.
  */
 int ThreadSetName(const Syscall::Args *args, const uintptr_t number);
-
 
 
 /**

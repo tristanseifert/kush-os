@@ -63,7 +63,7 @@ int sys::ThreadCreate(const Syscall::Args *args, const uintptr_t number) {
 int sys::ThreadDestroy(const Syscall::Args *args, const uintptr_t number) {
     sched::Thread *thread = nullptr;
 
-    // get the task
+    // get the thread
     if(!args->args[0]) {
         thread = sched::Thread::current();
     } else {
@@ -79,6 +79,54 @@ int sys::ThreadDestroy(const Syscall::Args *args, const uintptr_t number) {
     return Errors::Success;
 }
 
+/**
+ * Sets the priority of the thread in the first argument to the value in the second. It must be a
+ * value on [-100, 100].
+ */
+int sys::ThreadSetPriority(const Syscall::Args *args, const uintptr_t number) {
+    sched::Thread *thread = nullptr;
+
+    // get the thread
+    if(!args->args[0]) {
+        thread = sched::Thread::current();
+    } else {
+        thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
+        if(!thread) {
+            return Errors::InvalidHandle;
+        }
+    }
+
+    // validate priority and set it
+    int priority = static_cast<int>(args->args[1]);
+
+    if(priority < -100 || priority > 100) {
+        return Errors::InvalidArgument;
+    }
+
+    thread->setPriority(priority);
+    return Errors::Success;
+}
+
+/**
+ * Sets the notification mask of the specified thread.
+ */
+int sys::ThreadSetNoteMask(const Syscall::Args *args, const uintptr_t number) {
+    sched::Thread *thread = nullptr;
+
+    // get the thread
+    if(!args->args[0]) {
+        thread = sched::Thread::current();
+    } else {
+        thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
+        if(!thread) {
+            return Errors::InvalidHandle;
+        }
+    }
+
+    // validate priority and set it
+    thread->setNotificationMask(args->args[1]);
+    return Errors::Success;
+}
 /**
  * Sets the thread's new name.
  */

@@ -24,6 +24,13 @@ LIBC_INTERNAL int __do_syscall4(const uintptr_t number, const uintptr_t arg0, co
 /*
  * Define syscall numbers.
  */
+#define SYS_VM_CREATE                   0x10
+#define SYS_VM_CREATE_ANON              0x11
+#define SYS_VM_UPDATE_FLAGS             0x13
+#define SYS_VM_RESIZE                   0x14
+#define SYS_VM_MAP                      0x15
+#define SYS_VM_UNMAP                    0x16
+
 #define SYS_THREAD_GET_HANDLE           0x20
 #define SYS_THREAD_YIELD                0x21
 #define SYS_THREAD_SLEEP                0x22

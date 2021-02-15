@@ -20,6 +20,7 @@ add_library(c STATIC
     src/sys/abort.c
     src/sys/scheduler.c
     src/sys/task.c
+    src/sys/vm.c
     src/stack/stack_guard.c
 )
 

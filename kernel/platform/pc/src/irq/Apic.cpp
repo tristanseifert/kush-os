@@ -95,7 +95,7 @@ void Apic::mapNmi(const uint8_t lint, const IrqFlags f) {
     // build the register value
     uint32_t value = kVectorNMI;
     value |= (0b100 << 8); // deliver as NMI
-    value |= flags(f & IrqFlags::PolarityLow) ? (1 << 13) : 0;
+    value |= TestFlags(f & IrqFlags::PolarityLow) ? (1 << 13) : 0;
 
     // write it to the appropriate register
     if(lint == 0) {

@@ -1,4 +1,5 @@
 #include "Map.h"
+#include "MapEntry.h"
 
 #include <new>
 #include <arch.h>
@@ -41,6 +42,11 @@ Map::Map(const bool copyKernel) :
  * Decrements the ref counts of all memory referenced by this map.
  */
 Map::~Map() {
+    // release all map entries
+    for(auto entry : this->entries) {
+        entry->release();
+    }
+
     // TODO: implement
 }
 
@@ -100,11 +106,11 @@ int Map::add(const uint64_t physAddr, const uintptr_t _length, const uintptr_t v
 #endif
 
     // decompose the flags
-    const bool write = flags(mode & MapMode::WRITE);
-    const bool execute = flags(mode & MapMode::EXECUTE);
-    const bool global = flags(mode & MapMode::GLOBAL);
-    const bool user = flags(mode & MapMode::ACCESS_USER);
-    const bool nocache = flags(mode & MapMode::CACHE_DISABLE);
+    const bool write = TestFlags(mode & MapMode::WRITE);
+    const bool execute = TestFlags(mode & MapMode::EXECUTE);
+    const bool global = TestFlags(mode & MapMode::GLOBAL);
+    const bool user = TestFlags(mode & MapMode::ACCESS_USER);
+    const bool nocache = TestFlags(mode & MapMode::CACHE_DISABLE);
 
     // map each of the pages
     for(uintptr_t off = 0; off < length; off += pageSz) {
@@ -175,3 +181,94 @@ int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
 
     return err;
 }
+
+
+
+/**
+ * Maps the given virtual memory object.
+ *
+ * @return 0 on success
+ */
+int Map::add(MapEntry *_entry) {
+    RW_LOCK_WRITE(&this->lock);
+
+    // retain entry
+    auto entry = _entry->retain();
+
+    // check that it doesn't overlap with anything else
+    for(auto entry : this->entries) {
+        if(entry->intersects(_entry)) {
+            goto fail;
+        }
+    }
+
+    // the mapping doesn't overlap, so add it
+    this->entries.push_back(entry);
+
+    // allow the performing of mapping modifications by the entry
+    RW_UNLOCK_WRITE(&this->lock);
+
+    entry->addedToMap(this);
+    return 0;
+
+fail:;
+    // ensure we release the lock on failure
+    RW_UNLOCK_WRITE(&this->lock);
+
+    // we don't wnat to add the map
+    entry->release();
+    return -1;
+}
+
+/**
+ * Removes the given entry from this map.
+ */
+int Map::remove(MapEntry *_entry) {
+    RW_LOCK_WRITE_GUARD(this->lock);
+
+    // iterate over all entries...
+    for(size_t i = 0; i < this->entries.size(); i++) {
+        auto entry = this->entries[i];
+
+        // we've found it! so invoke its removal callback
+        if(entry == _entry) {
+            entry->removedFromMap(this);
+
+            // then remove it
+            this->entries.remove(i);
+            entry->release();
+
+            return 0;
+        }
+    }
+
+    // if we get here, the entry wasn't found
+    return -1;
+}
+
+
+
+/**
+ * Handles an userspace address range page fault.
+ *
+ * This handles the following situations:
+ * - Anonymous allocation that hasn't had all pages faulted in yet
+ * - Copy-on-write pages
+ *
+ * Any other type of fault will cause a signal to be sent to the process.
+ */
+bool Map::handlePagefault(const uintptr_t virtAddr, const bool present, const bool write) {
+    RW_LOCK_READ_GUARD(this->lock);
+
+    // test all our regions
+    for(auto entry : this->entries) {
+        // this one contains it :D
+        if(entry->contains(virtAddr)) {
+            return entry->handlePagefault(virtAddr, present, write);
+        }
+    }
+
+    // if we get here, no region contains the address
+    return false;
+}
+

@@ -181,7 +181,7 @@ void Manager::configureOverrides() {
         bool remapped = false;
 
         // handle interrupts (i.e. not NMIs)
-        if(!flags(o.flags & irq::IrqFlags::TypeNMI)) {
+        if(!TestFlags(o.flags & irq::IrqFlags::TypeNMI)) {
             // check each IOAPIC to see if it handles this irq
             for(auto ioapic : this->ioapics) {
                 // it does, so remap it there

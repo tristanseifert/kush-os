@@ -6,8 +6,14 @@
 /**
  * Returns the current task's handle.
  */
-int TaskGetHandle() {
-    return __do_syscall0(SYS_TASK_GET_HANDLE);
+int TaskGetHandle(uintptr_t *outHandle) {
+    int err = __do_syscall0(SYS_TASK_GET_HANDLE);
+
+    if(outHandle && err > 0) {
+        *outHandle = err;
+    }
+
+    return (err < 0) ? err : 0;
 }
 
 /**

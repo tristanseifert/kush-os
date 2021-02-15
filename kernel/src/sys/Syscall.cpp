@@ -27,8 +27,23 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     // 0x08-0x0F: Notifications
     nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 
-    // 0x10-0x1F: VM calls (reserved)
-    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    // 0x10: Create VM region
+    VmAlloc,
+    // 0x11: Create anonymous VM region
+    VmAllocAnon,
+    // 0x12: Destroy VM region
+    nullptr,
+    // 0x13: Update VM region permissions
+    VmRegionUpdatePermissions,
+    // 0x14: Resize VM region
+    VmRegionResize,
+    // 0x15: Map VM region
+    VmRegionMap,
+    // 0x16: Unmaps VM region
+    VmRegionUnmap,
+
+    // 0x17-0x1F: VM calls (reserved)
+    nullptr, 
     nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 
     // 0x20: Return current thread handle
@@ -62,9 +77,9 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     // 0x26: Set thread state 
     nullptr,
     // 0x27: Set thread priority 
-    nullptr,
+    ThreadSetPriority,
     // 0x28: Set thread notification mask
-    nullptr,
+    ThreadSetNoteMask,
     // 0x29: Set thread name
     ThreadSetName,
     // 0x2A-0x2F: reserved
@@ -160,7 +175,7 @@ bool Syscall::validateUserPtr(const void *address, const size_t _length) {
         }
 
         // the page is mapped. ensure the user flag is set
-        if(!flags(mode & vm::MapMode::ACCESS_USER)) {
+        if(!TestFlags(mode & vm::MapMode::ACCESS_USER)) {
             log("invalid user ptr %p! (page %08x flags %d)", address, virtAddr, (int) mode);
             return false;
         }

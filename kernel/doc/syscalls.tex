@@ -197,7 +197,7 @@ Allocates a virtual memory region backed by physical memory, starting with the g
 This call will fail if the entire region of $[\text{start}, \text{start} + \text{length})$ has any pages that are mapped. Likewise, the length must be a multiple of the platform-specific minimum page size.
 
 \begin{itemize}
-\item \texttt{1 << 0}: Use large pages, if supported, to satisfy this virtual memory mapping. The kernel will attempt to map as much of the physical memory region as possible with large pages, and use regular pages to map the remainder.
+\item \texttt{1 << 1}: Use large pages, if supported, to satisfy this virtual memory mapping. The kernel will attempt to map as much of the physical memory region as possible with large pages, and use regular pages to map the remainder.
 \item \texttt{1 << 10}: Allow read access to the memory region.
 \item \texttt{1 << 11}: Allow write access to the memory region.
 \item \texttt{1 << 12}: Allow code execution from the memory region. (This flag may not be supported on all architectures; on those that do not support it, all virtual maps are executable, so you should pass this flag to ensure your code works correctly where the flag is considered.)
@@ -267,11 +267,23 @@ Only the task that created a VM object can resize it.
 
 %%%%%
 \subsubsection{{\tt 0x15}: Map VM region}
-\textbf{Arguments:} (2) Destination task handle, VM object handle \\
+\textbf{Arguments:} (2) VM object handle, destination task handle \\
 \textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
-Maps the specified virtual memory object into the address space of the specified task, if possible.
+Maps the specified virtual memory object into the address space of the specified task, if possible; possible failure reasons include a conflicting mapping in the destination address space.
+
+Specify a task handle of \texttt{0} to use the currently running task.
+
+%%%%%
+\subsubsection{{\tt 0x15}: Unmap VM region}
+\textbf{Arguments:} (2) VM object handle, destination task handle \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success, or negative error code \\
+
+Unmaps a previously mapped VM region from the specified task. If this is the last task that had this object mapped, it will be destroyed automatically.
+
+Specify a task handle of \texttt{0} to use the currently running task.
 
 %%%%%%%%%%
 \newpage

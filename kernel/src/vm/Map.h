@@ -7,7 +7,10 @@
 #include <arch/rwlock.h>
 #include <arch/PTEHandler.h>
 
+#include <runtime/Vector.h>
+
 namespace vm {
+class MapEntry;
 class Mapper;
 
 /// modifier flags for mappings, defining its protection level
@@ -63,6 +66,9 @@ class Map {
         const bool isActive() const;
         void activate();
 
+        int add(MapEntry *entry);
+        int remove(MapEntry *entry);
+
         int add(const uint64_t physAddr, const uintptr_t length, const uintptr_t vmAddr, 
                 const MapMode mode);
         int remove(const uintptr_t vmAddr, const uintptr_t length);
@@ -74,6 +80,9 @@ class Map {
         }
         /// Gets the physical address to which this virtual address is mapped, and its flags.
         int get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode);
+
+        /// Page fault handler
+        bool handlePagefault(const uintptr_t virtAddr, const bool present, const bool write);
 
         /// Returns the global kernel map
         static Map *kern();
@@ -91,6 +100,8 @@ class Map {
         /// protecting modifications of the table
         DECLARE_RWLOCK(lock);
 
+        /// all VM map entries
+        rt::Vector<MapEntry *> entries;
         /// architecture-specific page table handling
         arch::vm::PTEHandler table;
 };

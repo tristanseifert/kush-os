@@ -4,6 +4,8 @@
 #include "gdt.h"
 #include "idt.h"
 
+#include <vm/Map.h>
+
 #include <printf.h>
 #include <log.h>
 
@@ -130,12 +132,27 @@ int x86_exception_format_info(char *outBuf, const size_t outBufLen,
  * Handles a page fault exception.
  */
 void x86_handle_pagefault(const x86_exception_info_t info) {
+    // get some info on the fault
     uint32_t faultAddr;
     asm volatile("mov %%cr2, %0" : "=r" (faultAddr));
 
-    // get some info on the fault
+    // if the fault is a reserved bit violation, fail immediately
+    if(info.errCode & 0x08) {
+        goto unhandled;
+    }
 
-    // page fault is unhandled
+    // forward userspace page faults to the VM manager
+    if(faultAddr < 0xC0000000 && (info.errCode & 0x04)) {
+        auto vm = vm::Map::current();
+        bool handled = vm->handlePagefault(faultAddr, (info.errCode & 0x01), (info.errCode & 0x02));
+
+        if(handled) {
+            return;
+        }
+    }
+
+unhandled:;
+    // page fault is unhandled (or in kernel)
     char buf[512] = {0};
     x86_exception_format_info(buf, 512, info);
     panic("unhandled page fault: %s%s %s (%s) at $%08x\n%s", 

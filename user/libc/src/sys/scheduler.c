@@ -9,8 +9,14 @@ extern void __ThreadTrampoline();
 /**
  * Returns the current thread's handle.
  */
-int ThreadGetHandle() {
-    return __do_syscall0(SYS_THREAD_GET_HANDLE);
+int ThreadGetHandle(uintptr_t *outHandle) {
+    int err = __do_syscall0(SYS_THREAD_GET_HANDLE);
+
+    if(outHandle && err > 0) {
+        *outHandle = err;
+    }
+
+    return (err < 0) ? err : 0;
 }
 
 /**
@@ -35,12 +41,20 @@ int ThreadUsleep(const uintptr_t usecs) {
  *
  * @return Handle to the new thread (> 0) or an error code.
  */
-int ThreadCreate(void (*entry)(uintptr_t), const uintptr_t entryArg, const uintptr_t stack) {
+int ThreadCreate(void (*entry)(uintptr_t), const uintptr_t entryArg, const uintptr_t stack,
+        uintptr_t *outHandle) {
     // prepare the stack environment
     __ThreadStackPrepare(stack, entry, entryArg);
 
     // create the thread
-    return __do_syscall3(SYS_THREAD_CREATE, (uintptr_t) &__ThreadTrampoline, 0, stack);
+    int err = __do_syscall3(SYS_THREAD_CREATE, (uintptr_t) &__ThreadTrampoline, 0, stack);
+
+    // extract handle if desired; return 0 for success, syscall error otherwise
+    if(outHandle && err > 0) {
+        *outHandle = err;
+    }
+
+    return (err < 0) ? err : 0;
 }
 
 /**

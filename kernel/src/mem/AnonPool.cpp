@@ -89,7 +89,7 @@ AnonPool::~AnonPool() {
     uint64_t phys;
 
     const auto pageSz = arch_page_size();
-    auto map = vm::Map::kern();
+    auto map = vm::Map::current();
 
     for(size_t i = 0; i < this->totalPages; i++) {
         err = map->get(this->virtBase + (pageSz * i), phys);
@@ -107,7 +107,7 @@ void *AnonPool::allocPage(uint64_t &phys) {
     auto page = gShared->alloc(1);
 
     if(page) {
-        auto map = vm::Map::kern();
+        auto map = vm::Map::current();
 
         int err = map->get((uintptr_t) page, phys);
         REQUIRE(!err, "failed to resolve phys addr: %d", err);
@@ -122,7 +122,7 @@ void *AnonPool::allocPage(uint64_t &phys) {
 void *AnonPool::alloc(const size_t numPages) {
     int err;
     const auto pageSz = arch_page_size();
-    auto map = vm::Map::kern();
+    auto map = vm::Map::current();
 
     size_t allocStart = 0;
     size_t allocPages = 0;
@@ -223,7 +223,7 @@ void AnonPool::free(void *base, const size_t numPages) {
     int err;
 
     const auto pageSz = arch_page_size();
-    auto map = vm::Map::kern();
+    auto map = vm::Map::current();
 
     // lock the free map and deallocate each page
     SPIN_LOCK_GUARD(this->freeMapLck);

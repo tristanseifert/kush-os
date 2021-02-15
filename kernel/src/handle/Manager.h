@@ -13,6 +13,10 @@ extern "C" void kernel_init();
 /// Handle type
 enum class Handle: uintptr_t {};
 
+namespace vm {
+class MapEntry;
+}
+
 namespace sched {
 struct Task;
 struct Thread;
@@ -96,6 +100,36 @@ class Manager {
             RW_LOCK_READ_GUARD(gShared->threadHandlesLock);
             return gShared->get(h, gShared->threadHandles);
         }
+
+        /// Allocates a new handle for the given mapping object.
+        static Handle makeVmObjectHandle(vm::MapEntry *vmObject) {
+            RW_LOCK_WRITE_GUARD(gShared->vmObjectHandlesLock);
+            return gShared->allocate(vmObject, gShared->vmObjectHandles, Type::VmRegion);
+        }
+        /// Releases the previously allocated mapping object handle.
+        static bool releaseVmObjectHandle(const Handle h) {
+            // validate type
+            const auto type = getType(h);
+            if(type != Type::VmRegion) {
+                return false;
+            }
+
+            // update the list
+            RW_LOCK_WRITE_GUARD(gShared->vmObjectHandlesLock);
+            return gShared->release(h, gShared->vmObjectHandles);
+        }
+        /// Returns the mapping entry object that the given handle points to.
+        static vm::MapEntry *getVmObject(const Handle h) {
+            // validate type
+            const auto type = getType(h);
+            if(type != Type::VmRegion) {
+                return nullptr;
+            }
+
+            RW_LOCK_READ_GUARD(gShared->vmObjectHandlesLock);
+            return gShared->get(h, gShared->vmObjectHandles);
+        }
+
     private:
         /// wraps a handle slot with an epoch counter
         template<class T>
@@ -247,6 +281,11 @@ class Manager {
         DECLARE_RWLOCK(threadHandlesLock);
         // storage for thread handles
         rt::Vector<HandleInfo<sched::Thread>> threadHandles;
+
+        // lock for the vm object handles
+        DECLARE_RWLOCK(vmObjectHandlesLock);
+        // storage for thread handles
+        rt::Vector<HandleInfo<vm::MapEntry>> vmObjectHandles;
 };
 }
 

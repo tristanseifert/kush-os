@@ -2,6 +2,7 @@
 #include "Thread.h"
 
 #include "vm/Map.h"
+#include "vm/MapEntry.h"
 #include "mem/SlabAllocator.h"
 
 #include <string.h>
@@ -11,6 +12,9 @@ using namespace sched;
 
 static char gAllocBuf[sizeof(mem::SlabAllocator<Task>)] __attribute__((aligned(64)));
 static mem::SlabAllocator<Task> *gTaskAllocator = nullptr;
+
+/// pid for the next task
+uint32_t Task::nextPid = 0;
 
 /**
  * Initializes the task struct allocator.
@@ -52,6 +56,9 @@ Task::Task(vm::Map *_map) {
 
     // allocate a handle
     this->handle = handle::Manager::makeTaskHandle(this);
+
+    // misc initialization
+    this->pid = __atomic_fetch_add(&nextPid, 1, __ATOMIC_RELEASE);
 }
 
 /**
@@ -73,10 +80,25 @@ Task::~Task() {
         Thread::free(thread);
     }
 
-    // release memory maps
+    // release VM objects
+    for(auto region : this->ownedRegions) {
+        region->release();
+    }
+
     if(this->ownsVm) {
         vm::Map::free(this->vm);
     }
+}
+
+/**
+ * Adds a reference to the given VM object to this task.
+ *
+ * This is used for created objects that aren't immediately mapped to a task. They'll have a ref
+ * count of one, so when this task exits, the objects are destroyed.
+ */
+void Task::addOwnedVmRegion(vm::MapEntry *region) {
+    RW_LOCK_WRITE_GUARD(this->lock);
+    this->ownedRegions.append(region);
 }
 
 /**

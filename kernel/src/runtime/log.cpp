@@ -7,6 +7,7 @@
 #include <arch/spinlock.h>
 
 #include "sched/Scheduler.h"
+#include "sched/Task.h"
 #include "sched/Thread.h"
 
 /// Panic lock; this ensures we can only ever have one CPU core in the panic code at once
@@ -49,6 +50,7 @@ void panic(const char *format, ...) {
 
     // get current thread
     auto thread = sched::Scheduler::get()->runningThread();
+    auto task = (thread ? thread->task : nullptr);
 
     // set up panic buffer
     static const size_t kPanicBufSz = 2048;
@@ -65,11 +67,15 @@ void panic(const char *format, ...) {
     fctprintf(_outchar, NULL, "panic: %s\npc: $%p\n", panicBuf, pc);
 
     if(thread) {
-        fctprintf(_outchar, NULL, "Active thread: %p (tid %u) '%s'\n", thread, thread->tid,
+        fctprintf(_outchar, NULL, "  Active thread: %p (tid %u) '%s'\n", thread, thread->tid,
                 thread->name);
     }
+    if(task) {
+        fctprintf(_outchar, NULL, "    Active task: %p (pid %u) '%s'\n", task, task->pid,
+                task->name);
+    }
 
-    fctprintf(_outchar, NULL, "nanoseconds since boot: %llu\n", platform_timer_now());
+    fctprintf(_outchar, NULL, "Time since boot: %llu ns\n", platform_timer_now());
 
     // try to get a backtrace as well
     int err = arch_backtrace(NULL, panicBuf, kPanicBufSz);

@@ -94,10 +94,10 @@ void IoApic::remap(const uint8_t irq, const uint32_t dest, const IrqFlags f) {
     r.destination = 0;
     r.destMode = 0; // physical mode: APIC ID
 
-    r.pinPolarity = flags(f & IrqFlags::PolarityLow) ? 1 : 0;
-    r.triggerMode = flags(f & IrqFlags::TriggerLevel) ? 1 : 0;
+    r.pinPolarity = TestFlags(f & IrqFlags::PolarityLow) ? 1 : 0;
+    r.triggerMode = TestFlags(f & IrqFlags::TriggerLevel) ? 1 : 0;
 
-    if(flags(f & IrqFlags::TypeNMI)) {
+    if(TestFlags(f & IrqFlags::TypeNMI)) {
         r.delvMode = 0b100; // NMI
     } else {
         r.delvMode = 0b000; // fixed
