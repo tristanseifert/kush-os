@@ -11,6 +11,7 @@ void IdleEntry(uintptr_t arg);
 
 class Scheduler;
 struct Thread;
+struct Task;
 
 /**
  * The idle worker handles tasks such as deleting threads/tasks when they're no longer needed,
@@ -35,6 +36,12 @@ class IdleWorker {
              * that must be deallocated using the thread allocator.
              */
             DestroyThread,
+
+            /**
+             * Deallocate the given task. The payload pointer is to a `struct Task` that we must
+             * release.
+             */
+            DestroyTask,
         };
         /// Work unit pushed to the idle thread
         struct WorkItem {
@@ -50,6 +57,9 @@ class IdleWorker {
             static WorkItem destroyThread(Thread *t) {
                 return WorkItem(Type::DestroyThread, t);
             }
+            static WorkItem destroyTask(Task *t) {
+                return WorkItem(Type::DestroyTask, t);
+            }
         };
 
     public:
@@ -62,11 +72,18 @@ class IdleWorker {
             this->work.push_back(WorkItem::destroyThread(thread));
         }
 
+        /// Queues the given task for deletion
+        void queueDestroyTask(Task *task) {
+            SPIN_LOCK_GUARD(this->workLock);
+            this->work.push_back(WorkItem::destroyTask(task));
+        }
+
     private:
         void main();
         void checkWork();
 
         void destroyThread(Thread *);
+        void destroyTask(Task *);
 
     private:
     public:

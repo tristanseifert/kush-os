@@ -270,7 +270,7 @@ If desired, a different base address can be specified where the region should be
 Specify a task handle of \texttt{0} to use the currently running task.
 
 %%%%%
-\subsubsection{{\tt 0x15}: Unmap VM region}
+\subsubsection{{\tt 0x16}: Unmap VM region}
 \textbf{Arguments:} (2) VM object handle, destination task handle \\
 \textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, or negative error code \\
@@ -278,6 +278,21 @@ Specify a task handle of \texttt{0} to use the currently running task.
 Unmaps a previously mapped VM region from the specified task. If this is the last task that had this object mapped, it will be destroyed automatically.
 
 Specify a task handle of \texttt{0} to use the currently running task.
+
+%%%%%
+\subsubsection{{\tt 0x17}: Get VM region info}
+\textbf{Arguments:} (4) VM object handle, task handle, info buffer, info buffer length \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success, or negative error code \\
+
+Gets information about the specified VM region. If the task handle is not \texttt{0}, the info is provided from the perspective of that task; otherwise, the running task is used. The information is then written into a buffer with the specified location. The buffer contains a structure with the following fields:
+
+\begin{bytefield}[bitwidth=1.3em]{32} \\
+\bitheader[endianness=big]{0,15,16,31} \\
+\bitbox{32}{Virtual base address} \\
+\bitbox{32}{Length (bytes)} \\
+\bitbox{16}{\it Reserved} & \bitbox{16}{Flags} \\
+\end{bytefield}
 
 %%%%%%%%%%
 \newpage

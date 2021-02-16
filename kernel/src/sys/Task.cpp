@@ -29,12 +29,20 @@ struct InitTaskDpcInfo {
  */
 int sys::TaskCreate(const Syscall::Args *args, const uintptr_t number) {
     auto task = sched::Task::alloc();
-    log("alloc task syscall: %p", task);
 
-    // insert task into handle table
+    // set the parent
+    if(!args->args[0]) {
+        task->parent = sched::Thread::current()->task;
+    } else {
+        auto parent = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
+        if(!parent) {
+            return Errors::InvalidHandle;
+        }
+        task->parent = parent;
+    }
 
     // return task handle
-    return -1;
+    return static_cast<int>(task->handle);
 }
 
 /**
@@ -44,6 +52,7 @@ int sys::TaskCreate(const Syscall::Args *args, const uintptr_t number) {
  * argument specifies the return code.
  */
 int sys::TaskTerminate(const Syscall::Args *args, const uintptr_t number) {
+    int err;
     sched::Task *task = nullptr;
 
     // get the task
@@ -58,7 +67,9 @@ int sys::TaskTerminate(const Syscall::Args *args, const uintptr_t number) {
 
     // terminate it aye
     log("Terminating task %p (code %d)", task, args->args[1]);
-    return Errors::Success;
+    err = task->terminate(args->args[1]);
+
+    return (err ? Errors::GeneralError : Errors::Success);
 }
 
 /**

@@ -61,15 +61,11 @@ void Manager::remove(const uintptr_t token) {
     CRITICAL_ENTER();
     RW_LOCK_WRITE(&this->timersLock);
 
-    for(size_t i = 0; i < this->timers.size(); i++) {
-        const auto &timer = this->timers[i];
-        if(timer.token == token) {
-            this->timers.remove(i);
-            goto yeet;
-        }
-    }
+    this->timers.removeMatching([](void *ctx, TimerInfo &timer) -> bool {
+        const auto token = reinterpret_cast<const uintptr_t>(ctx);
+        return (timer.token == token);
+    }, reinterpret_cast<void *>(token));
 
-yeet:;
     RW_UNLOCK_WRITE(&this->timersLock);
     CRITICAL_EXIT();
 }

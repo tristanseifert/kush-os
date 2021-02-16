@@ -18,9 +18,9 @@ set_target_properties(kernel_arch_x86_syscall_stub PROPERTIES SUFFIX "${PLATFORM
 add_custom_command(TARGET kernel_arch_x86_syscall_stub POST_BUILD
     COMMAND ${CMAKE_OBJCOPY} ARGS -O binary --only-section=.text ${CMAKE_CURRENT_BINARY_DIR}/x86_syscall_stub${PLATFORM_KERNEL_EXTENSION} ${CMAKE_CURRENT_BINARY_DIR}/syscall_stub
 )
-# then convert it to an object file we can link
+# then convert it to an object file we can link (ensure it will be in .rodata rather than rw .data)
 add_custom_command(TARGET kernel_arch_x86_syscall_stub POST_BUILD
-    COMMAND ${CMAKE_OBJCOPY} ARGS -I binary -O elf32-i386 syscall_stub ${CMAKE_CURRENT_BINARY_DIR}/syscall_stub.o
+    COMMAND ${CMAKE_OBJCOPY} ARGS -I binary --rename-section .data=.rodata,alloc,load,readonly,data,contents -O elf32-i386 syscall_stub ${CMAKE_CURRENT_BINARY_DIR}/syscall_stub.o
 )
 
 ###############################################################################

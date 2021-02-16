@@ -41,9 +41,10 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     VmRegionMap,
     // 0x16: Unmaps VM region
     VmRegionUnmap,
+    // 0x17: Get VM region info
+    VmRegionGetInfo,
 
-    // 0x17-0x1F: VM calls (reserved)
-    nullptr, 
+    // 0x18-0x1F: VM calls (reserved)
     nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 
     // 0x20: Return current thread handle

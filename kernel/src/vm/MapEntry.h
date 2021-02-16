@@ -111,8 +111,16 @@ class MapEntry {
             return temp;
         }
 
+        /// whether we're backed by anonymous memory or not
+        inline bool backedByAnonymousMem() const {
+            return this->isAnon;
+        }
+
         /// Attempts to resize the VM object
         int resize(const size_t newSize);
+
+        /// Gets info about the VM object in a particular map
+        int getInfo(Map *map, uintptr_t &base, uintptr_t &length, MappingFlags &flags);
 
         /// Allocates a VM object backed by a region of contiguous physical pages
         static MapEntry *makePhys(const uint64_t physAddr, const uintptr_t address,

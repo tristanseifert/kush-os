@@ -68,6 +68,7 @@ class Map {
 
         int add(MapEntry *entry, const uintptr_t base = 0);
         int remove(MapEntry *entry);
+        const bool contains(MapEntry *entry);
 
         int add(const uint64_t physAddr, const uintptr_t length, const uintptr_t vmAddr, 
                 const MapMode mode);

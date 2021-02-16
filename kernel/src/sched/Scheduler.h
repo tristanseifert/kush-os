@@ -100,6 +100,8 @@ class Scheduler {
         bool handleDeferredUpdates();
         void receivedDispatchIpi(const uintptr_t);
 
+        void removeThreadFromRunQueue(Thread *);
+
     private:
         /// Info on a thread that is runnable
         struct RunnableInfo {

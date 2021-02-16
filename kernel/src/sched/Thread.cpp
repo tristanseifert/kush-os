@@ -191,7 +191,7 @@ void Thread::die() {
  * If not active, we'll set it as a zombie and deal with it accordingly. Otherwise, we'll set some
  * flags, then context switch and the deferred work will occur then.
  */
-void Thread::terminate() {
+void Thread::terminate(bool release) {
     DECLARE_CRITICAL();
 
     // update state
@@ -209,13 +209,16 @@ void Thread::terminate() {
 
     CRITICAL_EXIT();
 
+    // ensure it's removed from run queues
+    Scheduler::get()->removeThreadFromRunQueue(this);
+
     // if running, context switch away
     if(isRunning) {
         yield();
     } 
     // delete it right away since the thread isn't running
     else {
-        Scheduler::get()->idle->queueDestroyThread(this);
+        if(release) Scheduler::get()->idle->queueDestroyThread(this);
     }
 }
 
@@ -397,4 +400,43 @@ void Thread::runDpcs() {
     // release queue access
     RW_UNLOCK_WRITE(&this->lock);
     CRITICAL_EXIT();
+}
+
+
+/**
+ * Handles faults.
+ *
+ * If the fault can be handeled, we rewrite the exception frame to return to a different address in
+ * the userspace thread; this would be an assembler runtime stub that records processor state and
+ * invokes its own handlers.
+ *
+ * This will only be invoked for faults from userspace. All kernel faults will immediately cause
+ * a panic.
+ */
+void Thread::handleFault(const FaultType type, const uintptr_t pc, void *context) {
+    // special handling for the general fault type
+    if(type == FaultType::General) {
+        goto unhandled;
+    }
+
+    // other faults may be caught
+    switch(type) {
+        // invoke the userspace handler for invalid instruction, if registered
+        case FaultType::InvalidInstruction:
+            goto unhandled;
+            break;
+
+        default:
+            break;
+    }
+
+    // if we get here, the fault wasn't handled
+
+unhandled:;
+    // fault was not handled; kill the thread
+    REQUIRE(this->task, "no task for thread %p with fault %d", this, (int) type);
+
+    log("Unhandled fault %d in thread $%08x'h (%s) info %08x", (int) type, this->handle, this->name,
+            context);
+    this->task->terminate(-1);
 }

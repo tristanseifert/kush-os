@@ -257,6 +257,20 @@ beach:;
     return 0;
 }
 
+/**
+ * Iterates the list of allocated mappings to see if we contain one.
+ */
+const bool Map::contains(MapEntry *entry) {
+    RW_LOCK_READ_GUARD(this->lock);
+    for(auto map : this->entries) {
+        if(map == entry) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 
 
 /**

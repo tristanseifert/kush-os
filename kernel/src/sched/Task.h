@@ -56,6 +56,9 @@ struct Task {
         /// current task state
         State state = State::Initializing;
 
+        /// parent task
+        Task *parent = nullptr;
+
         /// virtual memory mappings for this task
         vm::Map *vm = nullptr;
         /// whether we own the VM maps
@@ -63,6 +66,9 @@ struct Task {
 
         /// handle to the task
         Handle handle;
+
+        /// when set, skip deleting threads on dealloc
+        bool skipThreadDealloc = false;
 
         /// task lock
         DECLARE_RWLOCK(lock);
@@ -91,8 +97,13 @@ struct Task {
         /// Detaches the given thread from the task.
         void detachThread(Thread *t);
 
+        /// Terminates this task with the given return code
+        int terminate(int status);
+
     private:
         static void initAllocator();
+
+        void notifyExit(int);
 
         static uint32_t nextPid;
 };

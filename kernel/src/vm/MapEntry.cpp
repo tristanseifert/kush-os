@@ -288,6 +288,28 @@ void MapEntry::removedFromMap(Map *map) {
     RW_UNLOCK_WRITE(&this->lock);
 }
 
+/**
+ * Gets info about this map entry from the perspective of a map.
+ */
+int MapEntry::getInfo(Map *map, uintptr_t &outBase, uintptr_t &outLength, MappingFlags &outFlags) {
+    RW_LOCK_READ_GUARD(this->lock);
+
+    // iterate the map infos
+    for(const auto &info : this->maps) {
+        if(info.mapPtr == map) {
+            outBase = info.base;
+            outLength = this->length;
+            outFlags = this->flags;
+
+            return 0;
+        }
+    }
+
+    // if we get here, we're not mapped by this map
+    return -1;
+}
+
+
 
 
 /**

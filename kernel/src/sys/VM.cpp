@@ -13,6 +13,20 @@
 using namespace sys;
 
 /**
+ * Info buffer written to userspace for the "get VM region info" syscall
+ */
+struct VmInfo {
+    // base address of the region
+    uintptr_t virtualBase;
+    // length of the region in bytes
+    uintptr_t length;
+
+    uint16_t reserved;
+    // region flags: this is the same flags as passed to the syscall
+    uint16_t flags;
+};
+
+/**
  * Flags for VM object creation
  */
 enum Flags: uint16_t {
@@ -237,6 +251,83 @@ int sys::VmRegionUnmap(const Syscall::Args *args, const uintptr_t number) {
     // perform the unmapping
     int err = task->vm->remove(region);
     return (!err ? Errors::Success : Errors::GeneralError);
+}
+
+/**
+ * Gets info for a VM region.
+ */
+int sys::VmRegionGetInfo(const Syscall::Args *args, const uintptr_t number) {
+    int err;
+    sched::Task *task = nullptr;
+
+    // validate the info region buffer and size
+    auto infoPtr = reinterpret_cast<VmInfo *>(args->args[2]);
+    const auto infoLen = args->args[3];
+
+    if(infoLen != sizeof(VmInfo)) {
+        return Errors::InvalidArgument;
+    }
+    if(!Syscall::validateUserPtr(infoPtr, infoLen)) {
+        return Errors::InvalidPointer;
+    }
+
+    // get the task handle
+    if(!args->args[1]) {
+        task = sched::Thread::current()->task;
+    } else {
+        task = handle::Manager::getTask(static_cast<Handle>(args->args[1]));
+        if(!task) {
+            return Errors::InvalidHandle;
+        }
+    }
+
+    // get the VM region
+    auto region = handle::Manager::getVmObject(static_cast<Handle>(args->args[0]));
+    if(!region) {
+        return Errors::InvalidHandle;
+    }
+
+    // ensure the task has this region mapped
+    auto vm = task->vm;
+    if(!vm->contains(region)) {
+        return Errors::Unmapped;
+    }
+
+    // if so, fill the info
+    uintptr_t base, len;
+    vm::MappingFlags flags;
+
+    err = region->getInfo(vm, base, len, flags);
+    if(err) {
+        return Errors::GeneralError;
+    }
+
+    infoPtr->virtualBase = base;
+    infoPtr->length = len;
+
+    // convert the flags value
+    uint16_t outFlags = 0;
+
+    if(TestFlags(flags & vm::MappingFlags::Read)) {
+        outFlags |= (1 << 10);
+    }
+    if(TestFlags(flags & vm::MappingFlags::Write)) {
+        outFlags |= (1 << 11);
+    }
+    if(TestFlags(flags & vm::MappingFlags::Execute)) {
+        outFlags |= (1 << 12);
+    }
+    if(TestFlags(flags & vm::MappingFlags::MMIO)) {
+        outFlags |= (1 << 13);
+    }
+
+    if(region->backedByAnonymousMem()) {
+        outFlags |= (1 << 7);
+    }
+
+    infoPtr->flags = outFlags;
+
+    return Errors::Success;
 }
 
 

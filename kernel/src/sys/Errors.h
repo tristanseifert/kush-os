@@ -20,6 +20,8 @@ enum Errors: int {
     InvalidSyscall                      = -5,
     /// A virtual address specified is invalid
     InvalidAddress                      = -6,
+    /// Referenced memory is not mapped in the given process
+    Unmapped                            = -7,
 };
 }
 

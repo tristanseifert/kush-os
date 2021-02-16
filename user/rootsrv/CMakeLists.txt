@@ -8,9 +8,9 @@ add_executable(rootsrv
 )
 
 #####
-add_subdirectory(lib/bzip2)
+add_subdirectory(lib/lzfse)
 
-target_link_libraries(rootsrv PRIVATE rootsrv_bzip2)
+target_link_libraries(rootsrv PRIVATE rootsrv_lzfse)
 
 # allow link time optimization (strips C library functions we don't use)
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")

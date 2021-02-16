@@ -30,6 +30,7 @@ LIBC_INTERNAL int __do_syscall4(const uintptr_t number, const uintptr_t arg0, co
 #define SYS_VM_RESIZE                   0x14
 #define SYS_VM_MAP                      0x15
 #define SYS_VM_UNMAP                    0x16
+#define SYS_VM_GET_INFO                 0x17
 
 #define SYS_THREAD_GET_HANDLE           0x20
 #define SYS_THREAD_YIELD                0x21

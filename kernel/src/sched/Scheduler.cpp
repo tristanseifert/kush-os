@@ -384,6 +384,28 @@ const Scheduler::PriorityGroup Scheduler::groupForThread(Thread *t, const bool w
     }
 }
 
+/**
+ * Iterates over the run queue to remove the given thread from it.
+ */
+void Scheduler::removeThreadFromRunQueue(Thread *thread) {
+    const auto prevIrql = platform_raise_irql(platform::Irql::Scheduler);
+
+    // iterate each priority band
+    for(size_t band = 0; band < kPriorityGroupMax; band++) {
+        // get the underlying storage
+        auto &queue = this->runnable[band];
+        auto &list = queue.getStorage();
+
+        // remove this thread from it
+        list.removeMatching([](void *ctx, Thread *runnable) -> bool {
+            auto toRemove = reinterpret_cast<Thread *>(ctx);
+            return (toRemove == runnable);
+        }, thread);
+    }
+
+    platform_lower_irql(prevIrql);
+}
+
 
 
 /**

@@ -50,12 +50,12 @@ int x86_exception_format_info(char *outBuf, const size_t outBufLen,
 /**
  * Handles a page fault exception.
  */
-void x86_handle_pagefault(const x86_exception_info_t info);
+void x86_handle_pagefault(x86_exception_info_t info);
 
 /**
  * Handles all other (e.g. not page fault) exceptions.
  */
-void x86_handle_exception(const x86_exception_info_t info);
+void x86_handle_exception(x86_exception_info_t info);
 
 #ifdef __cplusplus
 }

@@ -75,6 +75,12 @@ void IdleWorker::checkWork() {
                 this->destroyThread(thread);
                 break;
             }
+            // the payload pointer is a task
+            case Type::DestroyTask: {
+                auto task = reinterpret_cast<Task *>(item.payload);
+                this->destroyTask(task);
+                break;
+            }
             // this is a no-op
             case Type::Unknown:
                 break;
@@ -99,4 +105,11 @@ void IdleWorker::destroyThread(Thread *thread) {
 
     // lastly, release it
     Thread::free(thread);
+}
+
+/**
+ * Deallocates a task.
+ */
+void IdleWorker::destroyTask(Task *task) {
+    Task::free(task);
 }

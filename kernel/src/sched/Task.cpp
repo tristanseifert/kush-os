@@ -1,5 +1,7 @@
 #include "Task.h"
 #include "Thread.h"
+#include "Scheduler.h"
+#include "IdleWorker.h"
 
 #include "vm/Map.h"
 #include "vm/MapEntry.h"
@@ -75,9 +77,9 @@ Task::~Task() {
     // invalidate the handle
     handle::Manager::releaseTaskHandle(this->handle);
 
-    // release all threads
+    // terminate all remaining threads
     for(auto thread : this->threads) {
-        Thread::free(thread);
+        thread->terminate();
     }
 
     // release VM objects
@@ -128,15 +130,24 @@ void Task::addThread(Thread *t) {
     RW_LOCK_WRITE_GUARD(this->lock);
     this->threads.push_back(t);
 
+    bool yes = true;
+    __atomic_store(&t->attachedToTask, &yes, __ATOMIC_RELEASE);
+
     t->task = this;
 }
 
 /**
  * Detaches a thread from this task.
  *
- * This is only allowed if the thread is paused or in the zombie state.
+ * This is only allowed if the thread is paused or in the zombie state. (or is it)
  */
 void Task::detachThread(Thread *t) {
+    bool attached;
+    __atomic_load(&t->attachedToTask, &attached, __ATOMIC_ACQUIRE);
+
+    // bail if not attached
+    if(!attached) return;
+
     REQUIRE(t->state == Thread::State::Paused || t->state == Thread::State::Zombie,
             "invalid thread state for detach: %d", (int) t->state);
 
@@ -144,11 +155,71 @@ void Task::detachThread(Thread *t) {
     for(size_t i = 0; i < this->threads.size(); i++) {
         // if we've found the thread, remove it
         if(this->threads[i] == t) {
+            bool no = false;
+            __atomic_store(&t->attachedToTask, &no, __ATOMIC_RELEASE);
+
             this->threads.remove(i);
             return;
         }
     }
 
-    // failed to find the thread
-    panic("thread %p does not belong to task %p!", t, this);
+    // failed to find the thread; ignore
+    log("thread %p does not belong to task %p (belongs to %p) attach %d!", t, this, t->task,
+            t->attachedToTask);
+    return;
+}
+
+
+
+/**
+ * Terminates the task.
+ *
+ * This will terminate all threads. If anyone is waiting on the task, they're notified of the
+ * status code; otherwise, it's discarded
+ */
+int Task::terminate(int status) {
+    // notify anyone blocking on us
+    this->notifyExit(status);
+
+    // terminate all threads in this task
+    auto current = Thread::current();
+
+    RW_LOCK_WRITE(&this->lock);
+
+    size_t i = 0;
+    bool no = false;
+
+    while(i < this->threads.size()) {
+        auto thread = this->threads[i];
+        if(thread == current) {
+            this->threads.remove(i);
+            continue;
+        }
+
+        __atomic_store(&thread->attachedToTask, &no, __ATOMIC_RELEASE);
+        thread->terminate();
+        i++;
+    }
+
+    this->threads.clear();
+    RW_UNLOCK_WRITE(&this->lock);
+
+    // request task deletion later
+    Scheduler::get()->idle->queueDestroyTask(this);
+
+    // finally, terminate calling thread, if it is also in this task
+    if(current->task == this) {
+        __atomic_store(&current->attachedToTask, &no, __ATOMIC_RELEASE);
+        current->terminate();
+    }
+
+    // success! the task was terminated
+    return 0;
+}
+
+/**
+ * Notifies all interested parties that we've exited.
+ */
+void Task::notifyExit(int status) {
+    log("Task $%08x'h (%s) exited: %d", this->handle, this->name, status);
 }

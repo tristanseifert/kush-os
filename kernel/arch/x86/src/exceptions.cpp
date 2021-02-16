@@ -4,6 +4,7 @@
 #include "gdt.h"
 #include "idt.h"
 
+#include <sched/Thread.h>
 #include <vm/Map.h>
 
 #include <printf.h>
@@ -131,7 +132,7 @@ int x86_exception_format_info(char *outBuf, const size_t outBufLen,
 /**
  * Handles a page fault exception.
  */
-void x86_handle_pagefault(const x86_exception_info_t info) {
+void x86_handle_pagefault(x86_exception_info_t info) {
     // get some info on the fault
     uint32_t faultAddr;
     asm volatile("mov %%cr2, %0" : "=r" (faultAddr));
@@ -168,7 +169,30 @@ unhandled:;
 /**
  * Exception handler; routes the exception into the correct part of the kernel.
  */
-void x86_handle_exception(const x86_exception_info_t info) {
+void x86_handle_exception(x86_exception_info_t info) {
+    // acquire currently executing thread
+    auto thread = sched::Thread::current();
+    if(!thread) goto unhandled;
+
+    // if exception is in kernel space, always panic
+    if(info.eip >= 0xC0000000) goto unhandled;
+
+    // try to handle exception
+    switch(info.intNo) {
+        case X86_EXC_ILLEGAL_OPCODE:
+            thread->handleFault(sched::Thread::FaultType::InvalidInstruction, info.eip, &info.eip);
+            break;
+
+        default:
+            goto unhandled;
+            break;
+    }
+
+    // if we get here, the error was handled and we can just return to it
+    return;
+
+unhandled:;
+    // otherwise, panique
     char buf[512] = {0};
     x86_exception_format_info(buf, 512, info);
     panic("unhandled exception: %s\n%s", vector_name(info.intNo), buf);
