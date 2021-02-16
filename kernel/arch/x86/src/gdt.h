@@ -67,5 +67,11 @@ void gdt_set_entry(uint16_t num, uint32_t base, uint32_t limit, uint8_t flags, u
 void gdt_setup_tss();
 void tss_set_esp0(void *ptr);
 
+void tss_activate(const uintptr_t idx, const uintptr_t stackAddr);
+const int tss_allocate(uintptr_t &idx);
+void tss_release(const uintptr_t idx);
+void tss_write_iopb(const uintptr_t idx, const uintptr_t portOffset, const uint8_t *iopb,
+        const uintptr_t iopbBits);
+
 #endif // ASM_FILE
 #endif

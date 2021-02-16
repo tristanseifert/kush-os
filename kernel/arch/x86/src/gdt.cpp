@@ -4,14 +4,24 @@
 
 #include <log.h>
 #include <string.h>
+#include <arch/spinlock.h>
 
 // the descriptor table is allocated in BSS
-constexpr static const size_t kGdtSize = 32;
+constexpr static const size_t kGdtSize = 64;
 static gdt_descriptor_t sys_gdt[kGdtSize];
 
 static gdt_task_gate_t gTss[GDT_NUM_TSS];
-static void *gTssStacks[GDT_NUM_TSS];
-static bool gTssLoaded[GDT_NUM_TSS];
+static void *gTssStacks[GDT_NUM_TSS] = {nullptr};
+static bool gTssLoaded[GDT_NUM_TSS] = {0};
+
+// allocation map of TSS indices
+constexpr static const size_t kNumTss = (kGdtSize - 8);
+static bool gTssAllocated[kNumTss] = {0};
+static uint8_t *gTssAllocatedBuf[kNumTss] = {nullptr};
+
+constexpr static const uintptr_t kFirstAllocTss = (GDT_FIRST_TSS >> 3) + GDT_NUM_TSS;
+
+DECLARE_SPINLOCK_S(gTssAllocatedLock);
 
 /// loads a GDT
 static void load_gdt(void *location);
@@ -46,7 +56,7 @@ void gdt_init() {
     // Create the correct number of TSS descriptors
     for(int i = 0; i < GDT_NUM_TSS; i++) {
         gdt_set_entry((GDT_FIRST_TSS >> 3) + i, ((uint32_t) &gTss[i]),
-                      sizeof(gdt_task_gate_t), 0x89, 0x4F);
+                      sizeof(gdt_task_gate_t)-1, 0x89, 0x4F);
     }
 
     load_gdt(gdt);
@@ -78,7 +88,7 @@ static void load_gdt(void *location) {
         uint32_t base;
     } __attribute__((__packed__)) IDTR;
 
-    IDTR.length = (0x28 + (GDT_NUM_TSS * 8)) - 1;
+    IDTR.length = (0x28 + (GDT_NUM_TSS * 8) + (kNumTss * 8)) - 1;
     IDTR.base = (uint32_t) location;
     asm volatile("lgdt (%0)" : : "r"(&IDTR));
 
@@ -140,3 +150,116 @@ void tss_set_esp0(void *ptr) {
     tss_load(GDT_FIRST_TSS + (tssIdx * 8));
 }
 
+
+
+/**
+ * Allocate the first free TSS entry.
+ *
+ * @return 0 if successful, error code otherwise.
+ */
+const int tss_allocate(uintptr_t &idx) {
+    size_t allocated = 0;
+    SPIN_LOCK_GUARD(gTssAllocatedLock);
+
+    // find a free TSS
+    for(size_t i = 0; i < kNumTss; i++) {
+        if(!gTssAllocated[i]) {
+            gTssAllocated[i] = true;
+            allocated = i;
+            goto beach;
+        }
+    }
+
+    // if we get here, no free TSS slots
+    return -1;
+
+beach:;
+    // initialize the TSS
+    const auto size = sizeof(gdt_task_gate_t) + ((65536 / 8) + 1);
+    auto buf = new uint8_t[size];
+
+    memset(buf, 0, size);
+    gTssAllocatedBuf[allocated] = buf;
+
+    auto tss = reinterpret_cast<gdt_task_gate_t *>(buf);
+    auto iopb = reinterpret_cast<uint8_t *>(buf + sizeof(gdt_task_gate_t));
+
+    // set up segments
+    tss->ss0 = GDT_KERN_DATA_SEG;
+    tss->cs = GDT_KERN_CODE_SEG | 3;
+    tss->ds = GDT_KERN_DATA_SEG | 3;
+    tss->es = GDT_KERN_DATA_SEG | 3;
+    tss->fs = GDT_KERN_DATA_SEG | 3;
+    tss->gs = GDT_KERN_DATA_SEG | 3;
+    tss->ss = GDT_KERN_DATA_SEG | 3;
+
+    // the IO permission map follows directly after; no ports are allowed yet
+    tss->iomap = sizeof(gdt_task_gate_t);
+    memset(iopb, 0xFF, (65536 / 8) + 1);
+
+    // update the GDT entry
+    gdt_set_entry((kFirstAllocTss + allocated), reinterpret_cast<uintptr_t>(tss),
+                      sizeof(gdt_task_gate_t) + (65536/8) - 1, 0x89, 0x4F);
+
+    return 0;
+}
+
+/**
+ * Releases the GDT entry for the specified TSS.
+ */
+void tss_release(const uintptr_t idx) {
+    REQUIRE(idx < kNumTss, "invalid tss index: %u", idx);
+
+    SPIN_LOCK_GUARD(gTssAllocatedLock);
+
+    // clear the flags
+    gTssAllocated[idx] = false;
+    gdt_set_entry(kFirstAllocTss + idx, 0, 0, 0, 0);
+
+    // free its memory
+    delete[] gTssAllocatedBuf[idx];
+    gTssAllocatedBuf[idx] = nullptr;
+}
+
+/**
+ * Activates a TSS that was previously allocated.
+ */
+void tss_activate(const uintptr_t idx, const uintptr_t stackAddr) {
+    REQUIRE(gTssAllocated[idx], "cannot activate unallocated TSS %u", idx);
+
+    // update stack
+    auto tss = reinterpret_cast<gdt_task_gate_t *>(gTssAllocatedBuf[idx]);
+    tss->esp0 = stackAddr;
+
+    // reload it
+    tss_load((kFirstAllocTss * 8) + (idx * 8));
+}
+
+/**
+ * Writes into the IO permission bitmap.
+ */
+void tss_write_iopb(const uintptr_t idx, const uintptr_t portOffset, const uint8_t *inIopb,
+        const uintptr_t iopbBits) {
+    SPIN_LOCK_GUARD(gTssAllocatedLock);
+
+    REQUIRE(idx < kNumTss, "invalid tss index: %u", idx);
+    REQUIRE(gTssAllocated[idx], "cannot update IOPB of unallocated TSS %u", idx);
+
+    // get the info on the TSS
+    auto buf = gTssAllocatedBuf[idx];
+    auto iopb = reinterpret_cast<uint8_t *>(buf + sizeof(gdt_task_gate_t));
+
+    // read the input bitmap
+    for(size_t i = 0; i < iopbBits; i++) {
+        // test if the bit is set in the input
+        const bool isSet = (inIopb[i / 8]) & (1 << (i % 8));
+
+        // if the bit is set in input, clear it in output
+        const uintptr_t outBit = portOffset + i;
+        if(isSet) {
+            iopb[outBit / 8] &= ~(1 << (outBit % 8));
+        } else {
+            iopb[outBit / 8] |= (1 << (outBit % 8));
+        }
+    }
+}

@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <arch/ThreadState.h>
 #include <arch/rwlock.h>
 
 #include <runtime/List.h>
@@ -77,6 +78,9 @@ struct Task {
         rt::Vector<Thread *> threads;
         /// VM objects we own
         rt::List<vm::MapEntry *> ownedRegions;
+
+        /// architecture-specific task state
+        arch::TaskState archState __attribute__((aligned(16)));
 
     public:
         /// Allocates a new task from the task struct pool

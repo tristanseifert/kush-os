@@ -97,14 +97,27 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
         //}
     }
 
-    // for kernel mode threads, the TSS should hold the per-CPU interrupt thread
-    if(to->kernelMode) {
-        // set the per-CPU kernel interrupt thread
-        tss_set_esp0(nullptr);
-    }
-    // otherwise, store the thread's specially allocated kernel thread
-    else {
-        tss_set_esp0(to->stack);
+    // update TSS
+    auto task = to->task;
+    if(task) {
+        const auto &taskState = task->archState;
+
+        // the task has a custom TSS which needs activating
+        if(taskState.hasTss) {
+            tss_activate(taskState.tssIdx, reinterpret_cast<uintptr_t>(to->stack));
+        }
+        // otherwise, use system TSS
+        else {
+            // for kernel mode threads, the TSS should hold the per-CPU interrupt thread
+            if(to->kernelMode) {
+                // set the per-CPU kernel interrupt thread
+                tss_set_esp0(nullptr);
+            }
+            // otherwise, store the thread's specially allocated kernel thread
+            else {
+                tss_set_esp0(to->stack);
+            }
+        }
     }
 
     // update syscall handler state
@@ -202,4 +215,17 @@ extern "C" void x86_dpc_handler() {
  */
 void x86_thread_end() {
     panic("thread returned from main");
+}
+
+
+
+/**
+ * Releases the allocated TSS, if any, when a thread is deallocated.
+ */
+TaskState::~TaskState() {
+    // release the TSS and its GDT entry
+    if(this->hasTss) {
+        this->hasTss = false;
+        tss_release(this->tssIdx);
+    }
 }

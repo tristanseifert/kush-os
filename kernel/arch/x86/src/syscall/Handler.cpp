@@ -1,4 +1,5 @@
 #include "Handler.h"
+#include "Syscalls.h"
 
 #include "gdt.h"
 #include <arch/x86_msr.h>
@@ -19,6 +20,14 @@ extern "C" char _binary_syscall_stub_start[], _binary_syscall_stub_end[];
 #define SIZE_OF_STUB (_binary_syscall_stub_end - _binary_syscall_stub_start)
 
 extern "C" void arch_syscall_entry();
+
+/// Total number of architecture-specific syscalls
+static const size_t gNumArchSyscalls = 1;
+static int (* const gArchSyscalls[])(const sys::Syscall::Args *, const uintptr_t) = {
+    // 0x00: Update task IO permissions
+    UpdateTaskIopb,
+};
+
 
 /**
  * Initializes the shared syscall handler.
@@ -104,3 +113,18 @@ void arch::TaskWillStart(sched::Task *task) {
     Handler::taskCreated(task);
 }
 
+
+
+/**
+ * Dispatch an architecture-specific system call.
+ */
+int arch::HandleSyscall(const sys::Syscall::Args *args, const uintptr_t _number) {
+    // validate the arch specific syscall number
+    const auto index = (_number & 0xFFFF0000) >> 16;
+    if(index > gNumArchSyscalls) {
+        return -5; // invalid syscall
+    }
+
+    // dispatch it
+    return (gArchSyscalls[index])(args, _number);
+}

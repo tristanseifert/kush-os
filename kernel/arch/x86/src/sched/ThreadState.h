@@ -37,6 +37,23 @@ struct ThreadState {
 };
 
 /**
+ * Task state specific to an x86 processor
+ *
+ * This is mainly used to handle IO permissions bitmaps.
+ */
+struct TaskState {
+    /// when set, we have a custom TSS for the task
+    bool hasTss = false;
+    /// index of the corresponding TSS
+    uintptr_t tssIdx = 0;
+    /// Most significant accessible IO port, or 0 if none
+    uintptr_t iopbBits = 0;
+
+    /// Release the TSS when deallocated
+    ~TaskState();
+};
+
+/**
  * Registers for a kernel thread as saved on the stack.
  */
 struct CpuRegs {

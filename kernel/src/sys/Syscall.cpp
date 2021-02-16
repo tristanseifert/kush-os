@@ -106,8 +106,14 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     nullptr,
     // 0x36: Debug printing
     TaskDbgOut,
+
+    // 0x37: Reserved
+    nullptr,
+
+    // 0x38: Architecture specific syscall
+    arch::HandleSyscall,
 };
-static const size_t gNumSyscalls = 0x37;
+static const size_t gNumSyscalls = 0x38;
 
 /**
  * Initializes the syscall handler.
@@ -123,7 +129,7 @@ void Syscall::init() {
 int Syscall::_handle(const Args *args, const uintptr_t code) {
     // validate syscall number
     const size_t syscallIdx = (code & 0xFFFF);
-    if(syscallIdx >= gNumSyscalls) {
+    if(syscallIdx > gNumSyscalls) {
         return Errors::InvalidSyscall;
     }
 

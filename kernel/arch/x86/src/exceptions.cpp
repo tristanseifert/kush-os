@@ -182,6 +182,9 @@ void x86_handle_exception(x86_exception_info_t info) {
         case X86_EXC_ILLEGAL_OPCODE:
             thread->handleFault(sched::Thread::FaultType::InvalidInstruction, info.eip, &info.eip);
             break;
+        case X86_EXC_GPF:
+            thread->handleFault(sched::Thread::FaultType::ProtectionViolation, info.eip, &info.eip);
+            break;
 
         default:
             goto unhandled;

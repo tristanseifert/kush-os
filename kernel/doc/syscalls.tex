@@ -443,4 +443,42 @@ Updates the task's name with the contents of the specified string buffer; if the
 
 Waits for the specified task to exit, up to the specified the timeout, then returns its exit code.
 
+
+
+
+
+%%%%%%%%%%%%%%%
+\section{Architecture Specific Calls}
+Architecture code may expose its own system calls to userspace applications, for tasks such as interrupt routing or other per-task configuration. Note that the kernel does not do any permissions checks; you are responsible for doing these.
+
+All arch specific calls are filtered through syscall \texttt{0x38} as described below:
+
+%%%%%
+\subsubsection{{\tt 0x38}: Arch specific syscall}
+\textbf{Arguments:} Varies \\
+\textbf{Flags:} Used for the "real" architecture syscall number \\
+\textbf{Returns:} Varies \\
+
+Performs an architecture specific system call. The 16 bits reserved for the flag are used instead as the "real" architecture specific system call number. These real numbers are described below.
+
+%%%%%%%%%%
+\subsection{x86}
+%%%%%
+\subsubsection{{\tt 0x00}: Set IO bitmap}
+\textbf{Arguments:} (3) Task handle, IO bitmap buffer, IO bitmap offset/length \\
+\textbf{Returns:} 0 on success, or a negative error code \\
+
+Configures the IO permission bitmap for the given task (or current task if \texttt{0} is specified,) filling it such that all ports whose bits are \textit{set} in the map can be accessed by the task.
+
+The offset/length field is formatted as follows:
+
+\begin{bytefield}[bitwidth=1.3em]{32} \\
+\bitheader[endianness=big]{0,15,16,31} \\
+\bitbox{16}{Length} & \bitbox{16}{Offset} \\
+\end{bytefield}
+
+Its length is specified as a number of ports (i.e. bits) but it will always be read in full byte increments. Offset is likewise specified in bits.
+
+If the task does not already have a TSS associated with it, this will allocate one. This TSS has the full 8K (plus one byte) allocated to map all 64K IO ports on the platform. This is a little wasteful, but avoids several common bugs resulting from partial TSS IO permission bitmaps.
+
 \end{document}  

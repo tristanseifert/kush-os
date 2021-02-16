@@ -40,12 +40,15 @@ target_include_directories(c PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 # build the correct platform-specific code
 if(${KERNEL_ARCH} STREQUAL "x86")
     target_sources(c PRIVATE
-        src/x86/syscall_impl.c
-        src/x86/start.S
         src/x86/div64.c
         src/x86/threads.c
         src/x86/thread_start.S
+        src/x86/start.S
+        src/x86/syscall_arch.c
+        src/x86/syscall_impl.c
     )
+
+    target_compile_definitions(c PRIVATE LIBC_ARCH_X86=1)
 
     # export settings to build statically linked executables
     set(C_STATIC_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/x86/app_static.ld CACHE FILEPATH "Statically linked C executable linker script")

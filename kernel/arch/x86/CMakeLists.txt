@@ -38,6 +38,7 @@ add_library(kernel_arch_x86 OBJECT
     src/sched/switchto.S
     src/syscall/entry.S
     src/syscall/Handler.cpp
+    src/syscall/Iopb.cpp
     src/math.c
 )
 set_source_files_properties(

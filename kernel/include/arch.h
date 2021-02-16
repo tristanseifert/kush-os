@@ -8,6 +8,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+
+#include <sys/Syscall.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -96,6 +99,11 @@ void RestoreThreadState(sched::Thread *from, sched::Thread *to);
  * specified.
  */
 void ReturnToUser(const uintptr_t pc, const uintptr_t stack, const uintptr_t arg = 0) __attribute__((noreturn));
+
+/**
+ * Handles architecture-specific system call.
+ */
+int HandleSyscall(const sys::Syscall::Args *args, const uintptr_t number);
 }
 #endif
 #endif

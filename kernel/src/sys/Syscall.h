@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "Errors.h"
+
 extern "C" void kernel_init();
 
 namespace sys {
