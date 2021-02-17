@@ -190,19 +190,54 @@ int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
  *
  * @return 0 on success
  */
-int Map::add(MapEntry *_entry, const uintptr_t base) {
+int Map::add(MapEntry *_entry, const uintptr_t _base) {
     RW_LOCK_WRITE(&this->lock);
 
     // retain entry
     auto entry = _entry->retain();
+    uintptr_t base = _base;
 
-    // check that it doesn't overlap with anything else
-    for(auto entry : this->entries) {
-        if(entry->intersects(_entry)) {
-            goto fail;
+    if(entry->base || base) {
+        if(!base) {
+            // check that it doesn't overlap with anything else
+            for(auto i : this->entries) {
+                if(i->intersects(this, entry)) {
+                    goto fail;
+                }
+            }
         }
+        // check the desired new base address
+        else {
+            for(auto i : this->entries) {
+                if(i->contains(this, base, entry->length)) {
+                    goto fail;
+                }
+            }
+        }
+    } else {
+        // find a VM address for this
+        base = kVmSearchBase;
+
+        while((base + _entry->length) < kVmMaxAddr) {
+            // check whether this address is suitable
+            for(auto i : this->entries) {
+                // it's intersected an existing mapping; try again after that mapping
+                if(i->contains(this, base, entry->length)) {
+                    base = (i->getBaseAddressIn(this) + i->length);
+                    log("conflict with %p; moving base to %08x", i, base);
+                    continue;
+                }
+            }
+
+            // if we get here, it didn't collide with any other mappings
+            goto beach;
+        }
+
+        // if we're here, we cannot find a suitable base address
+        goto fail;
     }
 
+beach:;
     // the mapping doesn't overlap, so add it
     this->entries.push_back(entry);
 
@@ -290,7 +325,7 @@ bool Map::handlePagefault(const uintptr_t virtAddr, const bool present, const bo
     // test all our regions
     for(auto entry : this->entries) {
         // this one contains it :D
-        if(entry->contains(virtAddr)) {
+        if(entry->contains(this, virtAddr)) {
             region = entry;
             goto beach;
         }

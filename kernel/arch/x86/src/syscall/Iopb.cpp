@@ -74,8 +74,8 @@ int syscall::UpdateTaskIopb(const ::sys::Syscall::Args *args, const uintptr_t) {
         ai.iopbBits = maxPort;
     }
 
-    // switch to the task's TSS if it was freshly allocated
-    if(needsTssSwitch) {
+    // switch to the task's TSS if it was freshly allocated (and it's currently executing)
+    if(needsTssSwitch && thread->task == task) {
         tss_activate(ai.tssIdx, reinterpret_cast<uintptr_t>(thread->stack));
     }
 

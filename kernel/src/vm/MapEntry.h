@@ -74,14 +74,60 @@ class MapEntry {
         }
 
         /**
-         * Tests whether the given address is within the range.
+         * Return the base address of the entry for the given map.
+         *
+         * @return Base address, or 0 if error.
          */
-        bool contains(const uintptr_t address) const {
-            return (address >= this->base) && (address < (this->base + this->length));
+        const uintptr_t getBaseAddressIn(const Map *map) {
+            RW_LOCK_READ_GUARD(this->lock);
+
+            for(auto &info : this->maps) {
+                if(info.mapPtr == map) {
+                    return (info.base ? info.base : this->base);
+                }
+            }
+
+            return 0;
+        }
+
+        /**
+         * Tests whether the given address is within the range, when the region is mapped in the
+         * specified map.
+         */
+        bool contains(const Map *map, const uintptr_t address) const {
+            // find the map info
+            for(auto &info : this->maps) {
+                if(info.mapPtr == map) {
+                    const auto b = (info.base ? info.base : this->base);
+                    return (address >= b) && (address < (b + this->length));
+                }
+            }
+
+            // not in the map???
+            return false;
         }
         /**
          * Tests whether the given address range overlaps with this entry.
          */
+        bool contains(const Map *map, const uintptr_t address, const size_t length) const {
+            // find the map info
+            for(auto &info : this->maps) {
+                if(info.mapPtr == map) {
+                    const auto x1 = (info.base ? info.base : this->base);
+                    const auto x2 = (x1 + this->length);
+                    const auto y1 = address;
+                    const auto y2 = (address + length);
+
+                    return (x1 >= y1 && x1 <= y2) ||
+                           (x2 >= y1 && x2 <= y2) ||
+                           (y1 >= x1 && y1 <= x2) ||
+                           (y2 >= x1 && y2 <= x2);
+                }
+            }
+
+            // not in the map???
+            return false;
+        }
         bool contains(const uintptr_t address, const size_t length) const {
             const auto x1 = this->base;
             const auto x2 = (this->base + this->length);
@@ -96,7 +142,9 @@ class MapEntry {
         /**
          * Tests whether the given mappings overlap.
          */
-        inline bool intersects(const MapEntry *entry) {
+        inline bool intersects(const Map *map, const MapEntry *entry) {
+            RW_LOCK_READ_GUARD(this->lock);
+
             return this->contains(entry->base, entry->length);
         }
 

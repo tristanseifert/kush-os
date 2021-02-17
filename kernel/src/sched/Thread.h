@@ -64,7 +64,7 @@ struct Thread {
             General                     = 0,
             /// The instruction executed is invalid; context is pointer to the pc in exc frame
             InvalidInstruction          = 1,
-            /// A page fault was unhandled
+            /// A page fault was unhandled (pc = faulting address; context = pc exception frame)
             UnhandledPagefault          = 2,
             /// Protection violation
             ProtectionViolation         = 3,

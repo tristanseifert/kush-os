@@ -150,6 +150,13 @@ void x86_handle_pagefault(x86_exception_info_t info) {
         if(handled) {
             return;
         }
+
+        // it wasn't handled by the VM manager; let the thread handle it
+        auto thread = sched::Thread::current();
+        if(thread) {
+            thread->handleFault(sched::Thread::FaultType::UnhandledPagefault, faultAddr, &info.eip);
+            return;
+        }
     }
 
 unhandled:;

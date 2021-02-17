@@ -192,7 +192,7 @@ Sets the provided notification bits on the specified thread. The thread may be w
 \textbf{Flags:} See below \\
 \textbf{Returns:} VM object handle ($>0$) or error code ($\leq0$) \\
 
-Allocates a virtual memory region backed by physical memory, starting with the given address, and incrementing linearly for the requested allocation size.
+Allocates a virtual memory region backed by physical memory, starting with the given address, and incrementing linearly for the requested allocation size.  If a zero virtual address is specified, the kernel will pick an address somewhere in the task's address space that can fit the entire region.
 
 This call will fail if the entire region of $[\text{start}, \text{start} + \text{length})$ has any pages that are mapped. Likewise, the length must be a multiple of the platform-specific minimum page size.
 
@@ -213,7 +213,7 @@ This call will fail if the entire region of $[\text{start}, \text{start} + \text
 
 Allocates a virtual memory region backed by anonymous memory.
 
-The kernel will attempt to place the region at the address requested by the caller; however, this is treated more as a hint than a hard requirement -- the call will fail if a non-zero virtual address is specified, and the allocation cannot be fully satisfied at that address.
+The kernel will attempt to place the region at the address requested by the caller; however, this is treated more as a hint than a hard requirement -- the call will fail if a non-zero virtual address is specified, and the allocation cannot be fully satisfied at that address. If a zero virtual address is specified, the kernel will pick an address somewhere in the task's address space that can fit the entire region.
 
 Allocation size must be a multiple of the platform-specific minimum page size, or the call will fail; the platform is free to use pages larger than this, if supported, to satisfy the allocation.
 

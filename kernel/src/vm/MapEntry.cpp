@@ -205,6 +205,7 @@ void MapEntry::addedToMap(Map *map, const uintptr_t _base) {
     RW_LOCK_READ(&this->lock);
 
     const auto baseAddr = (_base ? _base : this->base);
+    REQUIRE(baseAddr, "failed to get base address for map entry %p", this);
 
     // map all allocated physical anon pages
     if(this->isAnon) {

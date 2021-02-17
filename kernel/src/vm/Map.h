@@ -97,6 +97,11 @@ class Map {
 
         static void initAllocator();
 
+        /// VM address at which we test for free VM space
+        constexpr static const uintptr_t kVmSearchBase = 0x10000000;
+        /// maximum address that can be mapped
+        constexpr static const uintptr_t kVmMaxAddr = 0xBF800000;
+
     private:
         /// protecting modifications of the table
         DECLARE_RWLOCK(lock);

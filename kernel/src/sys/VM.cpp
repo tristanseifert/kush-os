@@ -69,7 +69,7 @@ int sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
     auto vmAddr = args->args[1];
     const auto length = args->args[2];
 
-    if(!vmAddr || (vmAddr + length) >= 0xC0000000 || (length % pageSz)) {
+    if((vmAddr + length) >= 0xC0000000 || (length % pageSz)) {
         // must specify virtual address entirely in user region, and length must be aligned
         return Errors::InvalidAddress;
     }
@@ -114,12 +114,6 @@ int sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
     const auto flags = (number & 0xFFFF0000) >> 16;
     auto vmAddr = args->args[0];
     const auto length = args->args[1];
-
-    if(!vmAddr) {
-        // TODO: find a place to map it
-        log("kernel selection of VM map address not yet supported");
-        return Errors::InvalidArgument;
-    }
 
     if(vmAddr + length >= 0xC0000000) {
         return Errors::InvalidAddress;
