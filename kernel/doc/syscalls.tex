@@ -102,6 +102,8 @@ The received message struct has the following format:
 \bitheader[endianness=big]{0,15,16,31} \\
 \bitbox{32}{Sender thread handle} \\
 \bitbox{16}{Flags} & \bitbox{16}{Message length (bytes)} \\
+\bitbox{32}{\it Reserved} \\
+\bitbox{32}{\it Reserved} \\
 \wordbox[lrt]{1}{Message payload} \\
 \skippedwords
 \end{bytefield}
@@ -144,7 +146,25 @@ The info structure has the following format:
 \end{bytefield}
 
 %%%%%
-\subsubsection{{\tt 0x04}: Share VM region}
+\subsubsection{{\tt 0x03}: Allocate Port}
+\textbf{Arguments:} None \\
+\textbf{Flags:} None \\
+\textbf{Returns:} Port handle ($>0$) or error code ($\leq0$) \\
+
+Creates a new port that an application can use to receive messages on.
+
+%%%%%
+\subsubsection{{\tt 0x04}: Deallocate Port}
+\textbf{Arguments:} (1) Port handle \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 or error code \\
+
+Deallocates all resources associated with a previously created port. The task making this call must have been the same task that originally created the port.
+
+Any threads that are blocking waiting to send to the port will be woken up.
+
+%%%%%
+\subsubsection{{\tt 0x05}: Share VM region}
 \textbf{Arguments:} (2) Destination task handle, VM object handle \\
 \textbf{Flags:} See below \\
 \textbf{Returns:} 0 on success, or a negative error code \\

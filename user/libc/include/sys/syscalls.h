@@ -10,6 +10,9 @@
 extern "C" {
 #endif
 
+LIBC_EXPORT int PortCreate(uintptr_t *outHandle);
+LIBC_EXPORT int PortDestroy(const uintptr_t portHandle);
+
 LIBC_EXPORT int AllocVirtualAnonRegion(const uintptr_t virtualAddr, const uintptr_t size,
         const uintptr_t inFlags, uintptr_t *outHandle);
 LIBC_EXPORT int AllocVirtualRegion(const uint64_t physAddr, const uintptr_t virtualAddr,

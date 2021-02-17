@@ -224,7 +224,6 @@ int Map::add(MapEntry *_entry, const uintptr_t _base) {
                 // it's intersected an existing mapping; try again after that mapping
                 if(i->contains(this, base, entry->length)) {
                     base = (i->getBaseAddressIn(this) + i->length);
-                    log("conflict with %p; moving base to %08x", i, base);
                     continue;
                 }
             }

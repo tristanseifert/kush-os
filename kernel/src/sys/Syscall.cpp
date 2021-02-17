@@ -22,8 +22,20 @@ Syscall *Syscall::gShared = nullptr;
  * Global syscall table
  */
 static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
-    // 0x00-0x07: Message passing IPC
-    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    // 0x00: Receive message
+    PortReceive,
+    // 0x01: Send message
+    nullptr,
+    // 0x02: SendRecv
+    nullptr,
+    /// 0x03: Allocate port
+    PortAlloc,
+    // 0x04: Deallocate port
+    PortDealloc,
+    // 0x05: Share virtual memory region
+    nullptr,
+    // 0x06-0x07: Reserved
+    nullptr, nullptr,
     // 0x08-0x0F: Notifications
     nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 

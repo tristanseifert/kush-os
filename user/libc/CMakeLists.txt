@@ -19,6 +19,7 @@ add_library(c STATIC
     src/string/strnstr.c
     src/sys/abort.c
     src/sys/assert.c
+    src/sys/port.c
     src/sys/scheduler.c
     src/sys/task.c
     src/sys/vm.c

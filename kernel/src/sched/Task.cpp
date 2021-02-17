@@ -3,6 +3,7 @@
 #include "Scheduler.h"
 #include "IdleWorker.h"
 
+#include "ipc/Port.h"
 #include "vm/Map.h"
 #include "vm/MapEntry.h"
 #include "mem/SlabAllocator.h"
@@ -80,6 +81,11 @@ Task::~Task() {
     // terminate all remaining threads
     for(auto thread : this->threads) {
         thread->terminate();
+    }
+
+    // release the ports
+    for(auto port : this->ports) {
+        ipc::Port::free(port);
     }
 
     // release VM objects
@@ -222,4 +228,69 @@ int Task::terminate(int status) {
  */
 void Task::notifyExit(int status) {
     log("Task $%08x'h (%s) exited: %d", this->handle, this->name, status);
+}
+
+/**
+ * Extract the currently executing task from the current thread.
+ */
+Task *Task::current() {
+    auto thread = Thread::current();
+    if(thread) {
+        return thread->task;
+    }
+    return nullptr;
+}
+
+/**
+ * Inserts the given port to the task's port list. All ports that remain in this list when the
+ * task is released will be released as well.
+ */
+void Task::addPort(ipc::Port *port) {
+    RW_LOCK_WRITE_GUARD(this->lock);
+    this->ports.append(port);
+}
+
+/**
+ * Removes a port from the task's ports list.
+ *
+ * @return Whether the port existed in this task prior to the call.
+ */
+bool Task::removePort(ipc::Port *port) {
+    RW_LOCK_WRITE_GUARD(this->lock);
+    bool removed = false;
+
+    // set up info
+    struct RemovePortInfo {
+        ipc::Port *port = nullptr;
+        bool *found = nullptr;
+    };
+
+    RemovePortInfo info{port, &removed};
+
+    // iterate
+    this->ports.removeMatching([](void *ctx, ipc::Port *port) {
+        auto info = reinterpret_cast<RemovePortInfo *>(ctx);
+
+        if(port == info->port) {
+            *info->found = true;
+            return true;
+        }
+        return false;
+    }, &info);
+
+    // return whether we removed it
+    return removed;
+}
+
+/**
+ * Iterate all ports to see if we own one.
+ */
+bool Task::ownsPort(ipc::Port *port) {
+    RW_LOCK_READ_GUARD(this->lock);
+    for(auto i : this->ports) {
+        if(i == port) {
+            return true;
+        }
+    }
+    return false;
 }

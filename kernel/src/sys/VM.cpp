@@ -60,6 +60,7 @@ static vm::MappingFlags ConvertFlags(const uintptr_t flags);
  * system supports some physical address extension mechanism! We need to address this later.
  */
 int sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
+    int err;
     vm::MapEntry *region = nullptr;
     const auto pageSz = arch_page_size();
 
@@ -90,7 +91,12 @@ int sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
     // add it to the calling task's mapping if desired
     if(!(flags & kDoNotMap)) {
         auto vm = sched::Thread::current()->task->vm;
-        vm->add(region);
+        err = vm->add(region);
+
+        if(err) {
+            vm::MapEntry::free(region);
+            return Errors::GeneralError;
+        }
     } 
     // if not, associate it with the task; if nobody maps it, that will keep us from leaking it
     else {
@@ -107,7 +113,7 @@ int sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
  */
 int sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
     vm::MapEntry *region = nullptr;
-
+    int err;
     const auto pageSz = arch_page_size();
 
     // validate arguments
@@ -133,7 +139,12 @@ int sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
     // add it to the calling task's mapping if desired
     if(!(flags & kDoNotMap)) {
         auto vm = sched::Thread::current()->task->vm;
-        vm->add(region);
+        err = vm->add(region);
+
+        if(err) {
+            vm::MapEntry::free(region);
+            return Errors::GeneralError;
+        }
     } 
     // if not, associate it with the task; if nobody maps it, that will keep us from leaking it
     else {

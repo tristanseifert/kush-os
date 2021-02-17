@@ -24,6 +24,13 @@ LIBC_INTERNAL int __do_syscall4(const uintptr_t number, const uintptr_t arg0, co
 /*
  * Define syscall numbers.
  */
+#define SYS_IPC_MSGRECV                 0x00
+#define SYS_IPC_MSGSEND                 0x01
+#define SYS_IPC_MSGSENDRECV             0x02
+#define SYS_IPC_CREATE_PORT             0x03
+#define SYS_IPC_DESTROY_PORT            0x04
+#define SYS_IPC_SHARE_VM                0x05
+
 #define SYS_VM_CREATE                   0x10
 #define SYS_VM_CREATE_ANON              0x11
 #define SYS_VM_UPDATE_FLAGS             0x13

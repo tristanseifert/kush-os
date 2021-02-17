@@ -16,7 +16,9 @@ enum class Handle: uintptr_t {};
 namespace vm {
 class MapEntry;
 }
-
+namespace ipc {
+class Port;
+}
 namespace sched {
 struct Task;
 struct Thread;
@@ -130,6 +132,34 @@ class Manager {
             return gShared->get(h, gShared->vmObjectHandles);
         }
 
+        /// Allocates a new handle for the given port.
+        static Handle makePortHandle(ipc::Port *port) {
+            RW_LOCK_WRITE_GUARD(gShared->portHandlesLock);
+            return gShared->allocate(port, gShared->portHandles, Type::Port);
+        }
+        /// Releases the previously allocated port handle.
+        static bool releasePortHandle(const Handle h) {
+            // validate type
+            const auto type = getType(h);
+            if(type != Type::Port) {
+                return false;
+            }
+
+            // update the list
+            RW_LOCK_WRITE_GUARD(gShared->portHandlesLock);
+            return gShared->release(h, gShared->portHandles);
+        }
+        /// Returns the mapping entry object that the given handle points to.
+        static ipc::Port *getPort(const Handle h) {
+            // validate type
+            const auto type = getType(h);
+            if(type != Type::Port) {
+                return nullptr;
+            }
+
+            RW_LOCK_READ_GUARD(gShared->portHandlesLock);
+            return gShared->get(h, gShared->portHandles);
+        }
     private:
         /// wraps a handle slot with an epoch counter
         template<class T>
@@ -284,8 +314,13 @@ class Manager {
 
         // lock for the vm object handles
         DECLARE_RWLOCK(vmObjectHandlesLock);
-        // storage for thread handles
+        // storage for vm object handles
         rt::Vector<HandleInfo<vm::MapEntry>> vmObjectHandles;
+
+        // lock for the port handles
+        DECLARE_RWLOCK(portHandlesLock);
+        // storage for port handles
+        rt::Vector<HandleInfo<ipc::Port>> portHandles;
 };
 }
 

@@ -9,6 +9,13 @@
 
 namespace sys {
 
+/// Waits to receive a message on a port.
+int PortReceive(const Syscall::Args *args, const uintptr_t number);
+/// Allocates a new port.
+int PortAlloc(const Syscall::Args *args, const uintptr_t number);
+/// Releases a previously allocated port.
+int PortDealloc(const Syscall::Args *args, const uintptr_t number);
+
 /// Allocates a virtual memory region backed by physical memory
 int VmAlloc(const Syscall::Args *args, const uintptr_t number);
 /// Allocate a virtual memory region backed by anonymous memory

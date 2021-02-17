@@ -59,13 +59,16 @@ int sys::ThreadCreate(const Syscall::Args *args, const uintptr_t number) {
 
 /**
  * Destroys an userspace thread.
+ *
+ * @note To guard against mis-use, you cannot use the shorthand of the thread handle 0 = current
+ * thread.
  */
 int sys::ThreadDestroy(const Syscall::Args *args, const uintptr_t number) {
     sched::Thread *thread = nullptr;
 
     // get the thread
     if(!args->args[0]) {
-        thread = sched::Thread::current();
+        return Errors::InvalidHandle;
     } else {
         thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
         if(!thread) {

@@ -17,6 +17,10 @@ class Map;
 class MapEntry;
 }
 
+namespace ipc {
+class Port;
+}
+
 namespace sched {
 class Scheduler;
 struct Thread;
@@ -76,6 +80,8 @@ struct Task {
 
         /// List of threads belonging to this task; must have at least one
         rt::Vector<Thread *> threads;
+        /// ports owned by this task
+        rt::List<ipc::Port *> ports;
         /// VM objects we own
         rt::List<vm::MapEntry *> ownedRegions;
 
@@ -101,8 +107,18 @@ struct Task {
         /// Detaches the given thread from the task.
         void detachThread(Thread *t);
 
+        /// Registers a new port to the task.
+        void addPort(ipc::Port *port);
+        /// Removes a port from the task.
+        bool removePort(ipc::Port *port);
+        /// Do we own the given port?
+        bool ownsPort(ipc::Port *port);
+
         /// Terminates this task with the given return code
         int terminate(int status);
+
+        /// Returns a handle to the currently executing task.
+        static Task *current();
 
     private:
         static void initAllocator();

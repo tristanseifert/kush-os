@@ -22,6 +22,10 @@ enum Errors: int {
     InvalidAddress                      = -6,
     /// Referenced memory is not mapped in the given process
     Unmapped                            = -7,
+    /// The kernel is refusing to perform the given operation
+    PermissionDenied                    = -8,
+    /// The specified timeout has elapsed.
+    Timeout                             = -9,
 };
 }
 

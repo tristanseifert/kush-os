@@ -231,7 +231,9 @@ void tss_activate(const uintptr_t idx, const uintptr_t stackAddr) {
     auto tss = reinterpret_cast<gdt_task_gate_t *>(gTssAllocatedBuf[idx]);
     tss->esp0 = stackAddr;
 
-    // reload it
+    // reload it (after clearing busy flag)
+    gdt_set_entry((kFirstAllocTss + idx), reinterpret_cast<uintptr_t>(tss),
+                      sizeof(gdt_task_gate_t) + (65536/8) - 1, 0x89, 0x4F);
     tss_load((kFirstAllocTss * 8) + (idx * 8));
 }
 
