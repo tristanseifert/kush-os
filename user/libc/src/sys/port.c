@@ -21,3 +21,28 @@ int PortDestroy(const uintptr_t portHandle) {
     return __do_syscall1(SYS_IPC_DESTROY_PORT, portHandle);
 }
 
+/**
+ * Performs a message send to the given port.
+ */
+LIBC_EXPORT int PortSend(const uintptr_t portHandle, const void *message, const size_t messageLen) {
+    return __do_syscall3(SYS_IPC_MSGSEND, portHandle, (const uintptr_t) message, messageLen);
+}
+
+/**
+ * Attempts to receive a message from the given port.
+ *
+ * @param blockUs Microseconds to block waiting for a message; 0 means poll (i.e. do not block and
+ *                fail immediately if no pending messages) while the value UINTPTR_MAX indicates
+ *                we should block forever.
+ */
+LIBC_EXPORT int PortReceive(const uintptr_t portHandle, struct MessageHeader *buf,
+        const size_t bufMaxLen, const uintptr_t blockUs) {
+    return __do_syscall4(SYS_IPC_MSGRECV, portHandle, (const uintptr_t) buf, bufMaxLen, blockUs);
+}
+
+/**
+ * Sets the queue depth (ceiling on the number of pending messages) for the given port.
+ */
+LIBC_EXPORT int PortSetQueueDepth(const uintptr_t portHandle, const uintptr_t queueDepth) {
+    return __do_syscall2(SYS_IPC_SET_PARAM_PORT, portHandle, queueDepth);
+}

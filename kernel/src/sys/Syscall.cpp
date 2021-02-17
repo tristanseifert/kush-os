@@ -25,9 +25,9 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     // 0x00: Receive message
     PortReceive,
     // 0x01: Send message
-    nullptr,
-    // 0x02: SendRecv
-    nullptr,
+    PortSend,
+    // 0x02: Update port parameters
+    PortSetParams,
     /// 0x03: Allocate port
     PortAlloc,
     // 0x04: Deallocate port

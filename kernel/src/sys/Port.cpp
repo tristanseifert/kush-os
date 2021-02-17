@@ -36,6 +36,41 @@ static_assert(offsetof(RecvInfo, data) % 16 == 0, "RecvInfo data must be 16 byte
 
 
 /**
+ * Sends message data to a port.
+ *
+ * Arg0: Port handle
+ * Arg1: Message buffer pointer (16-byte aligned)
+ * Arg2: Message length
+ */
+int sys::PortSend(const Syscall::Args *args, const uintptr_t number) {
+    int err;
+
+    // validate the message buffer
+    const auto msgLen = args->args[2];
+    auto msgPtr = reinterpret_cast<RecvInfo *>(args->args[1]);
+    if(!Syscall::validateUserPtr(msgPtr, msgLen)) {
+        return Errors::InvalidPointer;
+    }
+
+    // look up the port 
+    auto port = handle::Manager::getPort(static_cast<Handle>(args->args[0]));
+    if(!port) {
+        return Errors::InvalidHandle;
+    }
+
+    // perform the send
+    err = port->send(msgPtr, msgLen);
+
+    if(!err) {
+        return Errors::Success;
+    } else if(err == -1) {
+        return Errors::TryAgain;
+    } else {
+        return Errors::GeneralError;
+    }
+}
+
+/**
  * Receives a message on the given port.
  */
 int sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
@@ -95,6 +130,7 @@ int sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
     if(err < 0) {
         // receive timed out
         if(err == -1) {
+            // memset(recvPtr, 0, sizeof(RecvInfo));
             return Errors::Timeout;
         }
         // other receive error
@@ -108,6 +144,36 @@ int sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
     recvPtr->sender = sender;
     recvPtr->flags = 0;
     recvPtr->messageLength = err;
+
+    return err;
+}
+
+/**
+ * Updates a port's parameters.
+ *
+ * The caller must be the owner of the port.
+ *
+ * Arg0: New port queue size
+ */
+int sys::PortSetParams(const Syscall::Args *args, const uintptr_t number) {
+    auto task = sched::Task::current();
+    if(!task) {
+        return Errors::GeneralError;
+    }
+
+    // convert the port handle
+    auto port = handle::Manager::getPort(static_cast<Handle>(args->args[0]));
+    if(!port) {
+        return Errors::InvalidHandle;
+    }
+
+    // ensure the handle belongs to this task
+    if(!task->ownsPort(port)) {
+        return Errors::PermissionDenied;
+    }
+
+    // update params
+    port->setQueueDepth(args->args[1]);
 
     return Errors::Success;
 }

@@ -136,9 +136,13 @@ class List {
                 if(currentHead->next) {
                     currentHead->next->prev = nullptr;
                     this->head = currentHead->next;
+
+                    this->numElements--;
                 } else {
                     this->head = nullptr;
                     this->tail = nullptr;
+
+                    this->numElements = 0;
                 }
 
                 delete currentHead;
@@ -147,8 +151,6 @@ class List {
             else {
                 panic("removing elements inside list not yet supported");
             }
-
-            this->numElements--;
         }
 
         /**
@@ -206,7 +208,8 @@ class List {
 
         /// Gets a reference to the given item
         const T& operator[](const size_t index) const {
-            REQUIRE(index < this->numElements, "list access out of bounds: %zu", index);
+            REQUIRE(index < this->numElements, "list access out of bounds: %zu (%zu %p %p)",
+                    index, this->numElements, this->head, this->tail);
             if(!index) {
                 return this->head->value;
             }

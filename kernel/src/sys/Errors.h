@@ -26,6 +26,8 @@ enum Errors: int {
     PermissionDenied                    = -8,
     /// The specified timeout has elapsed.
     Timeout                             = -9,
+    /// Try the call again later (used for temporary failures)
+    TryAgain                            = -10,
 };
 }
 

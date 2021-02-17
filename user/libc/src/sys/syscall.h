@@ -26,7 +26,7 @@ LIBC_INTERNAL int __do_syscall4(const uintptr_t number, const uintptr_t arg0, co
  */
 #define SYS_IPC_MSGRECV                 0x00
 #define SYS_IPC_MSGSEND                 0x01
-#define SYS_IPC_MSGSENDRECV             0x02
+#define SYS_IPC_SET_PARAM_PORT          0x02
 #define SYS_IPC_CREATE_PORT             0x03
 #define SYS_IPC_DESTROY_PORT            0x04
 #define SYS_IPC_SHARE_VM                0x05

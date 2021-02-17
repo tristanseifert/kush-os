@@ -9,8 +9,12 @@
 
 namespace sys {
 
+/// Sends a message to the given port.
+int PortSend(const Syscall::Args *args, const uintptr_t number);
 /// Waits to receive a message on a port.
 int PortReceive(const Syscall::Args *args, const uintptr_t number);
+/// Updates a port's queue size
+int PortSetParams(const Syscall::Args *args, const uintptr_t number);
 /// Allocates a new port.
 int PortAlloc(const Syscall::Args *args, const uintptr_t number);
 /// Releases a previously allocated port.

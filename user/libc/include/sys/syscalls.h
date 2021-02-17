@@ -10,8 +10,26 @@
 extern "C" {
 #endif
 
+struct MessageHeader {
+    /// handle of the thread that sent this message
+    uintptr_t sender;
+    /// flags (not currently used)
+    uint16_t flags;
+    /// number of bytes of message data
+    uint16_t receivedBytes;
+
+    uintptr_t reserved[2];
+
+    /// message data
+    uint8_t data[];
+} __attribute__((aligned(16)));
+
 LIBC_EXPORT int PortCreate(uintptr_t *outHandle);
 LIBC_EXPORT int PortDestroy(const uintptr_t portHandle);
+LIBC_EXPORT int PortSend(const uintptr_t portHandle, const void *message, const size_t messageLen);
+LIBC_EXPORT int PortReceive(const uintptr_t portHandle, struct MessageHeader *buf,
+        const size_t bufMaxLen, const uintptr_t blockUs);
+LIBC_EXPORT int PortSetQueueDepth(const uintptr_t portHandle, const uintptr_t queueDepth);
 
 LIBC_EXPORT int AllocVirtualAnonRegion(const uintptr_t virtualAddr, const uintptr_t size,
         const uintptr_t inFlags, uintptr_t *outHandle);

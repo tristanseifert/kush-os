@@ -61,10 +61,12 @@ void Manager::remove(const uintptr_t token) {
     CRITICAL_ENTER();
     RW_LOCK_WRITE(&this->timersLock);
 
-    this->timers.removeMatching([](void *ctx, TimerInfo &timer) -> bool {
-        const auto token = reinterpret_cast<const uintptr_t>(ctx);
-        return (timer.token == token);
-    }, reinterpret_cast<void *>(token));
+    if(this->timers.size()) {
+        this->timers.removeMatching([](void *ctx, TimerInfo &timer) -> bool {
+            const auto token = reinterpret_cast<const uintptr_t>(ctx);
+            return (timer.token == token);
+        }, reinterpret_cast<void *>(token));
+    }
 
     RW_UNLOCK_WRITE(&this->timersLock);
     CRITICAL_EXIT();
