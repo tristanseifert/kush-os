@@ -20,3 +20,40 @@ make -j40
 mkdir -p ../../../llvm/lib/clang/12.0.0/lib/kush 
 cp lib/generic/libclang_rt.builtins-i386.a ../../../llvm/lib/clang/12.0.0/lib/kush
 ```
+
+### libcxxabi and libcxx
+libcxxabi provides the lower level portable layer for the C++ runtime library. Build it like so:
+
+```
+cd llvm-project
+mkdir build-libcxxabi
+cd build-libcxxabi
+cmake ../libcxxabi -DCMAKE_TOOLCHAIN_FILE=~/kush/cmake/toolchain-i386-clang.cmake -DLLVM_CONFIG_PATH=../../../llvm/bin/llvm-config -DLIBCXX_TARGET_TRIPLE="i386-pc-kush-elf"  -DLIBCXXABI_INSTALL_PREFIX=/Users/tristan/kush/sysroot/ -Wno-dev -DCMAKE_SIZEOF_VOID_P=4 -DLIBCXXABI_ENABLE_THREADS=OFF
+make install -j40
+```
+
+Once built, you have to build the libcxx, the actual C++ runtime:
+
+```
+cd llvm-project
+mkdir build-libcxx
+cd build-libcxx
+cmake ../libcxx -DCMAKE_TOOLCHAIN_FILE=~/kush/cmake/toolchain-i386-clang.cmake -DLLVM_CONFIG_PATH=../../../llvm/bin/llvm-config -DLIBCXX_TARGET_TRIPLE="i386-pc-kush-elf" -DLIBCXX_INSTALL_PREFIX=/Users/tristan/kush/sysroot/ -DLIBCXX_INSTALL_HEADER_PREFIX=/Users/tristan/kush/sysroot/usr/ -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXX_ENABLE_THREADS=OFF -DLIBCXX_ENABLE_STDOUT=OFF -DLIBCXX_ENABLE_STDIN=OFF -DLIBCXX_ENABLE_MONOTONIC_CLOCK=OFF -DLIBCXX_ENABLE_LOCALIZATION=OFF -DLIBCXX_ENABLE_RANDOM_DEVICE=OFF -DLIBCXX_ENABLE_FILESYSTEM=OFF  -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF -DLIBCXX_ENABLE_SHARED=OFF
+make install -j40
+```
+
+Most of the flags set to OFF will eventually be removed, when the C libraries and the system itself implements the requisite features.
+
+### libunwind
+Required for stack backtraces and C++ exception support. 
+
+
+```
+cd llvm-project
+mkdir build-libunwind
+cd build-libunwind
+cmake ../libunwind -DCMAKE_TOOLCHAIN_FILE=~/kush/cmake/toolchain-i386-clang.cmake -DLLVM_CONFIG_PATH=../../../llvm/bin/llvm-config -DLIBUNWIND_TARGET_TRIPLE="i386-pc-kush-elf" -DLIBUNWIND_INSTALL_PREFIX=/Users/tristan/kush/sysroot/ -DLIBUNWIND_USE_COMPILER_RT=ON -DLIBUNWIND_ENABLE_SHARED=OFF -DLIBUNWIND_ENABLE_THREADS=OFF
+make install -j40
+```
+
+We can enable `LIBUNWIND_ENABLE_THREADS` when we've got a pthreads compatibility layer.

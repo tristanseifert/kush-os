@@ -8,11 +8,11 @@ SET(CMAKE_SYSTEM_NAME generic)
 SET(TARGET_TRIPLE "i386-pc-kush-elf")
 SET(ARCH_FLAGS "-march=pentium3")
 
-SET(TOOLCHAIN_BASE ./toolchain/llvm)
+SET(TOOLCHAIN_BASE ~/kush/toolchain/llvm)
 get_filename_component(TOOLCHAIN_BASE ${TOOLCHAIN_BASE} ABSOLUTE)
 SET(TOOLS_BASE "${TOOLCHAIN_BASE}/bin")
 
-SET(CMAKE_SYSROOT ./sysroot)
+SET(CMAKE_SYSROOT ~/kush/sysroot)
 get_filename_component(CMAKE_SYSROOT ${CMAKE_SYSROOT} ABSOLUTE)
 
 # set up search paths for tools

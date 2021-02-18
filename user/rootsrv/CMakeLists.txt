@@ -2,7 +2,7 @@
 # Root server (init task)
 ###############################################################################
 add_executable(rootsrv
-    src/main.c
+    src/main.cpp
     src/log.c
     src/init/Init.cpp
 )

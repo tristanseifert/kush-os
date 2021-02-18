@@ -60,7 +60,6 @@ endif()
 ##### Userspace libraries
 if(BUILD_USER_LIBS)
     add_subdirectory(user/libc)
-    add_subdirectory(user/libm)
 endif()
 
 ##### System servers (init, drivers, core system services)

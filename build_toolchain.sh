@@ -103,6 +103,51 @@ echo "===================================================================="
 popd
 exit 0
 
+
+###############################################################################
+#####
+# Compile the C++ runtime libraries for the OS.
+#####
+###############################################################################
+echo "===================================================================="
+echo "===================================================================="
+echo "Building C++ libraries..."
+echo "===================================================================="
+echo "===================================================================="
+
+# configure LLVM, but only build libcxx and libcxxabi
+echo "===================================================================="
+echo "Configuring llvm..."
+echo "===================================================================="
+#-DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;libcxx;libcxxabi;libunwind;lldb;compiler-rt;lld;polly" \
+export EXTRA_OPTIONS="-I$TOOLCHAIN_DIR/libcxx/include"
+export EXTRA_LD_OPTIONS="-L$TOOLCHAIN_DIR/libcxx/lib -lc++"
+
+if [ ! -f build/llvm2/.config.succeeded ]; then
+    pushd build/llvm2 && \
+    CC=$TOOLCHAIN_DIR/clang/bin/clang CXX=$TOOLCHAIN_DIR/clang/bin/clang++ \
+    cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_TOOLCHAIN_FILE=~/kush/cmake/toolchain-i386-clang.cmake \
+        -DCMAKE_C_COMPILER_TARGET="i386-pc-kush-elf" \
+        -DCMAKE_ASM_COMPILER_TARGET="i386-pc-kush-elf" \
+        -DCMAKE_INSTALL_PREFIX=$TOOLCHAIN_DIR/llvm2 \
+        -DLLVM_ENABLE_PROJECTS="libcxx;libcxxabi;libunwind" \
+        -DLLVM_TARGETS_TO_BUILD=$LLVM_TARGETS \
+        -DLLVM_USE_SPLIT_DWARF=True -DLLVM_OPTIMIZED_TABLEGEN=True \
+        -DLLVM_BUILD_TESTS=False -DLLVM_INCLUDE_TESTS=False -DLLDB_INCLUDE_TESTS=False \
+        -DLLVM_BUILD_DOCS=False -DLLVM_INCLUDE_DOCS=False \
+        -DLLVM_ENABLE_OCAMLDOC=False -DLLVM_ENABLE_BINDINGS=False \
+        -DLLDB_USE_SYSTEM_DEBUGSERVER=True \
+        ../../sources/llvm-project/llvm && \
+    touch .config.succeeded && \
+    popd || exit 1
+else
+    echo "build/llvm2/.config2.succeeded exists, NOT reconfiguring llvm!"
+fi
+
+popd
+exit 0
+
 echo "===================================================================="
 echo "===================================================================="
 echo "Rebuilding LLVM libraries with freshly installed clang..."
