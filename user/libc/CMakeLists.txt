@@ -58,3 +58,13 @@ if(${KERNEL_ARCH} STREQUAL "x86")
 else()
     message(FATAL_ERROR "libc does not know how architecture '${KERNEL_ARCH}'")
 endif()
+
+# install the library to the sysroot
+install(TARGETS c ARCHIVE DESTINATION ${SYSROOT_DIR}/lib)
+install(TARGETS c LIBRARY DESTINATION ${SYSROOT_DIR}/lib)
+
+FILE(GLOB LIBC_PUB_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
+install(FILES ${LIBC_PUB_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include)
+FILE(GLOB LIBC_PUB_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/sys/*.h")
+install(FILES ${LIBC_PUB_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/sys)
+

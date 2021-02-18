@@ -8,6 +8,10 @@ project(kush VERSION 0.1 LANGUAGES ASM C CXX)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 
+##### Sysroot directory: we install libraries and so forth there
+set(SYSROOT_DIR ${CMAKE_CURRENT_BINARY_DIR}/../sysroot CACHE FILEPATH "Sysroot directory" FORCE)
+message("Sysroot at ${SYSROOT_DIR}")
+
 ##### Version
 include(GetGitRevisionDescription)
 git_describe(VERSION --tags --dirty=-d)
@@ -56,6 +60,7 @@ endif()
 ##### Userspace libraries
 if(BUILD_USER_LIBS)
     add_subdirectory(user/libc)
+    add_subdirectory(user/libm)
 endif()
 
 ##### System servers (init, drivers, core system services)

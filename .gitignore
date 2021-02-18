@@ -1,1 +1,6 @@
+# LLVM toolchain base
+toolchain/
+# sysroot
+sysroot/
+# output products go there
 build/

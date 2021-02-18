@@ -85,3 +85,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     target_link_options(kernel PRIVATE "-T${PLATFORM_LINKER_SCRIPT}")
 endif()
+
+# install the kernel to the boot directory
+install(TARGETS kernel RUNTIME DESTINATION ${SYSROOT_DIR}/boot)
+
