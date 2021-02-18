@@ -41,10 +41,11 @@ target_include_directories(c PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 # build the correct platform-specific code
 if(${KERNEL_ARCH} STREQUAL "x86")
     target_sources(c PRIVATE
+        src/x86/crt0.S
+        src/x86/crti.c
         src/x86/div64.c
         src/x86/threads.c
         src/x86/thread_start.S
-        src/x86/start.S
         src/x86/syscall_arch.c
         src/x86/syscall_impl.c
     )

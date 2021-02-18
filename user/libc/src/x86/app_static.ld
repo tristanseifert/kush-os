@@ -13,6 +13,22 @@ SECTIONS {
         *(.rodata*)
     }
 
+    /* Include the list of initialization functions sorted. */
+    .init_array : {
+        _init_array_start = .;
+        KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .init_array.*)))
+        KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .init_array))
+        _init_array_end = .;
+    }
+
+    /* Include the list of termination functions sorted. */
+    .fini_array : {
+        _fini_array_start = .;
+        KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .fini_array.*)))
+        KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .fini_array))
+        _fini_array_end = .;
+    }
+
     /* data (mutable) section */
     .data ALIGN(4K) : {
         __data_start = .;
