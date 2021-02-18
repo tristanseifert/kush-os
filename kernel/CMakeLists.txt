@@ -2,6 +2,9 @@
 # Handles compilation of the kernel.
 ###############################################################################
 
+# compiler options for kernel code
+set(KERNEL_COMPILE_OPTS -static -ffreestanding -nodefaultlibs -nostdlib -fno-exceptions -fno-rtti -fno-pie -nostdlib)
+
 # select the correct architecture code and build it
 set(KERNEL_ARCH "x86" CACHE STRING "Kernel CPU architecture")
 set_property(CACHE KERNEL_ARCH PROPERTY STRINGS x86)
@@ -69,13 +72,16 @@ endif()
 set_target_properties(kernel PROPERTIES OUTPUT_NAME "kernel-${KERNEL_ARCH}-${KERNEL_PLATFORM}")
 set_target_properties(kernel PROPERTIES SUFFIX "${PLATFORM_KERNEL_EXTENSION}")
 
+# kernel is freestanding
+target_compile_options(kernel PRIVATE ${KERNEL_COMPILE_OPTS})
+target_link_options(kernel PRIVATE ${KERNEL_COMPILE_OPTS} -fno-pie --static)
+
 # configure the linker script
 message("Platform linker script: ${PLATFORM_LINKER_SCRIPT}")
 set_target_properties(kernel PROPERTIES LINK_DEPENDS ${PLATFORM_LINKER_SCRIPT})
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    target_link_options(kernel PUBLIC "-T${PLATFORM_LINKER_SCRIPT}")
-    target_link_options(kernel PUBLIC "-Map=kernel.map")
+    target_link_options(kernel PRIVATE "-Wl,-T${PLATFORM_LINKER_SCRIPT}")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    target_link_options(kernel PUBLIC "-T${PLATFORM_LINKER_SCRIPT}")
+    target_link_options(kernel PRIVATE "-T${PLATFORM_LINKER_SCRIPT}")
 endif()

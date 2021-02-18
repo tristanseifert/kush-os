@@ -4,7 +4,7 @@
 /*
  * Fills a given segment of memory with a specified value.
  */
-void *memset(void *ptr, const uint8_t value, const size_t num) {
+void *memset(void *ptr, const int value, const size_t num) {
     if(value == 0x00) {
         return memclr(ptr, num);
     }

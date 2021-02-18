@@ -10,7 +10,7 @@
  * This will be an in-memory buffer, as well as optionally a debug spew port defined by the
  * platform code.
  */
-void log(const char *format, ...) {
+void LOG(const char *format, ...) {
     va_list va;
     va_start(va, format);
 

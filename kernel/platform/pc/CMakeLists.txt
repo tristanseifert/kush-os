@@ -29,6 +29,8 @@ target_include_directories(kernel_platform_pc PRIVATE ${CMAKE_CURRENT_LIST_DIR}/
 
 target_include_directories(kernel_platform_pc PRIVATE ${ARCH_INCLUDE_DIR})
 
+target_compile_options(kernel_platform_pc PRIVATE ${KERNEL_COMPILE_OPTS})
+
 set(PLATFORM_TARGET_NAME "kernel_platform_pc" CACHE STRING "Platform target name" FORCE)
 set(PLATFORM_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include CACHE FILEPATH "Platform include directory" FORCE)
 

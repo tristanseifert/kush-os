@@ -18,7 +18,10 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 endif()
 
 # include C library
-target_link_libraries(rootsrv PUBLIC "--whole-archive" c)
+target_link_libraries(rootsrv PUBLIC "-Wl,--whole-archive" c)
+
+# we have to compile the root server as standalone
+target_link_options(rootsrv PRIVATE -static -ffreestanding -nodefaultlibs -nostdlib -fno-exceptions -fno-rtti)
 
 # set its name
 #set_target_properties(rootsrv PROPERTIES OUTPUT_NAME "rootsrv")
@@ -26,5 +29,5 @@ set_target_properties(rootsrv PROPERTIES SUFFIX "${PLATFORM_KERNEL_EXTENSION}")
 
 # use the correct linker script
 set_target_properties(rootsrv PROPERTIES LINK_DEPENDS ${C_STATIC_LINKER_SCRIPT})
-target_link_options(rootsrv PUBLIC "-T${C_STATIC_LINKER_SCRIPT}")
+target_link_options(rootsrv PUBLIC "-Wl,-T${C_STATIC_LINKER_SCRIPT}")
 

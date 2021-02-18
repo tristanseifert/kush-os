@@ -14,6 +14,7 @@
 #include <platform.h>
 #include <stdint.h>
 
+#include <version.h>
 #include <printf.h>
 #include <log.h>
 

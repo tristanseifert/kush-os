@@ -10,7 +10,7 @@ extern "C" {
 /**
  * Writes a log message to the kernel log buffer.
  */
-void log(const char *format, ...) __attribute__((format (printf, 1, 2)));
+void LOG(const char *format, ...) __attribute__((format (printf, 1, 2)));
 
 
 #ifdef __cplusplus
@@ -21,6 +21,6 @@ void log(const char *format, ...) __attribute__((format (printf, 1, 2)));
 /**
  * Ensures the given condition is true; otherwise, panics with the given message string.
  */
-#define REQUIRE(cond, ...) {if(!(cond)) { log(__VA_ARGS__); abort(); }}
+#define REQUIRE(cond, ...) {if(!(cond)) { LOG(__VA_ARGS__); abort(); }}
 
 #endif
