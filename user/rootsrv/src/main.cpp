@@ -162,6 +162,7 @@ int main(int argc, const char **argv) {
     err = PortSetQueueDepth(port, 5);
     REQUIRE(!err, "failed to set port queue depth: %d", err);
 
+    /*
     // vector test
     std::vector<int> balls;
     balls.push_back(420);
@@ -170,7 +171,7 @@ int main(int argc, const char **argv) {
     for(auto fuck : balls) {
         LOG("fucker %d", fuck);
     }
-
+*/
     // receiver boi
     err = ThreadCreate(Receiveboi, port, ((uintptr_t) &fuck) + 1024, &newThread);
     REQUIRE(!err, "failed to create thread: %d", err);

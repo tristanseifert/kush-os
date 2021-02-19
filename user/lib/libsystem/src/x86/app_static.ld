@@ -1,0 +1,51 @@
+ENTRY(_start)
+OUTPUT_FORMAT(elf32-i386)
+
+SECTIONS {
+    /* default load address */
+    . = 0x08000000;
+
+    /* code (immutable) section */
+    .text ALIGN(4K) : {
+        *(.text)
+        *(.text*)
+        *(.rodata)
+        *(.rodata*)
+    }
+
+    /* Include the list of initialization functions sorted. */
+    .init_array : {
+        _init_array_start = .;
+        KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .init_array.*)))
+        KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .init_array))
+        _init_array_end = .;
+    }
+
+    /* Include the list of termination functions sorted. */
+    .fini_array : {
+        _fini_array_start = .;
+        KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .fini_array.*)))
+        KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .fini_array))
+        _fini_array_end = .;
+    }
+
+    /* data (mutable) section */
+    .data ALIGN(4K) : {
+        __data_start = .;
+        *(*.data)
+        *(*.data*)
+    }
+    __data_size = SIZEOF(.data);
+
+    /* data (uninitialized, mutable) */
+    .bss ALIGN(4K) : {
+        __bss_start = .;
+        *(.bss)
+        *(.bss*)
+        *(COMMON)
+    }
+
+    __bss_size = SIZEOF(.bss);
+    __bss_size_dwords = SIZEOF(.bss)/4;
+}
+

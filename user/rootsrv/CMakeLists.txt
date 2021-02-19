@@ -8,21 +8,19 @@ add_executable(rootsrv
 )
 
 #####
-add_subdirectory(lib/lzfse)
-
-target_link_libraries(rootsrv PRIVATE rootsrv_lzfse)
-
 # allow link time optimization (strips C library functions we don't use)
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     target_compile_options(rootsrv PRIVATE "-flto")
 endif()
 
-# include C library
-#target_link_libraries(rootsrv PUBLIC "-Wl,--whole-archive" c)
+# required libraries
+target_link_libraries(rootsrv PUBLIC system)
+target_link_libraries(rootsrv PRIVATE lzfse)
 
 # we have to compile the root server as standalone
 #target_link_options(rootsrv PRIVATE -static -ffreestanding -nodefaultlibs -nostdlib -fno-exceptions -fno-rtti)
-target_link_options(rootsrv PRIVATE -static -fno-exceptions -fno-rtti -nostdlib)
+#target_link_options(rootsrv PRIVATE -static -fno-exceptions -fno-rtti -nostdlib)
+target_link_options(rootsrv PRIVATE -static)
 
 # set its name
 #set_target_properties(rootsrv PROPERTIES OUTPUT_NAME "rootsrv")
