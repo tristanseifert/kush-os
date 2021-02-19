@@ -39,6 +39,7 @@ LIBSYSTEM_INTERNAL int __do_syscall4(const uintptr_t number, const uintptr_t arg
 #define SYS_VM_UNMAP                    0x16
 #define SYS_VM_GET_INFO                 0x17
 #define SYS_VM_GET_TASK_INFO            0x18
+#define SYS_VM_ADDR_TO_HANDLE           0x19
 
 #define SYS_THREAD_GET_HANDLE           0x20
 #define SYS_THREAD_YIELD                0x21

@@ -31,6 +31,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <stdint.h>
 
 #include <printf.h>
@@ -890,5 +891,10 @@ int fctvprintf(void (*out)(char character, void* arg), void* arg, const char* fo
   const out_fct_wrap_type out_fct_wrap = { out, arg };
   const int ret = _vsnprintf(_out_fct, (char*)(uintptr_t)&out_fct_wrap, (size_t)-1, format, va);
   return ret;
+}
+
+/// wide char printf not yet implemented
+int swprintf (wchar_t* ws, size_t len, const wchar_t* format, ...) {
+    abort();
 }
 

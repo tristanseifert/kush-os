@@ -315,6 +315,16 @@ Information is placed into an info buffer with the following structure:
 \bitbox{32}{Number of VM mappings} \\
 \end{bytefield}
 
+%%%%%
+\subsubsection{{\tt 0x19}: Get handle for address}
+\textbf{Arguments:} (2) Task handle, virtual address \\
+\textbf{Flags:} None \\
+\textbf{Returns:} VM region handle ($>0$) or error code ($\leq0$) \\
+
+Searches the given task's virtual address space to determine if there is a mapping that contains the specified address. In essence, all mappings are checked to see if they contain the byte at the given address. This does not trigger page faults on not present pages.
+
+We'll return either the handle of the region, a value of \texttt{0} to indicate that there is no mapping at the given address, or a negative error code.
+
 %%%%%%%%%%
 \newpage
 \subsection{Scheduler}

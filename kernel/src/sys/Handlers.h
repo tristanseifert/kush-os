@@ -36,7 +36,8 @@ int VmRegionUnmap(const Syscall::Args *args, const uintptr_t number);
 int VmRegionGetInfo(const Syscall::Args *args, const uintptr_t number);
 /// Gets information on a task's virtual memory environment
 int VmTaskGetInfo(const Syscall::Args *args, const uintptr_t number);
-
+/// Returns the handle for the region containing an address.
+int VmAddrToRegion(const Syscall::Args *args, const uintptr_t number);
 
 /**
  * Creates a new userspace thread.

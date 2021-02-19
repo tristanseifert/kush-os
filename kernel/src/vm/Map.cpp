@@ -284,6 +284,28 @@ bool Map::canResize(MapEntry *entry, const uintptr_t base, const size_t oldSize,
 }
 
 /**
+ * Searches all regions in this VM map to see if one contains the given virtual address.
+ *
+ * @note This does not consider manually added mappings, i.e. those that aren't represented by a
+ * MapEntry object. This should, however, be the only type of mappings an user task will ever
+ * have to encounter.
+ */
+bool Map::findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &outOffset) {
+    RW_LOCK_READ_GUARD(this->lock);
+
+    for(auto i : this->entries) {
+        if(i->contains(this, virtAddr, 1)) {
+            outHandle = i->getHandle();
+            outOffset = virtAddr - i->getBaseAddressIn(this);
+            return true;
+        }
+    }
+
+    // if we get here, no region contains this address
+    return false;
+}
+
+/**
  * Removes the given entry from this map.
  */
 int Map::remove(MapEntry *_entry) {

@@ -7,6 +7,7 @@
 #include <arch/rwlock.h>
 #include <arch/PTEHandler.h>
 
+#include <handle/Manager.h>
 #include <runtime/Vector.h>
 
 namespace vm {
@@ -88,6 +89,9 @@ class Map {
         /// Tests whether the given map entry can be expanded in this map without causing conflicts
         bool canResize(MapEntry *entry, const uintptr_t base, const size_t oldSize,
                 const size_t newSize);
+
+        /// Searches mappings to find one containing the given address.
+        bool findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &outOffset);
 
         /// Returns the number of installed mappings.
         const size_t numMappings() const {

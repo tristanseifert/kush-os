@@ -86,21 +86,17 @@ wctype_t
 #define	iswlower(wc)		__istype((wc), _CTYPE_L)
 #define	iswprint(wc)		__istype((wc), _CTYPE_R)
 #define	iswpunct(wc)		__istype((wc), _CTYPE_P)
-#define	iswspace(wc)		__istype((wc), _CTYPE_S)
+
+/// XXX: disgusting hack. this entire file needs to be properly redone
+//#define	iswspace(wc)		__istype((wc), _CTYPE_S)
+#define    iswspace(wc)        isspace((char) wc)
+
+
 #define	iswupper(wc)		__istype((wc), _CTYPE_U)
 #define	iswxdigit(wc)		__istype((wc), _CTYPE_X)
 #define	towlower(wc)		__tolower(wc)
 #define	towupper(wc)		__toupper(wc)
 
-#if __BSD_VISIBLE
-#define	iswascii(wc)		(((wc) & ~0x7F) == 0)
-#define	iswhexnumber(wc)	__istype((wc), _CTYPE_X) /* alias of iswxdigit */
-#define	iswideogram(wc)		__istype((wc), _CTYPE_I)
-#define	iswnumber(wc)		__istype((wc), _CTYPE_D|_CTYPE_N)
-#define	iswphonogram(wc)	__istype((wc), _CTYPE_Q)
-#define	iswrune(wc)		__istype((wc), 0xFFFFFF00L)
-#define	iswspecial(wc)		__istype((wc), _CTYPE_T)
-#endif /* __BSD_VISIBLE */
 #endif /* __cplusplus */
 
 #endif		/* _WCTYPE_H_ */

@@ -24,6 +24,9 @@ struct InitFileHeader {
     char name[];
 } __attribute__((packed));
 
+/// File header flag indicating its contents are compressed using lzfse
+constexpr static const uint32_t kInitFileFlagsCompressed = 0x80000000;
+
 /**
  * Header of an init bundle
  */

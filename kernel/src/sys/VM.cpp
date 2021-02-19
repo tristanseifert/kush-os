@@ -378,7 +378,44 @@ int sys::VmTaskGetInfo(const Syscall::Args *args, const uintptr_t number) {
     return Errors::Success;
 }
 
+/**
+ * Determines the virtual memory region that contains the given virtual address.
+ */
+int sys::VmAddrToRegion(const Syscall::Args *args, const uintptr_t number) {
+    sched::Task *task = nullptr;
 
+    // get the task handle
+    if(!args->args[0]) {
+        task = sched::Thread::current()->task;
+    } else {
+        task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
+        if(!task) {
+            return Errors::InvalidHandle;
+        }
+    }
+
+    // validate the virtual address
+    const auto vmAddr = args->args[1];
+
+    if(vmAddr >= 0xC0000000) {
+        return Errors::InvalidAddress;
+    }
+
+    // query the task's VM object for the information
+    Handle regionHandle;
+    uintptr_t offset;
+
+    auto vm = task->vm;
+    REQUIRE(vm, "failed to get vm object for task %p ($%08x'h)", task, task->handle);
+
+    bool found = vm->findRegion(vmAddr, regionHandle, offset);
+
+    if(found) {
+        return static_cast<int>(regionHandle);
+    } else {
+        return 0; // = Errors::Success
+    }
+}
 
 /**
  * Converts the syscall VM flags to those required to create an anonymous mapping.

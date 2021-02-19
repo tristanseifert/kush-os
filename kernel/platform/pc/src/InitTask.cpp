@@ -7,6 +7,7 @@
 #include <sched/Task.h>
 #include <sched/Thread.h>
 #include <vm/Map.h>
+#include <vm/MapEntry.h>
 
 #include <arch.h>
 #include <log.h>
@@ -16,6 +17,9 @@ using namespace platform;
 
 // output logs about setting up the root server environment
 #define LOG_SETUP                       0
+
+/// VM address at which the init bundle is mapped in the task
+constexpr static const uintptr_t kInitBundleVmAddr = 0x90000000;
 
 static void RootSrvEntry(const uintptr_t);
 static void MapSrvElfTemp();
@@ -148,7 +152,7 @@ static void MapSrvElfTemp() {
     const size_t numPages = ((gRootServerModule.length + pageSz - 1) / pageSz);
 
     // map each page
-    auto vm = sched::Thread::current()->task->vm;
+    auto vm = sched::Task::current()->vm;
 
     for(size_t i = 0; i < numPages; i++) {
         const auto physAddr = gRootServerModule.physBase + (i * pageSz);
@@ -197,7 +201,7 @@ static void RemoveSrvElfTempMap() {
     const auto pageSz = arch_page_size();
     const size_t numPages = ((gRootServerModule.length + pageSz - 1) / pageSz);
 
-    auto vm = sched::Thread::current()->task->vm;
+    auto vm = sched::Task::current()->vm;
 
     err = vm->remove(kTempBinaryBase, numPages * pageSz);
     REQUIRE(!err, "failed to remove temporary rootsrv ELF mapping: %d", err);
@@ -221,7 +225,7 @@ static uintptr_t MapSrvSegments() {
     const auto hdr = reinterpret_cast<Elf32_Ehdr *>(0xA0000000);
 
     const auto pageSz = arch_page_size();
-    auto vm = sched::Thread::current()->task->vm;
+    auto vm = sched::Task::current()->vm;
 
     // get location of program headers
     const auto pHdr = reinterpret_cast<Elf32_Phdr *>(0xA0000000 + hdr->progHdrOff);
@@ -332,11 +336,11 @@ static void MapInitBundle() {
     const auto pageSz = arch_page_size();
     const size_t numPages = ((gInitBundleModule.length + pageSz - 1) / pageSz);
 
-    // map
-    auto vm = sched::Thread::current()->task->vm;
+    // create an allocation
+    auto vm = sched::Task::current()->vm;
+    auto entry = vm::MapEntry::makePhys(gInitBundleModule.physBase, kInitBundleVmAddr,
+            numPages * pageSz, vm::MappingFlags::Read);
 
-    constexpr static const uintptr_t kInitBundleVmAddr = 0x90000000;
-    err = vm->add(gInitBundleModule.physBase, (numPages * pageSz), kInitBundleVmAddr,
-            vm::MapMode::ACCESS_USER | vm::MapMode::kKernelRead);
+    err = vm->add(entry);
     REQUIRE(!err, "failed to map root server init bundle: %d", err);
 }

@@ -76,9 +76,6 @@ typedef	int32_t	wint_t;
 #define	_WINT_T_DECLARED
 #endif
 
-#define	WCHAR_MIN	__WCHAR_MIN
-#define	WCHAR_MAX	__WCHAR_MAX
-
 #ifndef WEOF
 #define	WEOF 	((wint_t)-1)
 #endif

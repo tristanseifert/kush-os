@@ -56,5 +56,9 @@ LIBSYSTEM_EXPORT int VirtualRegionGetInfoFor(const uintptr_t regionHandle, const
 LIBSYSTEM_EXPORT int VirtualGetTaskInfo(const uintptr_t taskHandle, TaskVmInfo_t *info,
         const size_t infoSize);
 
+LIBSYSTEM_EXPORT int VirtualGetHandleForAddr(const uintptr_t address, uintptr_t *regionHandle);
+LIBSYSTEM_EXPORT int VirtualGetHandleForAddrInTask(const uintptr_t taskHandle, 
+        const uintptr_t address, uintptr_t *regionHandle);
+
 
 #endif

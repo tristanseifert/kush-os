@@ -1,10 +1,12 @@
 #include <sys/syscalls.h>
 #include <sys/x86/syscalls.h>
-#include <string.h>
-#include <stdint.h>
+#include <cstdint>
+#include <cstring>
 #include <assert.h>
 
 #include <vector>
+
+#include "init/Bundle.h"
 
 #include "log.h"
 
@@ -12,10 +14,6 @@
 static uint8_t fuck[1024];
 
 static uintptr_t taskHandle = 0;
-
-static inline void io_outb(const uint16_t port, const uint8_t val) {
-    asm volatile("outb %0, %1" : : "a"(val), "Nd"(port));
-}
 
 void Receiveboi(const uintptr_t handle) {
     ThreadSetName(0, "receiveyboi");
@@ -41,54 +39,6 @@ void Receiveboi(const uintptr_t handle) {
     }
 }
 
-void Kugelschreiber(const uintptr_t fuck) {
-    ThreadSetName(0, "megafgt deluxe");
-
-    uintptr_t handle = 0;
-    int err = ThreadGetHandle(&handle);
-    REQUIRE(!err, "failed to get thread handle: %d", err);
-
-    LOG("bitchass %08x (thread handle %08x)", fuck, handle);
-
-    // try to test map VGA memory
-    uintptr_t region = 0;
-    err = AllocVirtualRegion(0xb8000, 0x20000000, 0x8000, VM_REGION_RW | VM_REGION_NOMAP, &region);
-    REQUIRE(!err, "failed to create VM region: %d", err);
-
-    LOG("VM region handle: %08x", region);
-
-    err = MapVirtualRegionAt(region, 0x30000000);
-    REQUIRE(!err, "failed to map VM region: %d", err);
-
-    *((uint16_t *) 0x30000420) = 0x0E00 + 'w';
-
-    // get region info
-    uintptr_t base, length, flags;
-    err = VirtualRegionGetInfo(region, &base, &length, &flags);
-    REQUIRE(!err, "failed to get VM region info: %d", err);
-
-    LOG("VM region $%08x'h base $%08x, length $%08x flags $%08x", region, base, length, flags);
-
-    // unmap and get info again
-    err = UnmapVirtualRegionFrom(region, taskHandle);
-    REQUIRE(!err, "failed to unmap VM region: %d", err);
-
-    uint8_t iopb[64];
-    // memset(&iopb, 0xff, 64);
-    iopb[16] = 0b00000001;
-
-    err = X86UpdateIopb(iopb, 512, 0);
-    REQUIRE(!err, "failed to update IOPB: %d", err);
-
-    io_outb(0x80, 0x33);
-
-
-assert(0);
-    while(1) {
-        ThreadUsleep(6940 * 100);
-    }
-}
-
 int main(int argc, const char **argv) {
     int err;
     uintptr_t threadHandle = 0, newThread = 0;
@@ -105,45 +55,16 @@ int main(int argc, const char **argv) {
 
     LOG("task handle %08x; thread handle %08x", taskHandle, threadHandle);
 
-    // parse the init bundle
+    // parse the init bundle and read the init script
+    init::Bundle bundle;
+    if(!bundle.validate()) {
+        PANIC("failed to validate init bundle");
+    }
 
-    // test the anon shit
-    uintptr_t region = 0, region2 = 0;
-    err = AllocVirtualAnonRegion(0/*x28000000*/, 0x10000, VM_REGION_RW, &region);
-    REQUIRE(!err, "failed to allocate anon region: %d", err);
+    auto scriptFile = bundle.open("/etc/default.init");
+    REQUIRE(scriptFile, "failed to open default init script");
 
-    uintptr_t base, length, flags;
-    err = VirtualRegionGetInfo(region, &base, &length, &flags);
-    REQUIRE(!err, "failed to get VM region info: %d", err);
-
-    LOG("anon region base %08x", base);
-
-    uintptr_t *regionPtr = (uintptr_t *) base;
-    regionPtr[0] = 0xDEADBEEF;
-    regionPtr[0x2000] = 0xDEADBEEF;
-    LOG("region %08x %08x %08x %08x", regionPtr[0], regionPtr[1], regionPtr[0x1000], regionPtr[0x2000]);
-
-    // try to allocate more shit
-    err = AllocVirtualAnonRegion(0, 0x100000, VM_REGION_RW, &region2);
-    REQUIRE(!err, "failed to allocate anon region 2: %d", err);
-    err = VirtualRegionGetInfo(region2, &base, &length, &flags);
-    REQUIRE(!err, "failed to get VM region info 2: %d", err);
-
-    LOG("region2 @ %08x", base);
-
-    regionPtr = (uintptr_t *) base;
-    regionPtr[0] = 0xDEADBEEF;
-    regionPtr[0x2000] = 0xDEADBEEF;
-    LOG("region %08x %08x %08x %08x", regionPtr[0], regionPtr[1], regionPtr[0x1000], regionPtr[0x2000]);
-
-    err = UnmapVirtualRegion(region2);
-    REQUIRE(!err, "failed to unmap anon region2: %d", err);
-    err = UnmapVirtualRegion(region);
-    REQUIRE(!err, "failed to unmap anon region: %d", err);
-
-    //err = ThreadCreate(Kugelschreiber, 0xDEADBEEF, ((uintptr_t) &fuck) + 1024, &newThread);
-    //REQUIRE(!err, "failed to create thread: %d", err);
-    // LOG("new thread %08x", newThread);
+    LOG("Init script: %u bytes, '%s'", scriptFile->getSize(), scriptFile->getContents().data());
 
     // create a port
     uintptr_t port;
@@ -172,6 +93,7 @@ int main(int argc, const char **argv) {
         LOG("fucker %d", fuck);
     }
 */
+
     // receiver boi
     err = ThreadCreate(Receiveboi, port, ((uintptr_t) &fuck) + 1024, &newThread);
     REQUIRE(!err, "failed to create thread: %d", err);

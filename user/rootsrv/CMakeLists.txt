@@ -5,6 +5,7 @@ add_executable(rootsrv
     src/main.cpp
     src/log.c
     src/init/Init.cpp
+    src/init/Bundle.cpp
 )
 
 #####
@@ -13,14 +14,23 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     target_compile_options(rootsrv PRIVATE "-flto")
 endif()
 
+# copy the bundle types include file
+file(COPY ${CMAKE_CURRENT_LIST_DIR}/../../tools/mkinit/src/BundleTypes.h DESTINATION ${CMAKE_CURRENT_LIST_DIR}/src/init)
+
+# search our codebase for includes
+target_include_directories(rootsrv PRIVATE include)
+target_include_directories(rootsrv PRIVATE src)
+
+# ensure the C and systems libraries are built
+add_dependencies(rootsrv c system)
+
 # required libraries
 target_link_libraries(rootsrv PRIVATE system)
 target_link_libraries(rootsrv PRIVATE lzfse)
 
 # we have to compile the root server as standalone
-#target_link_options(rootsrv PRIVATE -static -ffreestanding -nodefaultlibs -nostdlib -fno-exceptions -fno-rtti)
-#target_link_options(rootsrv PRIVATE -static -fno-exceptions -fno-rtti -nostdlib)
 target_link_options(rootsrv PRIVATE -static)
+target_compile_options(rootsrv PRIVATE -fno-exceptions -fno-rtti)
 
 # set its name
 #set_target_properties(rootsrv PROPERTIES OUTPUT_NAME "rootsrv")

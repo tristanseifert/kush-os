@@ -23,4 +23,10 @@ void LOG(const char *format, ...) __attribute__((format (printf, 1, 2)));
  */
 #define REQUIRE(cond, ...) {if(!(cond)) { LOG(__VA_ARGS__); abort(); }}
 
+/**
+ * Logs a message and aborts the program.
+ */
+#define PANIC(...) { LOG(__VA_ARGS__); abort(); }
+
+
 #endif

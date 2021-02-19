@@ -65,10 +65,12 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     VmRegionGetInfo,
     // 0x18: Get task VM info
     VmTaskGetInfo,
+    // 0x19: Convert virtual address to region handle
+    VmAddrToRegion,
 
-    // 0x19-0x1F: VM calls (reserved)
+    // 0x1A-0x1F: VM calls (reserved)
     UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall,
-    UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall,
+    UnimplementedSyscall, UnimplementedSyscall,
 
     // 0x20: Return current thread handle
     [](auto, auto) -> int {

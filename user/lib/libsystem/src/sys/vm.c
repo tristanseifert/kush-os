@@ -221,3 +221,39 @@ int VirtualRegionGetInfoFor(const uintptr_t regionHandle, const uintptr_t taskHa
 int VirtualGetTaskInfo(const uintptr_t taskHandle, TaskVmInfo_t *info, const size_t infoSz) {
     return __do_syscall3(SYS_VM_GET_TASK_INFO, taskHandle, (uintptr_t) info, infoSz);
 }
+
+/**
+ * Attempts to translate the given virtual address into a VM region handle for the current task.
+ */
+int VirtualGetHandleForAddr(const uintptr_t address, uintptr_t *regionHandle) {
+    return VirtualGetHandleForAddrInTask(0, address, regionHandle);
+}
+
+/**
+ * Translates the given virtual address, from the view of the given task, into a handle to the
+ * region that contains that address.
+ *
+ * A successful return code does not indicate that the pages actually exist; just that there is a
+ * mapping that is prepared to handle faults for nonexistent pages. Perform an info request for
+ * this region for more information.
+ *
+ * @return Negative error code, 0 if there is no VM mapping at the given address, or 1 if there is
+ * a region and its handle was written out.
+ */
+int VirtualGetHandleForAddrInTask(const uintptr_t taskHandle, const uintptr_t address,
+        uintptr_t *regionHandle) {
+    int err;
+
+    // handle the error or non-existent mapping cases of the syscall
+    err = __do_syscall2(SYS_VM_ADDR_TO_HANDLE, taskHandle, address);
+    if(err < 0) {
+        return err;
+    } else if(!err) {
+        return 0;
+    }
+
+    // otherwise, extract the fields
+    if(regionHandle) *regionHandle = (uintptr_t) err;
+    return 1;
+}
+

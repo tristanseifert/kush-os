@@ -97,7 +97,7 @@ size_t InitBundle::write(const std::string &path) {
         auto hdr = reinterpret_cast<InitFileHeader *>(((uintptr_t) fileHdrs) + fileHdrOff);
         memset(hdr, 0, required);
 
-        hdr->flags = 0x80000000;
+        hdr->flags = kInitFileFlagsCompressed;
         hdr->dataLen = file.data.size();
         hdr->rawLen = file.rawBytes;
         hdr->dataOff = fileDataOff;
@@ -116,16 +116,24 @@ size_t InitBundle::write(const std::string &path) {
     // adjust file headers offset values
     const auto hdrBytes = sizeof(InitHeader) + fileHdrOff;
     const auto fileDataStart = ((hdrBytes + 15) / 16) * 16;
+    size_t totalSize = 0;
 
     InitFileHeader *fileHdr = reinterpret_cast<InitFileHeader *>(fileHdrs);
     for(size_t i = 0; i < this->files.size(); i++) {
         fileHdr->dataOff += fileDataStart;
 
+        const auto end = fileHdr->dataOff + fileHdr->dataLen;
+        if(end > totalSize) {
+            totalSize = end;
+        }
+
         // go to the next header
         fileHdr = reinterpret_cast<InitFileHeader *>(((uintptr_t) fileHdr) + sizeof(InitFileHeader) + fileHdr->nameLen);
     }
 
-    std::cout << "starting file dat at " << fileDataStart << std::endl;
+    std::cout << "starting file data at " << fileDataStart << std::endl;
+
+    hdr.totalLen = totalSize;
 
     // write out the bundle header and all file headers
     file.write(reinterpret_cast<const char *>(&hdr), sizeof(InitHeader));
