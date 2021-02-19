@@ -1,4 +1,3 @@
-#include "syscall.h"
 #include <sys/syscalls.h>
 #include <stdint.h>
 

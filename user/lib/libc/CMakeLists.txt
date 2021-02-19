@@ -20,10 +20,7 @@ add_library(c STATIC
     # syscalls
     src/sys/abort.c
     src/sys/assert.c
-    src/sys/port.c
-    src/sys/scheduler.c
-    src/sys/task.c
-    src/sys/vm.c
+    src/sys/exit.c
     # stdlib math stuff
     src/stdlib/div.c
     src/stdlib/labs.c
@@ -31,7 +28,21 @@ add_library(c STATIC
     src/stdlib/llabs.c
     src/stdlib/lldiv.c
     # locale
-    src/locale/isctype.c
+    src/locale/isalnum.c
+    src/locale/isalpha.c
+    src/locale/isascii.c
+    src/locale/isblank.c
+    src/locale/iscntrl.c
+    src/locale/isdigit.c
+    src/locale/isgraph.c
+    src/locale/islower.c
+    src/locale/isprint.c
+    src/locale/ispunct.c
+    src/locale/isspace.c
+    src/locale/isupper.c
+    src/locale/isxdigit.c
+    src/locale/tolower.c
+    src/locale/toupper.c
     # stack stuff
     src/stack/stack_guard.c
 )
@@ -53,11 +64,6 @@ if(${KERNEL_ARCH} STREQUAL "x86")
     target_sources(c PRIVATE
         src/x86/crt0.S
         src/x86/crti.c
-        src/x86/div64.c
-        src/x86/threads.c
-        src/x86/thread_start.S
-        src/x86/syscall_arch.c
-        src/x86/syscall_impl.c
     )
 
     target_compile_definitions(c PRIVATE LIBC_ARCH_X86=1)
