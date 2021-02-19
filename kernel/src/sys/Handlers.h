@@ -34,6 +34,8 @@ int VmRegionMap(const Syscall::Args *args, const uintptr_t number);
 int VmRegionUnmap(const Syscall::Args *args, const uintptr_t number);
 /// Gets information about a VM region
 int VmRegionGetInfo(const Syscall::Args *args, const uintptr_t number);
+/// Gets information on a task's virtual memory environment
+int VmTaskGetInfo(const Syscall::Args *args, const uintptr_t number);
 
 
 /**

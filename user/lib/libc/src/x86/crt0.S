@@ -21,7 +21,7 @@ _start:
 
 1:
 
-    # set up the initializers
+    # set up the initializers and the C library
     call        _init
 
     # run main function (no argc or argv yet!)

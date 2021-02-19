@@ -14,7 +14,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 endif()
 
 # required libraries
-target_link_libraries(rootsrv PUBLIC system)
+target_link_libraries(rootsrv PRIVATE system)
 target_link_libraries(rootsrv PRIVATE lzfse)
 
 # we have to compile the root server as standalone

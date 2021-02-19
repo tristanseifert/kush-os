@@ -75,6 +75,9 @@ struct Task {
         /// when set, skip deleting threads on dealloc
         bool skipThreadDealloc = false;
 
+        /// number of physical pages owned by this task
+        uintptr_t physPagesOwned = 0;
+
         /// task lock
         DECLARE_RWLOCK(lock);
 

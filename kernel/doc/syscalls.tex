@@ -299,6 +299,22 @@ Gets information about the specified VM region. If the task handle is not \textt
 \bitbox{16}{\it Reserved} & \bitbox{16}{Flags} \\
 \end{bytefield}
 
+%%%%%
+\subsubsection{{\tt 0x18}: Get task VM info}
+\textbf{Arguments:} (3) Task handle, info buffer, info buffer length \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success, or negative error code \\
+
+Retrieves information on a task's virtual memory environment. If the task handle is specified as \texttt{0}, the current task's information is returned.
+
+Information is placed into an info buffer with the following structure:
+
+\begin{bytefield}[bitwidth=1.3em]{32} \\
+\bitheader[endianness=big]{0,15,16,31} \\
+\bitbox{32}{Pages owned} \\
+\bitbox{32}{Number of VM mappings} \\
+\end{bytefield}
+
 %%%%%%%%%%
 \newpage
 \subsection{Scheduler}

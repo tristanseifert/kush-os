@@ -27,6 +27,14 @@ struct VmInfo {
 };
 
 /**
+ * Info buffer for a task's VM environment
+ */
+struct VmTaskInfo {
+    uintptr_t pagesOwned;
+    uintptr_t numMappings;
+};
+
+/**
  * Flags for VM object creation
  */
 enum Flags: uint16_t {
@@ -192,6 +200,7 @@ int sys::VmRegionResize(const Syscall::Args *args, const uintptr_t number) {
     // resize it
     err = map->resize(args->args[1]);
 
+    // log("Resize status for $%08x'h (new size %u): %d", map->getHandle(), args->args[1], err);
     return (!err ? Errors::Success : Errors::GeneralError);
 }
 
@@ -331,6 +340,40 @@ int sys::VmRegionGetInfo(const Syscall::Args *args, const uintptr_t number) {
     }
 
     infoPtr->flags = outFlags;
+
+    return Errors::Success;
+}
+
+/**
+ * Retrieves information about a task's VM environment.
+ */
+int sys::VmTaskGetInfo(const Syscall::Args *args, const uintptr_t number) {
+    sched::Task *task = nullptr;
+
+    // validate the info region buffer and size
+    auto infoPtr = reinterpret_cast<VmTaskInfo *>(args->args[1]);
+    const auto infoLen = args->args[2];
+
+    if(infoLen != sizeof(VmTaskInfo)) {
+        return Errors::InvalidArgument;
+    }
+    if(!Syscall::validateUserPtr(infoPtr, infoLen)) {
+        return Errors::InvalidPointer;
+    }
+
+    // get the task handle
+    if(!args->args[0]) {
+        task = sched::Thread::current()->task;
+    } else {
+        task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
+        if(!task) {
+            return Errors::InvalidHandle;
+        }
+    }
+
+    // copy the information
+    __atomic_load(&task->physPagesOwned, &infoPtr->pagesOwned, __ATOMIC_RELAXED);
+    infoPtr->numMappings = task->vm->numMappings();
 
     return Errors::Success;
 }

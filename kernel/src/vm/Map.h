@@ -85,6 +85,15 @@ class Map {
         /// Page fault handler
         bool handlePagefault(const uintptr_t virtAddr, const bool present, const bool write);
 
+        /// Tests whether the given map entry can be expanded in this map without causing conflicts
+        bool canResize(MapEntry *entry, const uintptr_t base, const size_t oldSize,
+                const size_t newSize);
+
+        /// Returns the number of installed mappings.
+        const size_t numMappings() const {
+            return this->entries.size();
+        }
+
         /// Returns the global kernel map
         static Map *kern();
         /// Returns the currently activated map

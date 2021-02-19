@@ -123,6 +123,13 @@ int AllocVirtualRegion(const uint64_t physAddr, const uintptr_t virtualAddr, con
 }
 
 /**
+ * Resizes the provided VM region.
+ */
+int ResizeVirtualRegion(const uintptr_t regionHandle, const uintptr_t newSize) {
+    return __do_syscall2(SYS_VM_RESIZE, regionHandle, newSize);
+}
+
+/**
  * Unmaps a virtual memory region from the current task.
  */
 int UnmapVirtualRegion(const uintptr_t handle) {
@@ -206,3 +213,11 @@ int VirtualRegionGetInfoFor(const uintptr_t regionHandle, const uintptr_t taskHa
     return 0;
 }
 
+
+
+/**
+ * Gets information about a task's virtual memory environment.
+ */
+int VirtualGetTaskInfo(const uintptr_t taskHandle, TaskVmInfo_t *info, const size_t infoSz) {
+    return __do_syscall3(SYS_VM_GET_TASK_INFO, taskHandle, (uintptr_t) info, infoSz);
+}

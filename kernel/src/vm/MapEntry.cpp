@@ -4,6 +4,7 @@
 
 #include "mem/PhysicalAllocator.h"
 #include "mem/SlabAllocator.h"
+#include "sched/Task.h"
 
 #include <arch.h>
 #include <log.h>
@@ -44,7 +45,7 @@ MapEntry::~MapEntry() {
 
     // release physical pages
     for(const auto &page : this->physOwned) {
-        mem::PhysicalAllocator::free(page.physAddr);
+        this->freePage(page.physAddr);
     }
 }
 
@@ -108,7 +109,7 @@ int MapEntry::resize(const size_t newSize) {
         return -1;
     }
 
-    // take al ock on the entry
+    // take a lock on the entry
     RW_LOCK_WRITE_GUARD(this->lock);
 
     // are we shrinking the region?
@@ -125,7 +126,7 @@ int MapEntry::resize(const size_t newSize) {
 
             // if it lies beyond the end, release it
             if(info.pageOff >= endPageOff) {
-                mem::PhysicalAllocator::free(info.physAddr);
+                this->freePage(info.physAddr);
                 this->physOwned.remove(i);
             } 
             // otherwise, check next entry
@@ -133,16 +134,23 @@ int MapEntry::resize(const size_t newSize) {
                 i++;
             }
         }
+
+        // we've successfully resized the region
+        return 0;
     }
     // no, it should be embiggened
     else {
-        // TODO: check that this will succeed in all maps
+        // check that the new size doesn't cause conflicts in maps we belong to
+        for(auto &info : this->maps) {
+            if(!info.mapPtr->canResize(this, info.base, this->length, newSize)) {
+                return -1;
+            }
+        }
 
-        return -1;
+        // if no conflicts, we're good to perform resize
+        this->length = newSize;
+        return 0;
     }
-
-    // if we get here, the region was successfully resized
-    return 0;
 }
 
 /**
@@ -180,6 +188,11 @@ void MapEntry::faultInPage(const uintptr_t address, Map *map) {
     const auto page = mem::PhysicalAllocator::alloc();
     REQUIRE(page, "failed to allocage physical page for %08x", address);
 
+    auto task = sched::Task::current();
+    if(task) {
+        __atomic_add_fetch(&task->physPagesOwned, 1, __ATOMIC_RELEASE);
+    }
+
     // insert page info
     AnonPageInfo info;
     info.physAddr = page;
@@ -191,6 +204,24 @@ void MapEntry::faultInPage(const uintptr_t address, Map *map) {
     const auto mode = ConvertVmMode(this->flags);
     err = map->add(page, pageSz, address, mode);
     REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", info.pageOff, this, this->handle);
+}
+
+/**
+ * Frees a memory page belonging to this map.
+ */
+void MapEntry::freePage(const uintptr_t page) {
+    mem::PhysicalAllocator::free(page);
+
+    /*
+     * Decrement the task's owned pages counter.
+     *
+     * This relies on callers being nice :) and not allocating pages in one task, then freeing
+     * them in yet another task.
+     */
+    auto task = sched::Task::current();
+    if(task) {
+        __atomic_sub_fetch(&task->physPagesOwned, 1, __ATOMIC_RELEASE);
+    }
 }
 
 

@@ -54,13 +54,6 @@ typedef	unsigned int	time_t;
 #define	_TIME_T_DECLARED
 #endif
 
-#if __BSD_VISIBLE
-#define TIMER_RELTIME	0x0	/* relative timer */
-#endif
-#if !defined(TIMER_ABSTIME) && __POSIX_VISIBLE >= 199506
-#define TIMER_ABSTIME	0x1	/* absolute timer */
-#endif /* !defined(TIMER_ABSTIME) && __POSIX_VISIBLE >= 199506 */
-
 struct tm {
 	int	tm_sec;		/* seconds after the minute [0-60] */
 	int	tm_min;		/* minutes after the hour [0-59] */
@@ -96,16 +89,6 @@ time_t mktime(struct tm *);
 size_t strftime(char * __restrict, size_t, const char * __restrict,
     const struct tm * __restrict);
 time_t time(time_t *);
-
-#if __POSIX_VISIBLE >= 200112
-struct sigevent;
-int timer_create(clockid_t, struct sigevent *__restrict, timer_t *__restrict);
-int timer_delete(timer_t);
-int timer_gettime(timer_t, struct itimerspec *);
-int timer_getoverrun(timer_t);
-int timer_settime(timer_t, int, const struct itimerspec *__restrict,
-	struct itimerspec *__restrict);
-#endif
 
 int nanosleep(const struct timespec *, struct timespec *);
 

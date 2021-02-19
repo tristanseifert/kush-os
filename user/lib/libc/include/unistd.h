@@ -109,34 +109,6 @@ typedef    size_t    useconds_t;
 #define	_SC_STREAM_MAX		26 /* user */
 #define	_SC_TZNAME_MAX		27 /* user */
 
-#if __POSIX_VISIBLE >= 199309
-#define	_SC_ASYNCHRONOUS_IO	28
-#define	_SC_MAPPED_FILES	29
-#define	_SC_MEMLOCK		30
-#define	_SC_MEMLOCK_RANGE	31
-#define	_SC_MEMORY_PROTECTION	32
-#define	_SC_MESSAGE_PASSING	33
-#define	_SC_PRIORITIZED_IO	34
-#define	_SC_PRIORITY_SCHEDULING	35
-#define	_SC_REALTIME_SIGNALS	36
-#define	_SC_SEMAPHORES		37
-#define	_SC_FSYNC		38
-#define	_SC_SHARED_MEMORY_OBJECTS 39
-#define	_SC_SYNCHRONIZED_IO	40
-#define	_SC_TIMERS		41
-#define	_SC_AIO_LISTIO_MAX	42
-#define	_SC_AIO_MAX		43
-#define	_SC_AIO_PRIO_DELTA_MAX	44
-#define	_SC_DELAYTIMER_MAX	45
-#define	_SC_MQ_OPEN_MAX		46
-#define	_SC_PAGESIZE		47
-#define	_SC_RTSIG_MAX		48
-#define	_SC_SEM_NSEMS_MAX	49
-#define	_SC_SEM_VALUE_MAX	50
-#define	_SC_SIGQUEUE_MAX	51
-#define	_SC_TIMER_MAX		52
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -193,9 +165,6 @@ int	ttyname_r(int, char *, size_t);
 int	 unlink(const char *);
 ssize_t	 write(int, const void *, size_t);
 
-/* 1003.2-1992 */
-#if __POSIX_VISIBLE >= 199209 || __XSI_VISIBLE
-size_t	 confstr(int, char *, size_t);
 #ifndef _GETOPT_DECLARED
 #define	_GETOPT_DECLARED
 int	 getopt(int, char * const [], const char *);
@@ -203,10 +172,7 @@ int	 getopt(int, char * const [], const char *);
 extern char *optarg;			/* getopt(3) external variables */
 extern int optind, opterr, optopt;
 #endif /* _GETOPT_DECLARED */
-#endif
 
-/* ISO/IEC 9945-1: 1996 */
-#if __POSIX_VISIBLE >= 199506 || __XSI_VISIBLE
 int	 fsync(int);
 int	 fdatasync(int);
 
@@ -217,22 +183,6 @@ int	 fdatasync(int);
 #ifndef _FTRUNCATE_DECLARED
 #define	_FTRUNCATE_DECLARED
 int	 ftruncate(int, off_t);
-#endif
-#endif
-
-#if __POSIX_VISIBLE >= 199506
-int	 getlogin_r(char *, size_t);
-#endif
-
-/* 1003.1-2001 */
-#if __POSIX_VISIBLE >= 200112 || __XSI_VISIBLE
-int	 fchown(int, uid_t, gid_t);
-ssize_t	 readlink(const char * __restrict, char * __restrict, size_t);
-#endif
-#if __POSIX_VISIBLE >= 200112
-int	 gethostname(char *, size_t);
-int	 setegid(gid_t);
-int	 seteuid(uid_t);
 #endif
 
 #ifdef __cplusplus

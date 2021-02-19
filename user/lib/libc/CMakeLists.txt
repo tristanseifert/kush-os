@@ -43,6 +43,12 @@ add_library(c STATIC
     src/locale/isxdigit.c
     src/locale/tolower.c
     src/locale/toupper.c
+    # memory allocation
+    src/mem/malloc.c
+    src/mem/fake_sbrk.c
+    src/mem/dlmalloc.cpp
+    # error handling
+    src/error/errno.c
     # stack stuff
     src/stack/stack_guard.c
 )
@@ -51,6 +57,8 @@ add_library(c STATIC
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     target_compile_options(c PRIVATE "-flto")
 endif()
+
+target_compile_options(c PRIVATE -fno-exceptions)
 
 # set required compiler flags
 target_compile_definitions(c PRIVATE BUILDING_LIBC=1)

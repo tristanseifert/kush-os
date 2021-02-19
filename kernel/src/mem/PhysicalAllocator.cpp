@@ -5,8 +5,10 @@
 #include <string.h>
 #include <log.h>
 
-#include <vm/Mapper.h>
-#include <vm/Map.h>
+#include "sched/Task.h"
+
+#include "vm/Mapper.h"
+#include "vm/Map.h"
 
 #include <new>
 

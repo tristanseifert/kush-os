@@ -101,9 +101,13 @@ LIBC_EXPORT void *malloc(const size_t numBytes);
 /// Frees previously allocated memory
 LIBC_EXPORT void free(void *ptr);
 /// Resizes the previously made allocation.
-LIBC_EXPORT void *realloc(void *ptr, const size_t size);
+LIBC_EXPORT void *realloc(void *ptr, const size_t newSize);
+/// Resizes a previously made allocation, iff it can be done in-place. Returns NULL if not.
+LIBC_EXPORT void *realloc_in_place(void *ptr, const size_t newSize);
 /// Aligned malloc
-LIBC_EXPORT int posix_memalign(void **, size_t, size_t);
+LIBC_EXPORT void *dlmemalign(const size_t alignment, const size_t size);
+/// Aligned malloc
+LIBC_EXPORT int posix_memalign(void **outPtr, const size_t alignment, const size_t size);
 
 #ifdef __cplusplus
 }

@@ -35,7 +35,7 @@ int PortSend(const uintptr_t portHandle, const void *message, const size_t messa
  *                fail immediately if no pending messages) while the value UINTPTR_MAX indicates
  *                we should block forever.
  */
-int PortReceive(const uintptr_t portHandle, struct MessageHeader *buf,
+int PortReceive(const uintptr_t portHandle, MessageHeader_t *buf,
         const size_t bufMaxLen, const uintptr_t blockUs) {
     return __do_syscall4(SYS_IPC_MSGRECV, portHandle, (const uintptr_t) buf, bufMaxLen, blockUs);
 }

@@ -256,6 +256,34 @@ fail:;
 }
 
 /**
+ * Tests if the new size for the given map entry will cause any conflicts with existing mappings.
+ *
+ * In effect, this takes the region of [base+length, base+newlength] and checks if there exist any
+ * mappings in thatspace.
+ */
+bool Map::canResize(MapEntry *entry, const uintptr_t base, const size_t oldSize, const size_t newSize) {
+    // we can always support shrinking
+    if(newSize <= oldSize) return true;
+
+    // get the new range to check
+    const auto newBase = base + oldSize;
+    const auto sizeDiff = newSize - oldSize;
+
+    // log("Old region: %08x -> %08x; new region to test %08x - %08x", base, base+oldSize, base+oldSize, base+newSize);
+
+    RW_LOCK_READ_GUARD(this->lock);
+
+    for(auto i : this->entries) {
+        if(i->contains(this, newBase, sizeDiff)) {
+            return false;
+        }
+    }
+
+    // if we get down here, there's no conflicts
+    return true;
+}
+
+/**
  * Removes the given entry from this map.
  */
 int Map::remove(MapEntry *_entry) {

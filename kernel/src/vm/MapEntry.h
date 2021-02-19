@@ -114,7 +114,7 @@ class MapEntry {
             for(auto &info : this->maps) {
                 if(info.mapPtr == map) {
                     const auto x1 = (info.base ? info.base : this->base);
-                    const auto x2 = (x1 + this->length);
+                    const auto x2 = (x1 + this->length - 1);
                     const auto y1 = address;
                     const auto y2 = (address + length);
 
@@ -130,7 +130,7 @@ class MapEntry {
         }
         bool contains(const uintptr_t address, const size_t length) const {
             const auto x1 = this->base;
-            const auto x2 = (this->base + this->length);
+            const auto x2 = (this->base + this->length - 1);
             const auto y1 = address;
             const auto y2 = (address + length);
 
@@ -218,6 +218,8 @@ class MapEntry {
 
         /// Faults in an anonymous memory page.
         void faultInPage(const uintptr_t address, Map *map);
+        /// Frees a physical page and updates the caller's "pages owned" counter
+        void freePage(const uintptr_t page);
 
     private:
         /// modification lock

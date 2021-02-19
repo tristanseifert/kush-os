@@ -19,6 +19,13 @@ static uint8_t gSharedBuf[sizeof(Syscall)] __attribute__((aligned(64)));
 Syscall *Syscall::gShared = nullptr;
 
 /**
+ * Stub for an unimplemented syscall
+ */
+static int UnimplementedSyscall(const Syscall::Args *, const uintptr_t) {
+    return Errors::InvalidSyscall;
+}
+
+/**
  * Global syscall table
  */
 static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
@@ -33,18 +40,19 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     // 0x04: Deallocate port
     PortDealloc,
     // 0x05: Share virtual memory region
-    nullptr,
+    UnimplementedSyscall,
     // 0x06-0x07: Reserved
-    nullptr, nullptr,
+    UnimplementedSyscall, UnimplementedSyscall,
     // 0x08-0x0F: Notifications
-    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall,
+    UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall,
 
     // 0x10: Create VM region
     VmAlloc,
     // 0x11: Create anonymous VM region
     VmAllocAnon,
     // 0x12: Destroy VM region
-    nullptr,
+    UnimplementedSyscall,
     // 0x13: Update VM region permissions
     VmRegionUpdatePermissions,
     // 0x14: Resize VM region
@@ -55,9 +63,12 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     VmRegionUnmap,
     // 0x17: Get VM region info
     VmRegionGetInfo,
+    // 0x18: Get task VM info
+    VmTaskGetInfo,
 
-    // 0x18-0x1F: VM calls (reserved)
-    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    // 0x19-0x1F: VM calls (reserved)
+    UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall,
+    UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall,
 
     // 0x20: Return current thread handle
     [](auto, auto) -> int {
@@ -84,11 +95,11 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     // 0x23: Create thread
     ThreadCreate,
     // 0x24: Join with thread
-    nullptr,
+    UnimplementedSyscall,
     // 0x25: Destroy thread
     ThreadDestroy,
     // 0x26: Set thread state 
-    nullptr,
+    UnimplementedSyscall,
     // 0x27: Set thread priority 
     ThreadSetPriority,
     // 0x28: Set thread notification mask
@@ -96,7 +107,8 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     // 0x29: Set thread name
     ThreadSetName,
     // 0x2A-0x2F: reserved
-    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall,
+    UnimplementedSyscall, UnimplementedSyscall,
 
     // 0x30: Get task handle
     [](auto, auto) -> int {
@@ -115,12 +127,12 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     // 0x34: Set task name
     TaskSetName,
     // 0x35: Wait on task
-    nullptr,
+    UnimplementedSyscall,
     // 0x36: Debug printing
     TaskDbgOut,
 
     // 0x37: Reserved
-    nullptr,
+    UnimplementedSyscall,
 
     // 0x38: Architecture specific syscall
     arch::HandleSyscall,
