@@ -1,0 +1,4 @@
+# cmake build directory
+build/
+# binaries live here
+bin/

@@ -21,8 +21,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 endif()
 
 # installation
-install(TARGETS bzip2 ARCHIVE DESTINATION ${SYSROOT_DIR}/usr/lib)
-install(TARGETS bzip2 LIBRARY DESTINATION ${SYSROOT_DIR}/usr/lib)
+install(TARGETS bzip2 LIBRARY)
 
 FILE(GLOB BZIP2_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
 install(FILES ${BZIP2_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/compress)

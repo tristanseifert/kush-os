@@ -6,8 +6,6 @@
 ###############################################################################
 
 add_library(system STATIC
-    #    src/sys/abort.c
-    #src/sys/assert.c
     src/sys/port.c
     src/sys/scheduler.c
     src/sys/task.c
@@ -51,18 +49,17 @@ if(${KERNEL_ARCH} STREQUAL "x86")
     set(C_STATIC_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/x86/app_static.ld CACHE FILEPATH "Statically linked C executable linker script")
 
     # ensure the x86 headers make it
-    FILE(GLOB LIBSYSTEM_PUB_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/sys/x86/*.h")
-    install(FILES ${LIBSYSTEM_PUB_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/sys/x86)
+    FILE(GLOB LIBSYSTEM_PUB_SYS_X86_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/sys/x86/*.h")
+    install(FILES ${LIBSYSTEM_PUB_SYS_X86_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/sys/x86)
 else()
     message(FATAL_ERROR "libsystem does not know how architecture '${KERNEL_ARCH}'")
 endif()
 
 # install the library to the sysroot
-install(TARGETS system ARCHIVE DESTINATION ${SYSROOT_DIR}/lib)
-install(TARGETS system LIBRARY DESTINATION ${SYSROOT_DIR}/lib)
+install(TARGETS system LIBRARY)
 
 FILE(GLOB LIBC_PUB_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
 install(FILES ${LIBC_PUB_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include)
-FILE(GLOB LIBC_PUB_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/sys/*.h")
-install(FILES ${LIBC_PUB_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/sys)
+FILE(GLOB LIBC_PUB_SYS_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/sys/*.h")
+install(FILES ${LIBC_PUB_SYS_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/sys)
 

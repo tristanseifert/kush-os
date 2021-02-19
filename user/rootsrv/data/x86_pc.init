@@ -1,0 +1,8 @@
+###############################################################################
+# Default init script
+#
+# Listed below are the basic binaries/boot servers required for an x86 PC
+# system.
+###############################################################################
+FILE /boot/rootsrv.elf
+FILE /etc/default.init

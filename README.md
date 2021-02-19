@@ -3,6 +3,19 @@
 ## Building
 We use CMake to build everything. The single `CMakeLists.txt` in this directory can build the kernel, all userspace components, and tools automatically. You will have to select one of the toolchains to use and pass it to CMake in the `CMAKE_TOOLCHAIN_FILE` flag.
 
+### Directory structure
+- kernel: Kernel source files, including architecture/platform specific stuff
+    - arch: Architecture initialization, exceptions, interrupts, syscalls
+    - platform: Booting and entry point, timers
+- user: All userspace code
+    - libs: Libraries that get put in the userspace image
+        - external: Third party libraries (most go in /usr/lib)
+        - libsystem: System call wrapper
+        - libc: C library
+- tools: Host side utilities
+- sysroot: Base directory of the OS root directory. Automatically built up as kernel/userspace is built.
+- toolchain: Created by the `build_toolchain.sh` script.
+
 ## LLVM Toolchain
 You can use the `build_toolchain.sh` script to build a toolchain to use for compiling the system. This sets up most of the libraries required: you'll also have to build a few supporting libraries.
 

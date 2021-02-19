@@ -175,7 +175,7 @@ int main(int argc, const char **argv) {
     // receiver boi
     err = ThreadCreate(Receiveboi, port, ((uintptr_t) &fuck) + 1024, &newThread);
     REQUIRE(!err, "failed to create thread: %d", err);
-     LOG("receiverboi thread %08x", newThread);
+    LOG("receiverboi thread handle $%08x'h", newThread);
 
     for(size_t j = 0; j < 420; j++) {
         cock[0] = (j>>8) & 0xFF;

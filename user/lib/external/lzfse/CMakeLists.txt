@@ -22,8 +22,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 endif()
 
 # installation
-install(TARGETS lzfse ARCHIVE DESTINATION ${SYSROOT_DIR}/usr/lib)
-install(TARGETS lzfse LIBRARY DESTINATION ${SYSROOT_DIR}/usr/lib)
+install(TARGETS lzfse LIBRARY DESTINATION)
 
 FILE(GLOB LZFSE_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
 install(FILES ${LZFSE_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/compress)

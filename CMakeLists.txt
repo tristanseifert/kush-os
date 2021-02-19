@@ -15,6 +15,8 @@ include(ExternalProject)
 set(SYSROOT_DIR ${CMAKE_CURRENT_BINARY_DIR}/../sysroot CACHE FILEPATH "Sysroot directory" FORCE)
 message("Sysroot at ${SYSROOT_DIR}")
 
+set(CMAKE_INSTALL_PREFIX ${SYSROOT_DIR})
+
 ##### Version
 include(GetGitRevisionDescription)
 git_describe(VERSION --tags --dirty=-d)

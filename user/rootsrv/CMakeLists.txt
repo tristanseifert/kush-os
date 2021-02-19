@@ -28,8 +28,11 @@ set_target_properties(rootsrv PROPERTIES SUFFIX "${PLATFORM_KERNEL_EXTENSION}")
 
 # use the correct linker script
 set_target_properties(rootsrv PROPERTIES LINK_DEPENDS ${C_STATIC_LINKER_SCRIPT})
+#target_link_options(rootsrv PUBLIC "-v")
 target_link_options(rootsrv PUBLIC "-Wl,-T${C_STATIC_LINKER_SCRIPT}")
 
 # install it to boot directory in sysroot
 install(TARGETS rootsrv RUNTIME DESTINATION ${SYSROOT_DIR}/boot)
 
+# copy some data files as well
+install(FILES data/x86_pc.init DESTINATION ${SYSROOT_DIR}/etc RENAME default.init)
