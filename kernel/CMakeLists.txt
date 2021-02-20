@@ -74,7 +74,7 @@ set_target_properties(kernel PROPERTIES SUFFIX "${PLATFORM_KERNEL_EXTENSION}")
 
 # kernel is freestanding
 target_compile_options(kernel PRIVATE ${KERNEL_COMPILE_OPTS})
-target_link_options(kernel PRIVATE ${KERNEL_COMPILE_OPTS} -fno-pie --static)
+target_link_options(kernel PRIVATE ${KERNEL_COMPILE_OPTS} -fno-pie --static -nostartfiles)
 
 # configure the linker script
 message("Platform linker script: ${PLATFORM_LINKER_SCRIPT}")

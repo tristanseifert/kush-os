@@ -41,13 +41,14 @@ class Bundle {
                     return this->contents;
                 }
 
-            private:
-                File(void *base, const InitFileHeader *hdr);
                 ~File() {
                     if(this->decompressed) {
                         delete[] this->decompressed;
                     }
                 }
+
+            private:
+                File(void *base, const InitFileHeader *hdr);
 
             private:
                 std::string name;

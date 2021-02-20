@@ -6,13 +6,12 @@ add_executable(rootsrv
     src/log.c
     src/init/Init.cpp
     src/init/Bundle.cpp
+    src/init/ScriptParser.cpp
 )
 
 #####
 # allow link time optimization (strips C library functions we don't use)
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    target_compile_options(rootsrv PRIVATE "-flto")
-endif()
+target_compile_options(rootsrv PRIVATE -flto)
 
 # copy the bundle types include file
 file(COPY ${CMAKE_CURRENT_LIST_DIR}/../../tools/mkinit/src/BundleTypes.h DESTINATION ${CMAKE_CURRENT_LIST_DIR}/src/init)
@@ -21,25 +20,18 @@ file(COPY ${CMAKE_CURRENT_LIST_DIR}/../../tools/mkinit/src/BundleTypes.h DESTINA
 target_include_directories(rootsrv PRIVATE include)
 target_include_directories(rootsrv PRIVATE src)
 
-# ensure the C and systems libraries are built
-add_dependencies(rootsrv c system)
-
 # required libraries
-target_link_libraries(rootsrv PRIVATE system)
-target_link_libraries(rootsrv PRIVATE lzfse)
+add_dependencies(rootsrv c_static)
+target_link_libraries(rootsrv PRIVATE system_static lzfse_static cista)
 
 # we have to compile the root server as standalone
-target_link_options(rootsrv PRIVATE -static)
+target_link_options(rootsrv PRIVATE -static -fno-exceptions -fno-rtti)
 target_compile_options(rootsrv PRIVATE -fno-exceptions -fno-rtti)
-
-# set its name
-#set_target_properties(rootsrv PROPERTIES OUTPUT_NAME "rootsrv")
-set_target_properties(rootsrv PROPERTIES SUFFIX "${PLATFORM_KERNEL_EXTENSION}")
 
 # use the correct linker script
 set_target_properties(rootsrv PROPERTIES LINK_DEPENDS ${C_STATIC_LINKER_SCRIPT})
-#target_link_options(rootsrv PUBLIC "-v")
 target_link_options(rootsrv PUBLIC "-Wl,-T${C_STATIC_LINKER_SCRIPT}")
+#target_link_options(rootsrv PRIVATE -v)
 
 # install it to boot directory in sysroot
 install(TARGETS rootsrv RUNTIME DESTINATION ${SYSROOT_DIR}/boot)

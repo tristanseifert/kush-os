@@ -1,7 +1,7 @@
 ###############################################################################
 # bzip2: used for compression of init bundle data
 ###############################################################################
-add_library(bzip2 STATIC
+add_library(bzip2 SHARED
     src/blocksort.c
     src/bzlib.c
     src/compress.c
@@ -9,16 +9,12 @@ add_library(bzip2 STATIC
     src/decompress.c
     src/huffman.c
     src/randtable.c)
+target_compile_options(bzip2 PRIVATE -fPIC)
 target_include_directories(bzip2 PRIVATE src)
 target_include_directories(bzip2 PUBLIC include)
 target_compile_definitions(bzip2 PRIVATE BZ_NO_STDIO=1)
 
 target_compile_options(bzip2 PRIVATE "-Wno-implicit-fallthrough")
-
-# allow link time optimization
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    target_compile_options(bzip2 PRIVATE "-flto")
-endif()
 
 # installation
 install(TARGETS bzip2 LIBRARY)

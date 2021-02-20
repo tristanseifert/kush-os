@@ -9,8 +9,6 @@ SECTIONS {
     .text ALIGN(4K) : {
         *(.text)
         *(.text*)
-        *(.rodata)
-        *(.rodata*)
     }
 
     /* Include the list of initialization functions sorted. */
@@ -29,11 +27,27 @@ SECTIONS {
         _fini_array_end = .;
     }
 
+    /* read only data */
+    .rodata ALIGN(4K) : {
+        *(.rodata)
+        *(.rodata*)
+
+        /* exception handling */
+        *(.gcc_except_table)
+        *(.gcc_except_table*)
+        *(.eh_frame)
+    }
+
+
     /* data (mutable) section */
     .data ALIGN(4K) : {
         __data_start = .;
         *(*.data)
         *(*.data*)
+
+        /* relocations; is this ok? */
+        /**(*.got)
+        *(*.got*)*/
     }
     __data_size = SIZEOF(.data);
 

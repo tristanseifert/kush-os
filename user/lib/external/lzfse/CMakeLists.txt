@@ -3,7 +3,7 @@
 #
 # See https://github.com/lzfse/lzfse
 ###############################################################################
-add_library(lzfse STATIC
+add_library(lzfse_objs OBJECT
     src/lzfse_decode_base.c
     src/lzfse_decode.c
     src/lzfse_encode_base.c
@@ -11,18 +11,24 @@ add_library(lzfse STATIC
     src/lzfse_fse.c
     src/lzvn_decode_base.c
     src/lzvn_encode_base.c)
-target_include_directories(lzfse PRIVATE src)
-target_include_directories(lzfse PUBLIC include)
+target_include_directories(lzfse_objs PRIVATE src)
+target_include_directories(lzfse_objs PUBLIC include)
 
-target_compile_options(lzfse PRIVATE "-Wno-implicit-fallthrough")
+target_compile_options(lzfse_objs PRIVATE -fPIC)
+target_compile_options(lzfse_objs PRIVATE "-Wno-implicit-fallthrough")
 
-# allow link time optimization
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    target_compile_options(lzfse PRIVATE "-flto")
-endif()
+# create the static and dynamic targets
+add_library(lzfse_static STATIC $<TARGET_OBJECTS:lzfse_objs>)
+set_target_properties(lzfse_static PROPERTIES OUTPUT_NAME "lzfse")
+target_include_directories(lzfse_static PUBLIC include)
+
+add_library(lzfse_dynamic SHARED $<TARGET_OBJECTS:lzfse_objs>)
+set_target_properties(lzfse_dynamic PROPERTIES OUTPUT_NAME "lzfse")
+target_include_directories(lzfse_dynamic PUBLIC include)
 
 # installation
-install(TARGETS lzfse LIBRARY DESTINATION)
+install(TARGETS lzfse_static LIBRARY DESTINATION)
+install(TARGETS lzfse_dynamic LIBRARY DESTINATION)
 
 FILE(GLOB LZFSE_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
 install(FILES ${LZFSE_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/compress)

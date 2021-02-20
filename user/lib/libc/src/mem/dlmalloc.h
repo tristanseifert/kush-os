@@ -553,6 +553,8 @@ MAX_RELEASE_CHECK_RATE   default: 4095 unless not HAVE_MMAP
 #define HAVE_MREMAP     0
 
 #define MORECORE __fake_sbrk
+#define MORECORE_CONTIGUOUS 1
+#define MORECORE_CANNOT_TRIM 0
 
 // TODO: get actual page size
 #define malloc_getpagesize ((size_t) 4096U)

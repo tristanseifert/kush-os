@@ -19,6 +19,8 @@ We use CMake to build everything. The single `CMakeLists.txt` in this directory 
 ## LLVM Toolchain
 You can use the `build_toolchain.sh` script to build a toolchain to use for compiling the system. This sets up most of the libraries required: you'll also have to build a few supporting libraries.
 
+Before compiling the libraries below, you will likely need to compile and install the C library into the sysroot; these libraries expect to find certain headers there.
+
 ### compiler-rt
 This contains helper functions and other stuff the compiler will rely on being present in all non-freestanding libraries. By default, the script doesn't seem to compile the compiler-rt for our platform. 
 
@@ -51,7 +53,7 @@ Once built, you have to build the libcxx, the actual C++ runtime:
 cd llvm-project
 mkdir build-libcxx
 cd build-libcxx
-cmake ../libcxx -DCMAKE_TOOLCHAIN_FILE=~/kush/cmake/toolchain-i386-clang.cmake -DLLVM_CONFIG_PATH=../../../llvm/bin/llvm-config -DLIBCXX_TARGET_TRIPLE="i386-pc-kush-elf" -DLIBCXX_INSTALL_PREFIX=/Users/tristan/kush/sysroot/ -DLIBCXX_INSTALL_HEADER_PREFIX=/Users/tristan/kush/sysroot/usr/ -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXX_ENABLE_THREADS=OFF -DLIBCXX_ENABLE_STDOUT=OFF -DLIBCXX_ENABLE_STDIN=OFF -DLIBCXX_ENABLE_MONOTONIC_CLOCK=OFF -DLIBCXX_ENABLE_LOCALIZATION=OFF -DLIBCXX_ENABLE_RANDOM_DEVICE=OFF -DLIBCXX_ENABLE_FILESYSTEM=OFF  -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF -DLIBCXX_ENABLE_SHARED=OFF
+cmake ../libcxx -DCMAKE_TOOLCHAIN_FILE=~/kush/cmake/toolchain-i386-clang.cmake -DLLVM_CONFIG_PATH=../../../llvm/bin/llvm-config -DLIBCXX_TARGET_TRIPLE="i386-pc-kush-elf" -DLIBCXX_INSTALL_PREFIX=/Users/tristan/kush/sysroot/ -DLIBCXX_INSTALL_HEADER_PREFIX=/Users/tristan/kush/sysroot/usr/ -DLIBCXX_CXX_ABI=libcxxabi -DLIBCXX_ENABLE_THREADS=OFF -DLIBCXX_ENABLE_STDOUT=OFF -DLIBCXX_ENABLE_STDIN=OFF -DLIBCXX_ENABLE_MONOTONIC_CLOCK=OFF -DLIBCXX_ENABLE_LOCALIZATION=OFF -DLIBCXX_ENABLE_RANDOM_DEVICE=OFF -DLIBCXX_ENABLE_FILESYSTEM=OFF  -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF
 make install -j40
 ```
 

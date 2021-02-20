@@ -1,15 +1,12 @@
 ###############################################################################
-# Userspace
+# Dyldo, the dynamic linker
 ###############################################################################
+# dynamic link server
+if(BUILD_SYSTEM_SERVERS)
+    add_subdirectory(srv)
+endif()
 
-# Libraries, if enabled
+# Shared library part of the linker
 if(BUILD_USER_LIBS)
     add_subdirectory(lib)
 endif()
-
-# system servers
-if(BUILD_SYSTEM_SERVERS)
-    add_subdirectory(rootsrv)
-endif()
-
-add_subdirectory(dyldo)

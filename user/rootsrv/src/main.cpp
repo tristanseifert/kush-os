@@ -2,10 +2,9 @@
 #include <sys/x86/syscalls.h>
 #include <cstdint>
 #include <cstring>
-#include <assert.h>
+#include <malloc.h>
 
-#include <vector>
-
+#include "init/Init.h"
 #include "init/Bundle.h"
 
 #include "log.h"
@@ -39,32 +38,39 @@ void Receiveboi(const uintptr_t handle) {
     }
 }
 
-int main(int argc, const char **argv) {
-    int err;
-    uintptr_t threadHandle = 0, newThread = 0;
-    memset(fuck, 0xee, 1024);
-
-    // initialize environment
+/**
+ * Configures our environment to be mostly sane.
+ */
+static void EnvInit() {
+    // set up the task and thread names
     TaskSetName(0, "rootsrv");
     ThreadSetName(0, "Main");
 
-    err = TaskGetHandle(&taskHandle);
+    // retrieve task handle
+    int err = TaskGetHandle(&taskHandle);
     REQUIRE(!err, "failed to get task handle: %d", err);
-    err = ThreadGetHandle(&threadHandle);
-    REQUIRE(!err, "failed to get thread handle: %d", err);
+}
 
-    LOG("task handle %08x; thread handle %08x", taskHandle, threadHandle);
+/**
+ * Root server entry points
+ *
+ * We receive precisely no arguments. Yay!
+ */
+int main(int argc, const char **argv) {
+    int err;
 
-    // parse the init bundle and read the init script
+    // set up env; read the init bundle and init script
+    EnvInit();
+
     init::Bundle bundle;
     if(!bundle.validate()) {
         PANIC("failed to validate init bundle");
     }
 
-    auto scriptFile = bundle.open("/etc/default.init");
-    REQUIRE(scriptFile, "failed to open default init script");
+    init::SetupServers(bundle);
 
-    LOG("Init script: %u bytes, '%s'", scriptFile->getSize(), scriptFile->getContents().data());
+    LOG("Malloc footprint %u", malloc_footprint());
+
 
     // create a port
     uintptr_t port;
@@ -83,18 +89,10 @@ int main(int argc, const char **argv) {
     err = PortSetQueueDepth(port, 5);
     REQUIRE(!err, "failed to set port queue depth: %d", err);
 
-    /*
-    // vector test
-    std::vector<int> balls;
-    balls.push_back(420);
-    balls.push_back(69);
-
-    for(auto fuck : balls) {
-        LOG("fucker %d", fuck);
-    }
-*/
-
     // receiver boi
+    memset(fuck, 0, 1024);
+
+    uintptr_t newThread;
     err = ThreadCreate(Receiveboi, port, ((uintptr_t) &fuck) + 1024, &newThread);
     REQUIRE(!err, "failed to create thread: %d", err);
     LOG("receiverboi thread handle $%08x'h", newThread);

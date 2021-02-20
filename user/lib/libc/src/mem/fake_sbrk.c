@@ -58,8 +58,24 @@ void *__fake_sbrk(const intptr_t inc) {
 
     // if negative, attempt to shrink the heap region
     if(inc < 0) {
-        // TODO: implement
+        // XXX: no idea if this is right
         abort();
+        // get the current pointer to the end of the region
+        void *endPtr = ((void *) (gHeapStart + gHeapSize));
+
+        // resize it
+        const size_t newSize = gHeapSize - abs(inc);
+        err = ResizeVirtualRegion(gHeapHandle, newSize);
+        if(err) {
+            abort();
+        }
+        gHeapSize = newSize;
+
+        gHeapSize = newSize;
+
+        // return the pointer to the end of the region, i.e. where this new memory begins
+        gSbrkBase = (void *) endPtr;
+        return endPtr;
     }
     // otherwise, grow it
     else {

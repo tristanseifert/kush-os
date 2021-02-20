@@ -67,6 +67,11 @@ LIBC_EXPORT size_t malloc_set_footprint_limit(const size_t newLimit);
  */
 LIBC_EXPORT int mallopt(const int option, const int value);
 
+/**
+ * Trims the malloc region, leaving at most `trim` bytes of extra space.
+ */
+LIBC_EXPORT int malloc_trim(const size_t trim);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,8 +1,24 @@
 ###############################################################################
 # Default init script
 #
-# Listed below are the basic binaries/boot servers required for an x86 PC
-# system.
+# This file defines both the contents of the boot-up init bundle, as well as
+# the servers and drivers that should be loaded. The first word in each line
+# defines what its purpose is:
+#
+#   FILE: Path to a file to include in the init bundle.
+# SERVER: Specifies the name of a server to launch. They are lauched in the
+#         order specified.
 ###############################################################################
-FILE /boot/rootsrv.elf
+## define the contents of the init bundle
+FILE /boot/rootsrv
 FILE /etc/default.init
+FILE /sbin/dyldosrv
+FILE /lib/libsystem.dyldo
+FILE /lib/libc.dyldo
+FILE /lib/libc++.dyldo.1.0
+FILE /lib/libc++abi.dyldo.1.0
+FILE /lib/libdyldo.dyldo
+
+###############
+## now, start all of the servers
+SERVER dyldosrv -test -flags arg1 arg2 "arg3 is longer with spaces" arg4

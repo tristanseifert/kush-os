@@ -2,7 +2,7 @@
 # Toolchain descripion for using the system's clang compiler to build for x86
 # 32-bit in ELF format.
 ###############################################################################
-SET(CMAKE_SYSTEM_NAME generic)
+SET(CMAKE_SYSTEM_NAME i386-kush)
 #SET(CMAKE_SYSTEM_VERSION 1)
 
 SET(TARGET_TRIPLE "i386-pc-kush-elf")
@@ -14,6 +14,8 @@ SET(TOOLS_BASE "${TOOLCHAIN_BASE}/bin")
 
 SET(CMAKE_SYSROOT ~/kush/sysroot)
 get_filename_component(CMAKE_SYSROOT ${CMAKE_SYSROOT} ABSOLUTE)
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SYSROOT}/../cmake/)
 
 # set up search paths for tools
 set(CMAKE_FIND_ROOT_PATH ${TOOLCHAIN_BASE})
@@ -38,6 +40,3 @@ SET(CMAKE_EXE_LINKER_FLAGS_INIT "-fuse-ld=lld")
 set(CMAKE_ASM_COMPILER_WORKS 1)
 set(CMAKE_C_COMPILER_WORKS 1)
 set(CMAKE_CXX_COMPILER_WORKS 1)
-
-# we support shared libraries
-SET_PROPERTY(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
