@@ -1,16 +1,8 @@
 /*-
  * SPDX-License-Identifier: BSD-3-Clause
  *
- * Copyright (c) 1989, 1993
- *	The Regents of the University of California.  All rights reserved.
- * (c) UNIX System Laboratories, Inc.
- * All or some portions of this file are derived from material licensed
- * to the University of California by American Telephone and Telegraph
- * Co. or Unix System Laboratories, Inc. and are reproduced herein with
- * the permission of UNIX System Laboratories, Inc.
- *
- * This code is derived from software contributed to Berkeley by
- * Paul Borman at Krystal Technologies.
+ * Copyright (c) 1987, 1991 Regents of the University of California.
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,36 +28,50 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)ctype.h	8.4 (Berkeley) 1/21/94
- *      $FreeBSD$
+ *	@(#)endian.h	7.8 (Berkeley) 4/3/91
+ * $FreeBSD$
  */
 
-#ifndef _CTYPE_H_
-#define	_CTYPE_H_
+#ifndef _X86_ENDIAN_H_
+#define	_X86_ENDIAN_H_
 
-#ifdef __cplusplus
-extern "C" {
+#include <sys/cdefs.h>
+#include <sys/types.h>
+
+/*
+ * Define the order of 32-bit words in 64-bit words.
+ */
+#define	_QUAD_HIGHWORD 1
+#define	_QUAD_LOWWORD 0
+
+/*
+ * Definitions for byte order, according to byte significance from low
+ * address to high.
+ */
+#define	_LITTLE_ENDIAN	1234	/* LSB first: i386, vax */
+#define	_BIG_ENDIAN	4321	/* MSB first: 68000, ibm, net */
+#define	_PDP_ENDIAN	3412	/* LSB first in word, MSW first in long */
+
+#define	_BYTE_ORDER	_LITTLE_ENDIAN
+
+/*
+ * Deprecated variants that don't have enough underscores to be useful in more
+ * strict namespaces.
+ */
+#if 0
+#define	LITTLE_ENDIAN	_LITTLE_ENDIAN
+#define	BIG_ENDIAN	_BIG_ENDIAN
+#define	PDP_ENDIAN	_PDP_ENDIAN
+#define	BYTE_ORDER	_BYTE_ORDER
 #endif
 
-int	isalnum(int);
-int	isalpha(int);
-int	iscntrl(int);
-int	isdigit(int);
-int	isgraph(int);
-int	islower(int);
-int	isprint(int);
-int	ispunct(int);
-int	isspace(int);
-int	isupper(int);
-int	isxdigit(int);
-int	tolower(int);
-int	toupper(int);
-int	isblank(int);
-int	isascii(int);
-int	toascii(int);
+#define	__bswap16(x)	__builtin_bswap16(x)
+#define	__bswap32(x)	__builtin_bswap32(x)
+#define	__bswap64(x)	__builtin_bswap64(x)
 
-#ifdef __cplusplus
-}
+#define	__htonl(x)	__bswap32(x)
+#define	__htons(x)	__bswap16(x)
+#define	__ntohl(x)	__bswap32(x)
+#define	__ntohs(x)	__bswap16(x)
+
 #endif
-
-#endif /* !_CTYPE_H_ */

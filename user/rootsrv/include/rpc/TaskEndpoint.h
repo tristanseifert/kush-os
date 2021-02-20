@@ -29,7 +29,7 @@ enum class RootSrvTaskEpType {
  */
 struct RootSrvTaskCreate {
     /// Path to the binary
-    cista::offset:string path;
+    cista::offset::string path;
     /// optional arguments
     cista::offset::vector<cista::offset::string> args;
     

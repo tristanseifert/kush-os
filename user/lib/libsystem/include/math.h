@@ -14,6 +14,14 @@ typedef double double_t;
  * We only include the basic math header here, since there's some complex number stuff that can
  * canse conflicts when compiled normally.
  */
+#define __MATH_BUILTIN_RELOPS
 #include <openlibm/openlibm_math.h>
+
+/*
+ * Now, declare a bunch of functions openlibm doesn't quite export right.
+ */
+/*#define signbit(x) __signbit(x)
+#define isfinite(x) __isfinite(x)
+#define isnormal(x) __isnormal(x)*/
 
 #endif

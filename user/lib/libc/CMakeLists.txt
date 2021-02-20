@@ -11,6 +11,8 @@ add_library(c_objs OBJECT
     src/string/memcpy.c
     src/string/memmove.c
     src/string/memset.c
+    # formatting
+    src/string/asprintf.c
     src/string/printf.c
     # string manipulation
     src/string/strchr.c
@@ -56,6 +58,7 @@ add_library(c_objs OBJECT
     src/stdlib/llabs.c
     src/stdlib/lldiv.c
     # locale
+    src/locale/strto.c
     src/locale/isalnum.c
     src/locale/isalpha.c
     src/locale/isascii.c
@@ -215,3 +218,6 @@ FILE(GLOB LIBC_PUB_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
 install(FILES ${LIBC_PUB_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include)
 FILE(GLOB LIBC_PUB_SYS_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/sys/*.h")
 install(FILES ${LIBC_PUB_SYS_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/sys)
+FILE(GLOB LIBC_LOCALE_SYS_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/locale/*.h")
+install(FILES ${LIBC_LOCALE_SYS_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/locale)
+

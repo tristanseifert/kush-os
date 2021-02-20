@@ -183,6 +183,19 @@ long long
 unsigned long long
 	 wcstoull(const wchar_t * __restrict, wchar_t ** __restrict, int);
 
+/* UTF-8. */
+#define MB_CUR_MAX 4
+
+#ifdef MB_LEN_MAX
+#undef MB_LEN_MAX
+#define MB_LEN_MAX 4
+#endif
+
+// wide char to multibyte
+size_t wcsnrtombs(char *dest, const wchar_t **src, size_t nwc, size_t len, mbstate_t *ps);
+// multibyte to wide char
+size_t mbsnrtowcs(wchar_t *dest, const char **src, size_t nms, size_t len, mbstate_t *ps);
+
 #ifdef __cplusplus
 }
 #endif

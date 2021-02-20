@@ -7,6 +7,7 @@ add_executable(rootsrv
     src/init/Init.cpp
     src/init/Bundle.cpp
     src/init/ScriptParser.cpp
+    src/task/RpcHandler.cpp
 )
 
 #####
