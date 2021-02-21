@@ -7,6 +7,7 @@ add_library(c_objs OBJECT
     # time functions
     src/time/gettimeofday.c
     src/time/time.c
+    src/time/strftime.c
     # string functions
     src/string/memchr.c
     src/string/memclr.c
@@ -17,6 +18,7 @@ add_library(c_objs OBJECT
     # formatting
     src/string/asprintf.c
     src/string/printf.c
+    src/string/sscanf.c
     # string manipulation
     src/string/strchr.c
     src/string/strlen.c
@@ -24,8 +26,12 @@ add_library(c_objs OBJECT
     src/string/strncmp.c
     src/string/strcmp.c
     src/string/strncpy.c
+    src/string/strlcat.c
+    src/string/strlcpy.c
     src/string/strnlen.c
     src/string/strnstr.c
+    src/string/strcoll.c
+    src/string/strxfrm.c
     # wide strings
     src/string/wcpcpy.c
     src/string/wcpncpy.c
@@ -62,6 +68,7 @@ add_library(c_objs OBJECT
     src/stdlib/llabs.c
     src/stdlib/lldiv.c
     # locale
+    src/locale/locale.c
     src/locale/strto.c
     src/locale/isalnum.c
     src/locale/isalpha.c
@@ -78,6 +85,16 @@ add_library(c_objs OBJECT
     src/locale/isxdigit.c
     src/locale/tolower.c
     src/locale/toupper.c
+    src/locale/stdlib.c
+    src/locale/string.c
+    # wide char support
+    src/wchar/conv.c
+    src/wchar/strconv.c
+    src/wchar/len.c
+    src/wchar/wctypes.c
+    src/wchar/wctypes_locale.c
+    src/wchar/wcscoll.c
+    src/wchar/wcsxfrm.c
     # wide string conversions
     src/locale/wcstol.c
     src/locale/wcstoll.c
@@ -105,6 +122,11 @@ add_library(c_objs OBJECT
     src/file/default_streams.c
     src/file/fflush.c
     src/file/fprintf.c
+    src/file/fwrite.c
+    src/file/fread.c
+    src/file/fseek.c
+    src/file/fopen.c
+    src/file/fclose.c
     # C11 threading implementation
     src/threads/thread_info.c
     src/threads/c11_condvar.c

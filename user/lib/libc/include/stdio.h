@@ -20,6 +20,8 @@
 
 // maximum length of filenames
 #define	FILENAME_MAX                    1024
+// min size of buffered IO Buffers
+#define BUFSIZ                          (1024)
 
 // declare some stuff to the actual symbol names
 #define	stdin	__stdinp

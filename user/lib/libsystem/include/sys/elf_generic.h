@@ -32,6 +32,7 @@
 #define	_SYS_ELF_GENERIC_H_ 1
 
 #include <sys/cdefs.h>
+#include <endian.h>
 
 /*
  * Definitions of generic ELF names which relieve applications from
@@ -44,9 +45,9 @@
 
 #define	ELF_CLASS	__CONCAT(ELFCLASS,__ELF_WORD_SIZE)
 
-#if BYTE_ORDER == LITTLE_ENDIAN
+#if _BYTE_ORDER == _LITTLE_ENDIAN
 #define	ELF_DATA	ELFDATA2LSB
-#elif BYTE_ORDER == BIG_ENDIAN
+#elif _BYTE_ORDER == _BIG_ENDIAN
 #define	ELF_DATA	ELFDATA2MSB
 #else
 #error "Unknown byte order"

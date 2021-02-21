@@ -1,5 +1,5 @@
 #include <stddef.h>
-
+#include <stdio.h>
 #include <dlfcn.h>
 #include <link.h>
 
@@ -10,6 +10,8 @@
  */
 int dl_iterate_phdr(int (*callback) (struct dl_phdr_info *info, const size_t size, void *data),
         void *data) {
+    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
+
     // TODO: implement
     return 0;
 }

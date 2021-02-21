@@ -2,11 +2,17 @@
 #define TASK_TASK_H
 
 #include <cstddef>
+#include <memory>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
 namespace task {
+namespace loader {
+class Loader;
+}
+
 /**
  * Encapsulates information about a task created on the system.
  *
@@ -15,6 +21,9 @@ namespace task {
  * the only task that should create other tasks.
  */
 class Task {
+    public:
+        using Buffer = std::span<std::byte>;
+
     public:
         // don't call this constructor, use one of the create*() functions
         Task(const std::string &path);
@@ -27,9 +36,12 @@ class Task {
 
     public:
         /// Creates a new task from memory
-        static uintptr_t createFromMemory(const std::string &elfPath,
-                const std::span<std::byte> &elf, const std::vector<std::string> &args);
+        static uintptr_t createFromMemory(const std::string &elfPath, const Buffer &elf,
+                const std::vector<std::string> &args);
 
+    private:
+        /// Instantiates a binary loader for the given file
+        std::shared_ptr<loader::Loader> getLoaderFor(const std::string &, const Buffer &);
 
     private:
         /// path from which the binary was loaded

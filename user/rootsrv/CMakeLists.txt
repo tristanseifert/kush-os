@@ -10,6 +10,7 @@ add_executable(rootsrv
     src/task/Task.cpp
     src/task/Registry.cpp
     src/task/RpcHandler.cpp
+    src/task/loader/Elf32.cpp
 )
 
 #####
@@ -25,11 +26,12 @@ target_include_directories(rootsrv PRIVATE src)
 
 # required libraries
 add_dependencies(rootsrv c_static)
+target_link_libraries(rootsrv PRIVATE c_static)
 target_link_libraries(rootsrv PRIVATE system_static lzfse_static cista)
+target_link_libraries(rootsrv PRIVATE fmt::fmt-header-only)
 
 # we have to compile the root server as standalone
-target_link_options(rootsrv PRIVATE -static -fno-exceptions -fno-rtti)
-target_compile_options(rootsrv PRIVATE -fno-exceptions -fno-rtti)
+target_link_options(rootsrv PRIVATE -static)
 
 # use the correct linker script
 set_target_properties(rootsrv PROPERTIES LINK_DEPENDS ${C_STATIC_LINKER_SCRIPT})

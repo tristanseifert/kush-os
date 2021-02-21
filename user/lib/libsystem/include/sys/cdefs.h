@@ -217,7 +217,9 @@
 #endif
 #if __GNUC_PREREQ__(2, 7)
 #define	__dead2		__attribute__((__noreturn__))
+#ifndef __pure2
 #define	__pure2		__attribute__((__const__))
+#endif
 #define	__unused	__attribute__((__unused__))
 #define	__used		__attribute__((__used__))
 #define	__packed	__attribute__((__packed__))
@@ -692,6 +694,7 @@
  * Deal with all versions of POSIX.  The ordering relative to the tests above is
  * important.
  */
+#undef __ISO_C_VISIBLE
 #if defined(_POSIX_SOURCE) && !defined(_POSIX_C_SOURCE)
 #define	_POSIX_C_SOURCE		198808
 #endif

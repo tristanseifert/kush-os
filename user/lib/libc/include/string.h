@@ -34,6 +34,8 @@ char	*strstr(const char *, const char *) ;
 char	*strtok(char * __restrict, const char * __restrict);
 size_t	 strxfrm(char * __restrict, const char * __restrict, size_t);
 
+size_t strlcpy(char * __restrict dst, const char * __restrict src, size_t dstsize);
+size_t strlcat(char * __restrict dst, const char * __restrict src, size_t dstsize);
 
 #ifdef __cplusplus
 }

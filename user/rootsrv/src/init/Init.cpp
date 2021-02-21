@@ -29,7 +29,11 @@ void init::SetupServers(Bundle &bundle) {
     script.parse(scriptFile);
 
     script.visitServers([&](const auto &name, const auto &params) {
-        InitServer(bundle, name, params);
+        try {
+            InitServer(bundle, name, params);
+        } catch(std::exception &e) {
+            PANIC("Failed to initialize server %s: %s", name.c_str(), e.what());
+        }
         return true;
     });
 

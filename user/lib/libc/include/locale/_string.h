@@ -4,6 +4,8 @@
 #ifndef _LOCALE_STRING_H
 #define _LOCALE_STRING_H
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

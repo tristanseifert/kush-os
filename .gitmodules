@@ -4,3 +4,6 @@
 [submodule "user/lib/external/cista"]
 	path = user/lib/external/cista
 	url = https://github.com/felixguendling/cista.git
+[submodule "user/lib/external/fmtlib"]
+	path = user/lib/external/fmtlib
+	url = git@github.com:fmtlib/fmt.git

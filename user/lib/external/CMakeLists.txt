@@ -9,6 +9,10 @@ add_subdirectory(lzfse)
 # Cista is used rather extensively for RPC serialization
 add_subdirectory(cista)
 
+# string formatting
+SET(FMT_OS OFF CACHE BOOL "disable fmtlib OS component" FORCE)
+add_subdirectory(fmtlib)
+
 # OpenLibm (math library)
 ExternalProject_Add(openlibm
     SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/openlibm

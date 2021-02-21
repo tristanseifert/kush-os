@@ -46,9 +46,62 @@ typedef    unsigned long    wctype_t;
 #include <ctype.h>
 #include <wchar.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+int
+iswalnum(wint_t wc);
+
+int
+iswalpha(wint_t wc);
+
+int
+iswascii(wint_t wc);
+
+int
+iswblank(wint_t wc);
+
+int
+iswcntrl(wint_t wc);
+
+int
+iswdigit(wint_t wc);
+
+int
+iswgraph(wint_t wc);
+
+int
+iswhexnumber(wint_t wc);
+
+int
+iswideogram(wint_t wc);
+
+int
+iswlower(wint_t wc);
+
+int
+iswnumber(wint_t wc);
+
+int
+iswphonogram(wint_t wc);
+
+int
+iswprint(wint_t wc);
+
+int
+iswpunct(wint_t wc);
+
+int
+iswrune(wint_t wc);
+
+int
+iswspace(wint_t wc);
+
+int
+iswspecial(wint_t wc);
+
+int
+iswupper(wint_t wc);
+
+int
+iswxdigit(wint_t wc);
 
 int	iswalnum(wint_t);
 int	iswalpha(wint_t);
@@ -71,32 +124,5 @@ wctrans_t
 wctype_t
 	wctype(const char *);
 
-#ifdef __cplusplus
-}
-#endif
-
-#ifndef __cplusplus
-#define	iswalnum(wc)		__istype((wc), _CTYPE_A|_CTYPE_D|_CTYPE_N)
-#define	iswalpha(wc)		__istype((wc), _CTYPE_A)
-#define	iswblank(wc)		__istype((wc), _CTYPE_B)
-#define	iswcntrl(wc)		__istype((wc), _CTYPE_C)
-#define	iswctype(wc, charclass)	__istype((wc), (charclass))
-#define	iswdigit(wc)		__istype((wc), _CTYPE_D)
-#define	iswgraph(wc)		__istype((wc), _CTYPE_G)
-#define	iswlower(wc)		__istype((wc), _CTYPE_L)
-#define	iswprint(wc)		__istype((wc), _CTYPE_R)
-#define	iswpunct(wc)		__istype((wc), _CTYPE_P)
-
-/// XXX: disgusting hack. this entire file needs to be properly redone
-//#define	iswspace(wc)		__istype((wc), _CTYPE_S)
-#define    iswspace(wc)        isspace((char) wc)
-
-
-#define	iswupper(wc)		__istype((wc), _CTYPE_U)
-#define	iswxdigit(wc)		__istype((wc), _CTYPE_X)
-#define	towlower(wc)		__tolower(wc)
-#define	towupper(wc)		__toupper(wc)
-
-#endif /* __cplusplus */
 
 #endif		/* _WCTYPE_H_ */

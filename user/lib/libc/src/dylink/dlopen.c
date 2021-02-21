@@ -1,5 +1,6 @@
 #include <dlfcn.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <errno.h>
 
 /**
@@ -9,6 +10,8 @@
  * Returned is an opaque handle, which can be passed to other dl* functions.
  */
 void *dlopen(const char *filename, int flag) {
+    fprintf(stderr, "%s unimplemented (path '%s' %u)", __PRETTY_FUNCTION__, filename, flag);
+
     errno = ENOENT;
     return NULL;
 }
@@ -18,6 +21,8 @@ void *dlopen(const char *filename, int flag) {
  * zero, it's unloaded from the process' address space.
  */
 int dlclose(void *handle) {
+    fprintf(stderr, "%s unimplemented (handle %p)", __PRETTY_FUNCTION__, handle);
+
     errno = ENXIO;
     return -1;
 }
