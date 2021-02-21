@@ -3,11 +3,15 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <threads.h>
 
 /**
  * State for the userspace threads code
  */
 typedef struct {
+    /// lock over the hashmap
+    mtx_t blocksLock;
     /// hashmap containing thread info blocks
     struct hashmap *blocks;
 } uthread_state_t;

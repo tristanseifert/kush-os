@@ -180,6 +180,11 @@ uintptr_t platform_timer_add(const uint64_t at, void (*callback)(const uintptr_t
 void platform_timer_remove(const uintptr_t token);
 
 
+/**
+ * Called by the idle task when there is no other work to be performed on this processor core. The
+ * platform code can use this to place the processor in a low power state.
+ */
+void platform_idle();
 
 /**
  * Initializes the root server task.

@@ -52,7 +52,8 @@ void IdleWorker::main() {
     while(1) {
         this->checkWork();
 
-        Thread::yield();
+        platform_idle();
+        //Thread::yield();
     }
 }
 

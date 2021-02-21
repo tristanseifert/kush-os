@@ -6,6 +6,7 @@ add_library(c_objs OBJECT
     src/lib_init.c
     # time functions
     src/time/gettimeofday.c
+    src/time/time.c
     # string functions
     src/string/memchr.c
     src/string/memclr.c

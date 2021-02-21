@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <malloc.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <time.h>
 
 #include <sys/syscalls.h>
@@ -334,6 +335,7 @@ int thrd_join_np(thrd_t _thread, int *outRes, const struct timespec *howLong) {
 
     // release our reference on the thread
     TIBRelease(thread);
+
     return thrd_success;
 }
 
@@ -344,7 +346,7 @@ int thrd_join_np(thrd_t _thread, int *outRes, const struct timespec *howLong) {
 int thrd_join(thrd_t thread, int *outRes) {
     int err = thrd_join_np(thread, outRes, NULL);
 
-    if(err == thrd_timedout) {
+    if(err != thrd_success) {
         return thrd_error;
     }
 

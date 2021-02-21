@@ -24,6 +24,7 @@ int __cxa_atexit(void (* _Nonnull func) (void * _Nullable), void * _Nullable arg
  */
 void __cxa_finalize (void * _Nullable d) {
     // TODO: implement
+    fprintf(stderr, "%s unimplemented!\n", __FUNCTION__);
 }
 
 /**

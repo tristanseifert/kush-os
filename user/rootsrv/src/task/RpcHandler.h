@@ -20,6 +20,8 @@ class RpcHandler {
     public:
         /// Name of the task service
         static const std::string_view kPortName;
+        /// maximum length of messages to be received by this handler; this includes headers
+        constexpr static const size_t kMaxMsgLen = (1024 * 16);
 
     public:
         static void init() {
@@ -41,8 +43,6 @@ class RpcHandler {
 
         /// handle of the task handler port
         uintptr_t portHandle;
-        /// handle for the worker thread
-        uintptr_t threadHandle;
 
         /// when set, the worker thread will continue executing
         std::atomic_bool run;

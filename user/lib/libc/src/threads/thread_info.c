@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <threads.h>
 #include <sys/syscalls.h>
 
 static uthread_state_t gState;
@@ -33,6 +34,9 @@ static int _HashmapThreadCompare(const void *a, const void *b, void *udata) {
  * Initializes the userspace threading component.
  */
 void __libc_thread_init() {
+    int err = mtx_init(&gState.blocksLock, mtx_plain);
+    if(err != thrd_success) abort();
+
     gState.blocks = hashmap_new(sizeof(uthread_t), 0, 0, 0, _HashmapThreadHash,
             _HashmapThreadCompare, NULL);
 }
@@ -41,18 +45,24 @@ void __libc_thread_init() {
  * Returns the thread info structure for a thread given its handle.
  */
 uthread_t *GetThreadInfoBlock(const uintptr_t handle) {
+    int err;
     uthread_t query = { .handle = handle  };
+    uthread_t *found = NULL;
 
     // retrieve an existing block if it exists
+    err = mtx_lock(&gState.blocksLock);
+    if(err != thrd_success) return NULL;
+
     void *_info = hashmap_get(gState.blocks, &query);
     if(_info) {
-        uthread_t *info = (uthread_t *) _info;
-
-        return info;
+        found = (uthread_t *) _info;
+        goto beach;
     }
 
+beach:;
     // no info block found
-    return NULL;
+    mtx_unlock(&gState.blocksLock);
+    return found;
 }
 
 /**
@@ -62,13 +72,20 @@ uthread_t *GetThreadInfoBlock(const uintptr_t handle) {
  * The returned object will have one reference to it.
  */
 uthread_t *CreateThreadInfoBlock(const uintptr_t handle) {
+    int err;
+
     uthread_t thread;
     memset(&thread, 0, sizeof(thread));
     thread.handle = handle;
     thread.refCount = 1;
 
+    err = mtx_lock(&gState.blocksLock);
+    if(err != thrd_success) return NULL;
+
     void *ret = hashmap_set(gState.blocks, &thread);
     assert(ret || (!ret && !hashmap_oom(gState.blocks)));
+
+    mtx_unlock(&gState.blocksLock);
 
     // then return the freshly inserted object
     return GetThreadInfoBlock(handle);
@@ -79,14 +96,17 @@ uthread_t *CreateThreadInfoBlock(const uintptr_t handle) {
  * global handle mapping.
  */
 void __TIBFree(uthread_t *thread) {
-    // remove from map
-    void *old = hashmap_delete(gState.blocks, thread);
-    assert(old);
+    int err = mtx_lock(&gState.blocksLock);
+    if(err != thrd_success) return;
 
     // free its memory
     if(thread->auxInfo) {
         free(thread->auxInfo);
     }
 
-    free(thread);
+    // remove from map (releases its memory as well)
+    void *old = hashmap_delete(gState.blocks, thread);
+    assert(old);
+
+    mtx_unlock(&gState.blocksLock);
 }

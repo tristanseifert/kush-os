@@ -541,9 +541,6 @@ MAX_RELEASE_CHECK_RATE   default: 4095 unless not HAVE_MMAP
 #define DLMALLOC_EXPORT extern
 #endif
 
-// do not pull in time() for now
-#define LACKS_TIME_H    1
-
 // avoid malloc stats... for now
 #define NO_MALLOC_STATS 1
 

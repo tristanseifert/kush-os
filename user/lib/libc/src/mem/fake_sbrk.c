@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 static uintptr_t gHeapHandle = 0;
 static uintptr_t gHeapStart = 0;
@@ -58,6 +59,7 @@ void *__fake_sbrk(const intptr_t inc) {
 
     // if negative, attempt to shrink the heap region
     if(inc < 0) {
+        fprintf(stderr, "shrinkn't\n");
         // XXX: no idea if this is right
         abort();
         // get the current pointer to the end of the region

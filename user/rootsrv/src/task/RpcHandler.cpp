@@ -47,17 +47,35 @@ RpcHandler::RpcHandler() {
  * This continuously reads from the port, waiting to receive a request.
  */
 void RpcHandler::main() {
+    int err;
+
     ThreadSetName(0, "rpc: task ep");
 
-    LOG("we chillin boi");
+    // allocate receive buffers for messages
+    void *rxBuf = nullptr;
+    err = posix_memalign(&rxBuf, 16, kMaxMsgLen);
+    REQUIRE(!err, "failed to allocate message rx buffer: %d", err);
 
     // process messages
     while(this->run) {
-        std::this_thread::yield();
+        // clear out any previous messages
+        memset(rxBuf, 0, kMaxMsgLen);
+
+        // read from the port
+        struct MessageHeader *msg = (struct MessageHeader *) rxBuf;
+        err = PortReceive(this->portHandle, msg, kMaxMsgLen, UINTPTR_MAX);
+
+        if(err > 0) {
+
+        }
+        // an error occurred
+        else {
+            LOG("Port rx error: %d", err);
+        }
     }
 
     // clean up
-    LOG("oh no");
+    free(rxBuf);
 }
 
 /**

@@ -8,9 +8,9 @@
  * Initializes a condition variable.
  */
 int cnd_init(cnd_t *cond) {
-    DbgOut("cnd_init", 8);
-    memset(cond, 0, sizeof(cnd_t));
+    fprintf(stderr, "%s unimplemented\n", __FUNCTION__);
 
+    memset(cond, 0, sizeof(cnd_t));
     return thrd_success;
 }
 

@@ -11,6 +11,7 @@ add_library(kernel_platform_pc OBJECT
     src/physmap.cpp
     src/InitTask.cpp
     src/acpi/Manager.cpp
+    src/acpi/Power.cpp
     src/io/spew.cpp
     src/irq/handlers.S
     src/irq/Manager.cpp

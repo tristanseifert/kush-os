@@ -109,7 +109,7 @@ fail:;
  * Returns the value of a thread local storage slot.
  */
 void *tss_get(tss_t key) {
-    fprintf(stderr, "tss_get() unimplemented");
+    fprintf(stderr, "tss_get() unimplemented: key %08x\n", key);
     return NULL;
 }
 
@@ -135,6 +135,7 @@ int tss_set(tss_t key, void *value) {
     item = (struct tls_slot_info *) _item;
 
     // TODO: store item
+    fprintf(stderr, "tss_set() unimplemented: key %08x value %p\n", key, value);
     return thrd_success;
 
     // handle error conditions
