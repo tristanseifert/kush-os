@@ -82,7 +82,7 @@ typedef	int32_t	wint_t;
 
 #ifndef _STDFILE_DECLARED
 #define _STDFILE_DECLARED
-typedef void FILE;
+typedef struct __libc_file_stream FILE;
 #endif
 struct tm;
 

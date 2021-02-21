@@ -15,6 +15,9 @@ using namespace task;
 // declare the constants for the handler
 const std::string_view RpcHandler::kPortName = "me.blraaz.rpc.rootsrv.task"sv;
 
+/// Shared RPC handler instance
+RpcHandler *RpcHandler::gShared = nullptr;
+
 /**
  * Initializes the RPC handler. This sets up the listening port, the worker thread, and then
  * registers the service.
@@ -28,7 +31,11 @@ RpcHandler::RpcHandler() {
 
     // create the thread next
     this->run = true;
-    // this->worker = std::make_unique<std::thread>(&RpcHandler::main, this);
+    this->worker = std::make_unique<std::thread>(&RpcHandler::main, this);
+
+    auto native = this->worker->native_handle();
+    LOG("thanks for the threadule! %p %p $%08x'h", this->worker.get(), native,
+            thrd_get_handle_np(native));
 
     // lastly, register the port
     // dispensary::RegisterPort(kPortName, this->port);
@@ -40,12 +47,17 @@ RpcHandler::RpcHandler() {
  * This continuously reads from the port, waiting to receive a request.
  */
 void RpcHandler::main() {
+    ThreadSetName(0, "rpc: task ep");
+
+    LOG("we chillin boi");
+
     // process messages
     while(this->run) {
-
+        std::this_thread::yield();
     }
 
     // clean up
+    LOG("oh no");
 }
 
 /**

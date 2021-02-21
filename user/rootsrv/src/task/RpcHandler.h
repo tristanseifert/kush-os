@@ -22,9 +22,13 @@ class RpcHandler {
         static const std::string_view kPortName;
 
     public:
-        RpcHandler();
+        static void init() {
+            gShared = new RpcHandler;
+        }
 
     private:
+        RpcHandler();
+
         void main();
 
         /// Handlesa received message.
@@ -33,6 +37,8 @@ class RpcHandler {
         bool handleTaskCreate(const struct MessageHeader *msg, const size_t len);
 
     private:
+        static RpcHandler *gShared;
+
         /// handle of the task handler port
         uintptr_t portHandle;
         /// handle for the worker thread

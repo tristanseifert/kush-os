@@ -2,6 +2,8 @@
 #include "Bundle.h"
 #include "ScriptParser.h"
 
+#include "task/Task.h"
+
 #include "log.h"
 
 #include <string>
@@ -55,10 +57,10 @@ static void InitServer(Bundle &bundle, const std::string &name,
     auto file = bundle.open(path);
     REQUIRE(file, "Failed to load server '%s' (from %s)", name.c_str(), path.c_str());
 
-    // TODO: create task
-    for(const auto &str : params) {
-        LOG("Param: '%s'", str.c_str());
-    }
+    // create a task
+    auto taskHandle = task::Task::createFromMemory(path, file->getContents(), params);
+    REQUIRE(taskHandle, "Failed to create task for server '%s' (from %s)", name.c_str(),
+            path.c_str());
 
     // clean up
     delete file;

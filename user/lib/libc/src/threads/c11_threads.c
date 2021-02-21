@@ -389,3 +389,10 @@ int thrd_set_stacksize_np(const size_t size) {
     gThreadStackSz = size;
     return thrd_success;
 }
+
+/**
+ * Return the native handle for the thread.
+ */
+uintptr_t thrd_get_handle_np(thrd_t thread) {
+    return thread->handle;
+}

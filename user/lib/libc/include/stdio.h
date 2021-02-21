@@ -37,7 +37,7 @@ extern "C" {
 #endif
 
 typedef int fpos_t;
-typedef void FILE;
+typedef struct __libc_file_stream FILE;
 
 #ifndef _STDSTREAM_DECLARED
 extern FILE *__stdinp;

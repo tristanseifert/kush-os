@@ -2,11 +2,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "file_private.h"
+
+#include <printf.h>
+#include <string.h>
+#include <sys/syscalls.h>
+
+/**
+ * Printf callback that writes to the given stream.
+ */
+static void _WriteStreamCallback(char ch, void *arg) {
+    FILE *stream = (FILE *) arg;
+    stream->putc(stream, ch);
+}
+
 /**
  * Like vprintf(), but the output goes to the given file.
  */
 int vfprintf(FILE *stream, const char *format, va_list arg) {
-    return -1;
+    if(!stream) return -1;
+
+    return fctvprintf(_WriteStreamCallback, stream, format, arg);
 }
 
 /**
@@ -14,6 +30,8 @@ int vfprintf(FILE *stream, const char *format, va_list arg) {
  * vfprintf() function.
  */
 int fprintf(FILE *stream, const char *format, ...) {
+    if(!stream) return -1;
+
     va_list va;
     va_start(va, format);
     int ret = vfprintf(stream, format, va);

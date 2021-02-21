@@ -19,28 +19,28 @@ _LIBCPP_BEGIN_NAMESPACE_STD
 // use the system timespec type
 typedef ::timespec __libcpp_timespec_t;
 
-// calling convention for TLS destructors: we use the standard one
+// calling convention for TLS destructors: we use the standard C calling convention
 #define _LIBCPP_TLS_DESTRUCTOR_CC
 
 // declare types
-typedef void *__libcpp_mutex_t;
-#define _LIBCPP_MUTEX_INITIALIZER 0
+typedef mtx_t __libcpp_mutex_t;
+#define _LIBCPP_MUTEX_INITIALIZER { .flag = 0 }
 
-typedef void *__libcpp_recursive_mutex_t;
-typedef void *__libcpp_condvar_t;
-#define _LIBCPP_CONDVAR_INITIALIZER 0
+typedef mtx_t __libcpp_recursive_mutex_t;
 
-typedef void *__libcpp_semaphore_t;
-typedef void *__libcpp_exec_once_flag;
-#define _LIBCPP_EXEC_ONCE_INITIALIZER 0
+typedef cnd_t __libcpp_condvar_t;
+#define _LIBCPP_CONDVAR_INITIALIZER {}
 
-// thread IDs are handles
+typedef once_flag __libcpp_exec_once_flag;
+#define _LIBCPP_EXEC_ONCE_INITIALIZER ONCE_FLAG_INIT
+
 typedef thrd_t __libcpp_thread_id;
 #define _LIBCPP_NULL_THREAD 0U
-// handle to a native thread
 typedef thrd_t __libcpp_thread_t;
 
-typedef uintptr_t __libcpp_tls_key;
+typedef tss_t __libcpp_tls_key;
+
+// typedef void *__libcpp_semaphore_t;
 
 // declare some helpers
 namespace __thread_helpers {
@@ -70,27 +70,59 @@ inline struct timespec __convert_to_timespec(const chrono::nanoseconds& __ns) {
 }
 
 // Mutex
-LIBC_EXPORT int __libcpp_recursive_mutex_init(__libcpp_recursive_mutex_t *__m); 
-LIBC_EXPORT int __libcpp_recursive_mutex_lock(__libcpp_recursive_mutex_t *__m);
-LIBC_EXPORT bool __libcpp_recursive_mutex_trylock(__libcpp_recursive_mutex_t *__m);
-LIBC_EXPORT int __libcpp_recursive_mutex_unlock(__libcpp_recursive_mutex_t *__m);
-LIBC_EXPORT int __libcpp_recursive_mutex_destroy(__libcpp_recursive_mutex_t *__m);
-LIBC_EXPORT int __libcpp_mutex_lock(__libcpp_mutex_t *__m);
+inline int __libcpp_recursive_mutex_init(__libcpp_recursive_mutex_t *__m) {
+    return mtx_init(__m, mtx_plain | mtx_recursive) == thrd_success ? 0 : EINVAL;
+} 
+inline int __libcpp_recursive_mutex_lock(__libcpp_recursive_mutex_t *__m) {
+    return mtx_lock(__m) == thrd_success ? 0 : EINVAL;
+}
+inline bool __libcpp_recursive_mutex_trylock(__libcpp_recursive_mutex_t *__m) {
+    return mtx_trylock(__m) == thrd_success;
+}
+inline int __libcpp_recursive_mutex_unlock(__libcpp_recursive_mutex_t *__m) {
+    return mtx_unlock(__m) == thrd_success ? 0 : EINVAL;
+}
+inline int __libcpp_recursive_mutex_destroy(__libcpp_recursive_mutex_t *__m) {
+    mtx_destroy(__m);
+    return 0;
+}
 
-LIBC_EXPORT bool __libcpp_mutex_trylock(__libcpp_mutex_t *__m);
-LIBC_EXPORT int __libcpp_mutex_unlock(__libcpp_mutex_t *__m);
-LIBC_EXPORT int __libcpp_mutex_destroy(__libcpp_mutex_t *__m);
+inline int __libcpp_mutex_lock(__libcpp_mutex_t *__m) {
+    return mtx_lock(__m) == thrd_success ? 0 : EINVAL;
+}
+inline bool __libcpp_mutex_trylock(__libcpp_mutex_t *__m) {
+    return mtx_trylock(__m) == thrd_success;
+}
+inline int __libcpp_mutex_unlock(__libcpp_mutex_t *__m) {
+    return mtx_unlock(__m) == thrd_success ? 0 : EINVAL;
+}
+inline int __libcpp_mutex_destroy(__libcpp_mutex_t *__m) {
+    mtx_destroy(__m);
+    return 0;
+}
 
 // Condition variable
-LIBC_EXPORT int __libcpp_condvar_signal(__libcpp_condvar_t* __cv);
-LIBC_EXPORT int __libcpp_condvar_broadcast(__libcpp_condvar_t* __cv);
-LIBC_EXPORT int __libcpp_condvar_wait(__libcpp_condvar_t* __cv, __libcpp_mutex_t* __m);
-LIBC_EXPORT int __libcpp_condvar_timedwait(__libcpp_condvar_t *__cv, __libcpp_mutex_t *__m,
-                               __libcpp_timespec_t *__ts);
-LIBC_EXPORT int __libcpp_condvar_destroy(__libcpp_condvar_t* __cv);
+inline int __libcpp_condvar_signal(__libcpp_condvar_t* __cv) {
+    return cnd_signal(__cv) == thrd_success ? 0 : EINVAL;
+}
+inline int __libcpp_condvar_broadcast(__libcpp_condvar_t* __cv) {
+    return cnd_broadcast(__cv) == thrd_success ? 0 : EINVAL;
+}
+inline int __libcpp_condvar_wait(__libcpp_condvar_t* __cv, __libcpp_mutex_t* __m) {
+    return cnd_wait(__cv, __m) == thrd_success ? 0 : EINVAL;
+}
+inline int __libcpp_condvar_timedwait(__libcpp_condvar_t *__cv, __libcpp_mutex_t *__m,
+        __libcpp_timespec_t *__ts) {
+    int __ec = cnd_timedwait(__cv, __m, __ts);
+    return __ec == thrd_timedout ? ETIMEDOUT : __ec;
+}
+inline int __libcpp_condvar_destroy(__libcpp_condvar_t* __cv) {
+    cnd_destroy(__cv);
+    return 0;
+}
 
+/*
 #ifndef _LIBCPP_NO_NATIVE_SEMAPHORES
-
 // Semaphore
 LIBC_EXPORT bool __libcpp_semaphore_init(__libcpp_semaphore_t* __sem, int __init);
 LIBC_EXPORT bool __libcpp_semaphore_destroy(__libcpp_semaphore_t* __sem);
@@ -100,9 +132,13 @@ LIBC_EXPORT bool __libcpp_semaphore_wait_timed(__libcpp_semaphore_t* __sem,
 std::chrono::nanoseconds const& __ns);
 
 #endif // _LIBCPP_NO_NATIVE_SEMAPHORES
+*/
 
 // Execute once
-LIBC_EXPORT int __libcpp_execute_once(__libcpp_exec_once_flag *flag, void (*init_routine)());
+inline int __libcpp_execute_once(__libcpp_exec_once_flag *flag, void (*init_routine)(void)) {
+    ::call_once(flag, init_routine);
+    return 0;
+}
 
 // Thread id
 inline bool __libcpp_thread_id_equal(__libcpp_thread_id t1, __libcpp_thread_id t2) {
@@ -118,7 +154,14 @@ inline bool __libcpp_thread_id_less(__libcpp_thread_id t1, __libcpp_thread_id t2
 inline int __libcpp_thread_create(__libcpp_thread_t *__t, void *(*__func)(void *),
                            void *__arg) {
     int __ec = thrd_create(__t, reinterpret_cast<thrd_start_t>(__func), __arg);
-    return __ec == thrd_nomem ? ENOMEM : __ec;
+    switch(__ec) {
+        case thrd_success:
+            return 0;
+        case thrd_nomem:
+            return ENOMEM;
+        default:
+            return EINVAL;
+    }
 }
 
 inline __libcpp_thread_id __libcpp_thread_get_current_id() {
@@ -150,10 +193,16 @@ inline bool __libcpp_thread_isnull(const __libcpp_thread_t *__t) {
 }
 
 // Thread local storage
-LIBC_EXPORT int __libcpp_tls_create(__libcpp_tls_key* __key,
-                        void(_LIBCPP_TLS_DESTRUCTOR_CC* __at_exit)(void*));
-LIBC_EXPORT void *__libcpp_tls_get(__libcpp_tls_key __key);
-LIBC_EXPORT int __libcpp_tls_set(__libcpp_tls_key __key, void *__p);
+inline int __libcpp_tls_create(__libcpp_tls_key* __key, 
+        void(_LIBCPP_TLS_DESTRUCTOR_CC* __at_exit)(void*)) {
+    return tss_create(__key, __at_exit) == thrd_success ? 0 : EINVAL;
+}
+inline void *__libcpp_tls_get(__libcpp_tls_key __key) {
+    return tss_get(__key);
+}
+inline int __libcpp_tls_set(__libcpp_tls_key __key, void *__p) {
+    return tss_set(__key, __p) == thrd_success ? 0 : EINVAL;
+}
 
 _LIBCPP_END_NAMESPACE_STD
 #endif

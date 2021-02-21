@@ -1,5 +1,7 @@
 #include <stdio.h>
 
+#include "file_private.h"
+
 /**
  * Flushes all output buffers in the given file pointer.
  */
@@ -10,12 +12,12 @@ int fflush(FILE *file) {
     }
 
     // otherwise, just flush this stream
-    return -1;
+    return file->flush(file);
 }
 
 /**
  * Purges all input and output buffers of the given file, discarding any unsent/unread data.
  */
-int fpurge(FILE *stream) {
-    return -1;
+int fpurge(FILE *file) {
+    return file->purge(file);
 }

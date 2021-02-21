@@ -4,6 +4,8 @@
 
 add_library(c_objs OBJECT
     src/lib_init.c
+    # time functions
+    src/time/gettimeofday.c
     # string functions
     src/string/memchr.c
     src/string/memclr.c
@@ -50,6 +52,7 @@ add_library(c_objs OBJECT
     # syscalls
     src/sys/abort.c
     src/sys/assert.c
+    src/sys/atexit.c
     src/sys/exit.c
     # stdlib math stuff
     src/stdlib/div.c
@@ -89,6 +92,7 @@ add_library(c_objs OBJECT
     src/env/getenv.c
     # error handling
     src/error/errno.c
+    src/error/strerror.c
     # stack stuff
     src/stack/stack_guard.c
     # dynamic linking
@@ -102,7 +106,10 @@ add_library(c_objs OBJECT
     src/file/fprintf.c
     # C11 threading implementation
     src/threads/thread_info.c
+    src/threads/c11_condvar.c
     src/threads/c11_threads.c
+    src/threads/c11_threadlocal.c
+    src/threads/c11_mutex.c
     # internal data structures
     src/struct/hashmap.c
 )

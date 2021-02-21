@@ -7,6 +7,8 @@
 
 #include "init/Init.h"
 #include "init/Bundle.h"
+#include "task/Registry.h"
+#include "task/RpcHandler.h"
 
 #include "log.h"
 
@@ -71,6 +73,9 @@ int main(int argc, const char **argv) {
 
     // set up env; read the init bundle and init script
     EnvInit();
+
+    task::Registry::init();
+    task::RpcHandler::init();
 
     init::Bundle bundle;
     if(!bundle.validate()) {
