@@ -97,7 +97,7 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     // 0x23: Create thread
     ThreadCreate,
     // 0x24: Join with thread
-    UnimplementedSyscall,
+    ThreadJoin,
     // 0x25: Destroy thread
     ThreadDestroy,
     // 0x26: Set thread state 

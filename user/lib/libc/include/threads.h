@@ -14,7 +14,11 @@ extern "C" {
 struct timespec;
 #endif
 
+// forward declare all the types
 typedef struct uthread *thrd_t;
+typedef struct ucondvar *cnd_t;
+typedef struct umutex *mtx_t;
+typedef uintptr_t tls_key;
 
 /* Function return values */
 #define thrd_error    0 /**< The requested operation failed */

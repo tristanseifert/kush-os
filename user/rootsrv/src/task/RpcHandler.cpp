@@ -28,6 +28,7 @@ RpcHandler::RpcHandler() {
 
     // create the thread next
     this->run = true;
+    // this->worker = std::make_unique<std::thread>(&RpcHandler::main, this);
 
     // lastly, register the port
     // dispensary::RegisterPort(kPortName, this->port);

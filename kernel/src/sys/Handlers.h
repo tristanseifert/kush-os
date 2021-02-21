@@ -65,13 +65,10 @@ int ThreadSetNoteMask(const Syscall::Args *args, const uintptr_t number);
  * address of the name and its length, in bytes.
  */
 int ThreadSetName(const Syscall::Args *args, const uintptr_t number);
-
-/**
- * Resumes the given thread.
- *
- * This is only valid for threads that are currently in the suspended state.
- */
+/// Resumes the given paused thread.
 int ThreadResume(const Syscall::Args *args, const uintptr_t number);
+/// Waits for the specified thread to terminate.
+int ThreadJoin(const Syscall::Args *args, const uintptr_t number);
 
 
 /**

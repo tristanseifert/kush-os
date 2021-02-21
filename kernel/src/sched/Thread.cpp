@@ -1,5 +1,6 @@
 #include "Thread.h"
 #include "Blockable.h"
+#include "SignalFlag.h"
 #include "Scheduler.h"
 #include "Task.h"
 #include "IdleWorker.h"
@@ -78,6 +79,12 @@ Thread::Thread(Task *_parent, const uintptr_t pc, const uintptr_t param, const b
  * Destroys all resources associated with this thread.
  */
 Thread::~Thread() {
+    // invoke termination handlers
+    while(!this->terminateSignals.empty()) {
+        auto signal = this->terminateSignals.pop();
+        signal->signal();
+    }
+
     // remove all objects we're blocking on
     if(this->blockingOn) {
         this->blockingOn->reset();
@@ -263,8 +270,10 @@ void Thread::sleep(const uint64_t nanos) {
  * Note that we raise the IRQL, but do not ever lower it; this is because when we get switched back
  * in, the IRQL will be lowered again to the Passive level, i.e. what most threads that are running
  * will be using.
+ *
+ * TODO: Handle the timeouts
  */
-int Thread::blockOn(Blockable *b) {
+int Thread::blockOn(Blockable *b, const uint64_t until) {
     REQUIRE(b, "invalid blockable %p", b);
     REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
 
@@ -400,6 +409,48 @@ void Thread::runDpcs() {
     // release queue access
     RW_UNLOCK_WRITE(&this->lock);
     CRITICAL_EXIT();
+}
+
+
+/**
+ * Blocks the caller waiting for this thread to terminate, or until the timeout elapses.
+ *
+ * @param waitUntil Absolute timepoint until which to wait, 0 to poll, or the maximum value of
+ * the type to wait forever.
+ *
+ * @return 0 if the thread terminated, 1 if the wait timed out, or a negativ error code.
+ */
+int Thread::waitOn(const uint64_t waitUntil) {
+    int err;
+
+    DECLARE_CRITICAL();
+
+    // create the notification flag
+    auto flag = new SignalFlag;
+    if(!flag) {
+        return -1;
+    }
+
+    // add it to the termination list
+    CRITICAL_ENTER();
+    RW_LOCK_WRITE(&this->lock);
+
+    this->terminateSignals.push_back(flag);
+
+    RW_UNLOCK_WRITE(&this->lock);
+    CRITICAL_EXIT();
+
+    // now, block the caller on this object
+    err = sched::Thread::current()->blockOn(flag, waitUntil);
+
+    // release the flag and interpret the block return
+    delete flag;
+
+    if(!err) { // block completed
+        return 0;
+    } else { // some sort of error
+        return err;
+    }
 }
 
 

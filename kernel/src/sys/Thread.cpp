@@ -203,6 +203,43 @@ int sys::ThreadResume(const Syscall::Args *args, const uintptr_t number) {
     return Errors::Success;
 }
 
+/**
+ * Waits for the given thread to terminate.
+ */
+int sys::ThreadJoin(const Syscall::Args *args, const uintptr_t number) {
+    int err;
+
+    // look up the thread; reject if it's the currently running thread
+    auto thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
+    if(!thread) {
+        return Errors::InvalidHandle;
+    }
+
+    if(thread == sched::Thread::current()) {
+        return Errors::DeadlockPrevented;
+    }
+
+    // get the time to wait
+    uint64_t nanos = 0;
+
+    if(args->args[1] != UINTPTR_MAX) {
+        nanos = platform_timer_now() + (args->args[1] * 1000ULL);
+    }
+
+    // wait for thread termination
+    err = thread->waitOn(nanos);
+
+    if(!err) { // 0 = thread terminated
+        return Errors::Success;
+    }
+    else if(err == 1) { // 1 == timeout expired
+        return Errors::Timeout;
+    }
+    else { // other error
+        return Errors::GeneralError;
+    }
+}
+
 
 /**
  * Entry point stub for threads created from userspace.

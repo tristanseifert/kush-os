@@ -30,6 +30,8 @@ enum Errors: int {
     TryAgain                            = -10,
     /// The destination object is in the wrong state for the call
     InvalidState                        = -11,
+    /// The call was aborted because it would result in a deadlock.
+    DeadlockPrevented                   = -12,
 };
 }
 

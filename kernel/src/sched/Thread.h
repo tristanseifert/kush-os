@@ -13,6 +13,7 @@
 
 namespace sched {
 class Blockable;
+class SignalFlag;
 struct Task;
 
 /**
@@ -152,6 +153,9 @@ struct Thread {
          */
         DECLARE_RWLOCK(lock);
 
+        /// notification flags to signal when terminating
+        rt::Queue<SignalFlag *> terminateSignals;
+
         /// DPCs queued for the thread
         rt::Queue<DpcInfo> dpcs;
         /// When set, there are DPCs pending.
@@ -205,13 +209,15 @@ struct Thread {
         }
 
         /// Blocks the thread on the given object.
-        int blockOn(Blockable *b);
+        int blockOn(Blockable *b, const uint64_t until = 0);
 
         /// Adds a DPC to the thread's queue.
         int addDpc(void (*handler)(Thread *, void *), void *context = nullptr);
         /// Drains the DPC queue.
         void runDpcs();
 
+        /// Waits for the thread to be terminated.
+        int waitOn(const uint64_t waitUntil = 0);
         /// Terminates this thread.
         void terminate(bool release = true);
 

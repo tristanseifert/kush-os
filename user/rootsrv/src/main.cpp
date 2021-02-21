@@ -20,7 +20,7 @@ int Receiveboi(void *arg) {
     LOG("handle: %08x'h", handle);
 
     int err;
-    char fuck[256] __attribute__((aligned(16)));
+    static char fuck[256] __attribute__((aligned(16)));
     memset(&fuck, 0, 256);
 
     ThreadUsleep(500 * 1000);
