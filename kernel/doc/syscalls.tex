@@ -355,14 +355,16 @@ Blocks the thread for the specified amount of time. The kernel makes no guarante
 %%%%%
 \subsubsection{{\tt 0x23}: Create thread}
 \textbf{Arguments:} (3) Thread entry point; entry point argument; initial stack pointer \\
-\textbf{Flags:} None \\
+\textbf{Flags:} See below \\
 \textbf{Returns:} Thread handle ($>0$) or error code ($\leq0$) \\
 
 Creates a new thread and attaches it to the running task. The caller must have set up a region of memory for the thread's stack. After the associated kernel thread has been initialized, the thread will execute a return to user mode with the given stack and program counter value. It will be invoked as if it were a function declared as \texttt{void ThreadEntry(const uintptr\_t param)}.
 
-By default, the thread is created in a suspended state. You must resume it before it will execute.
-
 It is undefined behavior to return from the user thread entry routine. (Doing so will probably just crash the task; however, runtime libraries may wish to wrap thread entry points such that returning from threads will terminate them, or do something else more desirable.)
+
+\begin{itemize}
+\item \texttt{1 << 15}: The is not scheduled by default; you need to resume it later.
+\end{itemize}
 
 %%%%%
 \subsubsection{{\tt 0x24}: Join with thread}
@@ -416,6 +418,13 @@ Updates the thread's notification mask. Any bits that are cleared in the mask wi
 
 Updates the thread's name with the contents of the specified string buffer; if the buffer is zero terminated, the terminator is not included in the byte count. The thread name is used purely for informational purposes. 
 
+%%%%%
+\subsubsection{{\tt 0x2A}: Resume thread}
+\textbf{Arguments:} (1) Thread handle \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success, or negative error code \\
+
+Resumes a thread that's currently paused. This can only be called on threads that are in the suspended state, i.e. those created with the \texttt{THREAD\_SUSPENDED} flag.
 
 %%%%%%%%%%
 \newpage

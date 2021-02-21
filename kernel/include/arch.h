@@ -52,6 +52,11 @@ struct Thread;
 
 namespace arch {
 /**
+ * Prints out the register state contained in the architecture-specific pointer.
+ */
+int PrintState(const void *state, char *buf, const size_t bufLen);
+
+/**
  * The kernel invokes this method when a newly created task is about to start executing for the
  * first time.
  *

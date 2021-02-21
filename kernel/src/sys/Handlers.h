@@ -66,6 +66,13 @@ int ThreadSetNoteMask(const Syscall::Args *args, const uintptr_t number);
  */
 int ThreadSetName(const Syscall::Args *args, const uintptr_t number);
 
+/**
+ * Resumes the given thread.
+ *
+ * This is only valid for threads that are currently in the suspended state.
+ */
+int ThreadResume(const Syscall::Args *args, const uintptr_t number);
+
 
 /**
  * Implements the create task syscall.

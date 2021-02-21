@@ -100,6 +100,11 @@ add_library(c_objs OBJECT
     src/file/default_streams.c
     src/file/fflush.c
     src/file/fprintf.c
+    # C11 threading implementation
+    src/threads/thread_info.c
+    src/threads/c11_threads.c
+    # internal data structures
+    src/struct/hashmap.c
 )
 target_compile_options(c_objs PRIVATE -flto)
 target_compile_options(c_objs PRIVATE -fno-exceptions -fno-rtti)
@@ -215,6 +220,7 @@ install(TARGETS c_static LIBRARY)
 install(TARGETS c_dynamic LIBRARY)
 
 FILE(GLOB LIBC_PUB_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
+install(FILES ${CMAKE_CURRENT_LIST_DIR}/include/__external_threading DESTINATION ${SYSROOT_DIR}/usr/include)
 install(FILES ${LIBC_PUB_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include)
 FILE(GLOB LIBC_PUB_SYS_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/sys/*.h")
 install(FILES ${LIBC_PUB_SYS_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/sys)

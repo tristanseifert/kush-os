@@ -51,6 +51,7 @@ LIBSYSTEM_INTERNAL int __do_syscall4(const uintptr_t number, const uintptr_t arg
 #define SYS_THREAD_SET_PRIORITY         0x27
 #define SYS_THREAD_SET_NOTEMASK         0x28
 #define SYS_THREAD_RENAME               0x29
+#define SYS_THREAD_RESUME               0x2A
 
 #define SYS_TASK_GET_HANDLE             0x30
 #define SYS_TASK_CREATE                 0x31

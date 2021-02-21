@@ -108,9 +108,12 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     ThreadSetNoteMask,
     // 0x29: Set thread name
     ThreadSetName,
-    // 0x2A-0x2F: reserved
+    // 0x2A: resume thread
+    ThreadResume,
+
+    // 0x2B-0x2F: reserved
     UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall,
-    UnimplementedSyscall, UnimplementedSyscall,
+    UnimplementedSyscall,
 
     // 0x30: Get task handle
     [](auto, auto) -> int {

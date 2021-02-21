@@ -44,13 +44,23 @@
 /* Frequency of the clock ticks reported by clock().  */
 #define	CLOCKS_PER_SEC	1000
 
+/*
+ * Supported clock types
+ */
+#define CLOCK_REALTIME          0
+#define CLOCK_MONOTONIC         4
+
 #ifndef _CLOCK_T_DECLARED
-typedef	uint64_t	clock_t;
+typedef	uint64_t clock_t;
 #define	_CLOCK_T_DECLARED
+#endif
+#ifndef _CLOCKID_T_DECLARED
+typedef unsigned int clockid_t;
+#define    _CLOCKID_T_DECLARED
 #endif
 
 #ifndef _TIME_T_DECLARED
-typedef	unsigned int	time_t;
+typedef	unsigned int time_t;
 #define	_TIME_T_DECLARED
 #endif
 
@@ -90,6 +100,9 @@ size_t strftime(char * __restrict, size_t, const char * __restrict,
     const struct tm * __restrict);
 time_t time(time_t *);
 
+int clock_getres(clockid_t, struct timespec *);
+int clock_gettime(clockid_t, struct timespec *);
+int clock_settime(clockid_t, const struct timespec *);
 int nanosleep(const struct timespec *, struct timespec *);
 
 char *asctime_r(const struct tm *, char *);

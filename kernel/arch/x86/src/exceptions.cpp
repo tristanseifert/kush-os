@@ -110,7 +110,7 @@ void exception_install_handlers() {
  * @return Number of characters written
  */
 int x86_exception_format_info(char *outBuf, const size_t outBufLen,
-        const x86_exception_info_t &info) {
+        const x86_exception_info_t *info) {
     uint32_t cr3;
     asm volatile("mov %%cr3, %0" : "=r" (cr3));
 
@@ -120,12 +120,12 @@ int x86_exception_format_info(char *outBuf, const size_t outBufLen,
             "EAX $%08x EBX $%08x ECX $%08x EDX $%08x\n"
             "EDI $%08x ESI $%08x EBP $%08x ESP $%08x\n"
             "EIP $%08x EFLAGS $%08x",
-            info.intNo, info.errCode,
-            info.cs, info.ds, info.es, info.fs, 
-            info.gs, info.ss, cr3,
-            info.eax, info.ebx, info.ecx, info.edx,
-            info.edi, info.esi, info.ebp, info.esp,
-            info.eip, info.eflags
+            info->intNo, info->errCode,
+            info->cs, info->ds, info->es, info->fs, 
+            info->gs, info->ss, cr3,
+            info->eax, info->ebx, info->ecx, info->edx,
+            info->edi, info->esi, info->ebp, info->esp,
+            info->eip, info->eflags
     );
 }
 
@@ -154,7 +154,7 @@ void x86_handle_pagefault(x86_exception_info_t info) {
         // it wasn't handled by the VM manager; let the thread handle it
         auto thread = sched::Thread::current();
         if(thread) {
-            thread->handleFault(sched::Thread::FaultType::UnhandledPagefault, faultAddr, &info.eip);
+            thread->handleFault(sched::Thread::FaultType::UnhandledPagefault, faultAddr, &info.eip, &info);
             return;
         }
     }
@@ -162,7 +162,7 @@ void x86_handle_pagefault(x86_exception_info_t info) {
 unhandled:;
     // page fault is unhandled (or in kernel)
     char buf[512] = {0};
-    x86_exception_format_info(buf, 512, info);
+    x86_exception_format_info(buf, 512, &info);
     panic("unhandled page fault: %s%s %s (%s) at $%08x\n%s", 
             ((info.errCode & 0x08) ? "reserved bit violation on " : ""),
             ((info.errCode & 0x04) ? "user" : "supervisor"),
@@ -187,10 +187,10 @@ void x86_handle_exception(x86_exception_info_t info) {
     // try to handle exception
     switch(info.intNo) {
         case X86_EXC_ILLEGAL_OPCODE:
-            thread->handleFault(sched::Thread::FaultType::InvalidInstruction, info.eip, &info.eip);
+            thread->handleFault(sched::Thread::FaultType::InvalidInstruction, info.eip, &info.eip, &info);
             break;
         case X86_EXC_GPF:
-            thread->handleFault(sched::Thread::FaultType::ProtectionViolation, info.eip, &info.eip);
+            thread->handleFault(sched::Thread::FaultType::ProtectionViolation, info.eip, &info.eip, &info);
             break;
 
         default:
@@ -204,7 +204,16 @@ void x86_handle_exception(x86_exception_info_t info) {
 unhandled:;
     // otherwise, panique
     char buf[512] = {0};
-    x86_exception_format_info(buf, 512, info);
+    x86_exception_format_info(buf, 512, &info);
     panic("unhandled exception: %s\n%s", vector_name(info.intNo), buf);
 }
 
+/**
+ * Arch print handler
+ */
+int arch::PrintState(const void *_state, char *buf, const size_t bufLen) {
+    const auto state = reinterpret_cast<const x86_exception_info_t *>(_state);
+    x86_exception_format_info(buf, 512, state);
+
+    return 0;
+}

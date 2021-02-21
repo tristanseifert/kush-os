@@ -9,6 +9,20 @@
 #include <arch.h>
 #include <log.h>
 
+/// Thread creation flags
+ENUM_FLAGS(ThreadCreateFlags)
+enum class ThreadCreateFlags {
+    /// No set flags
+    None                                = 0,
+    /// Default thread flags
+    Default                             = None,
+
+    /// The thread should be created as suspended
+    StartSuspended                      = (1 << 15),
+};
+
+static ThreadCreateFlags ConvertFlags(const uintptr_t inFlags);
+
 /// Info passed to a new userspace thread kernel stub
 struct InitThreadInfo {
     uintptr_t entry, entryArg, stack;
@@ -42,6 +56,10 @@ int sys::ThreadCreate(const Syscall::Args *args, const uintptr_t number) {
         return Errors::InvalidPointer;
     }
 
+    // convert the flags
+    const auto rawFlags = (number & 0xFFFF0000) >> 16;
+    const auto flags = ConvertFlags(rawFlags);
+
     // create a new thread
     auto info = new InitThreadInfo(args->args[0], args->args[1], args->args[2]);
 
@@ -50,8 +68,12 @@ int sys::ThreadCreate(const Syscall::Args *args, const uintptr_t number) {
     thread->kernelMode = false;
 
     // ensure it gets scheduled
-    thread->setState(sched::Thread::State::Runnable);
-    sched::Scheduler::get()->markThreadAsRunnable(thread);
+    if(TestFlags(flags & ThreadCreateFlags::StartSuspended)) {
+        thread->setState(sched::Thread::State::Paused);
+    } else {
+        thread->setState(sched::Thread::State::Runnable);
+        sched::Scheduler::get()->markThreadAsRunnable(thread);
+    }
 
     // return handle of newly created thread
     return static_cast<int>(thread->handle);
@@ -136,7 +158,7 @@ int sys::ThreadSetNoteMask(const Syscall::Args *args, const uintptr_t number) {
 int sys::ThreadSetName(const Syscall::Args *args, const uintptr_t number) {
     sched::Thread *thread = nullptr;
 
-    // get the task
+    // get the thread
     if(!args->args[0]) {
         thread = sched::Thread::current();
     } else {
@@ -159,6 +181,27 @@ int sys::ThreadSetName(const Syscall::Args *args, const uintptr_t number) {
     return Errors::Success;
 }
 
+/**
+ * Resumes a currently paused thread.
+ */
+int sys::ThreadResume(const Syscall::Args *args, const uintptr_t number) {
+    // look up the thread
+    auto thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
+    if(!thread) {
+        return Errors::InvalidHandle;
+    }
+
+    // ensure it's paused
+    if(thread->getState() != sched::Thread::State::Paused) {
+        return Errors::InvalidState;
+    }
+
+    // go ahead and resume it
+    thread->setState(sched::Thread::State::Runnable);
+    sched::Scheduler::get()->markThreadAsRunnable(thread);
+
+    return Errors::Success;
+}
 
 
 /**
@@ -178,4 +221,17 @@ static void CreateThreadEntryStub(uintptr_t _ctx) {
 
     // perform return to userspace
     thread->returnToUser(pc, sp, arg);
+}
+
+/**
+ * Converts the flag argument of the "create thread" syscall.
+ */
+static ThreadCreateFlags ConvertFlags(const uintptr_t inFlags) {
+    ThreadCreateFlags flags = ThreadCreateFlags::None;
+
+    if(inFlags & (1 << 15)) {
+        flags |= ThreadCreateFlags::StartSuspended;
+    }
+
+    return flags;
 }

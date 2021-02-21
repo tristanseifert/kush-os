@@ -413,7 +413,7 @@ void Thread::runDpcs() {
  * This will only be invoked for faults from userspace. All kernel faults will immediately cause
  * a panic.
  */
-void Thread::handleFault(const FaultType type, const uintptr_t pc, void *context) {
+void Thread::handleFault(const FaultType type, const uintptr_t pc, void *context, const void *arch) {
     // special handling for the general fault type
     if(type == FaultType::General) {
         goto unhandled;
@@ -436,7 +436,12 @@ unhandled:;
     // fault was not handled; kill the thread
     REQUIRE(this->task, "no task for thread %p with fault %d", this, (int) type);
 
-    log("Unhandled fault %d in thread $%08x'h (%s) info %08x", (int) type, this->handle, this->name,
-            context);
+    // print the register info
+    constexpr static const size_t kBufSize = 512;
+    char buf[kBufSize];
+    arch::PrintState(arch, buf, kBufSize);
+
+    log("Unhandled fault %d in thread $%08x'h (%s) info %08x pc %08x\n%s", (int) type, this->handle, 
+            this->name, context, pc, buf);
     this->task->terminate(-1);
 }

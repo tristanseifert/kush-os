@@ -30,6 +30,14 @@ LIBC_EXPORT void* valloc(const size_t numBytes);
 LIBC_EXPORT void* pvalloc(const size_t numBytes);
 
 /**
+ * GIven an array of void pointers to previously malloc()-ed regions, releases the memory of all
+ * of them. Any non-NULL pointer in the input array is cleared out.
+ *
+ * This is likely faster than just calling free() repeatedly.
+ */
+LIBC_EXPORT size_t bulk_free(void **, size_t n_elements);
+
+/**
  * Returns the total number of bytes acquired by the malloc implementation from the system; this includes
  * internal bookkeeping done by the implementation.
  */

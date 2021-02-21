@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstring>
 #include <malloc.h>
+#include <threads.h>
 
 #include "init/Init.h"
 #include "init/Bundle.h"
@@ -10,11 +11,11 @@
 #include "log.h"
 
 // temporary stackule
-static uint8_t fuck[1024];
-
 static uintptr_t taskHandle = 0;
 
-void Receiveboi(const uintptr_t handle) {
+int Receiveboi(void *arg) {
+    const uintptr_t handle = (uintptr_t) arg;
+
     ThreadSetName(0, "receiveyboi");
     LOG("handle: %08x'h", handle);
 
@@ -32,10 +33,19 @@ void Receiveboi(const uintptr_t handle) {
             uint8_t *yeet = (uint8_t *) msg->data;
             LOG("PortReceive returned %d: from $%08x'h len %d bytes %02x %02x %02x %02x", 
                     err, msg->sender, msg->receivedBytes, yeet[0], yeet[1], yeet[2], yeet[3]);
+
+            if(yeet[1] == 29) {
+                goto fucking;
+            }
         } else {
             LOG("PortReceive returned %d", err);
         }
     }
+
+fucking:;
+    LOG("aight im fuckin outta here");
+    ThreadUsleep(1000 * 420);
+    return 0x12344141;
 }
 
 /**
@@ -90,14 +100,12 @@ int main(int argc, const char **argv) {
     REQUIRE(!err, "failed to set port queue depth: %d", err);
 
     // receiver boi
-    memset(fuck, 0, 1024);
+    thrd_t test;
+    err = thrd_create(&test, Receiveboi, (void *) port);
+    REQUIRE(err == thrd_success, "failed to create thread: %d", err);
+    LOG("receiverboi thread $%p", test);
 
-    uintptr_t newThread;
-    err = ThreadCreate(Receiveboi, port, ((uintptr_t) &fuck) + 1024, &newThread);
-    REQUIRE(!err, "failed to create thread: %d", err);
-    LOG("receiverboi thread handle $%08x'h", newThread);
-
-    for(size_t j = 0; j < 420; j++) {
+    for(size_t j = 0; j < 30; j++) {
         cock[0] = (j>>8) & 0xFF;
         cock[1] = j & 0xFF;
 
@@ -118,8 +126,12 @@ int main(int argc, const char **argv) {
 
     // start the message handler thread
     ThreadUsleep(69420 * 102);
-    err = ThreadDestroy(newThread);
-    LOG("ThreadDestroy: %d", err);
+
+    // test thread_join
+    int cuck = 0;
+    err = thrd_join(test, &cuck);
+    REQUIRE(err == thrd_success, "failed to join thread: %d", err);
+    LOG("Thread return: %08x (%d)", cuck, cuck);
 
     // launch all the loaded drivers
 

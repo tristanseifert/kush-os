@@ -37,30 +37,11 @@
 
 #include <stddef.h>
 #include <stdint.h>
-
-#ifndef _GID_T_DECLARED
-typedef    uint16_t        gid_t;
-#define    _GID_T_DECLARED
-#endif
-
-#ifndef _OFF_T_DECLARED
-typedef    int        off_t;
-#define    _OFF_T_DECLARED
-#endif
+#include <sys/types.h>
 
 #ifndef _SSIZE_T_DECLARED
 typedef    long        ssize_t;
 #define    _SSIZE_T_DECLARED
-#endif
-
-#ifndef _PID_T_DECLARED
-typedef    uint32_t        pid_t;
-#define    _PID_T_DECLARED
-#endif
-
-#ifndef _UID_T_DECLARED
-typedef    uint16_t        uid_t;
-#define    _UID_T_DECLARED
 #endif
 
 #ifndef _USECONDS_T_DECLARED

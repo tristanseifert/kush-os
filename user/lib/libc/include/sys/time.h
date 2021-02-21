@@ -8,6 +8,9 @@ typedef    int    suseconds_t;
 #define    _SUSECONDS_T_DECLARED
 #endif
 
+/// XXX: do we need to define this properly at some point
+struct timezone;
+
 struct timeval {
     time_t      tv_sec;     /* seconds */
     suseconds_t tv_usec;    /* microseconds */

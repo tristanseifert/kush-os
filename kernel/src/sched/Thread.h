@@ -197,6 +197,12 @@ struct Thread {
 
             __atomic_store(&this->state, &newState, __ATOMIC_RELEASE);
         }
+        /// Atomically reads the current state.
+        const State getState() const {
+            State s;
+            __atomic_load(&this->state, &s, __ATOMIC_RELAXED);
+            return s;
+        }
 
         /// Blocks the thread on the given object.
         int blockOn(Blockable *b);
@@ -210,7 +216,7 @@ struct Thread {
         void terminate(bool release = true);
 
         /// Handles a fault of the given type. Called from fault handlers.
-        void handleFault(const FaultType type, const uintptr_t pc, void *context);
+        void handleFault(const FaultType type, const uintptr_t pc, void *context, const void *arch);
 
         /// Returns a handle to the currently executing thread.
         static Thread *current();

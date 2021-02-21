@@ -3,8 +3,8 @@
  *
  * This endpoint is used to create processes, for example.
  */
-#ifndef RPC_ROOTSRV_TASKEP_H
-#define RPC_ROOTSRV_TASKEP_H
+#ifndef RPC_ROOTSRV_TASKEP_HPP
+#define RPC_ROOTSRV_TASKEP_HPP
 
 #include <cstdint>
 
@@ -16,9 +16,11 @@ namespace rpc {
 /**
  * Message type
  */
-enum class RootSrvTaskEpType {
+enum class RootSrvTaskEpType: uint32_t {
     /// Client -> server; create task
-    kTaskCreate         = 1,
+    kTaskCreate                         = 'TSKC',
+    /// server -> client; create task response
+    kTaskCreateReply                    = 'TSKR',
 };
 
 /**

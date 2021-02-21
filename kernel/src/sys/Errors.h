@@ -28,6 +28,8 @@ enum Errors: int {
     Timeout                             = -9,
     /// Try the call again later (used for temporary failures)
     TryAgain                            = -10,
+    /// The destination object is in the wrong state for the call
+    InvalidState                        = -11,
 };
 }
 
