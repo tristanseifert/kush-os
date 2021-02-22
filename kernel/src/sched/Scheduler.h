@@ -73,6 +73,10 @@ class Scheduler {
             yield(nullptr, nullptr);
         }
 
+        void registerTask(Task *task);
+        void unregisterTask(Task *task);
+        void iterateTasks(void (*callback)(Task *));
+
     private:
         static void init();
 
@@ -128,9 +132,11 @@ class Scheduler {
 
         /// runnable threads (per priority band)
         rt::Queue<Thread *> runnable[kPriorityGroupMax];
-
         /// queue of threads that have become runnable
         rt::Queue<RunnableInfo> newlyRunnable;
+
+        /// all active tasks
+        rt::List<Task *> tasks;
 
     public:
         /// idle worker

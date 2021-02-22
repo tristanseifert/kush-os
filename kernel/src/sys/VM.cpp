@@ -303,10 +303,11 @@ int sys::VmRegionGetInfo(const Syscall::Args *args, const uintptr_t number) {
     if(!Syscall::validateUserPtr(infoPtr, infoLen)) {
         return Errors::InvalidPointer;
     }
+    memset(infoPtr, 0, sizeof(VmInfo));
 
     // get the task handle
     if(!args->args[1]) {
-        task = sched::Thread::current()->task;
+        task = sched::Task::current();
     } else {
         task = handle::Manager::getTask(static_cast<Handle>(args->args[1]));
         if(!task) {
@@ -359,6 +360,7 @@ int sys::VmRegionGetInfo(const Syscall::Args *args, const uintptr_t number) {
     }
 
     infoPtr->flags = outFlags;
+    // log("For handle $%08x'h: base %08x len %x flags %x %x", args->args[0], base, len, (uintptr_t )outFlags, (uintptr_t) flags);
 
     return Errors::Success;
 }

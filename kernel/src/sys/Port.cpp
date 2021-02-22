@@ -19,14 +19,16 @@ using namespace sys;
  */
 struct RecvInfo {
     /// thread handle of the thread that sent this message
-    Handle sender;
+    Handle thread;
+    /// task handle of the task that contains the thread
+    Handle task;
     /// flags; currently unused
     uint16_t flags;
     /// length of the message (bytes)
     uint16_t messageLength;
 
     /// reserved fields (for padding)
-    uint32_t reserved[2];
+    uint32_t reserved[1];
 
     /// data buffer; must be allocated in 16-byte chunks
     uint8_t data[];
@@ -124,8 +126,8 @@ int sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
     }
 
     // receive from port
-    Handle sender;
-    err = port->receive(sender, recvPtr->data, msgBufLen, timeout);
+    Handle senderThreadHandle;
+    err = port->receive(senderThreadHandle, recvPtr->data, msgBufLen, timeout);
 
     if(err < 0) {
         // receive timed out
@@ -140,8 +142,16 @@ int sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
         }
     }
 
+    // resolve the thread
+    auto senderThread = handle::Manager::getThread(senderThreadHandle);
+    if(senderThread && senderThread->task) {
+        recvPtr->task = senderThread->task->handle;
+    } else {
+        recvPtr->task = static_cast<Handle>(0);
+    }
+
     // write info on the received message to it
-    recvPtr->sender = sender;
+    recvPtr->thread = senderThreadHandle;
     recvPtr->flags = 0;
     recvPtr->messageLength = err;
 

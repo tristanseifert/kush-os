@@ -65,8 +65,5 @@ static void InitServer(std::shared_ptr<Bundle> &bundle, const std::string &name,
     auto taskHandle = task::Task::createFromMemory(path, file->getContents(), params);
     REQUIRE(taskHandle, "Failed to create task for server '%s' (from %s)", name.c_str(),
             path.c_str());
-
-    // clean up
-    delete file;
 }
 

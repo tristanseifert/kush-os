@@ -81,6 +81,7 @@ void RpcHandler::main() {
             // invoke the appropriate handler
             switch(packet->type) {
                 case static_cast<uint32_t>(RootSrvDispensaryEpType::Lookup):
+                    if(!packet->replyPort) continue;
                     this->handleLookup(msg, packet, err);
                     break;
 
@@ -104,9 +105,6 @@ void RpcHandler::main() {
  */
 void RpcHandler::handleLookup(const struct MessageHeader *msg, const rpc::RpcPacket *packet,
         const size_t msgLen) {
-    int err;
-    void *txBuf = nullptr;
-
     // deserialize the request
     auto data = std::span(packet->payload, msgLen - sizeof(RpcPacket));
     auto req = cista::deserialize<RootSrvDispensaryLookup>(data);
@@ -126,18 +124,29 @@ void RpcHandler::handleLookup(const struct MessageHeader *msg, const rpc::RpcPac
 
     // serialize it and stick it in an RPC packet
     auto replyBuf = cista::serialize(reply);
+    this->reply(packet, RootSrvDispensaryEpType::LookupReply, replyBuf);
+}
 
-    const auto replySize = replyBuf.size() + sizeof(RpcPacket);
+/**
+ * Sends an RPC message.
+ */
+void RpcHandler::reply(const rpc::RpcPacket *packet, const rpc::RootSrvDispensaryEpType type,
+        const std::span<uint8_t> &buf) {
+    int err;
+    void *txBuf = nullptr;
+
+    // allocate the reply buffer
+    const auto replySize = buf.size() + sizeof(rpc::RpcPacket);
     err = posix_memalign(&txBuf, 16, replySize);
     if(err) {
         throw std::system_error(err, std::generic_category(), "posix_memalign");
     }
 
-    auto txPacket = reinterpret_cast<RpcPacket *>(txBuf);
-    txPacket->type = static_cast<uint32_t>(RootSrvDispensaryEpType::LookupReply);
+    auto txPacket = reinterpret_cast<rpc::RpcPacket *>(txBuf);
+    txPacket->type = static_cast<uint32_t>(type);
     txPacket->replyPort = 0;
 
-    memcpy(txPacket->payload, replyBuf.data(), replyBuf.size());
+    memcpy(txPacket->payload, buf.data(), buf.size());
 
     // send it
     const auto replyPort = packet->replyPort;
@@ -146,8 +155,6 @@ void RpcHandler::handleLookup(const struct MessageHeader *msg, const rpc::RpcPac
     free(txBuf);
 
     if(err) {
-        LOG("Failed to send reply for request '%s' from $%08x'h: %d", name.c_str(), msg->sender,
-                err);
         throw std::system_error(err, std::generic_category(), "PortSend");
     }
 }

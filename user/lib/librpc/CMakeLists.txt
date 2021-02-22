@@ -5,7 +5,9 @@
 ###############################################################################
 
 add_library(rpc_objs OBJECT
+    src/helpers/Send.cpp
     src/rpc/Dispensary.cpp
+    src/rpc/FileIo.cpp
 )
 target_compile_options(rpc_objs PRIVATE -fPIC)
 
@@ -35,6 +37,6 @@ install(TARGETS rpc_static LIBRARY)
 #install(TARGETS rpc_dynamic LIBRARY)
 
 # copy the rpc headers
-FILE(GLOB LIBRPC_RPC_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/rpc/*.hpp")
+FILE(GLOB LIBRPC_RPC_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/rpc/*.h*")
 install(FILES ${LIBRPC_RPC_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/rpc)
 

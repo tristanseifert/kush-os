@@ -10,6 +10,9 @@
 #include "sys/Syscall.h"
 #include "handle/Manager.h"
 
+#include "sched/Thread.h"
+#include "sched/IdleWorker.h"
+
 #include <arch.h>
 #include <platform.h>
 #include <stdint.h>
@@ -17,6 +20,8 @@
 #include <version.h>
 #include <printf.h>
 #include <log.h>
+
+static void ThreadThymeCock(uintptr_t);
 
 /// root init server
 sched::Task *gRootServer = nullptr;
@@ -50,6 +55,12 @@ void kernel_init() {
     // notify other components of VM availability
     platform_vm_available();
 
+    // test map the first 4K of VGA memory
+#if 1
+    auto m = vm::Map::kern();
+    int err = m->add(0xb8000, 0x1000, 0xfc000000, vm::MapMode::kKernelRW);
+    REQUIRE(!err, "failed to map vga: %d", err);
+#endif
 }
 
 /**
@@ -57,10 +68,96 @@ void kernel_init() {
  * takes place and we go into the scheduler.
  */
 void kernel_main() {
-    log("kush time: PC = $%p", get_pc());
+    log("kush (%s) starting", gVERSION_SHORT);
 
+    auto task2 = sched::Task::alloc();
+    auto thread8 = sched::Thread::kernelThread(task2, &ThreadThymeCock, 0);
+    thread8->setName("thyme caulk");
+
+    sched::Scheduler::get()->scheduleRunnable(task2);
+
+    *((uint32_t *) 0xfc000000) = 0x04410E41;
+
+    // kernel is initialized. launch the root server
+    gRootServer = platform_init_rootsrv();
 
     // invoke the scheduler
     sched::Scheduler::get()->run();
     panic("scheduler returned, this should never happen");
+}
+
+static void ThreadThymeCock(uintptr_t) {
+    char bollocks[300] = {0};
+
+    uintptr_t i = 0;
+    auto last = platform_timer_now();
+
+    while(1) {
+        const auto nsec = platform_timer_now();
+        const auto since = nsec - last;
+        const auto idle =sched::Scheduler::get()->idle->thread->cpuTime; 
+        last = nsec;
+
+        // idle state
+        const uint64_t secs = (nsec / (1000ULL * 1000ULL * 1000ULL));
+        int written = snprintf(bollocks, 300, "o'clock: %16llu ns (%02lld:%02lld) yeet %8g mS "
+                "idle %g sec\n\n", nsec,
+                secs / 60, secs % 60, ((float) since / (1000. * 1000.)), ((float) idle / (1000. * 1000. * 1000.))
+                );
+
+        static uint16_t *base = (uint16_t *) 0xfc0000a0;
+        static size_t x = 0, y = 0;
+        x = y = 0;
+
+        for(int i = 0; i < written; i++) {
+            if(bollocks[i] == '\n') {
+                x = 0;
+                y++;
+                continue;
+            }
+
+            base[x + (y * 80)] = 0x0700 | bollocks[i];
+            x++;
+        }
+
+        // each task
+        sched::Scheduler::get()->iterateTasks([](sched::Task *task) {
+            // task header
+            char line[80];
+            int written = snprintf(line, 80, "* Task %4u %08x %-24s\n", task->pid, task->handle, task->name);
+
+            for(int i = 0; i < written; i++) {
+                if(line[i] == '\n') {
+                    x = 0;
+                    y++;
+                    continue;
+                }
+
+                base[x + (y * 80)] = 0x0700 | line[i];
+                x++;
+            }
+
+            // now write each thread
+            for(auto thread : task->threads) {
+                written = snprintf(line, 80, "  x %08x %24s %u %6.2f %08x\n", thread->handle,
+                        thread->name, (uintptr_t) thread->state,
+                        ((float) thread->cpuTime / (1000. * 1000. * 1000.)), thread->lastSyscall);
+            for(int i = 0; i < written; i++) {
+                if(line[i] == '\n') {
+                    x = 0;
+                    y++;
+                    continue;
+                }
+
+                base[x + (y * 80)] = 0x0700 | line[i];
+                x++;
+            }
+            }
+        });
+
+        // yeet
+        i++;
+        sched::Thread::sleep(200 * 1000 * 1000);
+        //sched::Thread::yield();
+    }
 }

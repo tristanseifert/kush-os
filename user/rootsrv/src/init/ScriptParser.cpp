@@ -13,7 +13,7 @@ using namespace init;
  *
  * If an error occurs, PANIC() is called.
  */
-void ScriptParser::parse(Bundle::File *file) {
+void ScriptParser::parse(std::shared_ptr<Bundle::File> file) {
     // clear out old state
     this->reset();
 

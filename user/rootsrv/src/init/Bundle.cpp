@@ -68,17 +68,37 @@ bool Bundle::validate() {
  *
  * @return A file object (which must be `delete`d when done with) or nullptr, if file doesn't exist
  */
-Bundle::File *Bundle::open(const std::string &_name) {
-    // iterate over all file entries
+std::shared_ptr<Bundle::File> Bundle::open(const std::string &_name) {
+    // trim the filename
     const InitFileHeader *fileHdr = this->header->headers;
     auto name = _name;
     name = trim(name);
 
+    // return immediately if it's in the cache
+    if(this->fileCache.contains(name)) {
+        auto ptr = this->fileCache.at(name).lock();
+
+        // return the pointer
+        if(ptr) {
+            return ptr;
+        } 
+        // pointer expired, so remove it from cache
+        else {
+            this->fileCache.erase(name);
+        }
+    }
+
+    // iterate over all file entries
     for(size_t i = 0; i < this->header->numFiles; i++) {
         // compare the names
         std::string thisName(fileHdr->name, static_cast<size_t>(fileHdr->nameLen));
         if(name == thisName) {
-            auto file = new File(this->base, fileHdr);
+            auto file = std::make_shared<File>(this->base, fileHdr);
+
+            // store it in our cache
+            this->fileCache[name] = file;
+
+            // done
             return file;
         }
 

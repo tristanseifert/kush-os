@@ -2,6 +2,8 @@
 #include "sys/infopage.h"
 #include "sys/syscalls.h"
 
+#include "helpers/Send.h"
+
 #include <malloc.h>
 #include <threads.h>
 
@@ -44,8 +46,6 @@ static void InitDispensary() {
     err = PortCreate(&gLookupReplyPort);
     assert(!err);
 
-    fprintf(stderr, "Reply port $%08x'h\n", gLookupReplyPort);
-
     // and the lock
     err = mtx_init(&gLookupReplyPortLock, mtx_plain);
     assert(err == thrd_success);
@@ -71,7 +71,7 @@ static void InitDispensary() {
  */
 int LookupService(const char * _Nonnull _name, uintptr_t * _Nonnull outPort) {\
     int err;
-    void *txBuf = nullptr, *rxBuf = nullptr;
+    void *rxBuf = nullptr;
     std::vector<uint8_t> buf;
 
     // fail if no dispensary port
@@ -84,25 +84,12 @@ int LookupService(const char * _Nonnull _name, uintptr_t * _Nonnull outPort) {\
         InitDispensary();
     });
 
-    // serialize the request
+    // serialize request
     const std::string name(_name);
     RootSrvDispensaryLookup req;
     req.name = name;
 
     buf = cista::serialize(req);
-
-    // prepare the message
-    const auto reqSize = buf.size() + sizeof(RpcPacket);
-    err = posix_memalign(&txBuf, 16, reqSize);
-    if(err) {
-        return err;
-    }
-
-    auto txPacket = reinterpret_cast<RpcPacket *>(txBuf);
-    txPacket->type = static_cast<uint32_t>(RootSrvDispensaryEpType::Lookup);
-    txPacket->replyPort = gLookupReplyPort;
-
-    memcpy(txPacket->payload, buf.data(), buf.size());
 
     // send it
     err = mtx_lock(&gLookupReplyPortLock);
@@ -112,7 +99,8 @@ int LookupService(const char * _Nonnull _name, uintptr_t * _Nonnull outPort) {\
         return err;
     }
 
-    err = PortSend(__kush_infopg->dispensaryPort, txPacket, reqSize);
+    err = _RpcSend(__kush_infopg->dispensaryPort,
+            static_cast<uint32_t>(RootSrvDispensaryEpType::Lookup), buf, gLookupReplyPort);
     if(err) {
         goto fail;
     }
@@ -155,14 +143,12 @@ int LookupService(const char * _Nonnull _name, uintptr_t * _Nonnull outPort) {\
     mtx_unlock(&gLookupReplyPortLock);
 
     free(rxBuf);
-    free(txBuf);
     return err;
 
 fail:;
     // failure handler; ensures we release memory and unlock again
     mtx_unlock(&gLookupReplyPortLock);
 
-    free(txBuf);
     if(rxBuf) free(rxBuf);
     return err;
 }

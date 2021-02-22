@@ -122,6 +122,7 @@ int thrd_create(thrd_t *outThread, thrd_start_t entry, void *arg) {
     err = ThreadResume(handle);
     if(err) {
         // XXX: is there anything we can do here? the thread might run at some point later...
+        fprintf(stderr, "failed to resume thread $%08x'h (%d)\n", handle, err);
     }
 
     return thrd_success;

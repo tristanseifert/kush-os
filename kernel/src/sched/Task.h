@@ -74,6 +74,8 @@ struct Task {
 
         /// when set, skip deleting threads on dealloc
         bool skipThreadDealloc = false;
+        /// whether the task is in the global registry
+        bool registered = false;
 
         /// number of physical pages owned by this task
         uintptr_t physPagesOwned = 0;

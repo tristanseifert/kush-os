@@ -162,6 +162,8 @@ int Syscall::_handle(const Args *args, const uintptr_t code) {
         return Errors::InvalidSyscall;
     }
 
+    sched::Thread::current()->lastSyscall = code;
+
     // invoke it
     return gSyscalls[syscallIdx](args, code);
 }

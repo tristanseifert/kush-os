@@ -4,6 +4,7 @@
 #include "Bundle.h"
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -17,7 +18,7 @@ namespace init {
 class ScriptParser {
     public:
         /// Parses an init script.
-        void parse(Bundle::File *file);
+        void parse(std::shared_ptr<Bundle::File> file);
 
         /// Visits all servers
         void visitServers(std::function<bool(const std::string &, const std::vector<std::string> &)> const &f);

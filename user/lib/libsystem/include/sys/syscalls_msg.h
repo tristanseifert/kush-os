@@ -9,13 +9,15 @@
  */
 typedef struct MessageHeader {
     /// handle of the thread that sent this message
-    uintptr_t sender;
+    uintptr_t senderThread;
+    /// task handle that contains the sender thread
+    uintptr_t senderTask;
     /// flags (not currently used)
     uint16_t flags;
     /// number of bytes of message data
     uint16_t receivedBytes;
 
-    uintptr_t reserved[2];
+    uintptr_t reserved[1];
 
     /// message data
     uint8_t data[];

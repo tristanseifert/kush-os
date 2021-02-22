@@ -3,6 +3,8 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <memory>
+#include <unordered_map>
 #include <string>
 #include <span>
 
@@ -47,7 +49,7 @@ class Bundle {
                     }
                 }
 
-            private:
+                // you should not call this; only public for std::shared_ptr
                 File(void *base, const InitFileHeader *hdr);
 
             private:
@@ -65,7 +67,7 @@ class Bundle {
         bool validate();
 
         /// Opens a file with the given name.
-        File *open(const std::string &name);
+        std::shared_ptr<File> open(const std::string &name);
 
     private:
         /// base address of the init bundle
@@ -75,6 +77,9 @@ class Bundle {
 
         /// once validated, a pointer to the bundle's header
         const InitHeader *header = nullptr;
+
+        /// cache of opened files
+        std::unordered_map<std::string, std::weak_ptr<File>> fileCache;
 };
 }
 

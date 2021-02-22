@@ -302,7 +302,7 @@ void MapEntry::addedToMap(Map *map, const uintptr_t _base, const MappingFlags fl
 
     // insert owner info
     RW_LOCK_WRITE(&this->lock);
-    this->maps.append(MapInfo(map, baseAddr, flagsMask));
+    this->maps.push_back(MapInfo(map, baseAddr, flagsMask));
     RW_UNLOCK_WRITE(&this->lock);
 }
 
@@ -372,18 +372,22 @@ void MapEntry::removedFromMap(Map *map) {
 
     // iterate the maps info dict to get our true base address
     RW_LOCK_WRITE(&this->lock);
-    this->maps.removeMatching([](void *_ctx, auto &info) -> bool {
+    size_t i = 0;
+    while(i < this->maps.size()) {
         // ensure it's the map we're after
-        auto ctx = reinterpret_cast<RemoveCtxInfo *>(_ctx);
-        if(info.mapPtr != ctx->map) return false;
+        if(this->maps[i].mapPtr != map) {
+            i++;
+            continue;
+        }
 
         // unmap the range
-        int err = ctx->map->remove(info.base, ctx->entry->length);
+        int err = map->remove(this->maps[i].base, this->length);
         REQUIRE(!err, "failed to unmap vm object: %d", err);
 
-        // done; we want to remove it.
-        return true;
-    }, &info);
+        // remove it
+        this->maps.remove(i);
+    }
+
     RW_UNLOCK_WRITE(&this->lock);
 }
 
@@ -398,7 +402,19 @@ int MapEntry::getInfo(Map *map, uintptr_t &outBase, uintptr_t &outLength, Mappin
         if(info.mapPtr == map) {
             outBase = info.base;
             outLength = this->length;
-            outFlags = this->flags;
+
+            auto flg = this->flags;
+            if(info.flagsMask != MappingFlags::None) {
+                //log("Maskule %08x", (uintptr_t) info.flagsMask);
+
+                flg &= ~MappingFlags::PermissionsMask;
+                flg |= (flg & info.flagsMask);
+            }
+
+            //log("fuck %08x %08x %08x %08x %08x", info.base, (uintptr_t) this->flags, (uintptr_t) info.flagsMask, (uintptr_t) flg,
+            //        info.base);
+
+            outFlags = flg;
 
             return 0;
         }

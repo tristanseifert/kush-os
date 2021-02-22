@@ -32,7 +32,7 @@ target_include_directories(rootsrv PRIVATE src)
 # required libraries
 add_dependencies(rootsrv c_static)
 target_link_libraries(rootsrv PRIVATE c_static)
-target_link_libraries(rootsrv PRIVATE system_static lzfse_static cista)
+target_link_libraries(rootsrv PRIVATE system_static rpc_static lzfse_static cista)
 target_link_libraries(rootsrv PRIVATE fmt::fmt-header-only)
 
 # we have to compile the root server as standalone

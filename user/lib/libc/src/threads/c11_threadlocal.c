@@ -136,6 +136,9 @@ int tss_set(tss_t key, void *value) {
 
     // TODO: store item
     fprintf(stderr, "tss_set() unimplemented: key %08x value %p\n", key, value);
+
+    // clean up
+    mtx_unlock(&gState.lock);
     return thrd_success;
 
     // handle error conditions

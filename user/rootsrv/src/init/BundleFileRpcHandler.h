@@ -4,15 +4,27 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
+#include <span>
 #include <string_view>
 #include <thread>
 
-namespace init {
-class Bundle;
+#include "Bundle.h"
 
+namespace rpc {
+struct RpcPacket;
+enum class FileIoEpType: uint32_t;
+}
+
+namespace init {
 /**
  * Provides a file IO RPC interface backed by the init bundle. This allows tasks during early init
  * to read from the init bundle's contents.
+ *
+ * Since this is only used during init phase of the system, we don't implement observation on
+ * tasks to ensure the handles are closed. This can result in us leaking the memory used by the
+ * init bundle if an init server crashes, but at that point the system is probably pretty fucked
+ * anyways.
  */
 class BundleFileRpcHandler {
     public:
@@ -30,8 +42,28 @@ class BundleFileRpcHandler {
         }
 
     private:
+        /// Opened file handle info
+        struct OpenedFile {
+            /// the file object
+            std::shared_ptr<Bundle::File> file;
+            /// task and thread handles that opened it
+            uintptr_t ownerTask, ownerThread;
+
+            OpenedFile(std::shared_ptr<Bundle::File> &_file, const uintptr_t task,
+                    const uintptr_t thread) : file(_file), ownerTask(task), ownerThread(thread) {};
+        };
+
+    private:
         /// thread entry point
         void main();
+
+        /// processes the open() request
+        void handleGetCaps(const struct MessageHeader *, const rpc::RpcPacket *, const size_t);
+        void handleOpen(const struct MessageHeader *, const rpc::RpcPacket *, const size_t);
+        void openFailed(int, const rpc::RpcPacket *);
+
+        void reply(const rpc::RpcPacket *packet, const rpc::FileIoEpType type,
+        const std::span<uint8_t> &buf);
 
     private:
         static BundleFileRpcHandler *gShared;
@@ -45,6 +77,11 @@ class BundleFileRpcHandler {
         std::atomic_bool run;
         /// runloop thread
         std::unique_ptr<std::thread> worker;
+
+        /// next file handle
+        std::atomic_uintptr_t nextHandle = 1;
+        /// file handles
+        std::unordered_map<uintptr_t, OpenedFile> openFiles;
 };
 }
 

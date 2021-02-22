@@ -75,6 +75,9 @@ Task::Task(vm::Map *_map) {
 Task::~Task() {
     RW_LOCK_WRITE_GUARD(this->lock);
 
+    // remove from scheduler
+    Scheduler::get()->unregisterTask(this);
+
     // invalidate the handle
     handle::Manager::releaseTaskHandle(this->handle);
 

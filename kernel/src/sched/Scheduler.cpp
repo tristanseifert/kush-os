@@ -84,7 +84,52 @@ void Scheduler::scheduleRunnable(Task *task) {
 
         this->markThreadAsRunnable(thread, false, true);
     }
+
+    if(!task->registered) {
+        bool yes = true;
+        __atomic_store(&task->registered, &yes, __ATOMIC_RELEASE);
+
+        this->tasks.append(task);
+    }
 }
+
+/**
+ * Registers new tasks.
+ */
+void Scheduler::registerTask(Task *task) {
+    const auto prevIrql = platform_raise_irql(platform::Irql::Scheduler);
+
+    this->tasks.append(task);
+
+    platform_lower_irql(prevIrql);
+}
+
+/**
+ * Removes a previously registered task.
+ */
+void Scheduler::unregisterTask(Task *task) {
+    const auto prevIrql = platform_raise_irql(platform::Irql::Scheduler);
+
+    this->tasks.removeMatching([](void *ctx, Task *task) {
+        return (ctx == task);
+    }, task);
+
+    platform_lower_irql(prevIrql);
+}
+
+/**
+ * Invokes the callback for each task.
+ */
+void Scheduler::iterateTasks(void (*callback)(Task *)) {
+    const auto prevIrql = platform_raise_irql(platform::Irql::Scheduler);
+
+    for(auto task : this->tasks) {
+        callback(task);
+    }
+
+    platform_lower_irql(prevIrql);
+}
+
 
 /**
  * Adds the given thread to the end of the run queue.

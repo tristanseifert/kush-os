@@ -100,7 +100,7 @@ class MapEntry {
          * Tests whether the given address is within the range, when the region is mapped in the
          * specified map.
          */
-        bool contains(const Map *map, const uintptr_t address) const {
+        bool contains(const Map *map, const uintptr_t address) {
             // find the map info
             for(auto &info : this->maps) {
                 if(info.mapPtr == map) {
@@ -115,7 +115,7 @@ class MapEntry {
         /**
          * Tests whether the given address range overlaps with this entry.
          */
-        bool contains(const Map *map, const uintptr_t address, const size_t length) const {
+        bool contains(const Map *map, const uintptr_t address, const size_t length) {
             // find the map info
             for(auto &info : this->maps) {
                 if(info.mapPtr == map) {
@@ -134,7 +134,7 @@ class MapEntry {
             // not in the map???
             return false;
         }
-        bool contains(const uintptr_t address, const size_t length) const {
+        bool contains(const uintptr_t address, const size_t length) {
             const auto x1 = this->base;
             const auto x2 = (this->base + this->length - 1);
             const auto y1 = address;
@@ -207,6 +207,8 @@ class MapEntry {
             /// If any bits are set, this is applied as a mask to the flags when mapping pages
             MappingFlags flagsMask = MappingFlags::None;
 
+            uint32_t reserved = 0;
+
             MapInfo() = default;
             MapInfo(Map *map, const uintptr_t _base, const MappingFlags _mask) : mapPtr(map), 
                 base(_base), flagsMask(_mask) {};
@@ -254,7 +256,7 @@ class MapEntry {
         /// physical pages we own
         rt::Vector<AnonPageInfo> physOwned;
         /// all maps that we exist in
-        rt::List<MapInfo> maps;
+        rt::Vector<MapInfo> maps;
 
         /// flags for the mapping
         MappingFlags flags;

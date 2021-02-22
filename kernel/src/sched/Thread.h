@@ -109,6 +109,9 @@ struct Thread {
         /// Timestamp at which the thread was switched to
         uint64_t lastSwitchedTo = 0;
 
+        /// number of the last syscall this thread performed
+        uintptr_t lastSyscall = UINTPTR_MAX;
+
         /**
          * Priority of the thread; this should be a value between -100 and 100, with negative
          * values having the lowest priority. The scheduler internally converts this to whatever

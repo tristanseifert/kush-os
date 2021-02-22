@@ -6,9 +6,11 @@
 #include <cstdint>
 #include <memory>
 #include <thread>
+#include <span>
 
 namespace rpc {
 struct RpcPacket;
+enum class RootSrvDispensaryEpType: uint32_t;
 }
 
 namespace dispensary {
@@ -33,6 +35,9 @@ class RpcHandler {
         void main();
         /// Handles a lookup request
         void handleLookup(const struct MessageHeader *, const rpc::RpcPacket *, const size_t);
+
+        void reply(const rpc::RpcPacket *packet, const rpc::RootSrvDispensaryEpType type,
+            const std::span<uint8_t> &buf);
 
     private:
         static RpcHandler *gShared;
