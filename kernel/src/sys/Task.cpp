@@ -28,17 +28,26 @@ struct InitTaskDpcInfo {
  * Allocates a new task.
  */
 int sys::TaskCreate(const Syscall::Args *args, const uintptr_t number) {
-    auto task = sched::Task::alloc();
+    sched::Task *parent = nullptr;
 
     // set the parent
     if(!args->args[0]) {
-        task->parent = sched::Thread::current()->task;
+        parent = sched::Task::current();
+        REQUIRE(parent, "no current task wtf");
     } else {
-        auto parent = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
+        parent = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
         if(!parent) {
             return Errors::InvalidHandle;
         }
-        task->parent = parent;
+    }
+    if(!parent) {
+        return Errors::GeneralError;
+    }
+
+    // allocate a task
+    auto task = sched::Task::alloc();
+    if(!task) {
+        return Errors::GeneralError;
     }
 
     // return task handle
@@ -57,7 +66,7 @@ int sys::TaskTerminate(const Syscall::Args *args, const uintptr_t number) {
 
     // get the task
     if(!args->args[0]) {
-        task = sched::Thread::current()->task;
+        task = sched::Task::current();
     } else {
         task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
         if(!task) {
@@ -121,7 +130,7 @@ int sys::TaskSetName(const Syscall::Args *args, const uintptr_t number) {
 
     // get the task
     if(!args->args[0]) {
-        task = sched::Thread::current()->task;
+        task = sched::Task::current();
     } else {
         task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
         if(!task) {

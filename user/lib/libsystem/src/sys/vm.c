@@ -23,8 +23,11 @@ struct VmInfoStruct {
  * You may notice this is the same as the ones defined in the header; therefore no real translation
  * is taking place here. This allows us flexibility to change the flags without changing the actual
  * programs later.
+ *
+ * @param create When set, extra flags allowed only for VM region creation are produced. Otherwise,
+ * they are simply ignored.
  */
-static uintptr_t BuildSyscallFlags(const uintptr_t inFlags) {
+static uintptr_t BuildSyscallFlags(const uintptr_t inFlags, int create) {
     uintptr_t temp = 0;
 
     if(inFlags & VM_REGION_READ) {
@@ -42,7 +45,7 @@ static uintptr_t BuildSyscallFlags(const uintptr_t inFlags) {
     if(inFlags & VM_REGION_WRITETHRU) {
         temp |= (1 << 14);
     }
-    if(inFlags & VM_REGION_NOMAP) {
+    if(create && inFlags & VM_REGION_NOMAP) {
         temp |= (1 << 15);
     }
 
@@ -87,7 +90,7 @@ int AllocVirtualAnonRegion(const uintptr_t virtualAddr, const uintptr_t size,
 
     // build flags
     uintptr_t flags = 0;
-    flags = BuildSyscallFlags(inFlags);
+    flags = BuildSyscallFlags(inFlags, 1);
 
     // perform syscall
     err = __do_syscall2(SYS_VM_CREATE_ANON | (flags << 16), virtualAddr, size);
@@ -109,7 +112,7 @@ int AllocVirtualRegion(const uint64_t physAddr, const uintptr_t virtualAddr, con
 
     // build flags
     uintptr_t flags = 0;
-    flags = BuildSyscallFlags(inFlags);
+    flags = BuildSyscallFlags(inFlags, 1);
 
     // perform syscall
     err = __do_syscall3(SYS_VM_CREATE | (flags << 16), physAddr, virtualAddr, size);
@@ -165,9 +168,9 @@ int MapVirtualRegionFrom(const uintptr_t regionHandle, const uintptr_t taskHandl
 }
 
 /**
- * Maps a virtual memory region from the specified task.
+ * Maps a virtual memory region into the specified task.
  */
-int MapVirtualRegionAtFrom(const uintptr_t regionHandle, const uintptr_t taskHandle,
+int MapVirtualRegionAtTo(const uintptr_t regionHandle, const uintptr_t taskHandle,
         const uintptr_t baseAddr) {
     return __do_syscall3(SYS_VM_MAP, regionHandle, taskHandle, baseAddr);
 }
@@ -257,3 +260,13 @@ int VirtualGetHandleForAddrInTask(const uintptr_t taskHandle, const uintptr_t ad
     return 1;
 }
 
+/**
+ * Updates the flags of a virtual memory region.
+ *
+ * Valid flags are VM_REGION_READ, VM_REGION_WRITE, VM_REGION_EXEC, VM_REGION_MMIO,
+ * VM_REGION_WRITETHRU or a combination thereof.
+ */
+int VirtualRegionSetFlags(const uintptr_t regionHandle, const uintptr_t newFlags) {
+    const uintptr_t flags = BuildSyscallFlags(newFlags, 0);
+    return __do_syscall1(SYS_VM_UPDATE_FLAGS | ((flags & 0xFFFF) << 16), regionHandle);
+}

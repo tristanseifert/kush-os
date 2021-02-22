@@ -9,6 +9,7 @@
 
 #include <handle/Manager.h>
 #include <runtime/Vector.h>
+#include <runtime/Queue.h>
 
 namespace vm {
 class MapEntry;
@@ -106,6 +107,21 @@ class Map {
         }
 
     private:
+        /// Represents a mapping that was deferred
+        struct DeferredMapping {
+            /// physical address backing this mapping
+            uint64_t physAddr;
+            /// virtual address at which to set the map
+            uintptr_t vmAddr;
+            /// flags for the mapping
+            MapMode mode;
+
+            DeferredMapping() = default;
+            DeferredMapping(const uint64_t _pa, const uintptr_t _va, const MapMode _flags) :
+                physAddr(_pa), vmAddr(_va), mode(_flags) {}
+        };
+
+    private:
         static Map *gCurrentMap;
 
         static void initAllocator();
@@ -116,8 +132,15 @@ class Map {
         constexpr static const uintptr_t kVmMaxAddr = 0xBF800000;
 
     private:
+        friend class arch::vm::PTEHandler;
+
         /// protecting modifications of the table
         DECLARE_RWLOCK(lock);
+
+        /// deferred mapping requests
+        rt::Queue<DeferredMapping> deferredMaps;
+        /// when set, there are deferred mappings
+        size_t numDeferredMaps = 0;
 
         /// all VM map entries
         rt::Vector<MapEntry *> entries;

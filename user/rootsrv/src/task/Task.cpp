@@ -5,6 +5,7 @@
 #include "loader/Elf32.h"
 
 #include <cstring>
+#include <system_error>
 
 #include <log.h>
 #include <fmt/format.h>
@@ -20,20 +21,24 @@ using namespace task;
  * @throws An exception is thrown if the task could not be loaded.
  */
 uintptr_t Task::createFromMemory(const std::string &elfPath, const Buffer &elf,
-        const std::vector<std::string> &args) {
+        const std::vector<std::string> &args, const uintptr_t parent) {
     // create the task object
-    auto task = std::make_shared<Task>(elfPath);
+    auto task = std::make_shared<Task>(elfPath, parent);
 
     // load the ELF into the task
     auto loader = task->getLoaderFor(elfPath, elf);
-    LOG("Loader for %s: %p", elfPath.c_str(), loader.get());
+    LOG("Loader for %s: %p; task $%08x'h", elfPath.c_str(), loader.get(), task->getHandle());
+
+    loader->mapInto(task);
 
     // set up a stack and map the dynamic linker stubs if enabled
+    loader->setUpStack(task);
 
     // add to registry
     Registry::registerTask(task);
 
     // set up its main thread to jump to the entry point
+    task->jumpTo(loader->getEntryAddress(), loader->getStackBottomAddress());
 
     // if we get here, the task has been created
     return task->getHandle();
@@ -46,8 +51,27 @@ uintptr_t Task::createFromMemory(const std::string &elfPath, const Buffer &elf,
  *
  * Here we create the task object and prepare to map executable pages in it.
  */
-Task::Task(const std::string &path) : binaryPath(path) {
+Task::Task(const std::string &path, const uintptr_t parentTask) : binaryPath(path) {
+    int err;
 
+    // create the task
+    LOG("Creating task '%s'", path.c_str());
+    err = TaskCreateWithParent(parentTask, &this->taskHandle);
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "TaskCreate");
+    }
+
+    // set its name
+    std::string name = path;
+
+    if(name.find_first_of('/') != std::string::npos) {
+        name = name.substr(name.find_last_of('/')+1);
+    }
+
+    err = TaskSetName(this->taskHandle, name.c_str());
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "TaskSetName");
+    }
 }
 
 /**
@@ -95,4 +119,14 @@ std::shared_ptr<loader::Loader> Task::getLoaderFor(const std::string &path, cons
 
     // we should not get here
     return nullptr;
+}
+
+/**
+ * Uses the TaskInitialize() syscall to execute a return to user mode.
+ */
+void Task::jumpTo(const uintptr_t pc, const uintptr_t sp) {
+    int err = TaskInitialize(this->taskHandle, pc, sp);
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "TaskInitialize");
+    }
 }

@@ -170,6 +170,7 @@ int sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
  * This takes the same flags as the creation functions, but only the RWX flags are considered.
  */
 int sys::VmRegionUpdatePermissions(const Syscall::Args *args, const uintptr_t number) {
+    int err;
     // get the VM map
     auto map = handle::Manager::getVmObject(static_cast<Handle>(args->args[0]));
     if(!map) {
@@ -180,8 +181,15 @@ int sys::VmRegionUpdatePermissions(const Syscall::Args *args, const uintptr_t nu
     const auto flags = (number & 0xFFFF0000) >> 16;
     const auto mapFlags = ConvertFlags(flags);
 
-    // TODO: implement
-    log("new flags for map %p: %04x", map, mapFlags);
+    // set the map's flags
+    // log("new flags for map %p: %04x", map, mapFlags);
+    err = map->updateFlags(mapFlags);
+
+    if(!err) {
+        return Errors::Success;
+    } else {
+        return Errors::GeneralError;
+    }
     return Errors::Success;
 }
 

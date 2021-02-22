@@ -164,6 +164,9 @@ class MapEntry {
             return this->isAnon;
         }
 
+        /// Updates the flags of the map. Only the RWX and cacheability flags are updated.
+        int updateFlags(const MappingFlags newFlags);
+
         /// Attempts to resize the VM object
         int resize(const size_t newSize);
 
@@ -201,7 +204,8 @@ class MapEntry {
 
     private:
         /// Attempt to handle a page fault for the virtual address
-        bool handlePagefault(const uintptr_t address, const bool present, const bool write);
+        bool handlePagefault(Map *map, const uintptr_t address, const bool present,
+                const bool write);
 
     private:
         static void initAllocator();

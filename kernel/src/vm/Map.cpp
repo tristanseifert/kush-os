@@ -16,7 +16,9 @@ static mem::SlabAllocator<Map> *gMapAllocator = nullptr;
 Map *Map::gCurrentMap = nullptr;
 
 /// Set to 1 to log adding mappings
-#define LOG_MAP_ADD     0
+#define LOG_MAP_ADD                     0
+/// Set to log deferred mappings
+#define LOG_DEFERRED_MAP                0
 
 /**
  * Initializes the VM mapping allocator.
@@ -72,6 +74,44 @@ void Map::free(Map *ptr) {
 void Map::activate() {
     this->table.activate();
     gCurrentMap = this;
+
+    // handle deferred maps
+    size_t numDeferred = 0;
+    __atomic_load(&this->numDeferredMaps, &numDeferred, __ATOMIC_ACQUIRE);
+
+    if(numDeferred) {
+        RW_LOCK_WRITE_GUARD(this->lock);
+        int err;
+
+#if LOG_DEFERRED_MAP
+        log("Performing %u deferred mappings", numDeferred);
+#endif
+        while(!this->deferredMaps.empty()) {
+            const auto toMap = this->deferredMaps.pop();
+
+            const bool write = TestFlags(toMap.mode & MapMode::WRITE);
+            const bool execute = TestFlags(toMap.mode & MapMode::EXECUTE);
+            const bool global = TestFlags(toMap.mode & MapMode::GLOBAL);
+            const bool user = TestFlags(toMap.mode & MapMode::ACCESS_USER);
+            const bool nocache = TestFlags(toMap.mode & MapMode::CACHE_DISABLE);
+
+#if LOG_DEFERRED_MAP
+            log("Mapping %016llx -> %08x w %d x %d g %d u %d c %d", toMap.physAddr, toMap.vmAddr,
+                    write, execute, global, user, !nocache);
+#endif
+
+            err = this->table.mapPage(toMap.physAddr, toMap.vmAddr, write, execute, global, user,
+                    nocache);
+            if(err) {
+                log("Failed to add mapping in %p: %d (phys %016llx, virt %08x, mode %08x)",
+                        this, err, toMap.physAddr, toMap.vmAddr, toMap.mode);
+            }
+        }
+
+        // clear the counter
+        size_t zero = 0;
+        __atomic_store(&this->numDeferredMaps, &zero, __ATOMIC_RELEASE);
+    }
 }
 
 /**
@@ -112,12 +152,27 @@ int Map::add(const uint64_t physAddr, const uintptr_t _length, const uintptr_t v
     const bool user = TestFlags(mode & MapMode::ACCESS_USER);
     const bool nocache = TestFlags(mode & MapMode::CACHE_DISABLE);
 
-    // map each of the pages
+    // map each of the pages now if possible
     for(uintptr_t off = 0; off < length; off += pageSz) {
-        err = this->table.mapPage(physAddr + off, vmAddr + off, write, execute, global, user, nocache);
+        const auto pa = physAddr + off;
+        const auto va = vmAddr + off;
 
-        if(err) {
-            return err;
+        if(this->isActive() || (!this->isActive() && this->table.supportsUnmappedModify(va))) {
+            err = this->table.mapPage(pa, va, write, execute, global, user, nocache);
+
+            if(err) {
+                return err;
+            }
+        } 
+        // otherwise, defer the mapping to the next time this map is activated
+        else {
+            // TODO: it would be nice to coalesce adjacent mappings
+
+            // build the mapping info
+            DeferredMapping def(pa, va, mode);
+            this->deferredMaps.push_back(DeferredMapping(def));
+
+            __atomic_add_fetch(&this->numDeferredMaps, 1, __ATOMIC_RELAXED);
         }
     }
 
@@ -387,6 +442,6 @@ bool Map::handlePagefault(const uintptr_t virtAddr, const bool present, const bo
 beach:;
     RW_UNLOCK_READ(&this->lock);
     // we found a region to handle it
-    return region->handlePagefault(virtAddr, present, write);
+    return region->handlePagefault(this, virtAddr, present, write);
 }
 

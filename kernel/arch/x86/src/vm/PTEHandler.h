@@ -33,6 +33,12 @@ class PTEHandler: public ::vm::IPTEHandler {
         int getMapping(const uintptr_t virt, uint64_t &phys, bool &write, bool &execute,
                 bool &global, bool &user, bool &noCache) override;
 
+        /// we must always be mapped to modify under kernel due to recursive mapping trick
+        bool supportsUnmappedModify(const uintptr_t virtAddr) override {
+            if(virtAddr >= 0xC0000000) return true;
+            return false;
+        }
+
     private:
         void initKernel();
         void initCopyKernel(PTEHandler *);
@@ -64,6 +70,8 @@ class PTEHandler: public ::vm::IPTEHandler {
         // parent map
         PTEHandler *parent = nullptr;
 
+        // when set, this is a user mapping
+        bool isUserMap = false;
         // physical address of the first level page directory pointer table
         uintptr_t pdptPhys = 0;
         // virtual address of the PDPT (if mapped)

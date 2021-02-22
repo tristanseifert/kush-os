@@ -26,7 +26,7 @@ class Task {
 
     public:
         // don't call this constructor, use one of the create*() functions
-        Task(const std::string &path);
+        Task(const std::string &path, const uintptr_t parentTask);
         ~Task();
 
         /// Returns the task handle for this task
@@ -37,18 +37,21 @@ class Task {
     public:
         /// Creates a new task from memory
         static uintptr_t createFromMemory(const std::string &elfPath, const Buffer &elf,
-                const std::vector<std::string> &args);
+                const std::vector<std::string> &args, const uintptr_t parent = 0);
 
     private:
         /// Instantiates a binary loader for the given file
         std::shared_ptr<loader::Loader> getLoaderFor(const std::string &, const Buffer &);
+
+        /// Completes initialization of a task by performing an userspace return.
+        void jumpTo(const uintptr_t pc, const uintptr_t sp);
 
     private:
         /// path from which the binary was loaded
         std::string binaryPath;
 
         /// kernel handle for the task
-        uintptr_t taskHandle;
+        uintptr_t taskHandle = 0;
 };
 }
 

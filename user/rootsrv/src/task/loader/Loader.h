@@ -4,8 +4,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <memory>
 #include <span>
 #include <string>
+
+namespace task {
+class Task;
+}
 
 namespace task::loader {
 /**
@@ -13,8 +18,18 @@ namespace task::loader {
  */
 class Loader {
     public:
-    Loader(const std::span<std::byte> &bytes) : file(bytes) {};
+        Loader(const std::span<std::byte> &bytes) : file(bytes) {};
         virtual ~Loader() = default;
+
+        /// Returns the address of the binary's entry point.
+        virtual uintptr_t getEntryAddress() const = 0;
+        /// Returns the virtual memory address of the bottom of the entry point stack
+        virtual uintptr_t getStackBottomAddress() const = 0;
+
+        /// Maps the loadable sections of the ELF into the task.
+        virtual void mapInto(std::shared_ptr<Task> &task) = 0;
+        /// Sets up the entry point stack in the given task.
+        virtual void setUpStack(std::shared_ptr<Task> &task) = 0;
 
     protected:
         /// in-memory copy of the ELF

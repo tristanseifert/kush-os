@@ -12,6 +12,9 @@ class IPTEHandler {
         IPTEHandler() = delete;
         IPTEHandler(IPTEHandler *parent) {};
 
+        /// whether the PTE can be accessed when it is not actively mapped
+        virtual bool supportsUnmappedModify(const uintptr_t virtAddr) = 0;
+
         virtual void activate() = 0;
         virtual const bool isActive() const = 0;
 

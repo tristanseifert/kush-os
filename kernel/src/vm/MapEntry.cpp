@@ -158,7 +158,8 @@ int MapEntry::resize(const size_t newSize) {
  *
  * @note As a precondition, the virtual address provided must fall in the range of this map.
  */
-bool MapEntry::handlePagefault(const uintptr_t address, const bool present, const bool write) {
+bool MapEntry::handlePagefault(Map *map, const uintptr_t address, const bool present,
+        const bool write) {
     // only anonymous memory can be faulted in
     if(!this->isAnon) {
         return false;
@@ -170,7 +171,7 @@ bool MapEntry::handlePagefault(const uintptr_t address, const bool present, cons
     }
 
     // fault it in
-    this->faultInPage(address & ~0xFFF, Map::current());
+    this->faultInPage(address & ~0xFFF, map);
 
     return true;
 }
@@ -193,17 +194,36 @@ void MapEntry::faultInPage(const uintptr_t address, Map *map) {
         __atomic_add_fetch(&task->physPagesOwned, 1, __ATOMIC_RELEASE);
     }
 
+    // get map specific base
+    uintptr_t thisBase = 0;
+    bool foundBase = false;
+
+    for(auto &info : this->maps) {
+        if(info.mapPtr == map) {
+            thisBase = (info.base ? info.base : this->base);
+            foundBase = true;
+            goto beach;
+        }
+    }
+
+beach:;
+    REQUIRE(foundBase, "failed to find base address");
+
     // insert page info
     AnonPageInfo info;
     info.physAddr = page;
-    info.pageOff = (address - this->base) / pageSz;
+    info.pageOff = (address - thisBase) / pageSz;
 
     this->physOwned.push_back(info);
 
     // map it
+    const auto destAddr = thisBase + (info.pageOff * pageSz);
     const auto mode = ConvertVmMode(this->flags);
-    err = map->add(page, pageSz, address, mode);
+    err = map->add(page, pageSz, destAddr, mode);
     REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", info.pageOff, this, this->handle);
+
+    // invalidate the address
+    asm volatile ( "invlpg (%0)" : : "b"(destAddr) : "memory" );
 }
 
 /**
@@ -224,6 +244,29 @@ void MapEntry::freePage(const uintptr_t page) {
     }
 }
 
+
+/**
+ * Updates the mapping's flags.
+ *
+ * This currently only affects it in new mappings and for new pages that are to be yeeted into
+ * memory; it is a TODO that this works properly in shared memory situations, and updates the
+ * permissions of existing mappings.
+ *
+ * @return 0 on success, a negative error code otherwise.
+ */
+int MapEntry::updateFlags(const MappingFlags newFlags) {
+    RW_LOCK_WRITE_GUARD(this->lock);
+
+    auto oldFlags = this->flags;
+    oldFlags &= ~(MappingFlags::Read | MappingFlags::Write | MappingFlags::Execute);
+    oldFlags &= ~(MappingFlags::MMIO);
+
+    oldFlags |= newFlags;
+
+    this->flags = oldFlags;
+
+    return 0;
+}
 
 
 /**

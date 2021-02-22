@@ -1,6 +1,7 @@
 #include "PTEHandler.h"
 #include "PDPTPool.h"
 
+#include <vm/Map.h>
 #include <mem/PhysicalAllocator.h>
 #include <arch.h>
 #include <log.h>
@@ -32,8 +33,10 @@ PTEHandler::PTEHandler(::vm::IPTEHandler *_parent) : IPTEHandler(_parent) {
     this->parent = kernelPte;
 
     if(kernelPte) {
+        this->isUserMap = true;
         this->initCopyKernel(kernelPte);
     } else {
+        this->isUserMap = false;
         this->initKernel();
     }
 }
@@ -87,6 +90,7 @@ void PTEHandler::initCopyKernel(PTEHandler *kernel) {
     // TODO: this is likely broken lol
     // TODO: this needs locking for the multi-CPU case
     uint32_t tempVirtBase = 0xF2000000;
+    auto &current = ::vm::Map::current()->table;
 
     // allocate three userspace PDTs; then copy the kernel PDT
     for(size_t i = 0; i < 3; i++) {
@@ -96,7 +100,7 @@ void PTEHandler::initCopyKernel(PTEHandler *kernel) {
         this->physToDealloc.push_back(this->pdtPhys[i]);
 
         auto pageVirt = tempVirtBase + (i * 0x1000);
-        err = kernel->mapPage(this->pdtPhys[i], pageVirt, true, false, false, false, false);
+        err = current.mapPage(this->pdtPhys[i], pageVirt, true, false, false, false, false);
         REQUIRE(!err, "failed to add temp PDT mapping: %d", err);
 
         this->pdt[i] = (uint64_t *) pageVirt;
@@ -132,7 +136,7 @@ void PTEHandler::initCopyKernel(PTEHandler *kernel) {
     // remove temporary mappings
     for(size_t i = 0; i < 3; i++) {
         auto pageVirt = tempVirtBase + (i * 0x1000);
-        err = kernel->unmapPage(pageVirt);
+        err = current.unmapPage(pageVirt);
         REQUIRE(!err, "failed to remove temp PDT mapping: %d", err);
 
         // TODO: do we need to.. do stuff here
@@ -231,7 +235,7 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t virt, const bool wr
     flags |= ((uint64_t) phys);
 
     // special case if mapped, or adding kernel mapping
-    if(this->isActive() || (this->parent && virt >= 0xC0000000)) {
+    if(this->isActive() || (this->isUserMap && virt >= 0xC0000000)) {
 #if LOG_MAP
         log("map phys %016llx to virt %08lx", phys, virt);
 #endif
@@ -281,6 +285,9 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t virt, const bool wr
         this->setPageTable(virt, flags);
     } else {
         REQUIRE(!this->parent, "cannot modify VM map that isn't mapped");
+#if LOG_MAP
+        log("xx map phys %016llx to virt %08lx", phys, virt);
+#endif
 
         // get the page directory and within it the index
         const auto pdptOff = (virt & 0xC0000000) >> 30;

@@ -4,6 +4,41 @@
 #include <string.h>
 
 /**
+ * Creates a new task; its parent is the given task.
+ *
+ * The kernel may perform validation to ensure the caller has the rights to add child tasks to the
+ * provided task handle. A task handle of 0 indicates the calling task.
+ */
+int TaskCreateWithParent(const uintptr_t parent, uintptr_t *outHandle) {
+    if(!outHandle) {
+        return -1;
+    }
+
+    int err = __do_syscall1(SYS_TASK_CREATE, parent);
+
+    if(err > 0) {
+        *outHandle = err;
+        return 0;
+    } else {
+        return err;
+    }
+}
+
+/**
+ * Creates a new task with the caller as its parent.
+ */
+int TaskCreate(uintptr_t *outHandle) {
+    return TaskCreateWithParent(0, outHandle);
+}
+
+/**
+ * Executes a return to usermode in the given task's main thread.
+ */
+int TaskInitialize(const uintptr_t taskHandle, const uintptr_t pc, const uintptr_t sp) {
+    return __do_syscall3(SYS_TASK_INIT, taskHandle, pc, sp);
+}
+
+/**
  * Returns the current task's handle.
  */
 int TaskGetHandle(uintptr_t *outHandle) {
