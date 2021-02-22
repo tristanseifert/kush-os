@@ -1,5 +1,6 @@
 #include "Task.h"
 #include "Registry.h"
+#include "InfoPage.h"
 
 #include "loader/Loader.h"
 #include "loader/Elf32.h"
@@ -22,8 +23,9 @@ using namespace task;
  */
 uintptr_t Task::createFromMemory(const std::string &elfPath, const Buffer &elf,
         const std::vector<std::string> &args, const uintptr_t parent) {
-    // create the task object
+    // create the task object and ensure the shared system pages are mapped
     auto task = std::make_shared<Task>(elfPath, parent);
+    InfoPage::gShared->mapInto(task);
 
     // load the ELF into the task
     auto loader = task->getLoaderFor(elfPath, elf);

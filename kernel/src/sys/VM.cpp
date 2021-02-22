@@ -219,6 +219,7 @@ int sys::VmRegionResize(const Syscall::Args *args, const uintptr_t number) {
  * update to the next time that task is switched to.
  */
 int sys::VmRegionMap(const Syscall::Args *args, const uintptr_t number) {
+    int err;
     sched::Task *task = nullptr;
 
     // get the task handle
@@ -243,8 +244,18 @@ int sys::VmRegionMap(const Syscall::Args *args, const uintptr_t number) {
         return Errors::InvalidAddress;
     }
 
-    // perform the mapping
-    int err = task->vm->add(region, base);
+    // perform the mapping, applying the flags mask if needed
+    const auto flags = (number & 0xFFFF0000) >> 16;
+
+    if(flags) {
+        auto flagMask = ConvertFlags(flags);
+        flagMask &= (vm::MappingFlags::PermissionsMask);
+
+        err = task->vm->add(region, base, flagMask);
+    } else {
+        err = task->vm->add(region, base);
+    }
+
     return (!err ? Errors::Success : Errors::GeneralError);
 }
 

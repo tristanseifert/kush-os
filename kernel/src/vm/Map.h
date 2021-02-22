@@ -1,6 +1,8 @@
 #ifndef KERNEL_VM_MAP_H
 #define KERNEL_VM_MAP_H
 
+#include "MapEntry.h"
+
 #include <stdint.h>
 
 #include <bitflags.h>
@@ -12,7 +14,6 @@
 #include <runtime/Queue.h>
 
 namespace vm {
-class MapEntry;
 class Mapper;
 
 /// modifier flags for mappings, defining its protection level
@@ -68,7 +69,7 @@ class Map {
         const bool isActive() const;
         void activate();
 
-        int add(MapEntry *entry, const uintptr_t base = 0);
+        int add(MapEntry *entry, const uintptr_t base = 0, const vm::MappingFlags flagMask = vm::MappingFlags::None);
         int remove(MapEntry *entry);
         const bool contains(MapEntry *entry);
 

@@ -245,7 +245,7 @@ int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
  *
  * @return 0 on success
  */
-int Map::add(MapEntry *_entry, const uintptr_t _base) {
+int Map::add(MapEntry *_entry, const uintptr_t _base, const MappingFlags flagsMask) {
     RW_LOCK_WRITE(&this->lock);
 
     // retain entry
@@ -298,7 +298,7 @@ beach:;
     // allow the performing of mapping modifications by the entry
     RW_UNLOCK_WRITE(&this->lock);
 
-    entry->addedToMap(this, base);
+    entry->addedToMap(this, base, flagsMask);
     return 0;
 
 fail:;

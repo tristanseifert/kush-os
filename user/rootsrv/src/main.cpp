@@ -1,14 +1,15 @@
 #include <sys/syscalls.h>
 #include <sys/x86/syscalls.h>
-#include <cstdint>
-#include <cstring>
-#include <malloc.h>
-#include <threads.h>
+
+#include <memory>
 
 #include "init/Init.h"
 #include "init/Bundle.h"
+#include "init/BundleFileRpcHandler.h"
 #include "task/Registry.h"
 #include "task/RpcHandler.h"
+#include "task/InfoPage.h"
+#include "dispensary/Dispensary.h"
 
 #include "log.h"
 
@@ -28,25 +29,40 @@ static void EnvInit() {
 }
 
 /**
+ * Loads the init bundle and sets up the file RPC provider. Then, load all servers requested.
+ */
+static void BundleInit() {
+    // load bundle
+    auto bundle = std::make_shared<init::Bundle>();
+    if(!bundle->validate()) {
+        PANIC("failed to validate init bundle");
+    }
+
+    init::BundleFileRpcHandler::init(bundle);
+
+    // initialize the servers we've loaded from the init script
+    init::SetupServers(bundle);
+}
+
+/**
  * Root server entry points
  *
  * We receive precisely no arguments. Yay!
  */
 int main(int argc, const char **argv) {
-    // set up env; read the init bundle and init script
+    // set up our environment and core structures
     EnvInit();
 
+    task::InfoPage::init();
+
+    dispensary::init();
     task::Registry::init();
+
+    // start RPC handlers
     task::RpcHandler::init();
 
-    init::Bundle bundle;
-    if(!bundle.validate()) {
-        PANIC("failed to validate init bundle");
-    }
-
-
-    // initialize the servers we've loaded from the init script
-    init::SetupServers(bundle);
+    // load bundle and the associated servers
+    BundleInit();
 
     // wait for quit notification
     while(1) {

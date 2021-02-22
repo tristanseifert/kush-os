@@ -46,8 +46,8 @@ SECTIONS {
         *(*.data*)
 
         /* relocations; is this ok? */
-        /**(*.got)
-        *(*.got*)*/
+        (*.got)
+        *(*.got*)
     }
     __data_size = SIZEOF(.data);
 

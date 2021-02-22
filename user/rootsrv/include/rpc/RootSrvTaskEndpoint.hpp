@@ -34,7 +34,7 @@ struct RootSrvTaskCreate {
     cista::offset::string path;
     /// optional arguments
     cista::offset::vector<cista::offset::string> args;
-    
+
     /// if set, the task is started suspended
     bool suspended = false;
 };

@@ -20,7 +20,7 @@ target_include_directories(dyldosrv PRIVATE src)
 
 # required libraries
 add_dependencies(dyldosrv c_static system_static)
-target_link_libraries(dyldosrv PRIVATE system_static cista)
+target_link_libraries(dyldosrv PRIVATE system_static cista rpc_static)
 
 # build a static binary
 target_link_options(dyldosrv PRIVATE -static)

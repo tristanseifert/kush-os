@@ -197,10 +197,12 @@ void MapEntry::faultInPage(const uintptr_t address, Map *map) {
     // get map specific base
     uintptr_t thisBase = 0;
     bool foundBase = false;
+    auto mask = MappingFlags::None;
 
     for(auto &info : this->maps) {
         if(info.mapPtr == map) {
             thisBase = (info.base ? info.base : this->base);
+            mask = info.flagsMask;
             foundBase = true;
             goto beach;
         }
@@ -208,6 +210,13 @@ void MapEntry::faultInPage(const uintptr_t address, Map *map) {
 
 beach:;
     REQUIRE(foundBase, "failed to find base address");
+
+    // figure out the proper flags
+    auto flg = this->flags;
+    if(mask != MappingFlags::None) {
+        flg &= ~MappingFlags::PermissionsMask;
+        flg |= (flg & mask);
+    }
 
     // insert page info
     AnonPageInfo info;
@@ -218,7 +227,7 @@ beach:;
 
     // map it
     const auto destAddr = thisBase + (info.pageOff * pageSz);
-    const auto mode = ConvertVmMode(this->flags);
+    const auto mode = ConvertVmMode(flg);
     err = map->add(page, pageSz, destAddr, mode);
     REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", info.pageOff, this, this->handle);
 
@@ -275,7 +284,7 @@ int MapEntry::updateFlags(const MappingFlags newFlags) {
  * If it is backed by anonymous memory, we map all pages that have been faulted in so far;
  * otherwise, we map the entire region.
  */
-void MapEntry::addedToMap(Map *map, const uintptr_t _base) {
+void MapEntry::addedToMap(Map *map, const uintptr_t _base, const MappingFlags flagsMask) {
     RW_LOCK_READ(&this->lock);
 
     const auto baseAddr = (_base ? _base : this->base);
@@ -283,30 +292,36 @@ void MapEntry::addedToMap(Map *map, const uintptr_t _base) {
 
     // map all allocated physical anon pages
     if(this->isAnon) {
-        this->mapAnonPages(map, baseAddr);
+        this->mapAnonPages(map, baseAddr, flagsMask);
     }
     // otherwise, map the whole thing
     else {
-        this->mapPhysMem(map, baseAddr);
+        this->mapPhysMem(map, baseAddr, flagsMask);
     }
     RW_UNLOCK_READ(&this->lock);
 
     // insert owner info
     RW_LOCK_WRITE(&this->lock);
-    this->maps.append(MapInfo(map, baseAddr));
+    this->maps.append(MapInfo(map, baseAddr, flagsMask));
     RW_UNLOCK_WRITE(&this->lock);
 }
 
 /**
  * Maps all allocated physical pages.
  */
-void MapEntry::mapAnonPages(Map *map, const uintptr_t base) {
+void MapEntry::mapAnonPages(Map *map, const uintptr_t base, const MappingFlags mask) {
     int err;
 
     const auto pageSz = arch_page_size();
 
     // convert flags
-    const auto mode = ConvertVmMode(this->flags);
+    auto flg = this->flags;
+    if(mask != MappingFlags::None) {
+        flg &= ~MappingFlags::PermissionsMask;
+        flg |= (flg & mask);
+    }
+
+    const auto mode = ConvertVmMode(flg);
 
     // map the pages
     for(const auto &page : this->physOwned) {
@@ -323,10 +338,19 @@ void MapEntry::mapAnonPages(Map *map, const uintptr_t base) {
 /**
  * Maps the entire underlying physical memory range.
  */
-void MapEntry::mapPhysMem(Map *map, const uintptr_t base) {
+void MapEntry::mapPhysMem(Map *map, const uintptr_t base, const MappingFlags mask) {
     int err;
 
-    const auto mode = ConvertVmMode(this->flags);
+    // determine flags
+    auto flg = this->flags;
+    if(mask != MappingFlags::None) {
+        flg &= ~MappingFlags::PermissionsMask;
+        flg |= (flg & mask);
+    }
+
+    const auto mode = ConvertVmMode(flg);
+
+    // insert the mapping
     err = map->add(this->physBase, this->length, base, mode);
 
     REQUIRE(!err, "failed to map vm object %p ($%08x'h) addr $%08x %d", this, this->handle,

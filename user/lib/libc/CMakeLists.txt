@@ -67,6 +67,8 @@ add_library(c_objs OBJECT
     src/stdlib/ldiv.c
     src/stdlib/llabs.c
     src/stdlib/lldiv.c
+    # stdio
+    src/stdio/printf.c
     # locale
     src/locale/locale.c
     src/locale/strto.c

@@ -1,11 +1,13 @@
 #ifndef INIT_INIT_H
 #define INIT_INIT_H
 
+#include <memory>
+
 namespace init {
 class Bundle;
 
 /// Sets up servers
-void SetupServers(Bundle &bundle);
+void SetupServers(std::shared_ptr<Bundle> &bundle);
 
 }
 

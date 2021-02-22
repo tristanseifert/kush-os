@@ -19,6 +19,9 @@ class Mapper;
  */
 ENUM_FLAGS(MappingFlags)
 enum class MappingFlags {
+    /// No set flags
+    None                                = 0,
+
     /// The mapping is readable
     Read                                = (1 << 0),
     /// The mapping can be written
@@ -28,6 +31,9 @@ enum class MappingFlags {
 
     /// Memory mapped IO mode (caching disabled entirely)
     MMIO                                = (1 << 7),
+
+    /// Mask including all permission bits
+    PermissionsMask                     = (Read | Write | Execute),
 };
 
 /*
@@ -198,8 +204,12 @@ class MapEntry {
             /// Virtual base address in that map; if 0, we use the base value in the map entry
             uintptr_t base = 0;
 
+            /// If any bits are set, this is applied as a mask to the flags when mapping pages
+            MappingFlags flagsMask = MappingFlags::None;
+
             MapInfo() = default;
-            MapInfo(Map *map, const uintptr_t _base = 0) : mapPtr(map), base(_base) {};
+            MapInfo(Map *map, const uintptr_t _base, const MappingFlags _mask) : mapPtr(map), 
+                base(_base), flagsMask(_mask) {};
         };
 
     private:
@@ -211,11 +221,12 @@ class MapEntry {
         static void initAllocator();
 
         /// The entry was added to a mapping.
-        void addedToMap(Map *, const uintptr_t base = 0);
+        void addedToMap(Map *, const uintptr_t base = 0, const MappingFlags flagsMask = 
+                MappingFlags::None);
         /// Maps all physical pages we've allocated (for anonymous mappings)
-        void mapAnonPages(Map *, const uintptr_t);
+        void mapAnonPages(Map *, const uintptr_t, const MappingFlags);
         /// Directly maps the underlying physical page.
-        void mapPhysMem(Map *, const uintptr_t);
+        void mapPhysMem(Map *, const uintptr_t, const MappingFlags);
 
         /// The entry was removed from a mapping.
         void removedFromMap(Map *);

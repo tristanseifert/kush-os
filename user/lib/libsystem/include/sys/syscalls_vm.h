@@ -42,6 +42,7 @@ LIBSYSTEM_EXPORT int ResizeVirtualRegion(const uintptr_t regionHandle, const uin
 LIBSYSTEM_EXPORT int MapVirtualRegion(const uintptr_t regionHandle);
 LIBSYSTEM_EXPORT int MapVirtualRegionAt(const uintptr_t regionHandle, const uintptr_t baseAddr);
 LIBSYSTEM_EXPORT int MapVirtualRegionTo(const uintptr_t regionHandle, const uintptr_t taskHandle);
+LIBSYSTEM_EXPORT int MapVirtualRegionToFlags(const uintptr_t regionHandle, const uintptr_t taskHandle, const uintptr_t flags);
 LIBSYSTEM_EXPORT int MapVirtualRegionAtTo(const uintptr_t regionHandle, const uintptr_t taskHandle,
         const uintptr_t baseAddr);
 

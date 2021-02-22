@@ -42,6 +42,15 @@ For kernel entry, the IA32 specific \texttt{SYSENTER} instruction should be used
 
 The syscall number is placed in \texttt{\%ax}; the high 16 bits of the \texttt{\%eax} register are unused and may be interpreted by the syscall as a 16-bit set of flags. Following the syscall number, a maximum of four 32-bit arguments may be passed in the \texttt{\%ebx}, \texttt{\%ecx}, \texttt{\%edx} and \texttt{\%edi} registers. The call's result is placed in \texttt{\%eax}.
 
+The entire memory range of \texttt{0xBF5F0000} to \texttt{0xBF5FFFFF}, inclusive is reserved for syscall data in all processes. The division of its address space is roughly as follows:
+\\ \\
+\begin{bytefield}{1}	
+	\memsection{bf5f ffff}{bf5f e000}{4}{System information} \\
+	\memsection{bf5f dfff}{bf5f d000}{2}{Time-of-day (clock) information} \\
+	\memsection{bf5f dfff}{bf5f 2000}{4}{-- reseved --} \\
+	\memsection{bf5f 1fff}{bf5f 0000}{2}{System call \texttt{SYSENTER} stub}
+\end{bytefield}
+
 %%%%%%%%%%%%%%%
 \section{Handles}
 Handles are opaque userspace identifiers for kernel objects. They take the form of positive integers, and are globally valid across the system. Any time a userspace process wishes to interact with a kernel object, it does so by using handles.
@@ -265,12 +274,20 @@ Only the task that created a VM object can resize it.
 %%%%%
 \subsubsection{{\tt 0x15}: Map VM region}
 \textbf{Arguments:} (3) VM object handle, destination task handle, destination VM base \\
-\textbf{Flags:} None \\
+\textbf{Flags:} See below \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
 Maps the specified virtual memory object into the address space of the specified task, if possible; possible failure reasons include a conflicting mapping in the destination address space.
 
 If desired, a different base address can be specified where the region should be mapped in the destination task. Specify a value of \texttt{0} to map it at the base address specified when the mapping was created.
+
+If any flags are specified at all, they are interpreted as a mask to be applied against the map's flags. For example, this can be used to map a page read-only into another task. The supported flags are:
+
+\begin{itemize}
+\item \texttt{1 << 10}: Allow read access to the memory region.
+\item \texttt{1 << 11}: Allow write access to the memory region.
+\item \texttt{1 << 12}: Allow code execution from the memory region.
+\end{itemize}
 
 Specify a task handle of \texttt{0} to use the currently running task.
 

@@ -7,10 +7,15 @@ add_executable(rootsrv
     src/init/Init.cpp
     src/init/Bundle.cpp
     src/init/ScriptParser.cpp
+    src/init/BundleFileRpcHandler.cpp
     src/task/Task.cpp
     src/task/Registry.cpp
     src/task/RpcHandler.cpp
+    src/task/InfoPage.cpp
     src/task/loader/Elf32.cpp
+    src/dispensary/Dispensary.cpp
+    src/dispensary/Registry.cpp
+    src/dispensary/RpcHandler.cpp
 )
 
 #####
@@ -40,6 +45,10 @@ target_link_options(rootsrv PUBLIC "-Wl,-T${C_STATIC_LINKER_SCRIPT}")
 
 # install it to boot directory in sysroot
 install(TARGETS rootsrv RUNTIME DESTINATION ${SYSROOT_DIR}/boot)
+
+# copy the rpc headers
+FILE(GLOB ROOTSRV_RPC_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/rpc/*.hpp")
+install(FILES ${ROOTSRV_RPC_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/rpc)
 
 # copy some data files as well
 install(FILES data/x86_pc.init DESTINATION ${SYSROOT_DIR}/etc RENAME default.init)

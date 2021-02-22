@@ -9,16 +9,17 @@
 
 #include "log.h"
 
-extern "C" int main(int, const char **);
-
 namespace task {
 /**
  * Holds references to all of our task structs, indexed by the task handle.
  */
 class Registry {
-    friend int ::main(int, const char **);
-
     public:
+        /// Initializes the task registry
+        static void init() {
+            gShared = new Registry;
+        }
+
         /// Adds a new task to the registry
         static void registerTask(std::shared_ptr<Task> &task) {
             const auto handle = task->getHandle();
@@ -38,11 +39,6 @@ class Registry {
         }
 
     private:
-        /// Initializes the task registry
-        static void init() {
-            gShared = new Registry;
-        }
-
         static Registry *gShared;
 
     private:

@@ -10,6 +10,7 @@ add_library(system_objs OBJECT
     src/sys/scheduler.c
     src/sys/task.c
     src/sys/vm.c
+    src/sys/infopage.c
     # stack stuff
     src/stack/stack_guard.c
 )
@@ -64,8 +65,12 @@ endif()
 install(TARGETS system_static LIBRARY)
 install(TARGETS system_dynamic LIBRARY)
 
-FILE(GLOB LIBC_PUB_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
-install(FILES ${LIBC_PUB_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include)
-FILE(GLOB LIBC_PUB_SYS_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/sys/*.h")
-install(FILES ${LIBC_PUB_SYS_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/sys)
+FILE(GLOB LIBSYSTEM_PUB_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
+install(FILES ${LIBSYSTEM_PUB_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include)
+FILE(GLOB LIBSYSTEM_PUB_SYS_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/sys/*.h")
+install(FILES ${LIBSYSTEM_PUB_SYS_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/sys)
+
+# copy the rpc headers
+FILE(GLOB LIBSYSTEM_RPC_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/rpc/*.hpp")
+install(FILES ${LIBSYSTEM_RPC_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/rpc)
 

@@ -163,8 +163,17 @@ int MapVirtualRegionAt(const uintptr_t handle, const uintptr_t baseAddr) {
 /**
  * Maps a virtual memory region from the specified task.
  */
-int MapVirtualRegionFrom(const uintptr_t regionHandle, const uintptr_t taskHandle) {
+int MapVirtualRegionTo(const uintptr_t regionHandle, const uintptr_t taskHandle) {
     return __do_syscall3(SYS_VM_MAP, regionHandle, taskHandle, 0);
+}
+/**
+ * Maps a virtual memory region from the specified task, with a specified flags mask.
+ */
+int MapVirtualRegionToFlags(const uintptr_t regionHandle, const uintptr_t taskHandle, const uintptr_t flagsMask) {
+    uintptr_t flags = 0;
+    flags = BuildSyscallFlags(flagsMask, 0);
+
+    return __do_syscall3(SYS_VM_MAP | ((flags & 0xFFFF) << 16), regionHandle, taskHandle, 0);
 }
 
 /**

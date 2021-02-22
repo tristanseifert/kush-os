@@ -44,7 +44,7 @@ class StackPool {
         static const uintptr_t kRegionLength = (0xC3000000 - kBaseAddr);
 
         /// size of a single stack region (in bytes)
-        static const uintptr_t kStackSize = 0x8000;
+        static const uintptr_t kStackSize = 0x4000;
         /// total number of stacks
         static const uintptr_t kNumStacks = kRegionLength / kStackSize;
         static_assert(!(kNumStacks & 0x1F), "Number of stacks must be a multiple of 32");

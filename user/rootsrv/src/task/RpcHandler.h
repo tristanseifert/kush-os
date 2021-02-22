@@ -33,11 +33,6 @@ class RpcHandler {
 
         void main();
 
-        /// Handlesa received message.
-        bool handleMsg(const struct MessageHeader *msg, const size_t len);
-        /// Handles a "create task" message
-        bool handleTaskCreate(const struct MessageHeader *msg, const size_t len);
-
     private:
         static RpcHandler *gShared;
 
