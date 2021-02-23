@@ -132,9 +132,8 @@ void Elf32::phdrLoad(std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
     const auto pageSz = 0x1000;
 
     // virtual address must be page aligned
-    if(hdr.p_vaddr & (pageSz - 1)) {
-        throw LoaderError(fmt::format("Unaligned load address {:08x}", hdr.p_vaddr));
-    }
+    const uintptr_t inPageOff = hdr.p_vaddr & (pageSz - 1);
+    const uintptr_t virtBase = hdr.p_vaddr & ~(pageSz - 1);
 
     // round up to the nearest page and get the mapping flags
     size_t allocSize = hdr.p_memsz;
@@ -156,7 +155,7 @@ void Elf32::phdrLoad(std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
     }
 
     // set up to write to it
-    vmBase = reinterpret_cast<void *>(regionBase);
+    vmBase = reinterpret_cast<void *>(regionBase + inPageOff);
     // LOG("Handle $%08x'h (base %p)", vmHandle, vmBase);
 
     // get the corresponding file region and copy it
@@ -170,7 +169,13 @@ void Elf32::phdrLoad(std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
         memcpy(vmBase, toCopy.data(), toCopy.size());
     }
 
-    // change the protection level to what the program header desires
+    /*
+     * Change the page's protection level.
+     *
+     * If the dynamic linker needs to fix up a read-only region, it will remap it as read/write
+     * temporarily. This ensures static binaries will never have their .text segments left writable
+     * or need to rely on a particular startup code to be secure.
+     */
     uintptr_t vmFlags = 0;
     if(hdr.p_flags & PF_R) {
         vmFlags |= VM_REGION_READ;
@@ -195,7 +200,7 @@ void Elf32::phdrLoad(std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
 
     // place the mapping into the task
     taskHandle = task->getHandle();
-    err = MapVirtualRegionAtTo(vmHandle, taskHandle, hdr.p_vaddr);
+    err = MapVirtualRegionAtTo(vmHandle, taskHandle, virtBase);
     if(err) {
         throw std::system_error(err, std::generic_category(), "MapVirtualRegionAtTo");
     }

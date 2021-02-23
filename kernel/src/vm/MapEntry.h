@@ -10,6 +10,10 @@
 
 #include <arch/rwlock.h>
 
+namespace sched {
+struct Task;
+}
+
 namespace vm {
 class Map;
 class Mapper;
@@ -195,12 +199,17 @@ class MapEntry {
             uintptr_t pageOff = 0;
             /// physical address of page
             uint64_t physAddr = 0;
+
+            /// task that originally allocated this
+            sched::Task *task = nullptr;
         };
 
         /// Reference to a map in which we're mapped
         struct MapInfo {
             /// Pointer to the map
             Map *mapPtr = nullptr;
+            /// Task this map was added to
+            sched::Task *task = nullptr;
             /// Virtual base address in that map; if 0, we use the base value in the map entry
             uintptr_t base = 0;
 
@@ -210,8 +219,8 @@ class MapEntry {
             uint32_t reserved = 0;
 
             MapInfo() = default;
-            MapInfo(Map *map, const uintptr_t _base, const MappingFlags _mask) : mapPtr(map), 
-                base(_base), flagsMask(_mask) {};
+            MapInfo(Map *map, sched::Task *_task, const uintptr_t _base, const MappingFlags _mask):
+                mapPtr(map), task(_task), base(_base), flagsMask(_mask) {};
         };
 
     private:
@@ -223,15 +232,15 @@ class MapEntry {
         static void initAllocator();
 
         /// The entry was added to a mapping.
-        void addedToMap(Map *, const uintptr_t base = 0, const MappingFlags flagsMask = 
-                MappingFlags::None);
+        void addedToMap(Map *, sched::Task *, const uintptr_t base = 0,
+                const MappingFlags flagsMask = MappingFlags::None);
         /// Maps all physical pages we've allocated (for anonymous mappings)
         void mapAnonPages(Map *, const uintptr_t, const MappingFlags);
         /// Directly maps the underlying physical page.
         void mapPhysMem(Map *, const uintptr_t, const MappingFlags);
 
         /// The entry was removed from a mapping.
-        void removedFromMap(Map *);
+        void removedFromMap(Map *, sched::Task *);
 
         /// Faults in an anonymous memory page.
         void faultInPage(const uintptr_t address, Map *map);

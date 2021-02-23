@@ -33,6 +33,19 @@ class PhysicalAllocator {
             gShared->reservePage(physicalAddr);
         }
 
+        /// Returns the total number of pages
+        static uintptr_t getTotalPages() {
+            uintptr_t ret = 0;
+            __atomic_load(&gShared->totalPages, &ret, __ATOMIC_RELAXED);
+            return ret;
+        }
+        /// Returns the number of allocated pages
+        static uintptr_t getAllocPages() {
+            uintptr_t ret = 0;
+            __atomic_load(&gShared->allocatedPages, &ret, __ATOMIC_RELAXED);
+            return ret;
+        }
+
     private:
         PhysicalAllocator();
 
@@ -92,6 +105,11 @@ class PhysicalAllocator {
         // TODO: this should be retrieved from the arch/platform code
         /// virtual address to map the next physical region allocation bitmap in
         uint32_t nextBitmapVmAddr = 0xC0400000;
+
+        /// total number of available pages
+        uintptr_t totalPages = 0;
+        /// number of allocated ap ges
+        uintptr_t allocatedPages = 0;
 
         /// lock to protect the alloc bitmaps
         DECLARE_SPINLOCK(bitmapLock);

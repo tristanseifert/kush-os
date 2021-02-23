@@ -33,6 +33,9 @@ class BundleFileRpcHandler {
         /// maximum length of messages to be received by this handler; this includes headers
         constexpr static const size_t kMaxMsgLen = (1024 * 16);
 
+        /// maximum IO block size
+        constexpr static const size_t kMaxBlockSize = 512;
+
     public:
         BundleFileRpcHandler(std::shared_ptr<Bundle> &_bundle);
 
@@ -60,7 +63,11 @@ class BundleFileRpcHandler {
         /// processes the open() request
         void handleGetCaps(const struct MessageHeader *, const rpc::RpcPacket *, const size_t);
         void handleOpen(const struct MessageHeader *, const rpc::RpcPacket *, const size_t);
-        void openFailed(int, const rpc::RpcPacket *);
+        void openFailed(const int, const rpc::RpcPacket *);
+        void handleReadDirect(const struct MessageHeader *, const rpc::RpcPacket *, const size_t);
+        void readFailed(const uintptr_t, const int, const rpc::RpcPacket *);
+
+        void handleClose(const struct MessageHeader *, const rpc::RpcPacket *, const size_t);
 
         void reply(const rpc::RpcPacket *packet, const rpc::FileIoEpType type,
         const std::span<uint8_t> &buf);

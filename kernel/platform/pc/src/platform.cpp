@@ -38,6 +38,7 @@ void platform_init() {
  * to set up interrupts.
  */
 void platform_vm_available() {
+
     irq::Manager::init();
     acpi::Manager::vmAvailable();
     timer::Manager::init();

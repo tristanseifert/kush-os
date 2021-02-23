@@ -87,7 +87,7 @@ void kernel_main() {
 }
 
 static void ThreadThymeCock(uintptr_t) {
-    char bollocks[300] = {0};
+    static char line[300] = {0};
 
     uintptr_t i = 0;
     auto last = platform_timer_now();
@@ -100,31 +100,34 @@ static void ThreadThymeCock(uintptr_t) {
 
         // idle state
         const uint64_t secs = (nsec / (1000ULL * 1000ULL * 1000ULL));
-        int written = snprintf(bollocks, 300, "o'clock: %16llu ns (%02lld:%02lld) yeet %8g mS "
-                "idle %g sec\n\n", nsec,
-                secs / 60, secs % 60, ((float) since / (1000. * 1000.)), ((float) idle / (1000. * 1000. * 1000.))
+        int written = snprintf(line, 300, "o'clock: %16llu ns (%02lld:%02lld) yeet %8g mS "
+                "idle %g sec\nPhys alloc: %8uK / %8uK\n", nsec,
+                secs / 60, secs % 60, ((float) since / (1000. * 1000.)),
+                ((float) idle / (1000. * 1000. * 1000.)),
+                mem::PhysicalAllocator::getAllocPages() * 4,
+                mem::PhysicalAllocator::getTotalPages() * 4
                 );
 
-        static uint16_t *base = (uint16_t *) 0xfc0000a0;
+        static uint16_t *base = (uint16_t *) 0xfc000000;
         static size_t x = 0, y = 0;
         x = y = 0;
 
         for(int i = 0; i < written; i++) {
-            if(bollocks[i] == '\n') {
+            if(line[i] == '\n') {
                 x = 0;
                 y++;
                 continue;
             }
 
-            base[x + (y * 80)] = 0x0700 | bollocks[i];
+            base[x + (y * 80)] = 0x0700 | line[i];
             x++;
         }
 
         // each task
         sched::Scheduler::get()->iterateTasks([](sched::Task *task) {
             // task header
-            char line[80];
-            int written = snprintf(line, 80, "* Task %4u %08x %-24s\n", task->pid, task->handle, task->name);
+            int written = snprintf(line, 300, "* Task %4u %08x %24s %8uK\n", task->pid,
+                    task->handle, task->name, (task->physPagesOwned * arch_page_size()) / 1024);
 
             for(int i = 0; i < written; i++) {
                 if(line[i] == '\n') {
@@ -139,19 +142,20 @@ static void ThreadThymeCock(uintptr_t) {
 
             // now write each thread
             for(auto thread : task->threads) {
-                written = snprintf(line, 80, "  x %08x %24s %u %6.2f %08x\n", thread->handle,
+                written = snprintf(line, 300, "  x %08x %24s %u %6.2f %08x\n", thread->handle,
                         thread->name, (uintptr_t) thread->state,
                         ((float) thread->cpuTime / (1000. * 1000. * 1000.)), thread->lastSyscall);
-            for(int i = 0; i < written; i++) {
-                if(line[i] == '\n') {
-                    x = 0;
-                    y++;
-                    continue;
-                }
 
-                base[x + (y * 80)] = 0x0700 | line[i];
-                x++;
-            }
+                for(int i = 0; i < written; i++) {
+                    if(line[i] == '\n') {
+                        x = 0;
+                        y++;
+                        continue;
+                    }
+
+                    base[x + (y * 80)] = 0x0700 | line[i];
+                    x++;
+                }
             }
         });
 

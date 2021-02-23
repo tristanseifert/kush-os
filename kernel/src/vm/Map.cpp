@@ -245,7 +245,8 @@ int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
  *
  * @return 0 on success
  */
-int Map::add(MapEntry *_entry, const uintptr_t _base, const MappingFlags flagsMask) {
+int Map::add(MapEntry *_entry, sched::Task *task, const uintptr_t _base,
+        const MappingFlags flagsMask) {
     RW_LOCK_WRITE(&this->lock);
 
     // retain entry
@@ -298,7 +299,7 @@ beach:;
     // allow the performing of mapping modifications by the entry
     RW_UNLOCK_WRITE(&this->lock);
 
-    entry->addedToMap(this, base, flagsMask);
+    entry->addedToMap(this, task, base, flagsMask);
     return 0;
 
 fail:;
@@ -363,7 +364,7 @@ bool Map::findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &out
 /**
  * Removes the given entry from this map.
  */
-int Map::remove(MapEntry *_entry) {
+int Map::remove(MapEntry *_entry, sched::Task *task) {
     MapEntry *removed = nullptr;
 
     RW_LOCK_WRITE(&this->lock);
@@ -390,7 +391,7 @@ beach:;
     RW_UNLOCK_WRITE(&this->lock);
     REQUIRE(removed, "wtf");
 
-    removed->removedFromMap(this);
+    removed->removedFromMap(this, task);
     removed->release();
 
     return 0;

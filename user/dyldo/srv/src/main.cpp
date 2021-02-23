@@ -1,5 +1,7 @@
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/syscalls.h>
 #include <sys/_infopage.h>
 
@@ -15,7 +17,6 @@ extern kush_sysinfo_page_t *__kush_infopg;
  */
 int main(const int argc, const char **argv) {
     int err;
-    uintptr_t handle = 0;
 
     // set up environment
     DbgOut("Megabitch has secreted", 22);
@@ -53,9 +54,47 @@ int main(const int argc, const char **argv) {
 */
 
     // try file stuff
+    void *read = malloc(42069);
+    assert(read);
+
+/*
+    uintptr_t handle = 0;
     uint64_t fileSz;
-    err = FileOpen("/sbin/dyldosrv", FILE_OPEN_READ, &handle, &fileSz);
+    err = FileOpen("/lib/libdyldo.so", FILE_OPEN_READ, &handle, &fileSz);
     fprintf(stderr, "FileOpen(): %d, handle $%08x length %llu bytes\n", err, handle, fileSz);
+
+    err = FileRead(handle, 0, 42069, read);
+    fprintf(stderr, "FileRead(): %d\n", err);
+
+    err = FileClose(handle);
+    fprintf(stderr, "FileClose(): %d\n", err);
+*/
+
+    FILE *fuck = fopen("/lib/libdyldo.so", "rb");
+    fprintf(stderr, "fopen(): %p %d\n", fuck, errno);
+
+    long pos = ftell(fuck);
+    fprintf(stderr, "ftell(): %ld\n", pos);
+
+    err = fseek(fuck, 0, SEEK_END);
+    assert(!err && "fseek");
+    pos = ftell(fuck);
+    fprintf(stderr, "ftell(): %ld\n", pos);
+    err = fseek(fuck, 0, SEEK_SET);
+    assert(!err && "fseek");
+    pos = ftell(fuck);
+    fprintf(stderr, "ftell(): %ld\n", pos);
+
+    err = fread(read, 42069, 1, fuck);
+    fprintf(stderr, "fread(): %d\n", err);
+
+    pos = ftell(fuck);
+    fprintf(stderr, "ftell(): %ld\n", pos);
+
+    err = fclose(fuck);
+    fprintf(stderr, "fclose(): %d\n", err);
+
+    free(read);
 
     while(1) {
         ThreadUsleep(1000 * 500);

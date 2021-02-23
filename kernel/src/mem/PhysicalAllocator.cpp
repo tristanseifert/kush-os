@@ -71,6 +71,7 @@ PhysicalAllocator::PhysicalAllocator() {
 
         // store it
         this->regions[this->numRegions++] = r;
+        this->totalPages += pages;
     }
 }
 
@@ -132,6 +133,7 @@ uint64_t PhysicalAllocator::allocPage() {
 #if LOG_ALLOC
             log("Allocated phys %016llx", addr);
 #endif
+            __atomic_add_fetch(&this->allocatedPages, 1, __ATOMIC_RELAXED);
             return addr;
         }
     }
@@ -203,6 +205,7 @@ void PhysicalAllocator::freePage(const uint64_t physAddr) {
             log("Freeing phys %016llx", physAddr);
 #endif
 
+        __atomic_sub_fetch(&this->allocatedPages, 1, __ATOMIC_RELAXED);
         return;
     }
 

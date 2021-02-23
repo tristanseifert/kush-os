@@ -45,6 +45,9 @@ MapEntry::~MapEntry() {
 
     // release physical pages
     for(const auto &page : this->physOwned) {
+        if(page.task) {
+            __atomic_sub_fetch(&page.task->physPagesOwned, 1, __ATOMIC_RELAXED);
+        }
         this->freePage(page.physAddr);
     }
 }
@@ -126,6 +129,10 @@ int MapEntry::resize(const size_t newSize) {
 
             // if it lies beyond the end, release it
             if(info.pageOff >= endPageOff) {
+                if(info.task) {
+                    __atomic_sub_fetch(&info.task->physPagesOwned, 1, __ATOMIC_RELAXED);
+                }
+
                 this->freePage(info.physAddr);
                 this->physOwned.remove(i);
             } 
@@ -184,16 +191,7 @@ void MapEntry::faultInPage(const uintptr_t address, Map *map) {
 
     int err;
     const auto pageSz = arch_page_size();
-
-    // allocate physical memory and map it in
-    const auto page = mem::PhysicalAllocator::alloc();
-    REQUIRE(page, "failed to allocage physical page for %08x", address);
-
-    auto task = sched::Task::current();
-    if(task) {
-        __atomic_add_fetch(&task->physPagesOwned, 1, __ATOMIC_RELEASE);
-    }
-
+  
     // get map specific base
     uintptr_t thisBase = 0;
     bool foundBase = false;
@@ -211,6 +209,8 @@ void MapEntry::faultInPage(const uintptr_t address, Map *map) {
 beach:;
     REQUIRE(foundBase, "failed to find base address");
 
+    const auto pageOff = (address - thisBase) / pageSz; 
+
     // figure out the proper flags
     auto flg = this->flags;
     if(mask != MappingFlags::None) {
@@ -218,15 +218,37 @@ beach:;
         flg |= (flg & mask);
     }
 
+    // check if we already own such a physical page (shared memory case)
+    for(auto &physPage : this->physOwned) {
+        if(physPage.pageOff == pageOff) {
+            const auto destAddr = thisBase + (pageOff * pageSz);
+            const auto mode = ConvertVmMode(flg);
+            err = map->add(physPage.physAddr, pageSz, destAddr, mode);
+            REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", pageOff, this, this->handle);
+
+            return;
+        }
+    }
+
+    // allocate physical memory and map it in
+    const auto page = mem::PhysicalAllocator::alloc();
+    REQUIRE(page, "failed to allocage physical page for %08x", address);
+
+    auto task = sched::Task::current();
+    if(task) {
+        __atomic_add_fetch(&task->physPagesOwned, 1, __ATOMIC_RELEASE);
+    }
+
     // insert page info
     AnonPageInfo info;
     info.physAddr = page;
-    info.pageOff = (address - thisBase) / pageSz;
+    info.pageOff = pageOff;
+    info.task = sched::Task::current();
 
     this->physOwned.push_back(info);
 
     // map it
-    const auto destAddr = thisBase + (info.pageOff * pageSz);
+    const auto destAddr = thisBase + (pageOff * pageSz);
     const auto mode = ConvertVmMode(flg);
     err = map->add(page, pageSz, destAddr, mode);
     REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", info.pageOff, this, this->handle);
@@ -284,7 +306,7 @@ int MapEntry::updateFlags(const MappingFlags newFlags) {
  * If it is backed by anonymous memory, we map all pages that have been faulted in so far;
  * otherwise, we map the entire region.
  */
-void MapEntry::addedToMap(Map *map, const uintptr_t _base, const MappingFlags flagsMask) {
+void MapEntry::addedToMap(Map *map, sched::Task *task, const uintptr_t _base, const MappingFlags flagsMask) {
     RW_LOCK_READ(&this->lock);
 
     const auto baseAddr = (_base ? _base : this->base);
@@ -302,7 +324,7 @@ void MapEntry::addedToMap(Map *map, const uintptr_t _base, const MappingFlags fl
 
     // insert owner info
     RW_LOCK_WRITE(&this->lock);
-    this->maps.push_back(MapInfo(map, baseAddr, flagsMask));
+    this->maps.push_back(MapInfo(map, task, baseAddr, flagsMask));
     RW_UNLOCK_WRITE(&this->lock);
 }
 
@@ -367,7 +389,7 @@ struct RemoveCtxInfo {
 /**
  * Unmaps the address range of this map entry.
  */
-void MapEntry::removedFromMap(Map *map) {
+void MapEntry::removedFromMap(Map *map, sched::Task *task) {
     RemoveCtxInfo info(this, map);
 
     // iterate the maps info dict to get our true base address
@@ -386,6 +408,26 @@ void MapEntry::removedFromMap(Map *map) {
 
         // remove it
         this->maps.remove(i);
+
+        // find the next first task that's mapped us still
+        sched::Task *newOwner = nullptr;
+        if(!this->maps.empty()) {
+            newOwner = this->maps[0].task;
+        }
+
+        // transfer ownership of physical pages to the next task that maps us
+        uintptr_t owned = 0;
+        for(auto &physPage : this->physOwned) {
+            if(physPage.task == task) {
+                physPage.task = newOwner;
+                owned++;
+            }
+        }
+
+        __atomic_sub_fetch(&task->physPagesOwned, owned, __ATOMIC_RELAXED);
+        if(newOwner) {
+            __atomic_add_fetch(&newOwner->physPagesOwned, owned, __ATOMIC_RELAXED);
+        }
     }
 
     RW_UNLOCK_WRITE(&this->lock);

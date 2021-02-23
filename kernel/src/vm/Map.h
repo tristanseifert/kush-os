@@ -69,8 +69,9 @@ class Map {
         const bool isActive() const;
         void activate();
 
-        int add(MapEntry *entry, const uintptr_t base = 0, const vm::MappingFlags flagMask = vm::MappingFlags::None);
-        int remove(MapEntry *entry);
+        int add(MapEntry *entry, sched::Task *task, const uintptr_t base = 0,
+                const vm::MappingFlags flagMask = vm::MappingFlags::None);
+        int remove(MapEntry *entry, sched::Task *);
         const bool contains(MapEntry *entry);
 
         int add(const uint64_t physAddr, const uintptr_t length, const uintptr_t vmAddr, 

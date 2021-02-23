@@ -72,11 +72,16 @@ class Port {
 
                 /// Reset the wake-up flag; this does nothing, you'll have to drain all messages
                 void reset() override {
+                    __atomic_clear(&this->unblockedSignalled, __ATOMIC_RELAXED);
                     __atomic_clear(&this->signalled, __ATOMIC_RELEASE);
                 }
 
                 /// Other threads may invoke this method when a message is enqueued.
                 void messageQueued() {
+                    if(!this->blocker) {
+                        this->unblockedSignalled = true;
+                        return;
+                    }
                     //bool yes = true, no = false;
                     //if(__atomic_compare_exchange(&this->signalled, &no, &yes, false, __ATOMIC_ACQUIRE, __ATOMIC_RELEASE)) {
                     if(!__atomic_test_and_set(&this->signalled, __ATOMIC_RELEASE)) {
@@ -84,8 +89,18 @@ class Port {
                     }
                 }
 
+                /// Sets the receive blockable object of the port when we're validly blocked on.
+                void willBlockOn(sched::Thread *t) override {
+                    Blockable::willBlockOn(t);
+
+                    if(this->unblockedSignalled) {
+                        this->unblock();
+                    }
+                }
+
             private:
                 Port *port = nullptr;
+                bool unblockedSignalled = false;
                 bool signalled = false;
         };
 

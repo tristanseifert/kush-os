@@ -32,7 +32,6 @@ int _RpcSend(const uintptr_t port, const uint32_t type, const std::span<uint8_t>
 
     // send it
     err = PortSend(port, txPacket, replySize);
-
     free(txBuf);
 
     if(err) {

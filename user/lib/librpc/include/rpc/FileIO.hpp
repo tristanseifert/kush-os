@@ -60,6 +60,8 @@ struct FileIoGetCapsReply {
     uint32_t version;
     /// supported capabilities mask
     FileIoCaps capabilities;
+    /// maximum read block size, or 0 if unlimited
+    uint32_t maxReadBlockSize;
 };
 
 
@@ -120,6 +122,47 @@ struct FileIoOpenReply {
     uint64_t length;
 };
 
+/**
+ * Close a previously opened file.
+ */
+struct FileIoClose {
+    /// file handle to close
+    uintptr_t file;
+};
+/**
+ * Response to a file close request.
+ */
+struct FileIoCloseReply {
+    /// status code: 0 indicates success
+    int32_t status;
+};
+
+
+
+/**
+ * Request to read from a file
+ */
+struct FileIoReadReq {
+    /// file handle
+    uintptr_t file;
+
+    /// offset to start reading from
+    uint64_t offset;
+    /// number of bytes to read
+    uint64_t length;
+};
+/**
+ * Read request reply
+ */
+struct FileIoReadReqReply {
+    /// file handle that this read request belongs to
+    uintptr_t file;
+    /// status code: 0 indicates at least one byte was read
+    int32_t status;
+
+    /// bytes of data returned; may be less than requested
+    cista::offset::vector<uint8_t> data;
+};
 
 }
 

@@ -6,9 +6,16 @@
  * Close the specified file descriptor.
  */
 int fclose(FILE *stream) {
-    // TODO: implement
-    fprintf(stderr, "%s unimplemented", __PRETTY_FUNCTION__);
-    return -1;
+    int err = 0;
+
+    // invoke the close handler
+    if(stream->close) {
+        err = stream->close(stream);
+    }
+
+    // XXX: is it a guarantee all file streams are allocated via malloc()?
+    free(stream);
+    return err;
 }
 
 /**

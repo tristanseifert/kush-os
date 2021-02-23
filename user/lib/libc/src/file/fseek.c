@@ -1,10 +1,15 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "file_private.h"
 
 int fseek(FILE *stream, long offset, int whence) {
-    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
-    return 0;
+    if(stream->seek) {
+        return stream->seek(stream, offset, whence);
+    }
+
+    errno = ENODEV;
+    return -1;
 }
 
 int fseeko(FILE *stream, off_t offset, int whence) {
@@ -18,8 +23,19 @@ int fsetpos(FILE *stream, const fpos_t *pos) {
 }
 
 long ftell(FILE *stream) {
-    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
-    return 0;
+    if(stream->tell) {
+        long ret = 0;
+        int err = stream->tell(stream, &ret);
+
+        if(err >= 0) {
+            return ret;
+        } else {
+            return err;
+        }
+    }
+
+    errno = ENODEV;
+    return -1;
 }
 
 off_t ftello(FILE *stream) {

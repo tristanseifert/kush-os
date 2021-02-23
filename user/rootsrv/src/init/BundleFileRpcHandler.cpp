@@ -87,6 +87,15 @@ void BundleFileRpcHandler::main() {
                     if(!packet->replyPort) continue;
                     this->handleOpen(msg, packet, err);
                     break;
+                case static_cast<uint32_t>(rpc::FileIoEpType::CloseFile):
+                    if(!packet->replyPort) continue;
+                    this->handleClose(msg, packet, err);
+                    break;
+
+                case static_cast<uint32_t>(rpc::FileIoEpType::ReadFileDirect):
+                    if(!packet->replyPort) continue;
+                    this->handleReadDirect(msg, packet, err);
+                    break;
 
                 default:
                     LOG("Init file RPC invalid msg type: $%08x", packet->type);
@@ -118,6 +127,7 @@ void BundleFileRpcHandler::handleGetCaps(const struct MessageHeader *msg,
     FileIoGetCapsReply reply;
     reply.version = 1;
     reply.capabilities = FileIoCaps::DirectIo;
+    reply.maxReadBlockSize = kMaxBlockSize;
 
     auto replyBuf = cista::serialize(reply);
     this->reply(packet, FileIoEpType::GetCapabilitiesReply, replyBuf);
@@ -165,7 +175,7 @@ void BundleFileRpcHandler::handleOpen(const struct MessageHeader *msg,
 /**
  * Sends a "file open failed" message as a response to a previous open request.
  */
-void BundleFileRpcHandler::openFailed(int errno, const rpc::RpcPacket *packet) {
+void BundleFileRpcHandler::openFailed(const int errno, const rpc::RpcPacket *packet) {
     rpc::FileIoOpenReply reply;
     reply.status = errno;
 
@@ -173,7 +183,95 @@ void BundleFileRpcHandler::openFailed(int errno, const rpc::RpcPacket *packet) {
     this->reply(packet, rpc::FileIoEpType::OpenFileReply, replyBuf);
 }
 
+/**
+ * Closes an open file handle.
+ */
+void BundleFileRpcHandler::handleClose(const struct MessageHeader *msg,
+        const rpc::RpcPacket *packet, const size_t msgLen) {
+    using namespace rpc;
 
+    rpc::FileIoCloseReply reply;
+
+    // deserialize the request
+    auto data = std::span(packet->payload, msgLen - sizeof(RpcPacket));
+    auto req = cista::deserialize<FileIoClose>(data);
+
+    // ensure we've got such a file handle
+    if(!this->openFiles.contains(req->file)) {
+        reply.status = EBADF;
+        auto replyBuf = cista::serialize(reply);
+        return this->reply(packet, rpc::FileIoEpType::CloseFileReply, replyBuf);
+    }
+
+    // remove it and acknowledge removal
+    this->openFiles.erase(req->file);
+
+    LOG("Closed file %u", req->file);
+
+    reply.status = 0;
+    auto replyBuf = cista::serialize(reply);
+    this->reply(packet, rpc::FileIoEpType::CloseFileReply, replyBuf);
+}
+ 
+
+
+/**
+ * Handles an open request.
+ */
+void BundleFileRpcHandler::handleReadDirect(const struct MessageHeader *msg,
+        const rpc::RpcPacket *packet, const size_t msgLen) {
+    using namespace rpc;
+    rpc::FileIoReadReqReply reply;
+
+    // deserialize the request and ensure length is ok
+    auto data = std::span(packet->payload, msgLen - sizeof(RpcPacket));
+    auto req = cista::deserialize<FileIoReadReq>(data);
+
+    if(req->length > kMaxBlockSize) {
+        return this->readFailed(req->file, EINVAL, packet);
+    }
+
+    // get the file
+    if(!this->openFiles.contains(req->file)) {
+        return this->readFailed(req->file, EBADF, packet);
+    }
+    reply.file = req->file;
+
+    const auto &file = this->openFiles.at(req->file);
+
+    // cap the read and offset values
+    if(req->offset >= file.file->getSize()) {
+        auto replyBuf = cista::serialize(reply);
+        return this->reply(packet, rpc::FileIoEpType::ReadFileDirectReply, replyBuf);
+    }
+
+    auto offset = req->offset;
+    auto length = std::min(req->length, (file.file->getSize() - offset));
+
+    // perform the file read (memcopy)
+    LOG("Read req %x: off %llu len %llu", req->file, offset, length);
+    auto range = file.file->getContents().subspan(offset, length);
+
+    reply.data.resize(range.size());
+    memcpy(reply.data.data(), range.data(), range.size());
+
+    // send the reply
+    auto replyBuf = cista::serialize(reply);
+
+    this->reply(packet, rpc::FileIoEpType::ReadFileDirectReply, replyBuf);
+}
+
+/**
+ * Sends a "read failed" message.
+ */
+void BundleFileRpcHandler::readFailed(const uintptr_t file, const int errno, const rpc::RpcPacket *packet) {
+    rpc::FileIoReadReqReply reply;
+    reply.status = errno;
+    reply.file = file;
+
+    auto replyBuf = cista::serialize(reply);
+    this->reply(packet, rpc::FileIoEpType::ReadFileDirectReply, replyBuf);
+}
 
 /**
  * Sends an RPC message.

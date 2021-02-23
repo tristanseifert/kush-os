@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -25,11 +26,24 @@ FILE *__stderrp = NULL;
 struct DebugOutStream {
     struct __libc_file_stream header;
 
+    /// total number of bytes written to the output stream
+    uint64_t bytesWritten;
+
     /// number of bytes of buffer space used so far
     size_t bufUsed;
     /// buffer area
     char buf[kBufLength];
 };
+
+/**
+ * Debug streams are always at the end of the stream.
+ */
+static int DebugTell(struct __libc_file_stream *_file, long *out) {
+    struct DebugOutStream *file = (struct DebugOutStream *) _file;
+    *out = file->bytesWritten;
+
+    return 0;
+}
 
 /**
  * Flushes the buffered contents of the output stream.
@@ -58,6 +72,8 @@ static int DebugOutPutc(struct __libc_file_stream *_file, char c) {
     if(err != thrd_success) {
         return EOF;
     }
+
+    file->bytesWritten++;
 
     // if buffer is full, flush and try again
     if(file->bufUsed == kBufLength) {
@@ -105,6 +121,7 @@ void __stdstream_init() {
     stream->header.putc = DebugOutPutc;
     stream->header.flush = DebugOutFlush;
     stream->header.purge = DebugOutPurge;
+    stream->header.tell = DebugTell;
 
     // configure it as the standard output and error out
     __stderrp = (FILE *) stream;

@@ -33,7 +33,7 @@ cd build-compiler-rt
 cmake ../compiler-rt -DLLVM_CONFIG_PATH=../../../llvm/bin/llvm-config -DCMAKE_C_COMPILER_TARGET="i386-pc-kush-elf" -DCMAKE_ASM_COMPILER_TARGET="i386-pc-kush-elf" -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON -DCMAKE_TOOLCHAIN_FILE=~/kush/cmake/toolchain-i386-clang.cmake -Wno-dev -DCMAKE_SIZEOF_VOID_P=4 -DCOMPILER_RT_BAREMETAL_BUILD=ON
 make -j40
 mkdir -p ../../../llvm/lib/clang/12.0.0/lib/kush 
-cp lib/generic/libclang_rt.builtins-i386.a ../../../llvm/lib/clang/12.0.0/lib/kush
+cp lib/i386-kush/libclang_rt.builtins-i386.a ../../../llvm/lib/clang/12.0.0/lib/kush
 ```
 
 ### libcxxabi and libcxx
@@ -67,7 +67,7 @@ Required for stack backtraces and C++ exception support.
 cd llvm-project
 mkdir build-libunwind
 cd build-libunwind
-cmake ../libunwind -DCMAKE_TOOLCHAIN_FILE=~/kush/cmake/toolchain-i386-clang.cmake -DLLVM_CONFIG_PATH=../../../llvm/bin/llvm-config -DLIBUNWIND_TARGET_TRIPLE="i386-pc-kush-elf" -DLIBUNWIND_INSTALL_PREFIX=/Users/tristan/kush/sysroot/ -DLIBUNWIND_USE_COMPILER_RT=ON -DLIBUNWIND_ENABLE_SHARED=OFF -DLIBUNWIND_ENABLE_THREADS=OFF
+cmake ../libunwind -DCMAKE_TOOLCHAIN_FILE=~/kush/cmake/toolchain-i386-clang.cmake -DLLVM_CONFIG_PATH=../../../llvm/bin/llvm-config -DLIBUNWIND_TARGET_TRIPLE="i386-pc-kush-elf" -DLIBUNWIND_INSTALL_PREFIX=/Users/tristan/kush/sysroot/ -DLIBUNWIND_USE_COMPILER_RT=ON -DLIBUNWIND_ENABLE_THREADS=OFF
 make install -j40
 ```
 

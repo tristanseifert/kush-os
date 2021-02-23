@@ -71,6 +71,7 @@ int sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
     int err;
     vm::MapEntry *region = nullptr;
     const auto pageSz = arch_page_size();
+    auto task = sched::Task::current();
 
     // validate the arguments
     const auto flags = (number & 0xFFFF0000) >> 16;
@@ -98,8 +99,8 @@ int sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
 
     // add it to the calling task's mapping if desired
     if(!(flags & kDoNotMap)) {
-        auto vm = sched::Thread::current()->task->vm;
-        err = vm->add(region);
+        auto vm = task->vm;
+        err = vm->add(region, task);
 
         if(err) {
             vm::MapEntry::free(region);
@@ -108,7 +109,6 @@ int sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
     } 
     // if not, associate it with the task; if nobody maps it, that will keep us from leaking it
     else {
-        auto task = sched::Thread::current()->task;
         task->addOwnedVmRegion(region->retain());
     }
 
@@ -123,6 +123,7 @@ int sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
     vm::MapEntry *region = nullptr;
     int err;
     const auto pageSz = arch_page_size();
+    auto task = sched::Task::current();
 
     // validate arguments
     const auto flags = (number & 0xFFFF0000) >> 16;
@@ -146,8 +147,8 @@ int sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
 
     // add it to the calling task's mapping if desired
     if(!(flags & kDoNotMap)) {
-        auto vm = sched::Thread::current()->task->vm;
-        err = vm->add(region);
+        auto vm = task->vm;
+        err = vm->add(region, task);
 
         if(err) {
             vm::MapEntry::free(region);
@@ -156,7 +157,6 @@ int sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
     } 
     // if not, associate it with the task; if nobody maps it, that will keep us from leaking it
     else {
-        auto task = sched::Thread::current()->task;
         task->addOwnedVmRegion(region->retain());
     }
 
@@ -224,7 +224,7 @@ int sys::VmRegionMap(const Syscall::Args *args, const uintptr_t number) {
 
     // get the task handle
     if(!args->args[1]) {
-        task = sched::Thread::current()->task;
+        task = sched::Task::current();
     } else {
         task = handle::Manager::getTask(static_cast<Handle>(args->args[1]));
         if(!task) {
@@ -251,9 +251,9 @@ int sys::VmRegionMap(const Syscall::Args *args, const uintptr_t number) {
         auto flagMask = ConvertFlags(flags);
         flagMask &= (vm::MappingFlags::PermissionsMask);
 
-        err = task->vm->add(region, base, flagMask);
+        err = task->vm->add(region, task, base, flagMask);
     } else {
-        err = task->vm->add(region, base);
+        err = task->vm->add(region, task, base);
     }
 
     return (!err ? Errors::Success : Errors::GeneralError);
@@ -267,7 +267,7 @@ int sys::VmRegionUnmap(const Syscall::Args *args, const uintptr_t number) {
 
     // get the task handle
     if(!args->args[1]) {
-        task = sched::Thread::current()->task;
+        task = sched::Task::current();
     } else {
         task = handle::Manager::getTask(static_cast<Handle>(args->args[1]));
         if(!task) {
@@ -282,7 +282,7 @@ int sys::VmRegionUnmap(const Syscall::Args *args, const uintptr_t number) {
     }
 
     // perform the unmapping
-    int err = task->vm->remove(region);
+    int err = task->vm->remove(region, task);
     return (!err ? Errors::Success : Errors::GeneralError);
 }
 
@@ -384,7 +384,7 @@ int sys::VmTaskGetInfo(const Syscall::Args *args, const uintptr_t number) {
 
     // get the task handle
     if(!args->args[0]) {
-        task = sched::Thread::current()->task;
+        task = sched::Task::current();
     } else {
         task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
         if(!task) {
@@ -407,7 +407,7 @@ int sys::VmAddrToRegion(const Syscall::Args *args, const uintptr_t number) {
 
     // get the task handle
     if(!args->args[0]) {
-        task = sched::Thread::current()->task;
+        task = sched::Task::current();
     } else {
         task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
         if(!task) {

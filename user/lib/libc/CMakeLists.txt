@@ -122,6 +122,7 @@ add_library(c_objs OBJECT
     src/dylink/dl_iterate_phdr.c
     # file IO
     src/file/default_streams.c
+    src/file/rpc_file_streams.c
     src/file/fflush.c
     src/file/fprintf.c
     src/file/fwrite.c
@@ -201,7 +202,7 @@ target_link_libraries(c_static PUBLIC system_static)
 add_library(c_dynamic SHARED $<TARGET_OBJECTS:c_objs> $<TARGET_OBJECTS:c_gdtoa>)
 set_target_properties(c_dynamic PROPERTIES OUTPUT_NAME "c")
 target_include_directories(c_dynamic PUBLIC include)
-target_link_libraries(c_dynamic PUBLIC system_dynamic)
+target_link_libraries(c_dynamic PUBLIC system_dynamic rpc_dynamic)
 target_compile_options(c_objs PRIVATE -fPIC)
 
 # build the correct platform-specific code

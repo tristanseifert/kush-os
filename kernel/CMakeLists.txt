@@ -59,6 +59,7 @@ target_include_directories(kernel PRIVATE ${ARCH_INCLUDE_DIR})
 target_include_directories(kernel PRIVATE ${PLATFORM_INCLUDE_DIR})
 target_include_directories(kernel PRIVATE src)
 
+target_link_options(kernel PRIVATE -nostartfiles)
 target_link_libraries(kernel PRIVATE ${ARCH_TARGET_NAME})
 target_link_libraries(kernel PRIVATE ${PLATFORM_TARGET_NAME})
 

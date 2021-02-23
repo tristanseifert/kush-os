@@ -32,6 +32,17 @@ struct FileIoState {
 
     /// various supported capabilities
     ServerCaps caps;
+    /// maximum IO block size
+    uintptr_t maxIoSize;
 };
+
+namespace fileio {
+extern once_flag gStateOnceFlag;
+extern FileIoState gState;
+
+void Init();
+
+bool UpdateServerPort();
+}
 
 #endif

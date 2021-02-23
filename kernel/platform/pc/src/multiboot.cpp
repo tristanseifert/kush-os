@@ -31,7 +31,7 @@ void multiboot_parse() {
 
     // validate info
     REQUIRE(x86_multiboot_magic == MULTIBOOT2_BOOTLOADER_MAGIC, "invalid multiboot2 magic: $%08x (multiboot at %08x)", x86_multiboot_magic, x86_multiboot_info);
-    REQUIRE(x86_multiboot_info < 0x400000, "Multiboot info must be in low 4M (is at $%08x)", x86_multiboot_info);
+    REQUIRE(x86_multiboot_info < 0x40000000, "Multiboot info must be in low 1G (is at $%08x)", x86_multiboot_info);
 
     // iterate over all tags
     for(tag = (struct multiboot_tag *) (x86_multiboot_info + 8);

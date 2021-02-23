@@ -337,10 +337,11 @@ static void MapInitBundle() {
     const size_t numPages = ((gInitBundleModule.length + pageSz - 1) / pageSz);
 
     // create an allocation
-    auto vm = sched::Task::current()->vm;
+    auto task = sched::Task::current();
+    auto vm = task->vm;
     auto entry = vm::MapEntry::makePhys(gInitBundleModule.physBase, kInitBundleVmAddr,
             numPages * pageSz, vm::MappingFlags::Read);
 
-    err = vm->add(entry);
+    err = vm->add(entry, task);
     REQUIRE(!err, "failed to map root server init bundle: %d", err);
 }
