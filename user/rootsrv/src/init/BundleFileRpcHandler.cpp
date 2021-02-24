@@ -22,6 +22,9 @@ const std::string_view BundleFileRpcHandler::kPortName = "me.blraaz.rpc.rootsrv.
 // shared instance of the bundle file IO handler
 BundleFileRpcHandler *BundleFileRpcHandler::gShared = nullptr;
 
+// set to log all IO
+#define LOG_IO                          0
+
 /**
  * Initializes the bundle RPC handler. We'll allocate a port and start the work loop.
  */
@@ -206,7 +209,9 @@ void BundleFileRpcHandler::handleClose(const struct MessageHeader *msg,
     // remove it and acknowledge removal
     this->openFiles.erase(req->file);
 
+#if LOG_IO
     LOG("Closed file %u", req->file);
+#endif
 
     reply.status = 0;
     auto replyBuf = cista::serialize(reply);
@@ -249,7 +254,9 @@ void BundleFileRpcHandler::handleReadDirect(const struct MessageHeader *msg,
     auto length = std::min(req->length, (file.file->getSize() - offset));
 
     // perform the file read (memcopy)
+#if LOG_IO
     LOG("Read req %x: off %llu len %llu", req->file, offset, length);
+#endif
     auto range = file.file->getContents().subspan(offset, length);
 
     reply.data.resize(range.size());

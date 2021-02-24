@@ -161,7 +161,7 @@ static void ThreadThymeCock(uintptr_t) {
 
         // yeet
         i++;
-        sched::Thread::sleep(200 * 1000 * 1000);
+        sched::Thread::sleep(100 * 1000 * 1000);
         //sched::Thread::yield();
     }
 }

@@ -8,6 +8,11 @@
 ###############################################################################
 add_executable(dyldosrv
     src/main.cpp
+    # dynamic library handling
+    src/dylib/Library.cpp
+    src/dylib/Registry.cpp
+    # prelinking of runtime libs
+    src/prelink/Prelink.cpp
 )
 
 #####
@@ -20,7 +25,7 @@ target_include_directories(dyldosrv PRIVATE src)
 
 # required libraries
 add_dependencies(dyldosrv c_static system_static)
-target_link_libraries(dyldosrv PRIVATE system_static cista rpc_static)
+target_link_libraries(dyldosrv PRIVATE c_static system_static cista rpc_static fmt::fmt-header-only)
 
 # build a static binary
 target_link_options(dyldosrv PRIVATE -static)

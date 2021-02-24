@@ -102,11 +102,24 @@ jmp_highhalf:
     mov         $0x1, %eax
     cpuid
     test        $(1 << 25), %edx
-    jz          .noSSE
+    jz          1f
 
     call        sse_init
 
-.noSSE:
+1:
+    // check if we support NX and enable it if we do
+    movl        $0x80000001, %eax
+    cpuid
+    testl       $0x100000, %edx
+    je          2f
+
+    // turn on IA32_EFER.NXE
+    movl        $0xc0000080, %ecx
+    rdmsr
+    orl         $0x800, %eax
+    wrmsr
+
+2:
     // clear caches
     wbinvd
 

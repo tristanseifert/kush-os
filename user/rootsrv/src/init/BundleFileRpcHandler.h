@@ -34,7 +34,7 @@ class BundleFileRpcHandler {
         constexpr static const size_t kMaxMsgLen = (1024 * 16);
 
         /// maximum IO block size
-        constexpr static const size_t kMaxBlockSize = 512;
+        constexpr static const size_t kMaxBlockSize = 3584;
 
     public:
         BundleFileRpcHandler(std::shared_ptr<Bundle> &_bundle);

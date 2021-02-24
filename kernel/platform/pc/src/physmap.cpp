@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 
+extern size_t __kern_keep_start;
 extern size_t __kern_code_start, __kern_code_end;
 extern size_t __kern_data_start, __kern_data_size;
 extern size_t __kern_bss_start, __kern_bss_size;
@@ -147,9 +148,9 @@ int platform_section_get_info(const platform_section_t section, uint64_t *physAd
     switch(section) {
         // kernel text segment
         case kSectionKernelText:
-            *virtAddr = (uintptr_t) &__kern_code_start;
+            *virtAddr = (uintptr_t) (&__kern_code_start) - 0x4000;
             *physAddr = (*virtAddr) - 0xC0000000;
-            *length = ((uintptr_t) &__kern_code_end) - ((uintptr_t) &__kern_code_start);
+            *length = ((uintptr_t) &__kern_code_end) - ((uintptr_t) &__kern_code_start) + 0x4000;
             return 0;
 
         // kernel data segment

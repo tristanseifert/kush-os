@@ -24,6 +24,7 @@ size_t	 strcspn(const char *, const char *) ;
 char	*strerror(int);
 int strerror_r(int errnum, char *buf, size_t buflen);
 size_t	 strlen(const char *);
+size_t strnlen(const char *s, size_t);
 char	*strncat(char * __restrict, const char * __restrict, size_t);
 int	 strncmp(const char *, const char *, size_t) ;
 char	*strncpy(char * __restrict, const char * __restrict, size_t);

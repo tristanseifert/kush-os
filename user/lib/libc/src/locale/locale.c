@@ -7,7 +7,7 @@
  * Releases a locale.
  */
 void freelocale(locale_t loc) {
-    
+    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);    
 }
 
 /**
@@ -17,6 +17,8 @@ void freelocale(locale_t loc) {
 #pragma clang diagnostic ignored "-Wcast-qual"
 #pragma clang diagnostic ignored "-Wincompatible-pointer-types-discards-qualifiers"
 char *setlocale(int category, const char *locale) {
+    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
+    
     // return current locale
     if(!locale) {
         return "";
@@ -33,6 +35,7 @@ char *setlocale(int category, const char *locale) {
  * Sets the locale of the calling thread.
  */
 locale_t uselocale(locale_t loc) {
+    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
     return loc;
 }
 
@@ -40,7 +43,7 @@ locale_t uselocale(locale_t loc) {
  * Creates a new locale.
  */
 locale_t newlocale(int mask, const char * locale, locale_t base) {
-    fprintf(stderr, "%s unimplemented", __PRETTY_FUNCTION__);
+    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
     return NULL;
 }
 
@@ -49,6 +52,7 @@ locale_t newlocale(int mask, const char * locale, locale_t base) {
  * Returns locale conventions for the given locale, or the current if NULL is specified.
  */
 struct lconv *localeconv_l(locale_t loc) {
+    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
     return NULL;
 }
 

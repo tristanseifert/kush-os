@@ -11,22 +11,6 @@ SECTIONS {
         *(.text*)
     }
 
-    /* Include the list of initialization functions sorted. */
-    .init_array : {
-        _init_array_start = .;
-        KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .init_array.*)))
-        KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .init_array))
-        _init_array_end = .;
-    }
-
-    /* Include the list of termination functions sorted. */
-    .fini_array : {
-        _fini_array_start = .;
-        KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .fini_array.*)))
-        KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .fini_array))
-        _fini_array_end = .;
-    }
-
     /* read only data */
     .rodata ALIGN(4K) : {
         *(.rodata)
@@ -38,9 +22,20 @@ SECTIONS {
         *(.eh_frame)
     }
 
-
     /* data (mutable) section */
     .data ALIGN(4K) : {
+        /* Include the list of initialization functions sorted. */
+        _init_array_start = .;
+        KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .init_array.*)))
+        KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .init_array))
+        _init_array_end = .;
+
+        /* Include the list of termination functions sorted. */
+        _fini_array_start = .;
+        KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .fini_array.*)))
+        KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .fini_array))
+        _fini_array_end = .;
+
         __data_start = .;
         *(*.data)
         *(*.data*)

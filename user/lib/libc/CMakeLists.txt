@@ -130,6 +130,8 @@ add_library(c_objs OBJECT
     src/file/fseek.c
     src/file/fopen.c
     src/file/fclose.c
+    # POSIX standard stuff
+    src/posix/sysconf.c
     # C11 threading implementation
     src/threads/thread_info.c
     src/threads/c11_condvar.c

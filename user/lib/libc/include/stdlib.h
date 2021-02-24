@@ -92,7 +92,7 @@ int	 system(const char *);
 
 
 /// Aborts program execution
-LIBC_EXPORT _Noreturn void abort();
+_Noreturn LIBC_EXPORT void abort();
 
 /// Allocates zeroed memory
 LIBC_EXPORT void *calloc(const size_t count, const size_t size);

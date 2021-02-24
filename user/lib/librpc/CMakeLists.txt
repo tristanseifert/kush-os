@@ -33,7 +33,7 @@ target_link_libraries(rpc_static PUBLIC system_static)
 add_library(rpc_dynamic SHARED $<TARGET_OBJECTS:rpc_objs>)
 set_target_properties(rpc_dynamic PROPERTIES OUTPUT_NAME "rpc")
 target_include_directories(rpc_dynamic PUBLIC include)
-target_link_libraries(rpc_dynamic PUBLIC system_dynamic)
+#target_link_libraries(rpc_dynamic PUBLIC system_dynamic)
 
 # install the library to the sysroot
 install(TARGETS rpc_static LIBRARY)

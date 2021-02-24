@@ -217,7 +217,11 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t virt, const bool wr
     uint64_t flags = (1 << 0);
 
     if(!execute && arch_supports_nx()) { // NX bit set if execute is not set
-        flags |= (1ULL << 63);
+        if(virt < 0xC0000000/* || virt >= 0xC0400000*/) {
+            //log("NX for %016llx %08x len %08x", phys, virt, write);
+            // flags |= 0x8000000000000000ULL;
+            flags |= (1ULL << 63);
+        }
     }
     if(user) { // allow user accesses if set
         flags |= (1 << 2);
