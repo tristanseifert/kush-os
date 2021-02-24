@@ -205,8 +205,8 @@ bool Library::readSegments() {
         const auto aBase = segment.base & ~(pageSz - 1);
         const auto aEnd = ((((segment.base + segment.length) + pageSz - 1) / pageSz) * pageSz) - 1;
 
-        L("Segment {:08x} - {:08x}, aligned {:08x} - {:08x}", segment.base,
-                segment.base + segment.length, aBase, aEnd);
+        L("Segment {:08x} - {:08x}, aligned {:08x} - {:08x} (prot {:02x})", segment.base,
+                segment.base + segment.length, aBase, aEnd, (uint8_t) segment.protection);
 
         segment.vmStart = aBase;
         segment.vmEnd = aEnd;
@@ -261,6 +261,9 @@ bool Library::processSegmentLoad(const Elf32_Phdr &phdr) {
     if(phdr.p_flags & PF_X) {
         info.protection |= SegmentProtection::Execute;
     }
+
+    // it's a load command, ostensibly we should read from file
+    info.progbits = true;
 
     // ensure it doesn't overlap any existing segments
     for(const auto &segment : this->segments) {
@@ -373,6 +376,24 @@ bool Library::readDynMandatory(const DynMap &map) {
 }
 
 /**
+ * Reads a string out of the temporary string table cache; if no cache is provided, we'll use the
+ * slow read method.
+ */
+std::optional<std::string> Library::readStrtab(const uintptr_t i) {
+    if(!this->strtabTemp.empty()) {
+        std::span<char> span = this->strtabTemp;
+        const auto sub = span.subspan(i);
+        if(sub.empty()) return std::nullopt;
+        if(sub[0] == '\0') return std::nullopt;
+
+        const auto len = strnlen(sub.data(), sub.size());
+        return std::string(sub.data(), len);
+    } else {
+        return this->readStrtabSlow(i);
+    }
+}
+
+/**
  * Reads from the string table of the binary. This reads into a small buffer up to `maxLen` bytes
  * from the file, limiting it to the maximum size of the string table if necessary. A string is
  * then returned.
@@ -439,6 +460,8 @@ bool Library::readDynSyms() {
         }
         return false;
     }
+
+    this->strtabTemp = strtab;
 
     // read the dynamic symbol table
     const auto numSyms = this->dynsymLen / this->symtabEntSz;
@@ -555,6 +578,7 @@ bool Library::parseSymtab(const std::span<char> &strtab, const std::span<Elf32_S
 
         // insert it
         this->syms.emplace_back(std::move(info));
+        //this->syms.emplace_back(name, std::move(info));
     }
 
     return true;
@@ -566,6 +590,24 @@ bool Library::parseSymtab(const std::span<char> &strtab, const std::span<Elf32_S
  * TODO: This could be made _way_ faster by not doing a linear scan of this table every time...
  */
 bool Library::exportsSymbol(const std::string &name) const {
+/*    // we have an entry for this symbol
+    if(this->syms.contains(name)) {
+        const auto &sym = this->syms.at(name);
+
+        // ensure it's a global or weak global symbol
+        const auto type = first.flags & SymbolFlags::BindMask;
+        switch(type) {
+            case SymbolFlags::BindGlobal:
+            case SymbolFlags::BindWeakGlobal:
+                return true;
+            default:
+                return false;
+        }
+    }
+    // not defined in this library
+    else {
+        return false;
+    }*/
     return std::any_of(this->syms.begin(), this->syms.end(),
             [&](auto &first) -> bool {
         if(!first.sectionIdx) return false;
@@ -581,6 +623,30 @@ bool Library::exportsSymbol(const std::string &name) const {
 
         return (first.name == name);
     });
+}
+
+/**
+ * Gets the offset/length for a symbol.
+ *
+ * Precondition of this function is that the symbol must exist in the library.
+ */
+void Library::getSymbolInfo(const std::string &name, std::pair<uintptr_t, size_t> &outInfo) {
+    auto it = std::find_if(this->syms.begin(), this->syms.end(), [&](const auto &sym) -> bool {
+        if(!sym.sectionIdx) return false;
+
+        const auto type = sym.flags & SymbolFlags::BindMask;
+        switch(type) {
+            case SymbolFlags::BindGlobal:
+            case SymbolFlags::BindWeakGlobal:
+                break;
+            default:
+                return false;
+        }
+
+        return (sym.name == name);
+    });
+
+    outInfo = (*it).data;
 }
 
 /**
@@ -716,7 +782,7 @@ bool Library::allocateProgbitsVm(const uintptr_t vmBase) {
         segment.vmRegion = handle;
 
         // read into it file data
-        if(segment.fileOff) {
+        if(segment.progbits) {
             // discover where this page is mapped
             uintptr_t base;
             err = VirtualRegionGetInfo(handle, &base, nullptr, nullptr);
@@ -726,6 +792,7 @@ bool Library::allocateProgbitsVm(const uintptr_t vmBase) {
             }
 
             void *ptr = reinterpret_cast<void *>(base + (pageOff));
+            // L("Copying to {} {:x}", ptr, base);
 
             // perform read
             err = fseek(this->file, segment.fileOff, SEEK_SET);
@@ -744,5 +811,204 @@ bool Library::allocateProgbitsVm(const uintptr_t vmBase) {
 
     // all segments were allocated
     return true;
+}
+
+
+
+/**
+ * Performs relocations on the binary.
+ *
+ * We'll start off by finding the .dynamic section (by parsing the section table) and reading from
+ * it the regular relocations (REL/RELSZ) and the PLT relocations (JMPREL/PLTRELSZ) if required.
+ */
+bool Library::relocate(const std::vector<std::pair<uintptr_t, std::shared_ptr<Library>>> &libs) {
+    // find out our base address (from the array above)
+    uintptr_t base = 0;
+    for(const auto &[loadAddr, library] : libs) {
+        if(library.get() == this) {
+            base = loadAddr;
+        }
+    }
+    if(!base) return false;
+
+    // attempt to locate the dynamic section
+    Elf32_Dyn *dynamic = nullptr;
+    const auto numDynEntries = (this->dynLen / sizeof(Elf32_Dyn));
+
+    for(const auto &section : this->sections) {
+        if(section.type == Section::Type::DynamicInfo) {
+            // get its VM offset
+            dynamic = reinterpret_cast<Elf32_Dyn *>(base + section.addr);
+        }
+    }
+    if(!dynamic) return false;
+    if(dynamic[numDynEntries-1].d_tag != DT_NULL) return false;
+
+    // extract from the dynamic section the address of the regular and PLT relocations
+    uintptr_t relAddr = 0, relEnt = 0, pltRelAddr = 0, pltRelEnt = 0, gotOff = 0;
+
+    for(size_t i = 0; i < numDynEntries; i++) {
+        const auto &ent = dynamic[i];
+
+        switch(ent.d_tag) {
+            case DT_REL:
+                relAddr = ent.d_un.d_ptr;
+                break;
+            case DT_RELSZ:
+                relEnt = ent.d_un.d_val / sizeof(Elf32_Dyn);
+                break;
+            case DT_JMPREL:
+                pltRelAddr = ent.d_un.d_ptr;
+                break;
+            case DT_PLTRELSZ:
+                pltRelEnt = ent.d_un.d_val / sizeof(Elf32_Dyn);
+                break;
+            case DT_PLTGOT:
+                gotOff = ent.d_un.d_ptr;
+                break;
+            // ensure PLT relocation type
+            case DT_PLTREL:
+                if(ent.d_un.d_val != DT_REL) {
+                    L("Unsupported DT_PTREL value: {}", ent.d_un.d_val);
+                    return false;
+                }
+                break;
+            default:
+                continue;
+        }
+    }
+
+    L("Relocations at {:x} ({}) PLT relocations at {:x} ({}) GOT @ {:x}", relAddr, relEnt,
+            pltRelAddr, pltRelEnt, gotOff);
+
+    // process the relocations
+    if(relAddr) {
+        auto relsPtr = reinterpret_cast<Elf32_Rel *>(base + relAddr);
+        auto rels = std::span<Elf32_Rel>(relsPtr, relEnt);
+
+        if(!this->processRelocs(rels, base, libs)) {
+            return false;
+        }
+    }
+    /*if(pltRelAddr) {
+        auto relPlt = std::span<Elf32_Dyn>(dynamic, pltRelEnt);
+        if(!this->processPltRelocs(relPlt)) {
+            return false;
+        }
+    }*/
+
+    // discard caches
+    this->strtabTemp.clear();
+    this->strtabTemp.shrink_to_fit();
+
+    return true;
+}
+
+/**
+ * Performs the relocations specified.
+ */
+bool Library::processRelocs(const std::span<Elf32_Rel> &relocs, const uintptr_t base,
+        const std::vector<std::pair<uintptr_t, std::shared_ptr<Library>>> &libs) {
+    // process each relocation
+    for(const auto &rel : relocs) {
+        // get pointer to the word (XXX: validate this)
+        auto fileOff = reinterpret_cast<void *>(base + rel.r_offset);
+
+        // handle the relocation type
+        switch(ELF32_R_TYPE(rel.r_info)) {
+            // relative address: add to the word 
+            case R_386_RELATIVE: {
+                uint32_t read;
+                memcpy(&read, fileOff, sizeof(read));
+                read += base;
+                memcpy(fileOff, &read, sizeof(read));
+                break;
+            }
+
+            // set GOT entry to data symbol
+            case R_386_GLOB_DAT: {
+                // try to resolve symbol
+                const auto sym = ELF32_R_SYM(rel.r_info);
+                uintptr_t addr = 0;
+                bool resolved = (sym == STN_UNDEF);
+
+                if(!resolved) {
+                    // look up the symbol name
+                    const auto &symInfo = this->syms.at(sym);
+                    // search all libraries for it
+                    addr = resolveSymbolVmAddr(symInfo.name, libs);
+                    resolved = (addr != 0);
+                }
+
+                if(!resolved) {
+                    L("Failed to resolve symbol for relocation type {} (off ${:08x} info ${:08x})", 
+                            ELF32_R_TYPE(rel.r_info), rel.r_offset, rel.r_info);
+                    return false;
+                }
+
+                // write the address
+                uint32_t read = addr;
+                memcpy(fileOff, &read, sizeof(read));
+                break;
+            }
+
+            // absolute address of a symbol
+            case R_386_32: {
+                // resolve symbol
+                const auto sym = ELF32_R_SYM(rel.r_info);
+                uintptr_t addr = 0;
+                bool resolved = (sym == STN_UNDEF);
+
+                if(!resolved) {
+                    const auto &symInfo = this->syms.at(sym);
+                    addr = resolveSymbolVmAddr(symInfo.name, libs);
+                    resolved = (addr != 0);
+                }
+
+                if(!resolved) {
+                    L("Failed to resolve symbol for relocation type {} (off ${:08x} info ${:08x})", 
+                            ELF32_R_TYPE(rel.r_info), rel.r_offset, rel.r_info);
+                    return false;
+                }
+
+                // fix up the symbol
+                uint32_t read;
+                memcpy(&read, fileOff, sizeof(read));
+                read += addr;
+                memcpy(fileOff, &read, sizeof(read));
+                break;
+            }
+
+            default:
+                L("Unknown relocation type {} (off ${:08x} info ${:08x})", ELF32_R_TYPE(rel.r_info),
+                        rel.r_offset, rel.r_info);
+                return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Searches the provided list of libraries for one that contains the given symbol.
+ *
+ * @return Symbol virtual address, or 0 if not found.
+ */
+uintptr_t Library::resolveSymbolVmAddr(const std::string &name,
+        const std::vector<std::pair<uintptr_t, std::shared_ptr<Library>>> &libs) {
+    // iterate all libraries to see if any hold the symbol
+    for(const auto &[loadAddr, lib] : libs) {
+        // does this one define the symbol?
+        if(lib->exportsSymbol(name)) {
+            // it does, so resolve it
+            std::pair<uintptr_t, size_t> symInfo;
+            lib->getSymbolInfo(name, symInfo);
+
+            return symInfo.first + loadAddr;
+        }
+    }
+
+    // failed to find the symbol anywhere
+    return 0;
 }
 

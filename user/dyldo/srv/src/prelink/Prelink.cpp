@@ -93,7 +93,7 @@ void prelink::Load() {
         }
     }
 
-    // iterate over each library and perform relocations
+    // resolve library imports and perform relocations
     for(auto &[base, library] : libs) {
         L("Library {} at {:x}", library->getSoname(), base);
 
@@ -101,13 +101,18 @@ void prelink::Load() {
             L("Unresolved imports in {}!", library->getSoname());
             std::terminate();
         }
+
+        if(!library->relocate(libs)) {
+            L("Failed to relocate {}!", library->getSoname());
+            std::terminate();
+        }
     }
 
     // ensure there's no unresolved symbols in any libraries
-    for(auto &[base, library] : libs) {
+    /*for(auto &[base, library] : libs) {
         if(library->hasUnresolvedRelos()) {
             L("Unresolved relocations in {}!", library->getSoname());
             std::terminate();
         }
-    }
+    }*/
 }

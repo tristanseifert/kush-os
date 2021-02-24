@@ -79,8 +79,12 @@ class Library {
 
         /// Quickly test if the given symbol is exported.
         bool exportsSymbol(const std::string &name) const;
+        /// Gets a symbol's address and length.
+        void getSymbolInfo(const std::string &name, std::pair<uintptr_t, size_t> &outInfo);
         /// Resolves external symbols against the list of libraries provided.
         bool resolveImports(const std::vector<std::pair<uintptr_t, std::shared_ptr<Library>>> &);
+        /// Performs the relocations required for the library against the provided libraries.
+        bool relocate(const std::vector<std::pair<uintptr_t, std::shared_ptr<Library>>> &);
 
         /// Gets the soname of the library
         const std::string &getSoname() const {
@@ -247,6 +251,10 @@ class Library {
              * It's likely the `fileCopyBytes` value rounded up to the nearest page size.
              */
             uintptr_t vmRegion;
+            /// Whether the VM protections have been restricted
+            bool vmPermissionsRestricted = false;
+            /// Whether there is data to be copied from the file
+            bool progbits = false;
 
             /**
              * Test if the two segments overlap.
@@ -300,8 +308,15 @@ class Library {
         bool readDynMandatory(const DynMap &);
         bool readDynSyms();
         bool parseSymtab(const std::span<char> &, const std::span<Elf32_Sym> &);
+        bool processRelocs(const std::span<Elf32_Rel> &, const uintptr_t,
+                const std::vector<std::pair<uintptr_t, std::shared_ptr<Library>>> &);
+        bool processPltRelocs(const std::span<Elf32_Rel> &, const uintptr_t);
 
+        std::optional<std::string> readStrtab(const uintptr_t i);
         std::optional<std::string> readStrtabSlow(const uintptr_t, const size_t = 150);
+
+        static uintptr_t resolveSymbolVmAddr(const std::string &,
+                const std::vector<std::pair<uintptr_t, std::shared_ptr<Library>>> &);
 
     private:
         /// File stream we're reading from, if the library is currently open
@@ -350,6 +365,10 @@ class Library {
 
         /// global symbols in the library
         std::vector<Symbol> syms;
+        //std::unordered_map<std::string, Symbol> syms;
+
+        /// temporary string table: discarded after all relocations are processed
+        std::vector<char> strtabTemp;
 };
 }
 
