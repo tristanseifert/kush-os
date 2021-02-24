@@ -31,7 +31,7 @@ THIS SOFTWARE.
 
 #include "gdtoaimp.h"
 
- void
+LIBC_INTERNAL  void
 #ifdef KR_headers
 ULtof(L, bits, exp, k) ULong *L; ULong *bits; Long exp; int k;
 #else
@@ -64,7 +64,7 @@ ULtof(ULong *L, ULong *bits, Long exp, int k)
 		L[0] |= 0x80000000L;
 	}
 
- int
+LIBC_INTERNAL  int
 #ifdef KR_headers
 strtorf(s, sp, rounding, f) CONST char *s; char **sp; int rounding; float *f;
 #else

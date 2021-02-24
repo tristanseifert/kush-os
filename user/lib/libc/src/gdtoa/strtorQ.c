@@ -49,7 +49,7 @@ THIS SOFTWARE.
 #define _3 0
 #endif
 
- void
+LIBC_INTERNAL  void
 #ifdef KR_headers
 ULtoQ(L, bits, exp, k) ULong *L; ULong *bits; Long exp; int k;
 #else
@@ -92,7 +92,7 @@ ULtoQ(ULong *L, ULong *bits, Long exp, int k)
 		L[_0] |= 0x80000000L;
 	}
 
- int
+LIBC_INTERNAL  int
 #ifdef KR_headers
 strtorQ(s, sp, rounding, L) CONST char *s; char **sp; int rounding; void *L;
 #else

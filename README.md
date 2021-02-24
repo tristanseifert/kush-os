@@ -43,7 +43,7 @@ libcxxabi provides the lower level portable layer for the C++ runtime library. B
 cd llvm-project
 mkdir build-libcxxabi
 cd build-libcxxabi
-cmake ../libcxxabi -DCMAKE_TOOLCHAIN_FILE=~/kush/cmake/toolchain-i386-clang.cmake -DLLVM_CONFIG_PATH=../../../llvm/bin/llvm-config -DLIBCXX_TARGET_TRIPLE="i386-pc-kush-elf"  -DLIBCXXABI_INSTALL_PREFIX=/Users/tristan/kush/sysroot/ -Wno-dev -DCMAKE_SIZEOF_VOID_P=4 -DLIBCXXABI_ENABLE_THREADS=OFF
+cmake ../libcxxabi -DCMAKE_TOOLCHAIN_FILE=~/kush/cmake/toolchain-i386-clang.cmake -DLIBCXX_TARGET_TRIPLE="i386-pc-kush-elf"  -DLIBCXXABI_INSTALL_PREFIX=/Users/tristan/kush/sysroot/ -Wno-dev -DLIBCXXABI_ENABLE_THREADS=OFF
 make install -j40
 ```
 

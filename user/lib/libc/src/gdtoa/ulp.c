@@ -31,7 +31,7 @@ THIS SOFTWARE.
 
 #include "gdtoaimp.h"
 
- double
+LIBC_INTERNAL  double
 ulp
 #ifdef KR_headers
 	(x) double x;

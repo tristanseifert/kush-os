@@ -8,6 +8,7 @@ add_library(c_objs OBJECT
     src/time/gettimeofday.c
     src/time/time.c
     src/time/strftime.c
+    src/time/clock.c
     # string functions
     src/string/memchr.c
     src/string/memclr.c
@@ -190,6 +191,7 @@ add_library(c_gdtoa OBJECT
     src/gdtoa/ulp.c
 )
 target_compile_options(c_gdtoa PRIVATE -flto)
+target_compile_definitions(c_gdtoa PRIVATE BUILDING_LIBC=1)
 
 # specify the include directories
 target_include_directories(c_objs PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
@@ -209,20 +211,20 @@ target_compile_options(c_objs PRIVATE -fPIC)
 
 # build the correct platform-specific code
 if(${KERNEL_ARCH} STREQUAL "x86")
-    target_sources(c_objs PRIVATE
+    #    target_sources(c_objs PRIVATE
 #        src/x86/crt0.S
-        src/x86/crti.c
         # this is useful for x86
         # src/gdtoa/strtodnrp.c
-    )
+        # )
 
     target_compile_definitions(c_objs PRIVATE LIBC_ARCH_X86=1)
 
     # compile the C library entry point (for static executables)
     add_library(c_crt0T OBJECT
-        src/x86/crt0.S
+        src/x86/crt0_static.S
+        src/x86/crti.c
     )
-    # compile the C library entry point (for regular executables)
+    # compile the C library entry point (for dynamic executables)
     add_library(c_crt0 OBJECT
         src/x86/crt0.S
     )
@@ -235,7 +237,8 @@ if(${KERNEL_ARCH} STREQUAL "x86")
     add_dependencies(c_objs c_crt0 c_crt0T c_crt0S)
 
     add_custom_command(TARGET c_static POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/c_crt0T.dir/src/x86/crt0.S.obj ${SYSROOT_DIR}/lib/crt0T.o
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/c_crt0T.dir/src/x86/crt0_static.S.obj ${SYSROOT_DIR}/lib/crt0T.o
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/c_crt0T.dir/src/x86/crti.c.obj ${SYSROOT_DIR}/lib/crti.o
     )
     add_custom_command(TARGET c_static POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/c_crt0.dir/src/x86/crt0.S.obj ${SYSROOT_DIR}/lib/crt0.o

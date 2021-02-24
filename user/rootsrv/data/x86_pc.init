@@ -17,6 +17,7 @@ FILE /lib/libsystem.so
 FILE /lib/libc.so
 FILE /lib/libc++.so.1
 FILE /lib/libc++abi.so.1
+FILE /lib/libunwind.so.1
 FILE /lib/librpc.so
 FILE /lib/libdyldo.so
 

@@ -31,7 +31,7 @@ THIS SOFTWARE.
 
 #include "gdtoaimp.h"
 
- Bigint *
+LIBC_INTERNAL  Bigint *
 #ifdef KR_headers
 sum(a, b) Bigint *a; Bigint *b;
 #else

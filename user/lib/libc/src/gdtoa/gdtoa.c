@@ -108,7 +108,7 @@ bitstob(ULong *bits, int nbits, int *bbits)
  *	   calculation.
  */
 
- char *
+LIBC_INTERNAL  char *
 gdtoa
 #ifdef KR_headers
 	(fpi, be, bits, kindp, mode, ndigits, decpt, rve)

@@ -44,7 +44,7 @@ fivesbits[] = {	 0,  3,  5,  7, 10, 12, 14, 17, 19, 21,
 #endif
 		};
 
- Bigint *
+LIBC_INTERNAL  Bigint *
 #ifdef KR_headers
 increment(b) Bigint *b;
 #else
@@ -89,7 +89,7 @@ increment(Bigint *b)
 	return b;
 	}
 
- int
+LIBC_INTERNAL  int
 #ifdef KR_headers
 decrement(b) Bigint *b;
 #else
@@ -141,7 +141,7 @@ all_on(Bigint *b, int n)
 	return 1;
 	}
 
- Bigint *
+LIBC_INTERNAL  Bigint *
 #ifdef KR_headers
 set_ones(b, n) Bigint *b; int n;
 #else
@@ -313,7 +313,7 @@ mantbits(double d)
 	return P - 32 - lo0bits(&L);
 	}
 
- int
+LIBC_INTERNAL  int
 strtodg
 #ifdef KR_headers
 	(s00, se, fpi, exp, bits)

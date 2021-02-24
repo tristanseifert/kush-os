@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <time.h>
+#include <stdio.h>
 #include <sys/time.h>
 
 /**
@@ -11,6 +12,7 @@
  */
 int gettimeofday(struct timeval *tv, struct timezone *tz) {
     // TODO: implement
+    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
     errno = ENXIO;
     return -1;
 }

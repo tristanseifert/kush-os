@@ -31,7 +31,7 @@ THIS SOFTWARE.
 
 #include "gdtoaimp.h"
 
- int
+LIBC_INTERNAL  int
 #ifdef KR_headers
 strtoId(s, sp, f0, f1) CONST char *s; char **sp; double *f0, *f1;
 #else

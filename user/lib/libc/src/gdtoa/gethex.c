@@ -35,7 +35,7 @@ THIS SOFTWARE.
 #include "locale.h"
 #endif
 
- int
+LIBC_INTERNAL  int
 #ifdef KR_headers
 gethex(sp, fpi, exp, bp, sign)
 	CONST char **sp; FPI *fpi; Long *exp; Bigint **bp; int sign;

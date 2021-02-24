@@ -31,7 +31,7 @@ THIS SOFTWARE.
 
 #include "gdtoaimp.h"
 
- Bigint *
+LIBC_INTERNAL  Bigint *
 s2b
 #ifdef KR_headers
 	(s, nd0, nd, y9) CONST char *s; int nd0, nd; ULong y9;
@@ -69,7 +69,7 @@ s2b
 	return b;
 	}
 
- double
+LIBC_INTERNAL  double
 ratio
 #ifdef KR_headers
 	(a, b) Bigint *a, *b;
@@ -108,7 +108,7 @@ ratio
 
 #ifdef INFNAN_CHECK
 
- int
+LIBC_INTERNAL  int
 match
 #ifdef KR_headers
 	(sp, t) char **sp, *t;
@@ -130,7 +130,7 @@ match
 	}
 #endif /* INFNAN_CHECK */
 
- void
+LIBC_INTERNAL  void
 #ifdef KR_headers
 copybits(c, n, b) ULong *c; int n; Bigint *b;
 #else
@@ -160,7 +160,7 @@ copybits(ULong *c, int n, Bigint *b)
 		*c++ = 0;
 	}
 
- ULong
+LIBC_INTERNAL  ULong
 #ifdef KR_headers
 any_on(b, k) Bigint *b; int k;
 #else

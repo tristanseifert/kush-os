@@ -49,7 +49,7 @@ L_shift(ULong *x, ULong *x1, int i)
 		} while(++x < x1);
 	}
 
- int
+LIBC_INTERNAL  int
 #ifdef KR_headers
 hexnan(sp, fpi, x0)
 	CONST char **sp; FPI *fpi; ULong *x0;

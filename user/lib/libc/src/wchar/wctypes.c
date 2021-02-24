@@ -7,6 +7,24 @@
 int iswspace(wint_t wc) {
     return (wc > 0xFF) ? 0 : isspace(wc);
 }
+int iswascii(wint_t wc) {
+    return (wc > 0xFF) ? 0 : isascii(wc);
+}
+int iswhexnumber(wint_t wc) {
+    return (wc > 0xFF) ? 0 : isxdigit(wc);
+}
+int iswalnum(wint_t wc) {
+    return (wc > 0xFF) ? 0 : isalnum(wc);
+}
+int iswgraph(wint_t wc) {
+    return (wc > 0xFF) ? 0 : isgraph(wc);
+}
+int iswspecial(wint_t wc) {
+    return (wc > 0xFF) ? 0 : iscntrl(wc);
+}
+int iswnumber(wint_t wc) {
+    return (wc > 0xFF) ? 0 : isdigit(wc);
+}
 int iswalpha(wint_t wc) {
     return (wc > 0xFF) ? 0 : isalpha(wc);
 }
@@ -34,6 +52,16 @@ int iswpunct(wint_t wc) {
 }
 int iswxdigit(wint_t wc) {
     return (wc > 0xFF) ? 0 : isxdigit(wc);
+}
+
+int iswideogram(wint_t wc) {
+    return 0;
+}
+int iswphonogram(wint_t wc) {
+    return 0;
+}
+int iswrune(wint_t wc) {
+    return 0;
 }
 
 wint_t towlower(wint_t wc) {

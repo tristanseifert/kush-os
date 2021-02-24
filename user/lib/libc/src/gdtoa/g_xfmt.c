@@ -51,7 +51,7 @@ THIS SOFTWARE.
 #define _4 0
 #endif
 
- char*
+LIBC_INTERNAL  char*
 #ifdef KR_headers
 g_xfmt(buf, V, ndig, bufsize) char *buf; char *V; int ndig; unsigned bufsize;
 #else

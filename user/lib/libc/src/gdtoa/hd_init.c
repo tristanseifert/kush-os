@@ -31,7 +31,7 @@ THIS SOFTWARE.
 
 #include "gdtoaimp.h"
 
- unsigned char hexdig[256];
+LIBC_INTERNAL  unsigned char hexdig[256];
 
  static void
 #ifdef KR_headers
@@ -45,7 +45,7 @@ htinit(unsigned char *h, unsigned char *s, int inc)
 		h[j] = i + inc;
 	}
 
- void
+LIBC_INTERNAL  void
 hexdig_init_D2A(Void)
 {
 #define USC (unsigned char *)

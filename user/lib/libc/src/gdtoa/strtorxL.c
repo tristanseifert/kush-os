@@ -47,7 +47,7 @@ THIS SOFTWARE.
 #define _2 0
 #endif
 
- void
+LIBC_INTERNAL  void
 #ifdef KR_headers
 ULtoxL(L, bits, exp, k) ULong *L; ULong *bits; Long exp; int k;
 #else
@@ -82,7 +82,7 @@ ULtoxL(ULong *L, ULong *bits, Long exp, int k)
 		L[_0] |= 0x80000000L;
 	}
 
- int
+LIBC_INTERNAL  int
 #ifdef KR_headers
 strtorxL(s, sp, rounding, L) CONST char *s; char **sp; int rounding; void *L;
 #else

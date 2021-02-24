@@ -53,13 +53,13 @@ typedef struct uthread {
     void *auxInfo;
 } uthread_t;
 
-void __libc_thread_init();
+LIBC_INTERNAL void __libc_thread_init();
 
-uthread_t *GetThreadInfoBlock(const uintptr_t handle);
-uthread_t *CreateThreadInfoBlock(const uintptr_t handle);
+LIBC_INTERNAL uthread_t *GetThreadInfoBlock(const uintptr_t handle);
+LIBC_INTERNAL uthread_t *CreateThreadInfoBlock(const uintptr_t handle);
 
 /// frees the memory associated with a thread information block unconditionally
-void __TIBFree(uthread_t *);
+LIBC_INTERNAL void __TIBFree(uthread_t *);
 
 /**
  * Atomically increments the reference count of the given thread.

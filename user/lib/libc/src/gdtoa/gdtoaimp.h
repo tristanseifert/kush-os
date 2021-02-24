@@ -170,6 +170,9 @@ THIS SOFTWARE.
 
 #ifndef GDTOAIMP_H_INCLUDED
 #define GDTOAIMP_H_INCLUDED
+
+#include <_libc.h>
+
 #include "gdtoa.h"
 #include "gd_qnan.h"
 

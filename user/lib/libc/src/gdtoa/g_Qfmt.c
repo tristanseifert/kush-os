@@ -49,7 +49,7 @@ THIS SOFTWARE.
 #define _3 0
 #endif
 
- char*
+LIBC_INTERNAL  char*
 #ifdef KR_headers
 g_Qfmt(buf, V, ndig, bufsize) char *buf; char *V; int ndig; unsigned bufsize;
 #else

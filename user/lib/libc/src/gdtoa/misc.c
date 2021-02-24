@@ -40,7 +40,7 @@ THIS SOFTWARE.
 static double private_mem[PRIVATE_mem], *pmem_next = private_mem;
 #endif
 
- Bigint *
+LIBC_INTERNAL  Bigint *
 Balloc
 #ifdef KR_headers
 	(k) int k;
@@ -80,7 +80,7 @@ Balloc
 	return rv;
 	}
 
- void
+LIBC_INTERNAL  void
 Bfree
 #ifdef KR_headers
 	(v) Bigint *v;
@@ -96,7 +96,7 @@ Bfree
 		}
 	}
 
- int
+LIBC_INTERNAL  int
 lo0bits
 #ifdef KR_headers
 	(y) ULong *y;
@@ -144,7 +144,7 @@ lo0bits
 	return k;
 	}
 
- Bigint *
+LIBC_INTERNAL  Bigint *
 multadd
 #ifdef KR_headers
 	(b, m, a) Bigint *b; int m, a;
@@ -201,7 +201,7 @@ multadd
 	return b;
 	}
 
- int
+LIBC_INTERNAL  int
 hi0bits_D2A
 #ifdef KR_headers
 	(x) register ULong x;
@@ -235,7 +235,7 @@ hi0bits_D2A
 	return k;
 	}
 
- Bigint *
+LIBC_INTERNAL  Bigint *
 i2b
 #ifdef KR_headers
 	(i) int i;
@@ -251,7 +251,7 @@ i2b
 	return b;
 	}
 
- Bigint *
+LIBC_INTERNAL  Bigint *
 mult
 #ifdef KR_headers
 	(a, b) Bigint *a, *b;
@@ -363,7 +363,7 @@ mult
 
  static Bigint *p5s;
 
- Bigint *
+LIBC_INTERNAL  Bigint *
 pow5mult
 #ifdef KR_headers
 	(b, k) Bigint *b; int k;
@@ -420,7 +420,7 @@ pow5mult
 	return b;
 	}
 
- Bigint *
+LIBC_INTERNAL  Bigint *
 lshift
 #ifdef KR_headers
 	(b, k) Bigint *b; int k;
@@ -474,7 +474,7 @@ lshift
 	return b1;
 	}
 
- int
+LIBC_INTERNAL  int
 cmp
 #ifdef KR_headers
 	(a, b) Bigint *a, *b;
@@ -508,7 +508,7 @@ cmp
 	return 0;
 	}
 
- Bigint *
+LIBC_INTERNAL  Bigint *
 diff
 #ifdef KR_headers
 	(a, b) Bigint *a, *b;
@@ -602,7 +602,7 @@ diff
 	return c;
 	}
 
- double
+LIBC_INTERNAL  double
 b2d
 #ifdef KR_headers
 	(a, e) Bigint *a; int *e;
@@ -671,7 +671,7 @@ b2d
 #undef d0
 #undef d1
 
- Bigint *
+LIBC_INTERNAL  Bigint *
 d2b
 #ifdef KR_headers
 	(d, e, bits) double d; int *e, *bits;
@@ -809,22 +809,22 @@ d2b
 #undef d0
 #undef d1
 
- CONST double
+LIBC_INTERNAL  CONST double
 #ifdef IEEE_Arith
 bigtens[] = { 1e16, 1e32, 1e64, 1e128, 1e256 };
-CONST double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128, 1e-256
+LIBC_INTERNAL CONST double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128, 1e-256
 		};
 #else
 #ifdef IBM
 bigtens[] = { 1e16, 1e32, 1e64 };
-CONST double tinytens[] = { 1e-16, 1e-32, 1e-64 };
+LIBC_INTERNAL CONST double tinytens[] = { 1e-16, 1e-32, 1e-64 };
 #else
 bigtens[] = { 1e16, 1e32 };
-CONST double tinytens[] = { 1e-16, 1e-32 };
+LIBC_INTERNAL CONST double tinytens[] = { 1e-16, 1e-32 };
 #endif
 #endif
 
- CONST double
+LIBC_INTERNAL  CONST double
 tens[] = {
 		1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
 		1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
@@ -834,7 +834,7 @@ tens[] = {
 #endif
 		};
 
- char *
+LIBC_INTERNAL  char *
 #ifdef KR_headers
 strcp_D2A(a, b) char *a; char *b;
 #else
@@ -848,7 +848,7 @@ strcp_D2A(char *a, CONST char *b)
 
 #ifdef NO_STRING_H
 
- Char *
+LIBC_INTERNAL  Char *
 #ifdef KR_headers
 memcpy_D2A(a, b, len) Char *a; Char *b; size_t len;
 #else

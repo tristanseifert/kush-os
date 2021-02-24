@@ -73,7 +73,7 @@ THIS SOFTWARE.
 #define Rounding Flt_Rounds
 #endif
 
- char *
+LIBC_INTERNAL  char *
 dtoa
 #ifdef KR_headers
 	(d, mode, ndigits, decpt, sign, rve)

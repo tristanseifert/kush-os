@@ -35,7 +35,7 @@ THIS SOFTWARE.
 #include "locale.h"
 #endif
 
- char *
+LIBC_INTERNAL  char *
 #ifdef KR_headers
 g__fmt(b, s, se, decpt, sign) char *b; char *s; char *se; int decpt; ULong sign;
 #else

@@ -32,10 +32,10 @@ THIS SOFTWARE.
 #include "gdtoaimp.h"
 
 #ifndef MULTIPLE_THREADS
- char *dtoa_result;
+LIBC_INTERNAL  char *dtoa_result;
 #endif
 
- char *
+LIBC_INTERNAL  char *
 #ifdef KR_headers
 rv_alloc(i) int i;
 #else
@@ -58,7 +58,7 @@ rv_alloc(int i)
 		(char *)(r+1);
 	}
 
- char *
+LIBC_INTERNAL  char *
 #ifdef KR_headers
 nrv_alloc(s, rve, n) char *s, **rve; int n;
 #else
@@ -81,7 +81,7 @@ nrv_alloc(char *s, char **rve, int n)
  * when MULTIPLE_THREADS is not defined.
  */
 
- void
+LIBC_INTERNAL  void
 #ifdef KR_headers
 freedtoa(s) char *s;
 #else
@@ -97,7 +97,7 @@ freedtoa(char *s)
 #endif
 	}
 
- int
+LIBC_INTERNAL  int
 quorem
 #ifdef KR_headers
 	(b, S) Bigint *b, *S;

@@ -31,7 +31,7 @@ THIS SOFTWARE.
 
 #include "gdtoaimp.h"
 
- char*
+LIBC_INTERNAL  char*
 #ifdef KR_headers
 g_dfmt(buf, d, ndig, bufsize) char *buf; double *d; int ndig; unsigned bufsize;
 #else

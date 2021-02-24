@@ -91,6 +91,9 @@ static void ThreadThymeCock(uintptr_t) {
 
     uintptr_t i = 0;
     auto last = platform_timer_now();
+    uint64_t lastIdle = 0;
+
+    static uint16_t *base = (uint16_t *) 0xfc000000;
 
     while(1) {
         const auto nsec = platform_timer_now();
@@ -98,17 +101,26 @@ static void ThreadThymeCock(uintptr_t) {
         const auto idle =sched::Scheduler::get()->idle->thread->cpuTime; 
         last = nsec;
 
+        const auto idleDiff = idle - lastIdle;
+        lastIdle = idle;
+
+        const float idlePct = (((double) idleDiff) / ((double) since)) * 100.;
+
+        // clear screen
+        memset(base, 0, sizeof(uint16_t) * 80 * 24);
+
         // idle state
         const uint64_t secs = (nsec / (1000ULL * 1000ULL * 1000ULL));
-        int written = snprintf(line, 300, "o'clock: %16llu ns (%02lld:%02lld) yeet %8g mS "
-                "idle %g sec\nPhys alloc: %8uK / %8uK\n", nsec,
+        int written = snprintf(line, 300, "o'clock %16llu ns (%02lld:%02lld) yeet %7gmS "
+                "idle %g sec (%5.2g %%)\nPhys alloc: %8uK / %8uK (%6.3f%% used)\n", nsec,
                 secs / 60, secs % 60, ((float) since / (1000. * 1000.)),
-                ((float) idle / (1000. * 1000. * 1000.)),
+                ((float) idle / (1000. * 1000. * 1000.)), idlePct,
                 mem::PhysicalAllocator::getAllocPages() * 4,
-                mem::PhysicalAllocator::getTotalPages() * 4
+                mem::PhysicalAllocator::getTotalPages() * 4,
+                ((double) mem::PhysicalAllocator::getAllocPages()) / 
+                ((double) mem::PhysicalAllocator::getTotalPages())
                 );
 
-        static uint16_t *base = (uint16_t *) 0xfc000000;
         static size_t x = 0, y = 0;
         x = y = 0;
 

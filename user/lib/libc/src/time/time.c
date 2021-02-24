@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <stdio.h>
 #include <time.h>
 
 /**
@@ -11,6 +12,7 @@ time_t time(time_t *outTime) {
     time_t time = 0;
 
     // TODO: implement
+    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
     if(outTime) *outTime = time;
     return time;
 }

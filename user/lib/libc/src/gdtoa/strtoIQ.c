@@ -31,7 +31,7 @@ THIS SOFTWARE.
 
 #include "gdtoaimp.h"
 
- int
+LIBC_INTERNAL  int
 #ifdef KR_headers
 strtoIQ(s, sp, a, b) CONST char *s; char **sp; void *a; void *b;
 #else

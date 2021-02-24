@@ -1,12 +1,15 @@
 #include "Prelink.h"
 #include "dylib/Library.h"
+#include "dylib/Registry.h"
 
 #include "log.h"
 
 #include <array>
 #include <cstdio>
-#include <string>
+#include <memory>
 #include <iostream>
+#include <string>
+#include <vector>
 
 #include <sys/elf.h>
 #include <sys/syscalls.h>
@@ -17,10 +20,12 @@ using namespace std::literals;
 /**
  * Absolute paths of libraries that need to be preloaded.
  */
-static const std::array<std::string, 6> kPrelinkLibraryPaths = {
+constexpr static const size_t kNumPrelinkLibs = 7;
+static const std::array<std::string, kNumPrelinkLibs> kPrelinkLibraryPaths = {
     "/lib/libc.so",
     "/lib/libc++abi.so.1",
     "/lib/libc++.so.1",
+    "/lib/libunwind.so.1",
     "/lib/libsystem.so",
     "/lib/librpc.so",
     "/lib/libdyldo.so",
@@ -55,6 +60,9 @@ void prelink::Load() {
     uintptr_t vmBase = 0xB0000000;
 
     // load each of the libraries
+    std::vector<std::pair<uintptr_t, std::shared_ptr<dylib::Library>>> libs;
+    libs.reserve(kNumPrelinkLibs);
+
     for(auto &path : kPrelinkLibraryPaths) {
         // try to open the library and reserve its VM space
         L("Opening library '{}' (base {:x})", path, vmBase);
@@ -65,6 +73,41 @@ void prelink::Load() {
             std::terminate();
         }
 
+        // load the library's pages and flush file caches
+        if(!library->allocateProgbitsVm(vmBase)) {
+            L("Failed to allocate progbits section for library '{}'", path);
+            std::terminate();
+        }
+
+        library->closeFile();
+
+        // register the library
+        dylib::Registry::add(library, path);
+        libs.emplace_back(std::make_pair(vmBase, library));
+
+        // advance the VM base past this library. round it UP to the nearest 1MB bound
         vmBase += library->getVmRequirements();
+
+        if(vmBase & ~0xFFFFF) {
+            vmBase += 0x100000 - (vmBase & 0xFFFFF);
+        }
+    }
+
+    // iterate over each library and perform relocations
+    for(auto &[base, library] : libs) {
+        L("Library {} at {:x}", library->getSoname(), base);
+
+        if(!library->resolveImports(libs)) {
+            L("Unresolved imports in {}!", library->getSoname());
+            std::terminate();
+        }
+    }
+
+    // ensure there's no unresolved symbols in any libraries
+    for(auto &[base, library] : libs) {
+        if(library->hasUnresolvedRelos()) {
+            L("Unresolved relocations in {}!", library->getSoname());
+            std::terminate();
+        }
     }
 }

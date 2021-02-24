@@ -31,7 +31,7 @@ THIS SOFTWARE.
 
 #include "gdtoaimp.h"
 
- void
+LIBC_INTERNAL  void
 #ifdef KR_headers
 rshift(b, k) Bigint *b; int k;
 #else
@@ -64,7 +64,7 @@ rshift(Bigint *b, int k)
 		b->x[0] = 0;
 	}
 
- int
+LIBC_INTERNAL  int
 #ifdef KR_headers
 trailz(b) Bigint *b;
 #else

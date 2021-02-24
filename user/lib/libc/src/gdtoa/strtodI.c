@@ -48,7 +48,7 @@ ulpdown(double *d)
 	return u;
 	}
 
- int
+LIBC_INTERNAL  int
 #ifdef KR_headers
 strtodI(s, sp, dd) CONST char *s; char **sp; double *dd;
 #else

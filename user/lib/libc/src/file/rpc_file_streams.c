@@ -97,7 +97,7 @@ static int RpcFileClose(struct __libc_file_stream *_file) {
 /**
  * Contacts the file server via RPC to attempt to open the file at the given path.
  */
-FILE *__libc_rpc_file_open(const char *path, const char *mode) {
+LIBC_INTERNAL FILE *__libc_rpc_file_open(const char *path, const char *mode) {
     int err;
 
     // convert mode string

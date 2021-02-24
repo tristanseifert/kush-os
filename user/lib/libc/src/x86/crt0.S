@@ -1,29 +1,16 @@
 .global _start
 
 /**
- * Program entry point: this will perform initialization of our temporary sections, then invoke
- * global constructors and run the program's main function. When that returns, we'll run all
- * destructors and request task termination.
+ * Program entry point: we have basically nothing to do here, since the dynamic linker will have
+ * already set up the C library, cleared .bss section, and ran any initializers specified in
+ * shared libraries and the executable itself.
  */
 _start:
     # set up stack
     xor     %ebp, %ebp
 
-    # clear BSS
-    mov         $__bss_size_dwords-1, %ecx
-    test        %ecx, %ecx
-    js          1f
-
-    mov         $__bss_start, %edi
-    xor         %eax, %eax
-    cld
-    rep stosb
-
-1:
-
     # set up the initializers and the C library
-    call        __libc_init
-    call        _init
+    # call        __libc_init
 
     # run main function (no argc or argv yet!)
     pushl       $0
@@ -31,10 +18,5 @@ _start:
     call        main
     add         $8, %esp
 
-    # global destructors
-    call        _fini
-
-    # exit (with a status code of 0)
-    pushl       $0
-    pushl       $0
-    call        TaskExit
+    # return to the dynamic linker that called us
+    ret

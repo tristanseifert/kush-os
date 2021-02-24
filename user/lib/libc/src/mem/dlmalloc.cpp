@@ -21,6 +21,7 @@
   on the next line, as well as in programs that use this malloc.
   ========================================================================
 */
+#include <_libc.h>
 #include <sys/syscalls.h>
 
 #include "dlmalloc.h"
@@ -172,10 +173,10 @@ extern "C" {
 #define CHUNK_ALIGN_MASK    (MALLOC_ALIGNMENT - 1)
 
 // True if address a has acceptable alignment
-bool is_aligned(void *p) { return ((size_t)p & CHUNK_ALIGN_MASK) == 0; }
+LIBC_INTERNAL bool is_aligned(void *p) { return ((size_t)p & CHUNK_ALIGN_MASK) == 0; }
 
 // the number of bytes to offset an address to align it
-size_t align_offset(void *p)
+LIBC_INTERNAL size_t align_offset(void *p)
 {
     return (((size_t)p & CHUNK_ALIGN_MASK) == 0) ? 0 :
         ((MALLOC_ALIGNMENT - ((size_t)p & CHUNK_ALIGN_MASK)) & CHUNK_ALIGN_MASK);
@@ -433,7 +434,7 @@ static MLOCK_T malloc_global_mutex = 0;
 #define EQ_OWNER(X,Y)         pthread_equal(X, Y)
 #endif
 
-struct malloc_recursive_lock {
+struct LIBC_INTERNAL malloc_recursive_lock {
     int sl;
     unsigned int c;
     THREAD_ID_T threadid;
@@ -729,7 +730,7 @@ static int pthread_init_lock (MLOCK_T *lk) {
 #define MIN_CHUNK_SIZE  ((MCHUNK_SIZE + CHUNK_ALIGN_MASK) & ~CHUNK_ALIGN_MASK)
 
 // ===============================================================================
-struct malloc_chunk_header {
+struct LIBC_INTERNAL malloc_chunk_header {
     void set_size_and_pinuse_of_free_chunk(size_t s) {
         _head = s | PINUSE_BIT;
         set_foot(s);
@@ -776,7 +777,7 @@ struct malloc_chunk_header {
 };
 
 // ===============================================================================
-struct malloc_chunk : public malloc_chunk_header {
+struct LIBC_INTERNAL malloc_chunk : public malloc_chunk_header {
     // Set size, pinuse bit, foot, and clear next pinuse
     void set_free_with_pinuse(size_t s, malloc_chunk* n)
     {
@@ -945,7 +946,7 @@ nextchunk-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 */
 
 // ===============================================================================
-struct malloc_tree_chunk : public malloc_chunk_header {
+struct LIBC_INTERNAL malloc_tree_chunk : public malloc_chunk_header {
     malloc_tree_chunk *leftmost_child() {
         return _child[0] ? _child[0] : _child[1]; 
     }
@@ -1021,7 +1022,7 @@ typedef malloc_tree_chunk* tbinptr; // The type of bins of trees
 */
 
 // ===============================================================================
-struct malloc_segment {
+struct LIBC_INTERNAL malloc_segment {
     bool is_mmapped_segment()  { return !!(_sflags & USE_MMAP_BIT); }
     bool is_extern_segment()   { return !!(_sflags & EXTERN_BIT); }
 
@@ -1044,7 +1045,7 @@ typedef malloc_segment* msegmentptr;
 */
 
 // ===============================================================================
-struct malloc_params {
+struct LIBC_INTERNAL malloc_params {
     malloc_params() : _magic(0) {}
 
     void ensure_initialization()
@@ -1167,7 +1168,7 @@ static malloc_params mparams;
 
 
 // ================================================================================
-class malloc_state 
+class LIBC_INTERNAL malloc_state 
 {
 public:
     /* ----------------------- _malloc, _free, etc... --- */
@@ -1638,7 +1639,7 @@ static malloc_state _gm_;
 
 
 //  True if segment S holds address A
-bool segment_holds(msegmentptr S, mchunkptr A) {
+LIBC_INTERNAL bool segment_holds(msegmentptr S, mchunkptr A) {
     return (char*)A >= S->_base && (char*)A < S->_base + S->_size;
 }
 

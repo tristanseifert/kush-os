@@ -19,7 +19,7 @@ static const uintptr_t kHeapInitialAddr = 0x30000000;
 /**
  * Initializes the sbrk emulation.
  */
-void __fake_sbrk_init(const size_t initialSize) {
+LIBC_INTERNAL void __fake_sbrk_init(const size_t initialSize) {
     int err;
 
     // allocate a region for the heap
@@ -37,7 +37,7 @@ void __fake_sbrk_init(const size_t initialSize) {
  * Fake implementation of the sbrk system call for use with our internal memory allocator and
  * friends.
  */
-void *__fake_sbrk(const intptr_t inc) {
+LIBC_INTERNAL void *__fake_sbrk(const intptr_t inc) {
     int err;
 
     // if increment is 0, return current sbrk base

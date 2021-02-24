@@ -8,7 +8,7 @@
  */
 size_t strftime_l(char *s, size_t maxsize, const char *format, const struct tm *timeptr,
                   locale_t loc) {
-    fprintf(stderr, "%s unimplemented", __PRETTY_FUNCTION__);
+    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
     return 0;
 }
 

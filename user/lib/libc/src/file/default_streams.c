@@ -111,7 +111,7 @@ static int DebugOutPurge(struct __libc_file_stream *_file) {
  * null descriptors (basically the same as those pointing to /dev/null on UNIX-like systems) for
  * each of them.
  */
-void __stdstream_init() {
+LIBC_INTERNAL void __stdstream_init() {
     // allocate a stream
     struct DebugOutStream *stream = calloc(1, sizeof(struct DebugOutStream));
     if(!stream) abort();

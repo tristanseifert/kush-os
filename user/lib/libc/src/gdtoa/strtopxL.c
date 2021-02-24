@@ -47,7 +47,7 @@ THIS SOFTWARE.
 #define _2 0
 #endif
 
- int
+LIBC_INTERNAL  int
 #ifdef KR_headers
 strtopxL(s, sp, V) CONST char *s; char **sp; void *V;
 #else
