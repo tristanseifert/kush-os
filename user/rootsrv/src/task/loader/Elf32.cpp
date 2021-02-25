@@ -1,5 +1,6 @@
 #include "Elf32.h"
 #include "../Task.h"
+#include "StringHelpers.h"
 
 #include <fmt/format.h>
 #include <sys/elf.h>
@@ -108,6 +109,11 @@ void Elf32::processProgHdr(std::shared_ptr<Task> &task, const Elf32_Phdr &phdr) 
             this->phdrGnuStack(task, phdr);
             break;
 
+        // dynamic link interpreter
+        case PT_INTERP:
+            this->phdrInterp(task, phdr);
+            break;
+
         // unhandled program header type
         default:
             LOG("Unhandled phdr type %08x offset %08x vaddr %08x filesz %08x memsz %08x"
@@ -136,12 +142,12 @@ void Elf32::phdrLoad(std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
     const uintptr_t virtBase = hdr.p_vaddr & ~(pageSz - 1);
 
     // round up to the nearest page and get the mapping flags
-    size_t allocSize = hdr.p_memsz;
+    size_t allocSize = hdr.p_memsz + inPageOff;
     if(allocSize & (pageSz - 1)) {
         allocSize = ((allocSize + pageSz - 1) / pageSz) * pageSz;
     }
 
-    // LOG("Alloc size %08x (orig %08x)", allocSize, hdr.p_memsz);
+    LOG("Alloc size %08x (orig %08x)", allocSize, hdr.p_memsz);
 
     // allocate an anonymous region (RW for now) and get its base address in our vm map
     err = AllocVirtualAnonRegion(0, allocSize, VM_REGION_RW, &vmHandle);
@@ -224,7 +230,24 @@ void Elf32::phdrGnuStack(std::shared_ptr<Task> &, const Elf32_Phdr &hdr) {
     }
 }
 
+/**
+ * Reads the interpreter string from the binary.
+ *
+ * We only support binaries whose interpreter is "/lib/libdyldo.so"
+ */
+void Elf32::phdrInterp(std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
+    // read interp string
+    const auto stringRange = this->file.subspan(hdr.p_offset, hdr.p_filesz);
+    std::string interp(reinterpret_cast<const char *>(stringRange.data()), stringRange.size());
+    interp = trim(interp);
 
+    // assert it's what we expect
+    if(!interp.starts_with("/lib/libdyldo.so")) {
+        throw LoaderError(fmt::format("Unsupported dynamic linker '{}'", interp));
+    }
+
+    this->isDynamic = true;
+}
 
 /**
  * Sets up the stack memory pages.

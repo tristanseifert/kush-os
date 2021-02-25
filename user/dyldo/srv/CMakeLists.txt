@@ -13,6 +13,8 @@ add_executable(dyldosrv
     src/dylib/Registry.cpp
     # prelinking of runtime libs
     src/prelink/Prelink.cpp
+    # rpc servers
+    src/server/LoaderPort.cpp
 )
 
 #####

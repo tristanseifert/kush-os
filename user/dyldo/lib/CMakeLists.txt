@@ -8,10 +8,12 @@
 ###############################################################################
 
 add_library(dyldo SHARED
+    src/entry.S
     src/lib_init.c
 )
 
 # this is a shared library but really only in spirit lol
+#set_source_files_properties(src/entry.S PROPERTIES COMPILE_FLAGS "-fPIC")
 target_compile_options(dyldo PRIVATE -fno-rtti -fno-exceptions)
 target_link_options(dyldo PRIVATE -nostartfiles)
 

@@ -85,6 +85,11 @@ void RpcHandler::main() {
                     this->handleLookup(msg, packet, err);
                     break;
 
+                case static_cast<uint32_t>(RootSrvDispensaryEpType::Register):
+                    if(!packet->replyPort) continue;
+                    this->handleRegister(msg, packet, err);
+                    break;
+
                 default:
                     LOG("Dispensary RPC invalid msg type: $%08x", packet->type);
                     break;
@@ -125,6 +130,32 @@ void RpcHandler::handleLookup(const struct MessageHeader *msg, const rpc::RpcPac
     // serialize it and stick it in an RPC packet
     auto replyBuf = cista::serialize(reply);
     this->reply(packet, RootSrvDispensaryEpType::LookupReply, replyBuf);
+}
+
+/**
+ * Handles a registration request.
+ *
+ * Currently, all tasks are allowed to overwrite registrations from any other task. In the future,
+ * we should add some scoping to this.
+ */
+void RpcHandler::handleRegister(const struct MessageHeader *msg, const rpc::RpcPacket *packet,
+        const size_t msgLen) {
+    // deserialize request and register it
+    auto data = std::span(packet->payload, msgLen - sizeof(RpcPacket));
+    auto req = cista::deserialize<RootSrvDispensaryRegister>(data);
+    const std::string name(req->name);
+
+    bool replaced = Registry::gShared->registerPort(name, req->portHandle);
+
+    // build response
+    RootSrvDispensaryRegisterReply reply;
+    reply.name = name;
+    reply.status = 0;
+    reply.replaced = replaced;
+
+    // respond
+    auto replyBuf = cista::serialize(reply);
+    this->reply(packet, RootSrvDispensaryEpType::RegisterReply, replyBuf);
 }
 
 /**

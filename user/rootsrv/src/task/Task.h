@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -12,6 +13,8 @@ namespace task {
 namespace loader {
 class Loader;
 }
+
+class DyldoPipe;
 
 /**
  * Encapsulates information about a task created on the system.
@@ -33,6 +36,10 @@ class Task {
         const uintptr_t getHandle() const {
             return this->taskHandle;
         }
+        /// binary path
+        const std::string &getPath() const {
+            return this->binaryPath;
+        }
 
     public:
         /// Creates a new task from memory
@@ -43,8 +50,14 @@ class Task {
         /// Instantiates a binary loader for the given file
         std::shared_ptr<loader::Loader> getLoaderFor(const std::string &, const Buffer &);
 
+        /// Notifies the dynamic link server that the task is starting.
+        void notifyDyldo(uintptr_t &pcOut);
         /// Completes initialization of a task by performing an userspace return.
         void jumpTo(const uintptr_t pc, const uintptr_t sp);
+
+    private:
+        static std::once_flag gDyldoPipeFlag;
+        static DyldoPipe *gDyldoPipe;
 
     private:
         /// path from which the binary was loaded

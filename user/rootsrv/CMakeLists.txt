@@ -12,6 +12,7 @@ add_executable(rootsrv
     src/task/Registry.cpp
     src/task/RpcHandler.cpp
     src/task/InfoPage.cpp
+    src/task/DyldoPipe.cpp
     src/task/loader/Elf32.cpp
     src/dispensary/Dispensary.cpp
     src/dispensary/Registry.cpp
@@ -24,6 +25,8 @@ target_compile_options(rootsrv PRIVATE -flto)
 
 # copy the bundle types include file
 file(COPY ${CMAKE_CURRENT_LIST_DIR}/../../tools/mkinit/src/BundleTypes.h DESTINATION ${CMAKE_CURRENT_LIST_DIR}/src/init)
+# copy the dynamic linker RPC headers
+file(COPY ${CMAKE_CURRENT_LIST_DIR}/../dyldo/srv/include/rpc/LoaderPort.h DESTINATION ${CMAKE_CURRENT_LIST_DIR}/include/rpc)
 
 # search our codebase for includes
 target_include_directories(rootsrv PRIVATE include)

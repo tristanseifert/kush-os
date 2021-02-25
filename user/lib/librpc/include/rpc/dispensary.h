@@ -18,6 +18,16 @@ extern "C" {
  */
 int LookupService(const char * _Nonnull name, uintptr_t * _Nonnull outPort);
 
+/**
+ * Registers a named service.
+ *
+ * @param name Service name to register under; this is a zero-terminated UTF-8 string.
+ * @param port Port handle to register
+ *
+ * @return 0 if request was completed and port registered successfully; an error code otherwise.
+ */
+int RegisterService(const char * _Nonnull name, const uintptr_t port);
+
 #ifdef __cplusplus
 }
 #endif

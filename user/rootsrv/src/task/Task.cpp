@@ -1,6 +1,7 @@
 #include "Task.h"
 #include "Registry.h"
 #include "InfoPage.h"
+#include "DyldoPipe.h"
 
 #include "loader/Loader.h"
 #include "loader/Elf32.h"
@@ -14,6 +15,10 @@
 
 using namespace task;
 
+std::once_flag Task::gDyldoPipeFlag;
+DyldoPipe *Task::gDyldoPipe = nullptr;
+
+
 /**
  * Creates a new task with an ELF image in memory.
  *
@@ -23,24 +28,31 @@ using namespace task;
  */
 uintptr_t Task::createFromMemory(const std::string &elfPath, const Buffer &elf,
         const std::vector<std::string> &args, const uintptr_t parent) {
+    uintptr_t entry = 0;
+
     // create the task object and ensure the shared system pages are mapped
     auto task = std::make_shared<Task>(elfPath, parent);
     InfoPage::gShared->mapInto(task);
 
     // load the ELF into the task
     auto loader = task->getLoaderFor(elfPath, elf);
-    LOG("Loader for %s: %p; task $%08x'h", elfPath.c_str(), loader.get(), task->getHandle());
+    LOG("Loader for %s: %p (id '%s'); task $%08x'h", elfPath.c_str(), loader.get(),
+            loader->getLoaderId().data(), task->getHandle());
 
     loader->mapInto(task);
 
     // set up a stack and map the dynamic linker stubs if enabled
     loader->setUpStack(task);
+    if(loader->needsDyldoInsertion()) {
+        task->notifyDyldo(entry);
+    }
 
     // add to registry
     Registry::registerTask(task);
 
     // set up its main thread to jump to the entry point
-    task->jumpTo(loader->getEntryAddress(), loader->getStackBottomAddress());
+    entry = entry ? entry : loader->getEntryAddress();
+    task->jumpTo(entry, loader->getStackBottomAddress());
 
     // if we get here, the task has been created
     return task->getHandle();
@@ -130,5 +142,28 @@ void Task::jumpTo(const uintptr_t pc, const uintptr_t sp) {
     int err = TaskInitialize(this->taskHandle, pc, sp);
     if(err) {
         throw std::system_error(err, std::generic_category(), "TaskInitialize");
+    }
+}
+
+/**
+ * Notifies the dynamic linker that this task has been loaded, and the dynamic libraries should
+ * be mapped into it. It also returns the actual entry point to jump to, in place of the one
+ * listed in the binary header.
+ */
+void Task::notifyDyldo(uintptr_t &newPc) {
+    int err;
+
+    // set up the dyldo communicator
+    std::call_once(gDyldoPipeFlag, []() {
+        gDyldoPipe = new DyldoPipe;
+    });
+
+    // send task notify
+    err = gDyldoPipe->taskLaunched(this, newPc);
+
+    if(err) {
+        // XXX: handle this better. this will crash the task on launch
+        LOG("Failed to notify dyldo of task %p loading: %d", this, err);
+        newPc = 1;
     }
 }

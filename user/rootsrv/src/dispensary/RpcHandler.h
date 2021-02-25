@@ -35,6 +35,8 @@ class RpcHandler {
         void main();
         /// Handles a lookup request
         void handleLookup(const struct MessageHeader *, const rpc::RpcPacket *, const size_t);
+        /// Registers a new port.
+        void handleRegister(const struct MessageHeader *, const rpc::RpcPacket *, const size_t);
 
         void reply(const rpc::RpcPacket *packet, const rpc::RootSrvDispensaryEpType type,
             const std::span<uint8_t> &buf);

@@ -86,6 +86,11 @@ class Library {
         /// Performs the relocations required for the library against the provided libraries.
         bool relocate(const std::vector<std::pair<uintptr_t, std::shared_ptr<Library>>> &);
 
+        /// map all segments that are not writable as-is
+        void mapShareable(const uintptr_t base, const uintptr_t taskHandle);
+        // create copies of all writable segments
+        void mapData(const uintptr_t base, const uintptr_t taskHandle);
+
         /// Gets the soname of the library
         const std::string &getSoname() const {
             return this->soname;

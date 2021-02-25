@@ -4,6 +4,7 @@
 #include "log.h"
 #include "dylib/Registry.h"
 #include "prelink/Prelink.h"
+#include "server/LoaderPort.h"
 
 /**
  * Entry point for the dynamic link server
@@ -28,6 +29,7 @@ int main(const int argc, const char **argv) {
     prelink::Load();
 
     // set up the RPC servers
+    server::LoaderPort::init();
 
     // enter the RPC request loop 
 

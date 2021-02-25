@@ -23,18 +23,16 @@ class Elf32: public Loader {
         void mapInto(std::shared_ptr<Task> &task) override;
         void setUpStack(std::shared_ptr<Task> &task) override;
 
+        virtual std::string_view getLoaderId() const override {
+            using namespace std::literals;
+            return "me.blraaz.exec.loader.elf32"sv;
+        }
+
         /**
-         * Gets the entry point of the binary. For static binaries, this will be the value we read
-         * from the ELF header; for dynamic binaries, the entry point is in the dynamic linker,
-         * which will pass control to the actual entry point later.
+         * Gets the entry point of the binary, as read from the ELF header.
          */
         uintptr_t getEntryAddress() const override {
-            if(this->isDynamic) {
-                // TODO: get dynamic linker entry point
-                return 0;
-            } else {
-                return this->entryAddr;
-            }
+            return this->entryAddr;
         }
 
         /**
@@ -44,11 +42,19 @@ class Elf32: public Loader {
             return kDefaultStackAddr + kDefaultStackSz;
         }
 
+        /**
+         * If the executable is dynamic, the dynamic linker needs to be notified.
+         */
+        bool needsDyldoInsertion() const override {
+            return this->isDynamic;
+        }
+
     private:
         void processProgHdr(std::shared_ptr<Task> &, const Elf32_Phdr &);
 
         void phdrLoad(std::shared_ptr<Task> &, const Elf32_Phdr &);
         void phdrGnuStack(std::shared_ptr<Task> &, const Elf32_Phdr &);
+        void phdrInterp(std::shared_ptr<Task> &, const Elf32_Phdr &);
 
     private:
         /// whether the executable we're loading is statically or dynamically linked

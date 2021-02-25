@@ -71,7 +71,6 @@ static void InitDispensary() {
  */
 int LookupService(const char * _Nonnull _name, uintptr_t * _Nonnull outPort) {\
     int err;
-    void *rxBuf = nullptr;
     std::vector<uint8_t> buf;
 
     // fail if no dispensary port
@@ -95,7 +94,6 @@ int LookupService(const char * _Nonnull _name, uintptr_t * _Nonnull outPort) {\
     err = mtx_lock(&gLookupReplyPortLock);
     if(err != thrd_success) {
         // cannot goto fail since the lock isn't locked
-        free(rxBuf);
         return err;
     }
 
@@ -141,14 +139,92 @@ int LookupService(const char * _Nonnull _name, uintptr_t * _Nonnull outPort) {\
 
     // clean up
     mtx_unlock(&gLookupReplyPortLock);
-
-    free(rxBuf);
     return err;
 
 fail:;
     // failure handler; ensures we release memory and unlock again
     mtx_unlock(&gLookupReplyPortLock);
+    return err;
+}
 
-    if(rxBuf) free(rxBuf);
+/**
+ * Registers a named service.
+ *
+ * @param name Service name to register under; this is a zero-terminated UTF-8 string.
+ * @param port Port handle to register
+ *
+ * @return 0 if request was completed and port registered successfully; an error code otherwise.
+ */
+int RegisterService(const char * _Nonnull _name, const uintptr_t port) {
+    int err;
+    std::vector<uint8_t> buf;
+
+    // fail if no dispensary port
+    if(!__kush_infopg->dispensaryPort) {
+        return -420;
+    }
+    // create the port for replies, if needed
+    call_once(&gLookupReplyPortCreatedFlag, []{
+        InitDispensary();
+    });
+
+    // serialize request
+    const std::string name(_name);
+    RootSrvDispensaryRegister req;
+    req.name = name;
+    req.portHandle = port;
+
+    buf = cista::serialize(req);
+
+    // send it
+    err = mtx_lock(&gLookupReplyPortLock);
+    if(err != thrd_success) {
+        // cannot goto fail since the lock isn't locked
+        return err;
+    }
+
+    err = _RpcSend(__kush_infopg->dispensaryPort,
+            static_cast<uint32_t>(RootSrvDispensaryEpType::Register), buf, gLookupReplyPort);
+    if(err) {
+        goto fail;
+    }
+
+    // receive the reply
+    err = PortReceive(gLookupReplyPort, reinterpret_cast<struct MessageHeader *>(gRxBuffer),
+            kMaxMsgLen, UINTPTR_MAX);
+
+    if(err < 0) {
+        goto fail;
+    }
+
+    // interpret the reply
+    {
+        const auto rxMsg = reinterpret_cast<struct MessageHeader *>(gRxBuffer);
+
+        // deserialize the request
+        auto packet = reinterpret_cast<RpcPacket *>(rxMsg->data);
+
+        auto data = std::span(packet->payload, std::min(err - sizeof(RpcPacket), (unsigned int) err));
+        auto reply = cista::deserialize<RootSrvDispensaryRegisterReply>(data);
+
+        // make sure we got the right reply message
+        if(reply->name != name) {
+            err = -1;
+            goto fail;
+        }
+
+        // extract handle
+        // XXX: do we care about the "did overwrite" flag?
+        err = reply->status;
+    }
+
+    // clean up
+    mtx_unlock(&gLookupReplyPortLock);
+
+    return err;
+
+fail:;
+    // failure handler; ensures we release memory and unlock again
+    mtx_unlock(&gLookupReplyPortLock);
     return err;
 }

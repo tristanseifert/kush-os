@@ -31,6 +31,9 @@ static const std::array<std::string, kNumPrelinkLibs> kPrelinkLibraryPaths = {
     "/lib/libdyldo.so",
 };
 
+/// References to all prelinked libs and their VM addresses
+static std::vector<std::pair<uintptr_t, std::shared_ptr<dylib::Library>>> gPrelinkLibs;
+
 /**
  * Performs initialization of the prelink stage. This does the following:
  *
@@ -60,8 +63,7 @@ void prelink::Load() {
     uintptr_t vmBase = 0xB0000000;
 
     // load each of the libraries
-    std::vector<std::pair<uintptr_t, std::shared_ptr<dylib::Library>>> libs;
-    libs.reserve(kNumPrelinkLibs);
+    gPrelinkLibs.reserve(kNumPrelinkLibs);
 
     for(auto &path : kPrelinkLibraryPaths) {
         // try to open the library and reserve its VM space
@@ -83,7 +85,7 @@ void prelink::Load() {
 
         // register the library
         dylib::Registry::add(library, path);
-        libs.emplace_back(std::make_pair(vmBase, library));
+        gPrelinkLibs.emplace_back(std::make_pair(vmBase, library));
 
         // advance the VM base past this library. round it UP to the nearest 1MB bound
         vmBase += library->getVmRequirements();
@@ -94,25 +96,52 @@ void prelink::Load() {
     }
 
     // resolve library imports and perform relocations
-    for(auto &[base, library] : libs) {
+    for(auto &[base, library] : gPrelinkLibs) {
         L("Library {} at {:x}", library->getSoname(), base);
 
-        if(!library->resolveImports(libs)) {
+        if(!library->resolveImports(gPrelinkLibs)) {
             L("Unresolved imports in {}!", library->getSoname());
             std::terminate();
         }
 
-        if(!library->relocate(libs)) {
+        if(!library->relocate(gPrelinkLibs)) {
             L("Failed to relocate {}!", library->getSoname());
             std::terminate();
         }
     }
 
     // ensure there's no unresolved symbols in any libraries
-    /*for(auto &[base, library] : libs) {
+    /*for(auto &[base, library] : gPrelinkLibs) {
         if(library->hasUnresolvedRelos()) {
             L("Unresolved relocations in {}!", library->getSoname());
             std::terminate();
         }
     }*/
 }
+
+/**
+ * Maps the prelink libraries' into the task whose handle is provided.
+ */
+void prelink::BootstrapTask(const uintptr_t taskHandle, uintptr_t &outEntry) {
+    // map the libraries into the task
+    for(const auto &[base, library] : gPrelinkLibs) {
+        // map all segments that are not writable as-is
+        library->mapShareable(base, taskHandle);
+
+        // create copies of all writable segments
+        library->mapData(base, taskHandle);
+    }
+
+    // get the entry point address
+    static const std::string kEntryName = "__libdyldo_init";
+
+    for(const auto &[base, library] : gPrelinkLibs) {
+        if(library->exportsSymbol(kEntryName)) {
+            std::pair<uintptr_t, size_t> info;
+            library->getSymbolInfo(kEntryName, info);
+
+            outEntry = info.first + base;
+        }
+    }
+}
+

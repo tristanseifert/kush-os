@@ -34,15 +34,21 @@ class PhysicalAllocator {
         }
 
         /// Returns the total number of pages
-        static uintptr_t getTotalPages() {
-            uintptr_t ret = 0;
+        static size_t getTotalPages() {
+            size_t ret = 0;
             __atomic_load(&gShared->totalPages, &ret, __ATOMIC_RELAXED);
             return ret;
         }
         /// Returns the number of allocated pages
-        static uintptr_t getAllocPages() {
-            uintptr_t ret = 0;
+        static size_t getAllocPages() {
+            size_t ret = 0;
             __atomic_load(&gShared->allocatedPages, &ret, __ATOMIC_RELAXED);
+            return ret;
+        }
+        /// Returns the number of reserved pages
+        static size_t getReservedPages() {
+            size_t ret = 0;
+            __atomic_load(&gShared->reservedPages, &ret, __ATOMIC_RELAXED);
             return ret;
         }
 
@@ -107,9 +113,11 @@ class PhysicalAllocator {
         uint32_t nextBitmapVmAddr = 0xC0400000;
 
         /// total number of available pages
-        uintptr_t totalPages = 0;
-        /// number of allocated ap ges
-        uintptr_t allocatedPages = 0;
+        size_t totalPages = 0;
+        /// number of allocated a pges
+        size_t allocatedPages = 0;
+        /// number of reserved pages
+        size_t reservedPages = 0;
 
         /// lock to protect the alloc bitmaps
         DECLARE_SPINLOCK(bitmapLock);

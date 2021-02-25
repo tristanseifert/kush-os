@@ -205,8 +205,9 @@ bool Library::readSegments() {
         const auto aBase = segment.base & ~(pageSz - 1);
         const auto aEnd = ((((segment.base + segment.length) + pageSz - 1) / pageSz) * pageSz) - 1;
 
-        L("Segment {:08x} - {:08x}, aligned {:08x} - {:08x} (prot {:02x})", segment.base,
-                segment.base + segment.length, aBase, aEnd, (uint8_t) segment.protection);
+        L("Segment {:08x} - {:08x}, aligned {:08x} - {:08x} (prot {:02x} copy {:x})", segment.base,
+                segment.base + segment.length, aBase, aEnd, (uint8_t) segment.protection,
+                segment.fileCopyBytes);
 
         segment.vmStart = aBase;
         segment.vmEnd = aEnd;
@@ -890,12 +891,14 @@ bool Library::relocate(const std::vector<std::pair<uintptr_t, std::shared_ptr<Li
             return false;
         }
     }
-    /*if(pltRelAddr) {
-        auto relPlt = std::span<Elf32_Dyn>(dynamic, pltRelEnt);
-        if(!this->processPltRelocs(relPlt)) {
+    if(pltRelAddr) {
+        auto relsPtr = reinterpret_cast<Elf32_Rel *>(base + pltRelAddr);
+        auto rels = std::span<Elf32_Rel>(relsPtr, pltRelEnt);
+
+        if(!this->processRelocs(rels, base, libs)) {
             return false;
         }
-    }*/
+    }
 
     // discard caches
     this->strtabTemp.clear();
@@ -946,9 +949,24 @@ bool Library::processRelocs(const std::span<Elf32_Rel> &relocs, const uintptr_t 
                     return false;
                 }
 
-                // write the address
-                uint32_t read = addr;
-                memcpy(fileOff, &read, sizeof(read));
+                memcpy(fileOff, &addr, sizeof(uintptr_t));
+                break;
+            }
+
+            // PLT jump table entry
+            case R_386_JMP_SLOT: {
+                // try to resolve symbol
+                const auto sym = ELF32_R_SYM(rel.r_info);
+                const auto &symInfo = this->syms.at(sym);
+                const uintptr_t addr = resolveSymbolVmAddr(symInfo.name, libs);
+
+                if(!addr) {
+                    L("Failed to resolve symbol for relocation type {} (off ${:08x} info ${:08x})", 
+                            ELF32_R_TYPE(rel.r_info), rel.r_offset, rel.r_info);
+                    return false;
+                }
+
+                memcpy(fileOff, &addr, sizeof(uintptr_t));
                 break;
             }
 
@@ -1012,3 +1030,151 @@ uintptr_t Library::resolveSymbolVmAddr(const std::string &name,
     return 0;
 }
 
+/**
+ * Maps the shareable (e.g. those segments that are read-only) into the task.
+ */
+void Library::mapShareable(const uintptr_t base, const uintptr_t taskHandle) {
+    int err;
+
+    for(const auto &segment : this->segments) {
+        // skip if section is writable
+        if(TestFlags(segment.protection & SegmentProtection::Write)) {
+            continue;
+        }
+
+        // figure out protection to use
+        uintptr_t flags = VM_REGION_READ;
+
+        if(TestFlags(segment.protection & SegmentProtection::Write)) {
+            L("Shareable page: {} (in {})", segment.vmStart, this->soname);
+            std::terminate();
+            // flags |= VM_REGION_WRITE;
+        }
+        if(TestFlags(segment.protection & SegmentProtection::Execute)) {
+            flags |= VM_REGION_EXEC;
+        }
+
+        // map the page
+        const auto vmBase = base + segment.vmStart;
+
+        err = MapVirtualRegionAtTo(segment.vmRegion, taskHandle, vmBase);
+        if(err) {
+            L("Failed to map '{}' segment (base {:x}): {:d}", this->soname, segment.base, err);
+            std::terminate();
+        }
+
+        L("Mapped shareable page of {}: base {:08x} vm {:08x} - {:08x}", this->soname,
+                segment.base, vmBase, vmBase + segment.length);
+    }
+}
+
+/*
+LIBSYSTEM_EXPORT int MapVirtualRegionToFlags(const uintptr_t regionHandle, const uintptr_t taskHandle, const uintptr_t flags);
+
+LIBSYSTEM_EXPORT int MapVirtualRegionAtTo(const uintptr_t regionHandle, const uintptr_t taskHandle,
+        const uintptr_t baseAddr);
+
+LIBSYSTEM_EXPORT int VirtualRegionSetFlags(const uintptr_t regionHandle, const uintptr_t newFlags);
+
+LIBSYSTEM_EXPORT int AllocVirtualAnonRegion(const uintptr_t virtualAddr, const uintptr_t size,
+const uintptr_t inFlags, uintptr_t *outHandle);
+
+LIBSYSTEM_EXPORT int VirtualRegionGetInfo(const uintptr_t regionHandle, uintptr_t *baseAddr,
+uintptr_t *length, uintptr_t *flags);
+*/
+
+/**
+ * Creates copies of writeable segments and yeets them into the task.
+ */
+void Library::mapData(const uintptr_t vmBase, const uintptr_t taskHandle) {
+    int err;
+    uintptr_t base, regionSz, handle;
+
+    // get the page size
+    const auto pageSz = sysconf(_SC_PAGESIZE);
+    if(pageSz <= 0) {
+        L("Failed to retrieve page size {}", errno);
+        std::terminate();
+    }
+
+    // iterate over all segments
+    for(const auto &segment : this->segments) {
+        // skip if section is not writable
+        if(!TestFlags(segment.protection & SegmentProtection::Write)) {
+            continue;
+        }
+
+        // get the base address of the source data
+        err = VirtualRegionGetInfo(segment.vmRegion, &base, &regionSz, nullptr);
+        if(err) {
+            L("VirtualRegionGetInfo failed: {}", err);
+            std::terminate();
+        }
+
+        auto srcBase = reinterpret_cast<void *>(base + (segment.base % pageSz));
+
+        // allocate the data page and copy into it
+        regionSz = ((segment.length + pageSz + (segment.base % pageSz) - 1) / pageSz) * pageSz;
+
+        err = AllocVirtualAnonRegion(0, regionSz, VM_REGION_RW, &handle);
+        if(err) {
+            L("AllocVirtualAnonRegion failed: {}", err);
+            std::terminate();
+        }
+
+        err = VirtualRegionGetInfo(handle, &base, nullptr, nullptr);
+        if(err) {
+            L("VirtualRegionGetInfo failed: {}", err);
+            std::terminate();
+        }
+
+        /*
+         * XXX: hack to work around page faults not working right when writing to map entries that
+         * are at a non-native base in a task. we fault in all pages now so we don't have any
+         * issues.
+         */
+        // memset(reinterpret_cast<void *>(base), 0, regionSz-1);
+
+        auto destBase = reinterpret_cast<void *>(base + (segment.base % pageSz));
+
+        L("Copying {} to {} (len {} {} {})", srcBase, destBase, segment.fileCopyBytes,
+                segment.length, regionSz);
+        memcpy(destBase, srcBase, segment.fileCopyBytes);
+
+        // update the protection flags
+        uintptr_t flags = VM_REGION_WRITE;
+
+        if(TestFlags(segment.protection & SegmentProtection::Read)) {
+            flags |= VM_REGION_READ;
+        }
+        if(TestFlags(segment.protection & SegmentProtection::Execute)) {
+            flags |= VM_REGION_EXEC;
+        }
+
+        err = VirtualRegionSetFlags(handle, flags);
+        if(err) {
+            L("VirtualRegionSetFlags failed: {}", err);
+            std::terminate();
+        }
+
+        // map it into the destination task
+        const auto destVmBase = vmBase + segment.vmStart;
+
+        // L("Mapping to {:08x}", destVmBase);
+        err = MapVirtualRegionAtTo(handle, taskHandle, destVmBase);
+        if(err) {
+            L("Failed to map '{}' segment (base {:x}): {:d}", this->soname, segment.base, err);
+            std::terminate();
+        }
+
+        L("Mapped private page of {}: base {:08x} vm {:08x} - {:08x} len {:08x}", this->soname,
+                segment.base, destVmBase, destVmBase + segment.length, regionSz);
+
+        // unmap the region from our address space
+        err = UnmapVirtualRegion(handle);
+        if(err) {
+            L("UnmapVirtualRegion failed: {}", err);
+        }
+    }
+
+}

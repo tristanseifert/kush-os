@@ -235,6 +235,7 @@ void PhysicalAllocator::reservePage(const uint64_t physAddr) {
         const auto index = ((physAddr - region.base) / pageSz) - region.freeMapPages;
         region.reserve(index);
 
+        __atomic_add_fetch(&this->reservedPages, 1, __ATOMIC_RELAXED);
         return;
     }
 
