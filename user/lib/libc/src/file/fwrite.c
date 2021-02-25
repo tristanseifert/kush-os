@@ -20,6 +20,21 @@ int fputc(int ch, FILE *stream) {
 }
 
 /**
+ * Writes a string to the file.
+ */
+int fputs(const char *str, FILE *stream) {
+    int i = 0, err;
+
+    while(*str) {
+        err = fputc(*str++, stream);
+        if(err < 0) return err;
+        else i++;
+    }
+    
+    return i;
+}
+
+/**
  * Calls the device's write implementation.
  */
 size_t fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stream) {

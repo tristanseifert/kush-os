@@ -22,6 +22,7 @@ add_library(c_objs OBJECT
     src/string/sscanf.c
     # string manipulation
     src/string/strchr.c
+    src/string/strdup.c
     src/string/strlen.c
     src/string/strncat.c
     src/string/strncmp.c

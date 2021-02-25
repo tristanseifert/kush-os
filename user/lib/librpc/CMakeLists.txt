@@ -17,6 +17,7 @@ target_compile_options(rpc_objs PRIVATE -fPIC)
 # allow the library to have link time optimization
 target_compile_options(rpc_objs PRIVATE -flto)
 target_compile_options(rpc_objs PRIVATE -fno-exceptions -fno-rtti)
+target_link_options(rpc_objs PUBLIC -fno-exceptions -fno-rtti)
 # specify the include directories
 target_include_directories(rpc_objs PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 target_include_directories(rpc_objs PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)

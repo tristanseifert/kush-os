@@ -16,7 +16,6 @@
 #include <span>
 #include <vector>
 
-#include <cista/serialization.h>
 #include <rpc/RpcPacket.hpp>
 #include <rpc/FileIO.hpp>
 
@@ -28,16 +27,19 @@ using namespace fileio;
  */
 int FileOpen(const char * _Nonnull _path, const uintptr_t flags, uintptr_t * _Nonnull outHandle,
         uint64_t *outLength) {
-    std::vector<uint8_t> requestBuf;
     int err;
     void *rxBuf = nullptr;
+    std::span<uint8_t> requestBuf;
+    FileIoOpen *open = NULL;
     struct MessageHeader *rxMsg = nullptr;
-    FileIoOpen open;
 
     // validate args
     if(!_path || !outHandle) return -1;
 
-    const std::string path(_path);
+    const size_t pathLen = strlen(_path);
+    const size_t openMsgLen = sizeof(FileIoOpen) + pathLen + '\0';
+
+    if(!pathLen || pathLen > UINT16_MAX) return -1;
 
     // perform one-time init if needed
     call_once(&gStateOnceFlag, []{
@@ -56,20 +58,27 @@ int FileOpen(const char * _Nonnull _path, const uintptr_t flags, uintptr_t * _No
         }
     }
 
-    // send the request
-    open.path = path;
+    // allocate memory for the send request
+    err = posix_memalign(reinterpret_cast<void **>(&open), 16, openMsgLen);
+    memset(open, 0, openMsgLen);
+
+    // populate the request and send it
+    open->pathLen = pathLen;
+    memcpy(open->path, _path, pathLen);
 
     if(flags & FILE_OPEN_READ) {
-        open.mode |= FileIoOpenFlags::ReadOnly;
+        open->mode |= FileIoOpenFlags::ReadOnly;
     }
     if(flags & FILE_OPEN_WRITE) {
-        open.mode |= FileIoOpenFlags::WriteOnly;
+        open->mode |= FileIoOpenFlags::WriteOnly;
     }
 
-    requestBuf = cista::serialize(open);
-
+    requestBuf = std::span<uint8_t>(reinterpret_cast<uint8_t *>(open), openMsgLen);
     err = _RpcSend(gState.ioServerPort, static_cast<uint32_t>(FileIoEpType::OpenFile),
             requestBuf, gState.replyPort);
+
+    free(open);
+
     if(err) {
         err = -3;
         goto fail;
@@ -99,14 +108,19 @@ int FileOpen(const char * _Nonnull _path, const uintptr_t flags, uintptr_t * _No
 
         const auto packet = reinterpret_cast<RpcPacket *>(rxMsg->data);
         if(packet->type != static_cast<uint32_t>(FileIoEpType::OpenFileReply)) {
-            fprintf(stderr, "%s received wrong packet type %08x!\n", __PRETTY_FUNCTION__, packet->type);
+            fprintf(stderr, "%s received wrong packet type %08x!\n", __FUNCTION__, packet->type);
             err = -4;
             goto fail;
         }
 
         // deserialize the capabilities response
         auto data = std::span(packet->payload, err - sizeof(RpcPacket));
-        auto req = cista::deserialize<FileIoOpenReply>(data);
+        if(data.size() < sizeof(FileIoOpenReply)) {
+            err = -4;
+            goto fail;
+        }
+
+        auto req = reinterpret_cast<const FileIoOpenReply *>(data.data());
 
         if(!req->status) {
             *outHandle = req->fileHandle;
@@ -143,7 +157,7 @@ fail:;
  */
 int FileClose(const uintptr_t file) {
     int err;
-    std::vector<uint8_t> requestBuf;
+    std::span<uint8_t> requestBuf;
     void *rxBuf = nullptr;
     struct MessageHeader *rxMsg = nullptr;
 
@@ -165,9 +179,11 @@ int FileClose(const uintptr_t file) {
 
     // send the request
     FileIoClose req;
+    memset(&req, 0, sizeof(req));
+
     req.file = file;
 
-    requestBuf = cista::serialize(req);
+    requestBuf = std::span<uint8_t>(reinterpret_cast<uint8_t *>(&req), sizeof(req));
 
     err = _RpcSend(gState.ioServerPort, static_cast<uint32_t>(FileIoEpType::CloseFile),
             requestBuf, gState.replyPort);
@@ -198,7 +214,11 @@ int FileClose(const uintptr_t file) {
 
         // deserialize the capabilities response
         auto data = std::span(packet->payload, err - sizeof(RpcPacket));
-        auto req = cista::deserialize<FileIoCloseReply>(data);
+        if(data.size() < sizeof(FileIoCloseReply)) {
+            err = -3;
+            goto fail;
+        }
+        auto req = reinterpret_cast<const FileIoCloseReply *>(data.data());
 
         err = req->status;
     } 

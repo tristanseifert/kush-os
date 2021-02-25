@@ -9,9 +9,7 @@
 #define RPC_SYSTEM_FILEIO_HPP
 
 #include <cstdint>
-
-#include <cista/containers/string.h>
-#include <cista/containers/vector.h>
+#include <cstddef>
 
 #include <sys/bitflags.hpp>
 
@@ -90,10 +88,13 @@ enum class FileIoOpenFlags: uint32_t {
  * Request to open a file
  */
 struct FileIoOpen {
-    /// path (should be absolute)
-    cista::offset::string path;
     /// open modes
     FileIoOpenFlags mode;
+
+    /// length of path (max 64K bytes. in practice much lower). doesn't include 0 terminator
+    uint16_t pathLen;
+    /// UTF-8 path string
+    char path[];
 };
 /**
  * Response to an open file request
@@ -160,8 +161,10 @@ struct FileIoReadReqReply {
     /// status code: 0 indicates at least one byte was read
     int32_t status;
 
-    /// bytes of data returned; may be less than requested
-    cista::offset::vector<uint8_t> data;
+    /// number of bytes of data returned
+    size_t dataLen;
+    /// actual data
+    char data[];
 };
 
 }

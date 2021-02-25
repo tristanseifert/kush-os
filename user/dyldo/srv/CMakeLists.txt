@@ -26,12 +26,12 @@ target_include_directories(dyldosrv PRIVATE include)
 target_include_directories(dyldosrv PRIVATE src)
 
 # required libraries
-add_dependencies(dyldosrv c_static system_static)
-target_link_libraries(dyldosrv PRIVATE c_static system_static cista rpc_static fmt::fmt-header-only)
+add_dependencies(dyldosrv c_dynamic system_dynamic)
+target_link_libraries(dyldosrv PRIVATE rpc_dynamic unwind cista fmt::fmt-header-only)
 
 # build a static binary
-target_link_options(dyldosrv PRIVATE -static)
-target_compile_options(dyldosrv PRIVATE -fno-exceptions -fno-rtti)
+#target_link_options(dyldosrv PRIVATE -static)
+#target_compile_options(dyldosrv PRIVATE -fno-exceptions -fno-rtti)
 
 # use the correct linker script
 set_target_properties(dyldosrv PROPERTIES LINK_DEPENDS ${C_STATIC_LINKER_SCRIPT})

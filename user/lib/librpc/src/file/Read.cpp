@@ -10,11 +10,11 @@
 #include <malloc.h>
 
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <span>
 #include <vector>
 
-#include <cista/serialization.h>
 #include <rpc/RpcPacket.hpp>
 #include <rpc/FileIO.hpp>
 
@@ -26,7 +26,7 @@ using namespace rpc;
  *
  * This reads the file in small chunks via direct message passing.
  */
-static int FileReadDirect(const uintptr_t file, const uint64_t _offset, const size_t length,
+LIBRPC_INTERNAL static int FileReadDirect(const uintptr_t file, const uint64_t _offset, const size_t length,
         void *outBuf) {
     int err;
     void *rxBuf = nullptr;
@@ -57,11 +57,13 @@ static int FileReadDirect(const uintptr_t file, const uint64_t _offset, const si
     for(size_t i = 0; i < numChunks; i++) {
         // send the request
         FileIoReadReq req;
+        memset(&req, 0, sizeof(req));
+
         req.file = file;
         req.offset = offset;
         req.length = std::min(chunkSize, (length - bytesRead));
 
-        auto requestBuf = cista::serialize(req);
+        auto requestBuf = std::span<uint8_t>(reinterpret_cast<uint8_t *>(&req), sizeof(req));
 
         err = _RpcSend(gState.ioServerPort, static_cast<uint32_t>(FileIoEpType::ReadFileDirect),
                 requestBuf, gState.replyPort);
@@ -80,14 +82,18 @@ static int FileReadDirect(const uintptr_t file, const uint64_t _offset, const si
 
             const auto packet = reinterpret_cast<RpcPacket *>(msg->data);
             if(packet->type != static_cast<uint32_t>(FileIoEpType::ReadFileDirectReply)) {
-                fprintf(stderr, "%s received wrong packet type %08x!\n", __PRETTY_FUNCTION__, packet->type);
+                fprintf(stderr, "%s received wrong packet type %08x!\n", __FUNCTION__, packet->type);
                 err = -50;
                 goto fail;
             }
 
             // deserialize the response
             auto data = std::span(packet->payload, err - sizeof(RpcPacket));
-            auto req = cista::deserialize<FileIoReadReqReply>(data);
+            if(data.size() < sizeof(FileIoReadReqReply)) {
+                err = -1;
+                goto fail;
+            }
+            auto req = reinterpret_cast<const FileIoReadReqReply *>(data.data());
 
             if(req->status < 0) {
                 err = req->status;
@@ -95,13 +101,18 @@ static int FileReadDirect(const uintptr_t file, const uint64_t _offset, const si
             }
 
             // the read succeeded at least partially
-            if(req->data.empty()) {
+            if(!req->dataLen) {
                 goto beach;
             }
+            if(req->dataLen > (data.size() - sizeof(FileIoReadReqReply))) {
+                // received buffer too small!
+                err = -2;
+                goto fail;
+            }
 
-            const auto toCopy = std::min(req->data.size(), (length - bytesRead));
+            const auto toCopy = std::min(req->dataLen, (length - bytesRead));
             void *writePtr = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(outBuf) + bytesRead);
-            memcpy(writePtr, req->data.data(), toCopy);
+            memcpy(writePtr, req->data, toCopy);
 
             // bookkeeping
             bytesRead += toCopy;

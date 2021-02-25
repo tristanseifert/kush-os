@@ -1,19 +1,19 @@
 #include "rpc/dispensary.h"
 #include "sys/infopage.h"
 #include "sys/syscalls.h"
-
+#include "rpc_internal.h"
 #include "helpers/Send.h"
 
 #include <malloc.h>
 #include <threads.h>
 
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <span>
 #include <vector>
 
-#include <cista/serialization.h>
 #include <rpc/RpcPacket.hpp>
 #include <rpc/RootSrvDispensaryEndpoint.hpp>
 
@@ -23,14 +23,14 @@ using namespace rpc;
 constexpr static const size_t kMaxMsgLen = 512 + sizeof(struct MessageHeader);
 
 /// Lock to protect the port from concurrent use
-static mtx_t gLookupReplyPortLock;
+LIBRPC_INTERNAL static mtx_t gLookupReplyPortLock;
 /// Flag to ensure the receive port for lookups is only created once.
-static once_flag gLookupReplyPortCreatedFlag;
+LIBRPC_INTERNAL static once_flag gLookupReplyPortCreatedFlag;
 /// Port handle for service lookups
-static uintptr_t gLookupReplyPort = 0;
+LIBRPC_INTERNAL static uintptr_t gLookupReplyPort = 0;
 
 /// Receive buffer for replies from the port
-static void *gRxBuffer = nullptr;
+LIBRPC_INTERNAL static void *gRxBuffer = nullptr;
 
 /**
  * Performs one-time initialization of the lookup machinery.
@@ -39,7 +39,7 @@ static void *gRxBuffer = nullptr;
  * go through this code at once. Lookups will entail a context switch anyways so the performance
  * impact of this isn't too great. Handles should be cached whenever possible.
  */
-static void InitDispensary() {
+LIBRPC_INTERNAL static void InitDispensary() {
     int err;
 
     // create the port
@@ -71,7 +71,16 @@ static void InitDispensary() {
  */
 int LookupService(const char * _Nonnull _name, uintptr_t * _Nonnull outPort) {\
     int err;
-    std::vector<uint8_t> buf;
+    std::span<uint8_t> buf;
+
+    // validate string inputs
+    const auto nameLen = strlen(_name);
+    const auto packetLen = sizeof(RootSrvDispensaryLookup) + nameLen + 1;
+
+    if(nameLen > MAX_SERVICE_NAME || packetLen > kMaxMsgLen) {
+        errno = EINVAL;
+        return -1;
+    }
 
     // fail if no dispensary port
     if(!__kush_infopg->dispensaryPort) {
@@ -83,22 +92,25 @@ int LookupService(const char * _Nonnull _name, uintptr_t * _Nonnull outPort) {\
         InitDispensary();
     });
 
-    // serialize request
-    const std::string name(_name);
-    RootSrvDispensaryLookup req;
-    req.name = name;
-
-    buf = cista::serialize(req);
-
-    // send it
+    // acquire the lock
     err = mtx_lock(&gLookupReplyPortLock);
     if(err != thrd_success) {
         // cannot goto fail since the lock isn't locked
         return err;
     }
 
+    // build the send request
+    auto req = reinterpret_cast<RootSrvDispensaryLookup *>(gRxBuffer);
+    memset(req, 0, packetLen);
+
+    req->nameLen = nameLen;
+    memcpy(req->name, _name, nameLen);
+
+    buf = std::span<uint8_t>(reinterpret_cast<uint8_t *>(req), packetLen);
+
     err = _RpcSend(__kush_infopg->dispensaryPort,
             static_cast<uint32_t>(RootSrvDispensaryEpType::Lookup), buf, gLookupReplyPort);
+
     if(err) {
         goto fail;
     }
@@ -119,10 +131,20 @@ int LookupService(const char * _Nonnull _name, uintptr_t * _Nonnull outPort) {\
         auto packet = reinterpret_cast<RpcPacket *>(rxMsg->data);
 
         auto data = std::span(packet->payload, std::min(err - sizeof(RpcPacket), (unsigned int) err));
-        auto reply = cista::deserialize<RootSrvDispensaryLookupReply>(data);
+        if(data.size() < sizeof(RootSrvDispensaryLookupReply)) {
+            err = -1;
+            goto fail;
+        }
+
+        auto reply = reinterpret_cast<const RootSrvDispensaryLookupReply *>(data.data());
+        if(reply->nameLen > (data.size() - sizeof(RootSrvDispensaryLookupReply))) {
+            // name was truncated
+            err = -1;
+            goto fail;
+        }
 
         // make sure we got the right reply message
-        if(reply->name != name) {
+        if(strncmp(_name, reply->name, nameLen)) {
             err = -1;
             goto fail;
         }
@@ -157,7 +179,16 @@ fail:;
  */
 int RegisterService(const char * _Nonnull _name, const uintptr_t port) {
     int err;
-    std::vector<uint8_t> buf;
+    std::span<uint8_t> buf;
+
+    // validate string inputs
+    const auto nameLen = strlen(_name);
+    const auto packetLen = sizeof(RootSrvDispensaryRegister) + nameLen + 1;
+
+    if(nameLen > MAX_SERVICE_NAME || packetLen > kMaxMsgLen) {
+        errno = EINVAL;
+        return -1;
+    }
 
     // fail if no dispensary port
     if(!__kush_infopg->dispensaryPort) {
@@ -168,21 +199,24 @@ int RegisterService(const char * _Nonnull _name, const uintptr_t port) {
         InitDispensary();
     });
 
-    // serialize request
-    const std::string name(_name);
-    RootSrvDispensaryRegister req;
-    req.name = name;
-    req.portHandle = port;
-
-    buf = cista::serialize(req);
-
-    // send it
+    // acquire lock
     err = mtx_lock(&gLookupReplyPortLock);
     if(err != thrd_success) {
         // cannot goto fail since the lock isn't locked
         return err;
     }
 
+    // build the send request
+    auto req = reinterpret_cast<RootSrvDispensaryRegister *>(gRxBuffer);
+    memset(req, 0, packetLen);
+
+    req->portHandle = port;
+    req->nameLen = nameLen;
+    memcpy(req->name, _name, nameLen);
+
+    buf = std::span<uint8_t>(reinterpret_cast<uint8_t *>(req), packetLen);
+
+    // and send it
     err = _RpcSend(__kush_infopg->dispensaryPort,
             static_cast<uint32_t>(RootSrvDispensaryEpType::Register), buf, gLookupReplyPort);
     if(err) {
@@ -203,12 +237,20 @@ int RegisterService(const char * _Nonnull _name, const uintptr_t port) {
 
         // deserialize the request
         auto packet = reinterpret_cast<RpcPacket *>(rxMsg->data);
-
         auto data = std::span(packet->payload, std::min(err - sizeof(RpcPacket), (unsigned int) err));
-        auto reply = cista::deserialize<RootSrvDispensaryRegisterReply>(data);
+        if(data.size() < sizeof(RootSrvDispensaryRegisterReply)) {
+            err = -1;
+            goto fail;
+        }
+
+        auto reply = reinterpret_cast<const RootSrvDispensaryRegisterReply *>(data.data());
+        if(reply->nameLen > (data.size() - sizeof(RootSrvDispensaryRegisterReply))) {
+            err = -1;
+            goto fail;
+        }
 
         // make sure we got the right reply message
-        if(reply->name != name) {
+        if(strncmp(_name, reply->name, nameLen)) {
             err = -1;
             goto fail;
         }
@@ -227,4 +269,5 @@ fail:;
     // failure handler; ensures we release memory and unlock again
     mtx_unlock(&gLookupReplyPortLock);
     return err;
+    return -1;
 }

@@ -6,6 +6,7 @@
 #include "sys/syscalls.h"
 
 #include "helpers/Send.h"
+#include "rpc_internal.h"
 
 #include <malloc.h>
 #include <threads.h>
@@ -29,9 +30,9 @@ static bool UpdateCaps();
 }
 
 /// ensures global state is initialized only once
-once_flag fileio::gStateOnceFlag;
+LIBRPC_INTERNAL once_flag fileio::gStateOnceFlag;
 /// global file IO state
-FileIoState fileio::gState;
+LIBRPC_INTERNAL FileIoState fileio::gState;
 
 /**
  * Initializes file IO.
@@ -86,8 +87,7 @@ static bool fileio::UpdateCaps() {
     FileIoGetCaps req;
     req.requestedVersion = 1;
 
-    auto requestBuf = cista::serialize(req);
-
+    auto requestBuf = std::span<uint8_t>(reinterpret_cast<uint8_t *>(&req), sizeof(FileIoGetCaps));
     err = _RpcSend(gState.ioServerPort, static_cast<uint32_t>(FileIoEpType::GetCapabilities),
             requestBuf, gState.replyPort);
     if(err) return false;
@@ -113,13 +113,16 @@ static bool fileio::UpdateCaps() {
 
         const auto packet = reinterpret_cast<RpcPacket *>(msg->data);
         if(packet->type != static_cast<uint32_t>(FileIoEpType::GetCapabilitiesReply)) {
-            fprintf(stderr, "%s received wrong packet type %08x!\n", __PRETTY_FUNCTION__, packet->type);
+            fprintf(stderr, "%s received wrong packet type %08x!\n", __FUNCTION__, packet->type);
             goto fail;
         }
 
         // deserialize the capabilities response
         auto data = std::span(packet->payload, err - sizeof(RpcPacket));
-        auto req = cista::deserialize<FileIoGetCapsReply>(data);
+        if(data.size() < sizeof(FileIoGetCapsReply)) {
+            goto fail;
+        }
+        auto req = reinterpret_cast<const FileIoGetCapsReply *>(data.data());
 
         // read out capabilities
         gState.caps = ServerCaps::Default;

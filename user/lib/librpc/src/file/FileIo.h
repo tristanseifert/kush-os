@@ -1,6 +1,8 @@
 #ifndef _LIBRPC_RPC_FILEIO_H
 #define _LIBRPC_RPC_FILEIO_H
 
+#include "rpc_internal.h"
+
 #include <sys/bitflags.hpp>
 #include <cstdint>
 
@@ -40,9 +42,9 @@ namespace fileio {
 extern once_flag gStateOnceFlag;
 extern FileIoState gState;
 
-void Init();
+LIBRPC_INTERNAL void Init();
 
-bool UpdateServerPort();
+LIBRPC_INTERNAL bool UpdateServerPort();
 }
 
 #endif

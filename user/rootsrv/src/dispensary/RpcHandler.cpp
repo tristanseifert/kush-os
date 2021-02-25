@@ -15,8 +15,6 @@
 #include <system_error>
 #include <vector>
 
-#include <cista/serialization.h>
-
 #include "log.h"
 
 using namespace dispensary;
@@ -112,8 +110,16 @@ void RpcHandler::handleLookup(const struct MessageHeader *msg, const rpc::RpcPac
         const size_t msgLen) {
     // deserialize the request
     auto data = std::span(packet->payload, msgLen - sizeof(RpcPacket));
-    auto req = cista::deserialize<RootSrvDispensaryLookup>(data);
-    const std::string name(req->name);
+    if(data.size() < sizeof(RootSrvDispensaryLookup)) {
+        return;
+    }
+
+    auto req = reinterpret_cast<const RootSrvDispensaryLookup *>(data.data());
+    if(req->nameLen > (data.size() - sizeof(RootSrvDispensaryLookup))) {
+        return;
+    }
+
+    const std::string name(req->name, req->nameLen);
 
     // perform lookup
     uintptr_t handle = 0;
@@ -122,13 +128,17 @@ void RpcHandler::handleLookup(const struct MessageHeader *msg, const rpc::RpcPac
     LOG("Request for port '%s': resolved %d ($%08x'h)", name.c_str(), found, handle);
 
     // build response
-    RootSrvDispensaryLookupReply reply;
-    reply.name = name;
-    reply.status = found ? 0 : 1;
-    reply.port = handle;
+    std::vector<uint8_t> replyBuf;
+    replyBuf.resize(sizeof(RootSrvDispensaryLookupReply) + req->nameLen + 1, 0);
 
-    // serialize it and stick it in an RPC packet
-    auto replyBuf = cista::serialize(reply);
+    auto reply = reinterpret_cast<RootSrvDispensaryLookupReply *>(replyBuf.data());
+
+    reply->status = found ? 0 : 1;
+    reply->port = handle;
+    reply->nameLen = req->nameLen;
+    memcpy(reply->name, req->name, req->nameLen);
+
+    // send it
     this->reply(packet, RootSrvDispensaryEpType::LookupReply, replyBuf);
 }
 
@@ -142,19 +152,31 @@ void RpcHandler::handleRegister(const struct MessageHeader *msg, const rpc::RpcP
         const size_t msgLen) {
     // deserialize request and register it
     auto data = std::span(packet->payload, msgLen - sizeof(RpcPacket));
-    auto req = cista::deserialize<RootSrvDispensaryRegister>(data);
-    const std::string name(req->name);
+    if(data.size() < sizeof(RootSrvDispensaryRegister)) {
+        return;
+    }
+
+    auto req = reinterpret_cast<const RootSrvDispensaryRegister *>(data.data());
+    if(req->nameLen > (data.size() - sizeof(RootSrvDispensaryRegister))) {
+        return;
+    }
+
+    const std::string name(req->name, req->nameLen);
 
     bool replaced = Registry::gShared->registerPort(name, req->portHandle);
 
     // build response
-    RootSrvDispensaryRegisterReply reply;
-    reply.name = name;
-    reply.status = 0;
-    reply.replaced = replaced;
+    std::vector<uint8_t> replyBuf;
+    replyBuf.resize(sizeof(RootSrvDispensaryLookupReply) + req->nameLen + 1, 0);
 
-    // respond
-    auto replyBuf = cista::serialize(reply);
+    auto reply = reinterpret_cast<RootSrvDispensaryRegisterReply *>(replyBuf.data());
+
+    reply->status = 0;
+    reply->replaced = replaced;
+    reply->nameLen = req->nameLen;
+    memcpy(reply->name, req->name, req->nameLen);
+
+    // send it
     this->reply(packet, RootSrvDispensaryEpType::RegisterReply, replyBuf);
 }
 

@@ -18,11 +18,6 @@ SECTIONS {
     .rodata ALIGN(4K) : {
         *(.rodata)
         *(.rodata*)
-
-        /* exception handling */
-        *(.gcc_except_table)
-        *(.gcc_except_table*)
-        *(.eh_frame)
     }
 
     /* data (mutable) section */
@@ -38,7 +33,7 @@ SECTIONS {
     __data_size = SIZEOF(.data);
 
     /* data (uninitialized, mutable) */
-    .bss ALIGN(4K) : {
+    .bss : {
         __bss_start = .;
         *(.bss)
         *(.bss*)
@@ -51,6 +46,11 @@ SECTIONS {
     /* garbage we want to discard */
     /DISCARD/ : {
         *(.comment*)
+
+        /* exception handling */
+        *(.gcc_except_table)
+        *(.gcc_except_table*)
+        *(.eh_frame)
     }
 }
 

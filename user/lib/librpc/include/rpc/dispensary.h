@@ -7,6 +7,9 @@
 extern "C" {
 #endif
 
+/// Maximum service name length
+#define MAX_SERVICE_NAME                (255)
+
 /**
  * Attempts to resolve a name into a port.
  *
