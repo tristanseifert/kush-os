@@ -82,6 +82,8 @@ int FileOpen(const char * _Nonnull _path, const uintptr_t flags, uintptr_t * _No
         goto fail;
     }
 
+    memset(rxBuf, 0, kReplyBufSize);
+
     // receive pls
     rxMsg = (struct MessageHeader *) rxBuf;
     err = PortReceive(gState.replyPort, rxMsg, kReplyBufSize, UINTPTR_MAX);
@@ -151,6 +153,8 @@ int FileClose(const uintptr_t file) {
     if(err) {
         goto fail;
     }
+
+    memset(rxBuf, 0, kReplyBufSize);
 
     // acquire lock
     err = mtx_lock(&gState.lock);

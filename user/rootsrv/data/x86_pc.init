@@ -20,7 +20,8 @@ FILE /lib/libc++abi.so.1
 FILE /lib/libunwind.so.1
 FILE /lib/librpc.so
 FILE /lib/libdyldo.so
+FILE /sbin/ldyldo
 
 ###############
 ## now, start all of the servers
-SERVER dyldosrv -test -flags arg1 arg2 "arg3 is longer with spaces" arg4
+#SERVER dyldosrv -test -flags arg1 arg2 "arg3 is longer with spaces" arg4

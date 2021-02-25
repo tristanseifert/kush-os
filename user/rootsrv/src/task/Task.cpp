@@ -3,62 +3,73 @@
 #include "InfoPage.h"
 #include "DyldoPipe.h"
 
+#include "LaunchInfo.h"
 #include "loader/Loader.h"
 #include "loader/Elf32.h"
 
+#include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <system_error>
 
 #include <log.h>
 #include <fmt/format.h>
 #include <sys/elf.h>
+#include <unistd.h>
 
 using namespace task;
 
 std::once_flag Task::gDyldoPipeFlag;
 DyldoPipe *Task::gDyldoPipe = nullptr;
 
-
 /**
- * Creates a new task with an ELF image in memory.
+ * Creates a new task, loading the specified file from disk.
  *
  * @return Kernel handle to the task. This can be used with the registry to look up the task
  * object.
  * @throws An exception is thrown if the task could not be loaded.
  */
-uintptr_t Task::createFromMemory(const std::string &elfPath, const Buffer &elf,
-        const std::vector<std::string> &args, const uintptr_t parent) {
+uintptr_t Task::createFromFile(const std::string &elfPath, const std::vector<std::string> &args,
+        const uintptr_t parent) {
+    // int err;
     uintptr_t entry = 0;
+
+    // try to open the file
+    FILE *fp = fopen(elfPath.c_str(), "rb");
+    if(!fp) {
+        throw std::system_error(errno, std::generic_category(), "Failed to open executable");
+    }
 
     // create the task object and ensure the shared system pages are mapped
     auto task = std::make_shared<Task>(elfPath, parent);
     InfoPage::gShared->mapInto(task);
 
-    // load the ELF into the task
-    auto loader = task->getLoaderFor(elfPath, elf);
+    // load the binary into the task's VM map
+    auto loader = task->getLoaderFor(elfPath, fp);
     LOG("Loader for %s: %p (id '%s'); task $%08x'h", elfPath.c_str(), loader.get(),
             loader->getLoaderId().data(), task->getHandle());
 
     loader->mapInto(task);
 
-    // set up a stack and map the dynamic linker stubs if enabled
-    loader->setUpStack(task);
-    if(loader->needsDyldoInsertion()) {
-        task->notifyDyldo(entry);
+    // load dynamic linker as well if needed
+    if(loader->needsDyld()) {
+        task->loadDyld(loader->getDyldPath(), entry);
     }
 
-    // add to registry
-    Registry::registerTask(task);
+    // build the task info structure and push it on the stack
+    const auto infoBase = task->buildInfoStruct(args);
+    loader->setUpStack(task, infoBase);
 
     // set up its main thread to jump to the entry point
+    Registry::registerTask(task);
+
     entry = entry ? entry : loader->getEntryAddress();
     task->jumpTo(entry, loader->getStackBottomAddress());
 
-    // if we get here, the task has been created
+    // clean up
+    fclose(fp);
     return task->getHandle();
 }
-
-
 
 /**
  * Creates a new task object.
@@ -104,31 +115,37 @@ Task::~Task() {
  *
  * @throw An exception is thrown if the ELF is invalid.
  */
-std::shared_ptr<loader::Loader> Task::getLoaderFor(const std::string &path, const Buffer &elf) {
+std::shared_ptr<loader::Loader> Task::getLoaderFor(const std::string &path, FILE *fp) {
     int err;
 
     using namespace loader;
 
-    // get at the header
-    auto hdrSpan = elf.subspan(0, sizeof(Elf32_Ehdr));
-    if(hdrSpan.size() < sizeof(Elf32_Ehdr)) {
-        throw LoaderError("ELF header too small");
+    // read out the header
+    Elf32_Ehdr hdr;
+    memset(&hdr, 0, sizeof(Elf32_Ehdr));
+
+    err = fseek(fp, 0, SEEK_SET);
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "Failed to read ELF header");
     }
 
-    auto hdr = reinterpret_cast<const Elf32_Ehdr *>(hdrSpan.data());
+    err = fread(&hdr, 1, sizeof(Elf32_Ehdr), fp);
+    if(err != sizeof(Elf32_Ehdr)) {
+        throw std::system_error(err, std::generic_category(), "Failed to read ELF header");
+    }
 
     // ensure magic is correct, before we try and instantiate an ELF reader
-    err = strncmp(reinterpret_cast<const char *>(hdr->e_ident), ELFMAG, SELFMAG);
+    err = strncmp(reinterpret_cast<const char *>(hdr.e_ident), ELFMAG, SELFMAG);
     if(err) {
         throw LoaderError(fmt::format("Invalid ELF header: {:02x} {:02x} {:02x} {:02x}",
-                    hdr->e_ident[0], hdr->e_ident[1], hdr->e_ident[2], hdr->e_ident[3]));
+                    hdr.e_ident[0], hdr.e_ident[1], hdr.e_ident[2], hdr.e_ident[3]));
     }
 
     // use the class value to pick a reader (32 vs 64 bits)
-    if(hdr->e_ident[EI_CLASS] == ELFCLASS32) {
-        return std::make_shared<Elf32>(elf);
+    if(hdr.e_ident[EI_CLASS] == ELFCLASS32) {
+        return std::make_shared<Elf32>(fp);
     } else {
-        throw LoaderError(fmt::format("Invalid ELF class: {:02x}", hdr->e_ident[EI_CLASS]));
+        throw LoaderError(fmt::format("Invalid ELF class: {:02x}", hdr.e_ident[EI_CLASS]));
     }
 
     // we should not get here
@@ -150,20 +167,130 @@ void Task::jumpTo(const uintptr_t pc, const uintptr_t sp) {
  * be mapped into it. It also returns the actual entry point to jump to, in place of the one
  * listed in the binary header.
  */
-void Task::notifyDyldo(uintptr_t &newPc) {
-    int err;
+void Task::loadDyld(const std::string &dyldPath, uintptr_t &pcOut) {
+    LOG("Loading dynamic linker: '%s'", dyldPath.c_str());
 
-    // set up the dyldo communicator
-    std::call_once(gDyldoPipeFlag, []() {
-        gDyldoPipe = new DyldoPipe;
-    });
-
-    // send task notify
-    err = gDyldoPipe->taskLaunched(this, newPc);
-
-    if(err) {
-        // XXX: handle this better. this will crash the task on launch
-        LOG("Failed to notify dyldo of task %p loading: %d", this, err);
-        newPc = 1;
+    // open a file handle to it
+    FILE *fp = fopen(dyldPath.c_str(), "rb");
+    if(!fp) {
+        throw std::system_error(errno, std::generic_category(), "Failed to open dynamic linker");
     }
+
+    // load it into the task
+    try {
+        auto loader = this->getLoaderFor(dyldPath, fp);
+        if(loader->needsDyld()) {
+            throw loader::LoaderError(fmt::format("Dynamic linker '{}' is not statically linked!",
+                        dyldPath));
+        }
+
+        loader->mapInto(this);
+
+        pcOut = loader->getEntryAddress();
+    } catch(std::exception &) {
+        // ensure the file is closed even on error
+        fclose(fp);
+        throw;
+    }
+
+    // clean up
+    fclose(fp);
+}
+
+/**
+ * Allocates a task information structure. We'll place this in an anonymous page somewhere around
+ * 0xBE000000.
+ */
+uintptr_t Task::buildInfoStruct(const std::vector<std::string> &args) {
+    int err;
+    uintptr_t vmHandle, base;
+    std::vector<char> buf;
+
+    static const uintptr_t kVmBase = 0xBE000000;
+    static const auto kStrStart = (kVmBase + sizeof(kush_task_launchinfo_t));
+
+    // build the header
+    kush_task_launchinfo_t info;
+    memset(&info, 0, sizeof(kush_task_launchinfo_t));
+
+    info.magic = TASK_LAUNCHINFO_MAGIC;
+
+    // allocate the task path
+    info.loadPath = reinterpret_cast<const char *>(kStrStart + buf.size());
+    buf.insert(buf.end(), this->binaryPath.begin(), this->binaryPath.end());
+    buf.push_back('\0');
+
+    // each of the arguments
+    if(!args.empty()) {
+        // allocate some space for the arg pointer array
+        info.numArgs = args.size();
+
+        std::vector<const char *> argPtrs;
+        argPtrs.resize(info.numArgs+1, nullptr);
+
+        // allocate the storage for each of the argument strings
+        for(size_t i = 0; i < args.size(); i++) {
+            const auto &arg = args[i];
+
+            // update the pointer array
+            argPtrs[i] = reinterpret_cast<const char *>(kStrStart + buf.size());
+
+            // copy the string
+            buf.insert(buf.end(), arg.begin(), arg.end());
+            buf.push_back('\0');
+        }
+
+        // set the arg pointers
+        info.args = reinterpret_cast<const char **>(kStrStart + buf.size());
+
+        auto argPtrsBytes = reinterpret_cast<const char *>(argPtrs.data());
+        const auto argPtrsLen = argPtrs.size() * sizeof(const char *);
+        std::copy(argPtrsBytes, argPtrsBytes + argPtrsLen, std::back_inserter(buf));
+    }
+
+    // allocate a memory region for it
+    const auto pageSz = sysconf(_SC_PAGESIZE);
+    if(pageSz <= 0) {
+        throw std::system_error(errno, std::generic_category(), "Failed to determine page size");
+    }
+
+    const auto totalInfoBytes = sizeof(kush_task_launchinfo_t) + buf.size();
+    const auto vmAllocSize = ((totalInfoBytes + pageSz - 1) / pageSz) * pageSz;
+
+    err = AllocVirtualAnonRegion(0, vmAllocSize, VM_REGION_RW, &vmHandle);
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "AllocVirtualAnonRegion");
+    }
+
+    // get its base and copy the data into it
+    err = VirtualRegionGetInfo(vmHandle, &base, nullptr, nullptr);
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "VirtualRegionGetInfo");
+    }
+
+    auto writePtr = reinterpret_cast<std::byte *>(base);
+
+    memcpy(writePtr, &info, sizeof(kush_task_launchinfo_t));
+    writePtr += sizeof(kush_task_launchinfo_t);
+    memcpy(writePtr, buf.data(), buf.size());
+
+    // make it read only
+    err = VirtualRegionSetFlags(vmHandle, VM_REGION_READ);
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "VirtualRegionSetFlags");
+    }
+
+    // map the page into destination task's address space
+    err = MapVirtualRegionAtTo(vmHandle, this->taskHandle, kVmBase);
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "MapVirtualRegionAtTo");
+    }
+
+    // unmap the page from our address space
+    err = UnmapVirtualRegion(vmHandle);
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "UnmapVirtualRegion");
+    }
+
+    return kVmBase;
 }

@@ -1,6 +1,7 @@
 #ifndef TASK_TASK_H
 #define TASK_TASK_H
 
+#include <cstdio>
 #include <cstddef>
 #include <memory>
 #include <mutex>
@@ -42,16 +43,19 @@ class Task {
         }
 
     public:
-        /// Creates a new task from memory
-        static uintptr_t createFromMemory(const std::string &elfPath, const Buffer &elf,
+        /// Creates a new task from a file
+        static uintptr_t createFromFile(const std::string &elfPath,
                 const std::vector<std::string> &args, const uintptr_t parent = 0);
 
     private:
         /// Instantiates a binary loader for the given file
-        std::shared_ptr<loader::Loader> getLoaderFor(const std::string &, const Buffer &);
+        std::shared_ptr<loader::Loader> getLoaderFor(const std::string &, FILE *);
 
-        /// Notifies the dynamic link server that the task is starting.
-        void notifyDyldo(uintptr_t &pcOut);
+        /// Builds the launch info structure for this task.
+        uintptr_t buildInfoStruct(const std::vector<std::string> &args);
+
+        /// Loads the specified dynamic linker.
+        void loadDyld(const std::string &dyldPath, uintptr_t &pcOut);
         /// Completes initialization of a task by performing an userspace return.
         void jumpTo(const uintptr_t pc, const uintptr_t sp);
 

@@ -7,6 +7,7 @@
 
 #include <log.h>
 
+#include <unistd.h>
 #include <cstring>
 #include <system_error>
 
@@ -19,53 +20,54 @@ using namespace task::loader;
  *
  * @throws An exception is thrown if the ELF header is invalid.
  */
-Elf32::Elf32(const std::span<std::byte> &bytes) : Loader(bytes) {
+Elf32::Elf32(FILE *file) : Loader(file) {
     // get the header
-    auto hdrSpan = bytes.subspan(0, sizeof(Elf32_Ehdr));
-    if(hdrSpan.size() < sizeof(Elf32_Ehdr)) {
-        throw LoaderError("ELF header too small");
-    }
+    Elf32_Ehdr hdr;
+    memset(&hdr, 0, sizeof(Elf32_Ehdr));
 
-    auto hdr = reinterpret_cast<const Elf32_Ehdr *>(hdrSpan.data());
+    this->read(sizeof(Elf32_Ehdr), &hdr, 0);
 
     // ensure the ELF is little endian, the correct version, and has an entry
-    if(hdr->e_ident[EI_DATA] != ELFDATA2LSB) {
-        throw LoaderError(fmt::format("Invalid ELF format: {:02x}", hdr->e_ident[EI_DATA]));
+    if(hdr.e_ident[EI_DATA] != ELFDATA2LSB) {
+        throw LoaderError(fmt::format("Invalid ELF format: {:02x}", hdr.e_ident[EI_DATA]));
     }
 
-    if(hdr->e_ident[EI_VERSION] != EV_CURRENT) {
-        throw LoaderError(fmt::format("Invalid ELF version ({}): {:02x}", "ident", hdr->e_ident[EI_VERSION]));
-    } else if(hdr->e_version != EV_CURRENT) {
-        throw LoaderError(fmt::format("Invalid ELF version ({}): {:08x}", "header", hdr->e_version));
+    if(hdr.e_ident[EI_VERSION] != EV_CURRENT) {
+        throw LoaderError(fmt::format("Invalid ELF version ({}): {:02x}", "ident", hdr.e_ident[EI_VERSION]));
+    } else if(hdr.e_version != EV_CURRENT) {
+        throw LoaderError(fmt::format("Invalid ELF version ({}): {:08x}", "header", hdr.e_version));
     }
 
-    if(hdr->e_type == ET_EXEC) {
+    if(hdr.e_type == ET_EXEC) {
         // ensure that we've got an entry point and program headers
-        if(!hdr->e_entry || !hdr->e_phoff) {
+        if(!hdr.e_entry || !hdr.e_phoff) {
             throw LoaderError("Invalid ELF executable");
         }
 
-        this->entryAddr = hdr->e_entry;
+        this->entryAddr = hdr.e_entry;
     } else {
-        throw LoaderError(fmt::format("Invalid ELF type {:08x}", hdr->e_type));
+        throw LoaderError(fmt::format("Invalid ELF type {:08x}", hdr.e_type));
     }
 
     // ensure CPU architecture
 #if defined(__i386__)
-    if(hdr->e_machine != EM_386) {
-        throw LoaderError(fmt::format("Invalid ELF machine type {:08x}", hdr->e_type));
+    if(hdr.e_machine != EM_386) {
+        throw LoaderError(fmt::format("Invalid ELF machine type {:08x}", hdr.e_type));
     }
 #else
 #error Update Elf32 to handle the current arch
 #endif
 
     // ensure the program header and section header sizes make sense
-    if(hdr->e_shentsize != sizeof(Elf32_Shdr)) {
-        throw LoaderError(fmt::format("Invalid section header size {}", hdr->e_shentsize));
+    if(hdr.e_shentsize != sizeof(Elf32_Shdr)) {
+        throw LoaderError(fmt::format("Invalid section header size {}", hdr.e_shentsize));
     }
-    else if(hdr->e_phentsize != sizeof(Elf32_Phdr)) {
-        throw LoaderError(fmt::format("Invalid program header size {}", hdr->e_phentsize));
+    else if(hdr.e_phentsize != sizeof(Elf32_Phdr)) {
+        throw LoaderError(fmt::format("Invalid program header size {}", hdr.e_phentsize));
     }
+
+    this->phdrOff = hdr.e_phoff;
+    this->numPhdr = hdr.e_phnum;
 }
 
 
@@ -73,31 +75,23 @@ Elf32::Elf32(const std::span<std::byte> &bytes) : Loader(bytes) {
 /**
  * Maps all sections defined by the program headers into the task.
  */
-void Elf32::mapInto(std::shared_ptr<Task> &task) {
-    // get the ELF header
-    auto hdrSpan = this->file.subspan(0, sizeof(Elf32_Ehdr));
-    auto hdr = reinterpret_cast<const Elf32_Ehdr *>(hdrSpan.data());
+void Elf32::mapInto(Task *task) {
+    // read program headers 
+    std::vector<Elf32_Phdr> phdrs;
+    phdrs.resize(this->numPhdr);
 
-    // then, find the program headers
-    const size_t phdrBytes = hdr->e_phnum * hdr->e_phentsize;
-    auto phdrSpan = this->file.subspan(hdr->e_phoff, phdrBytes);
-
-    if(phdrSpan.size() < phdrBytes) {
-        throw LoaderError(fmt::format("Invalid program header offset {}", hdr->e_phoff));
-    }
-
-    auto phdrs = reinterpret_cast<const Elf32_Phdr *>(phdrSpan.data());
+    this->read((this->numPhdr * sizeof(Elf32_Phdr)), phdrs.data(), this->phdrOff);
 
     // process each program header
-    for(size_t i = 0; i < hdr->e_phnum; i++) {
-        this->processProgHdr(task, phdrs[i]);
+    for(const auto &phdr : phdrs) {
+        this->processProgHdr(task, phdr);
     }
 }
 
 /**
  * Processes a loaded program header.
  */
-void Elf32::processProgHdr(std::shared_ptr<Task> &task, const Elf32_Phdr &phdr) {
+void Elf32::processProgHdr(Task *task, const Elf32_Phdr &phdr) {
     switch(phdr.p_type) {
         // load from file
         case PT_LOAD:
@@ -129,7 +123,7 @@ void Elf32::processProgHdr(std::shared_ptr<Task> &task, const Elf32_Phdr &phdr) 
  * This will allocate an anonymous memory region, and copy from the file buffer. It will be mapped
  * in virtual address space at the location specified.
  */
-void Elf32::phdrLoad(std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
+void Elf32::phdrLoad(Task *task, const Elf32_Phdr &hdr) {
     int err;
     uintptr_t vmHandle, taskHandle, regionBase;
     void *vmBase;
@@ -166,13 +160,7 @@ void Elf32::phdrLoad(std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
 
     // get the corresponding file region and copy it
     if(hdr.p_filesz) {
-        auto toCopy = this->file.subspan(hdr.p_offset, hdr.p_filesz);
-        if(toCopy.size() != hdr.p_filesz) {
-            throw LoaderError(fmt::format("Failed to get section data; requested {} got {}",
-                        hdr.p_filesz, toCopy.size()));
-        }
-
-        memcpy(vmBase, toCopy.data(), toCopy.size());
+        this->read(hdr.p_filesz, vmBase, hdr.p_offset);
     }
 
     /*
@@ -223,7 +211,7 @@ void Elf32::phdrLoad(std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
  *
  * This just asserts that the flag is only RW; we do not support executable stack segments.
  */
-void Elf32::phdrGnuStack(std::shared_ptr<Task> &, const Elf32_Phdr &hdr) {
+void Elf32::phdrGnuStack(Task *, const Elf32_Phdr &hdr) {
     const auto flags = hdr.p_flags & ~(PF_MASKOS | PF_MASKPROC);
     if(flags & PF_X) {
         throw LoaderError(fmt::format("Unsupported stack flags {:08x}", hdr.p_flags));
@@ -231,34 +219,37 @@ void Elf32::phdrGnuStack(std::shared_ptr<Task> &, const Elf32_Phdr &hdr) {
 }
 
 /**
- * Reads the interpreter string from the binary.
+ * Reads the interpreter string from the binary. This should be the path of a statically linked
+ * executable that's loaded alongside this binary (so, it must be linked in such a way as to not
+ * interfere with it)
  *
- * We only support binaries whose interpreter is "/lib/libdyldo.so"
+ * Per the ELF specification, the string always has a NULL terminator byte. SInce we're going to
+ * store this as a C++ string, we chop that off.
  */
-void Elf32::phdrInterp(std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
-    // read interp string
-    const auto stringRange = this->file.subspan(hdr.p_offset, hdr.p_filesz);
-    std::string interp(reinterpret_cast<const char *>(stringRange.data()), stringRange.size());
-    interp = trim(interp);
+void Elf32::phdrInterp(Task *task, const Elf32_Phdr &hdr) {
+    std::string path;
 
-    // assert it's what we expect
-    if(!interp.starts_with("/lib/libdyldo.so")) {
-        throw LoaderError(fmt::format("Unsupported dynamic linker '{}'", interp));
-    }
+    // read zero terminated string
+    path.resize(hdr.p_filesz);
+    this->read(hdr.p_filesz, path.data(), hdr.p_offset);
 
-    this->isDynamic = true;
+    // trim off the last byte
+    this->dynLdPath = path.substr(0, path.length() - 1);
 }
 
 /**
  * Sets up the stack memory pages.
  */
-void Elf32::setUpStack(std::shared_ptr<Task> &task) {
+void Elf32::setUpStack(Task *task, const uintptr_t infoStructAddr) {
     int err;
     uintptr_t vmHandle;
     uintptr_t base, len;
 
     // TODO: get from sysconf
-    const size_t pageSz = 0x1000;
+    const auto pageSz = sysconf(_SC_PAGESIZE);
+    if(pageSz <= 0) {
+        throw std::system_error(errno, std::generic_category(), "Failed to determine page size");
+    }
 
     // allocate the anonymous region
     err = AllocVirtualAnonRegion(0, kDefaultStackSz, VM_REGION_RW, &vmHandle);
@@ -276,6 +267,12 @@ void Elf32::setUpStack(std::shared_ptr<Task> &task) {
 
     auto lastPage = reinterpret_cast<std::byte *>(base + len - pageSz);
     memset(lastPage, 0, pageSz);
+
+    // build the stack frame
+    this->stackBottom = (kDefaultStackAddr + kDefaultStackSz) - sizeof(uintptr_t);
+
+    auto argPtr = reinterpret_cast<uintptr_t *>(base + len);
+    argPtr[-1] = infoStructAddr;
 
     // place the mapping into the task
     err = MapVirtualRegionAtTo(vmHandle, task->getHandle(), kDefaultStackAddr);

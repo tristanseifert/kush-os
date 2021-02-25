@@ -48,6 +48,8 @@ static int FileReadDirect(const uintptr_t file, const uint64_t _offset, const si
         return err;
     }
 
+    memset(rxBuf, 0, rxBufSize);
+
     // perform the required number of reads
     uint64_t offset = _offset;
     size_t bytesRead = 0;
@@ -83,9 +85,8 @@ static int FileReadDirect(const uintptr_t file, const uint64_t _offset, const si
                 goto fail;
             }
 
-            // deserialize the capabilities response
+            // deserialize the response
             auto data = std::span(packet->payload, err - sizeof(RpcPacket));
-
             auto req = cista::deserialize<FileIoReadReqReply>(data);
 
             if(req->status < 0) {

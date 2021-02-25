@@ -144,7 +144,7 @@ class Port {
 
     private:
         /// maximum length of message
-        constexpr static const size_t kMaxMsgLen = 4096;
+        constexpr static const size_t kMaxMsgLen = 4096 * 9;
 
         static void initAllocator();
 

@@ -14,7 +14,23 @@ static size_t gHeapSize = 0;
 static void *gSbrkBase = NULL;
 
 /// VM base of the heap
-static const uintptr_t kHeapInitialAddr = 0x30000000;
+LIBC_INTERNAL static uintptr_t gHeapInitialAddr = 0x30000000;
+/// Maximum heap size: 0 indicates unlimited (we'll grow til we hit something else)
+LIBC_INTERNAL static size_t gHeapMaxSize = 0;
+
+/**
+ * Adjusts the initial address of the heap.
+ *
+ * This is a private interface for use by the dynamic linker, so that it can use the regular static
+ * version of the C library; it simply calls this with a starting address high in memory that will
+ * not conflict with the heap in an executable.
+ *
+ * This must be called before any other libc function, INCLUDING __libc_init, is called.
+ */
+LIBC_EXPORT void __libc_set_heap_start(const uintptr_t start, const size_t maxSize) {
+    gHeapInitialAddr = start;
+    gHeapMaxSize = maxSize;
+}
 
 /**
  * Initializes the sbrk emulation.
@@ -23,13 +39,13 @@ LIBC_INTERNAL void __fake_sbrk_init(const size_t initialSize) {
     int err;
 
     // allocate a region for the heap
-    err = AllocVirtualAnonRegion(kHeapInitialAddr, initialSize, VM_REGION_RW, &gHeapHandle);
+    err = AllocVirtualAnonRegion(gHeapInitialAddr, initialSize, VM_REGION_RW, &gHeapHandle);
     if(err) {
         abort();
     }
 
-    gHeapStart = kHeapInitialAddr;
-    gSbrkBase = (void *) kHeapInitialAddr;
+    gHeapStart = gHeapInitialAddr;
+    gSbrkBase = (void *) gHeapInitialAddr;
     gHeapSize = initialSize;
 }
 
@@ -39,6 +55,12 @@ LIBC_INTERNAL void __fake_sbrk_init(const size_t initialSize) {
  */
 LIBC_INTERNAL void *__fake_sbrk(const intptr_t inc) {
     int err;
+
+    // fail if we're at or above the limit
+    if(gHeapMaxSize && gHeapSize >= gHeapMaxSize) {
+        errno = ENOMEM;
+        return (void *) -1;
+    }
 
     // if increment is 0, return current sbrk base
     if(!inc) {

@@ -3,9 +3,9 @@
 
 #include "Loader.h"
 
+#include <cstdio>
 #include <cstddef>
 #include <cstdint>
-#include <span>
 
 #include <sys/elf.h>
 
@@ -18,10 +18,10 @@ class Elf32: public Loader {
         constexpr static const uintptr_t kDefaultStackSz = 0x10000;
 
     public:
-        Elf32(const std::span<std::byte> &bytes);
+        Elf32(FILE *file);
 
-        void mapInto(std::shared_ptr<Task> &task) override;
-        void setUpStack(std::shared_ptr<Task> &task) override;
+        void mapInto(Task *task) override;
+        void setUpStack(Task *task, const uintptr_t infoStructAddr) override;
 
         virtual std::string_view getLoaderId() const override {
             using namespace std::literals;
@@ -39,28 +39,43 @@ class Elf32: public Loader {
          * The stack is always mapped into a fixed address in each process.
          */
         uintptr_t getStackBottomAddress() const override {
-            return kDefaultStackAddr + kDefaultStackSz;
+            return this->stackBottom;
         }
 
         /**
-         * If the executable is dynamic, the dynamic linker needs to be notified.
+         * If the executable is dynamic, the dynamic linker needs to be mapped.
          */
-        bool needsDyldoInsertion() const override {
-            return this->isDynamic;
+        bool needsDyld() const override {
+            return !this->dynLdPath.empty();
+        }
+        /**
+         * The path for the dynamic linker is what we read out as the PT_INTERP field.
+         */
+        const std::string &getDyldPath() const override {
+            return this->dynLdPath;
         }
 
-    private:
-        void processProgHdr(std::shared_ptr<Task> &, const Elf32_Phdr &);
-
-        void phdrLoad(std::shared_ptr<Task> &, const Elf32_Phdr &);
-        void phdrGnuStack(std::shared_ptr<Task> &, const Elf32_Phdr &);
-        void phdrInterp(std::shared_ptr<Task> &, const Elf32_Phdr &);
 
     private:
-        /// whether the executable we're loading is statically or dynamically linked
-        bool isDynamic = false;
+        void processProgHdr(Task *, const Elf32_Phdr &);
+
+        void phdrLoad(Task *, const Elf32_Phdr &);
+        void phdrGnuStack(Task *, const Elf32_Phdr &);
+        void phdrInterp(Task *, const Elf32_Phdr &);
+
+    private:
+        /// dynamic linker
+        std::string dynLdPath = "";
         /// address of the executable entry point
         uintptr_t entryAddr = 0;
+
+        /// index of program headers
+        uintptr_t phdrOff = 0;
+        /// how many program headers do we have? (must be sizeof(Elf32_Phdr)!)
+        size_t numPhdr = 0;
+
+        /// bottom address of the stack
+        uintptr_t stackBottom = 0;
 };
 }
 

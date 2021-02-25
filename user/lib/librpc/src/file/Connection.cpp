@@ -99,6 +99,8 @@ static bool fileio::UpdateCaps() {
         return err;
     }
 
+    memset(rxBuf, 0, kReplyBufSize);
+
     // receive pls
     struct MessageHeader *msg = (struct MessageHeader *) rxBuf;
     err = PortReceive(gState.replyPort, msg, kReplyBufSize, UINTPTR_MAX);

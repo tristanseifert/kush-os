@@ -1,6 +1,7 @@
 #ifndef _SYS_TIME_H_
 #define	_SYS_TIME_H_
 
+#include <_libc.h>
 #include <time.h>
 
 #ifndef _SUSECONDS_T_DECLARED
@@ -20,7 +21,7 @@ struct timeval {
 extern "C" {
 #endif
 
-int gettimeofday(struct timeval *tv, struct timezone *tz);
+LIBC_EXPORT int gettimeofday(struct timeval *tv, struct timezone *tz);
 
 #ifdef __cplusplus
 }

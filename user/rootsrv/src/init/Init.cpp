@@ -57,12 +57,8 @@ static void InitServer(std::shared_ptr<Bundle> &bundle, const std::string &name,
         path = "/sbin/" + name;
     }
 
-    // try to get the server binary
-    auto file = bundle->open(path);
-    REQUIRE(file, "Failed to load server '%s' (from %s)", name.c_str(), path.c_str());
-
     // create a task
-    auto taskHandle = task::Task::createFromMemory(path, file->getContents(), params);
+    auto taskHandle = task::Task::createFromFile(path, params);
     REQUIRE(taskHandle, "Failed to create task for server '%s' (from %s)", name.c_str(),
             path.c_str());
 }
