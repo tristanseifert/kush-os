@@ -24,6 +24,8 @@ class ElfLibReader: public ElfReader {
         void mapContents();
         /// Registers all symbols exported from the ELF and registers them.
         void exportSymbols(Library * _Nonnull lib);
+        /// Finds all initialization and termination functions and registers them.
+        void exportInitFiniFuncs(Library * _Nonnull lib);
 
         void processRelocs(const std::span<Elf32_Rel> &rels) override {
             this->patchRelocs(rels, this->base);

@@ -31,6 +31,11 @@ struct Library {
     /// virtual memory base and length
     uintptr_t vmBase = 0, vmLength = 0;
 
+    /// initialization functions exported by this object
+    std::list<void(*)(void)> initFuncs;
+    /// all termination functions associated with this object
+    std::list<void(*)(void)> finiFuncs;
+
     /// string allocator
     StringAllocator strings;
 };

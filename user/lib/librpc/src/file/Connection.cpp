@@ -133,8 +133,8 @@ static bool fileio::UpdateCaps() {
 
         gState.maxIoSize = req->maxReadBlockSize;
 
-        fprintf(stderr, "supported capabilities: %08x block max %u\n", (uintptr_t) gState.caps,
-                gState.maxIoSize);
+        //fprintf(stderr, "supported capabilities: %08x block max %u\n", (uintptr_t) gState.caps,
+        //        gState.maxIoSize);
     } else {
         goto fail;
     }

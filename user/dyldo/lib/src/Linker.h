@@ -68,6 +68,8 @@ class Linker {
         void doFixups();
         /// Releases caches and other buffers we don't need during runtime
         void cleanUp();
+        /// Runs initializers of loaded libraries.
+        void runInit();
         /// Transfers control to the entry point of the loaded program.
         [[noreturn]] void jumpToEntry(const kush_task_launchinfo_t * _Nonnull);
 
@@ -90,6 +92,9 @@ class Linker {
         static Linker * _Nullable gShared;
         /// are trace logs enabled?
         static bool gLogTraceEnabled;
+
+        /// whether we log initializer/destructor invocations
+        static bool gLogInitFini;
 
     private:
         /// ELF reader for the executable

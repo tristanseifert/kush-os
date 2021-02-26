@@ -20,6 +20,8 @@ bool Linker::gLogTraceEnabled = false;
 bool Linker::gLogTraceEnabled = true;
 #endif
 
+bool Linker::gLogInitFini = true;
+
 /**
  * Initializes a new linker, for the executable at the path given.
  *
@@ -122,6 +124,29 @@ void Linker::jumpToEntry(const kush_task_launchinfo_t *info) {
 }
 
 /**
+ * Runs initializers of all shared libraries (currently, in the same order as they were loaded, 
+ * which isn't entirely correct ¯\_(ツ)_/¯) and then those exported by the executable itself.
+ */
+void Linker::runInit() {
+    hashmap_iterate(&this->loaded, [](void *ctx, void *value) {
+        auto lib = reinterpret_cast<Library *>(value);
+        if(!lib->initFuncs.empty()) {
+            // invoke each function
+            if(gLogInitFini) {
+                Linker::Trace("Invoking %u init funcs for %s", lib->initFuncs.size(), lib->soname);
+            }
+
+            for(auto func : lib->initFuncs) {
+                func();
+            }
+
+        }
+
+        return 1;
+    }, this);
+}
+
+/**
  * Loads dependent libraries.
  *
  * This starts with the ones required by the main executable, recursively loading depenencies of
@@ -187,8 +212,11 @@ void Linker::loadSharedLib(const char *soname) {
     /**
      * Get information about all exported symbols in the library. These are extracted from the
      * .dynsym region of the binary.
+     *
+     * At this stage, we also get its initializers and destructors.
      */
     loader->exportSymbols(info);
+    loader->exportInitFiniFuncs(info);
 
     // advance the pointer to place the next library
     const auto nextBase = base + loader->getVmRequirements();

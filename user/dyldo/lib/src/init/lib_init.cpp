@@ -14,7 +14,6 @@ using namespace dyldo;
  */
 extern "C" void dyldo_start(const kush_task_launchinfo_t *info) {
     // validate the info structure we got
-    fprintf(stderr, "Launch info: %p\n", info);
     if(info->magic != TASK_LAUNCHINFO_MAGIC) {
         fprintf(stderr, "invalid task launchinfo magic: %08x\n", info->magic);
         abort();
@@ -35,7 +34,7 @@ extern "C" void dyldo_start(const kush_task_launchinfo_t *info) {
     Linker::Trace("Max alloc: %u bytes", maxAlloc);
 
     // invoke initializers, then invoke entry point
-
+    Linker::the()->runInit();
     Linker::the()->jumpToEntry(info);
 }
 

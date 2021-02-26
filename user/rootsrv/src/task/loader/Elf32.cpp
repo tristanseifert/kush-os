@@ -141,7 +141,7 @@ void Elf32::phdrLoad(Task *task, const Elf32_Phdr &hdr) {
         allocSize = ((allocSize + pageSz - 1) / pageSz) * pageSz;
     }
 
-    LOG("Alloc size %08x (orig %08x)", allocSize, hdr.p_memsz);
+    // LOG("Alloc size %08x (orig %08x)", allocSize, hdr.p_memsz);
 
     // allocate an anonymous region (RW for now) and get its base address in our vm map
     err = AllocVirtualAnonRegion(0, allocSize, VM_REGION_RW, &vmHandle);

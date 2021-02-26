@@ -167,3 +167,91 @@ void ElfLibReader::exportSymbols(Library *lib) {
     }
 }
 
+/**
+ * Extracts initializers and destructors from the binary.
+ *
+ * Initializers are taken from the value of the DT_INIT pointer, if present, then the contents of
+ * the DT_INIT_ARRAY array.
+ *
+ * Destructors are read in the same way, first from the DT_FINI pointer, then the contents of the
+ * DT_FINI_ARRAY array.
+ *
+ * It doesn't seem like the DT_INIT/DT_FINI constructs are exported by clang/lld, but they're
+ * included for compatibility.
+ */
+void ElfLibReader::exportInitFiniFuncs(Library *lib) {
+    uintptr_t initArrayAddr = 0, finiArrayAddr = 0;
+    size_t initArrayLen = 0, finiArrayLen = 0;
+
+    // find the old style INIT/FINI functions, and the addresses of the new arrays
+    for(const auto &dyn : this->dynInfo) {
+        switch(dyn.d_tag) {
+            case DT_INIT: {
+                const auto addr = this->rebaseVmAddr(dyn.d_un.d_ptr);
+                auto func = reinterpret_cast<void(*)(void)>(addr);
+                lib->initFuncs.push_back(func);
+                break;
+            }
+            case DT_FINI: {
+                const auto addr = this->rebaseVmAddr(dyn.d_un.d_ptr);
+                auto func = reinterpret_cast<void(*)(void)>(addr);
+                lib->finiFuncs.push_back(func);
+                break;
+            }
+
+            case DT_INIT_ARRAY:
+                initArrayAddr = this->rebaseVmAddr(dyn.d_un.d_ptr);
+                break;
+            case DT_INIT_ARRAYSZ:
+                initArrayLen = dyn.d_un.d_val;
+                break;
+            case DT_FINI_ARRAY:
+                finiArrayAddr = this->rebaseVmAddr(dyn.d_un.d_ptr);
+                break;
+            case DT_FINI_ARRAYSZ:
+                finiArrayLen = dyn.d_un.d_val;
+                break;
+
+            default:
+                continue;
+        }
+    }
+
+    if(initArrayLen) {
+        // read out the number of functions
+        auto read = reinterpret_cast<const void *>(initArrayAddr);
+        const auto numEntries = initArrayLen / sizeof(uintptr_t);
+
+        for(size_t i = 0; i < numEntries; i++) {
+            // read the value and add it to init func list
+            uintptr_t addr = 0;
+            memcpy(&addr, read, sizeof(uintptr_t));
+            addr = this->rebaseVmAddr(addr);
+
+            auto func = reinterpret_cast<void(*)(void)>(addr);
+            lib->initFuncs.push_back(func);
+
+            // advance the pointer
+            read = reinterpret_cast<const void *>(reinterpret_cast<uintptr_t>(read) + sizeof(uintptr_t));
+        }
+    }
+
+    if(finiArrayLen) {
+        // read out the number of functions
+        auto read = reinterpret_cast<const void *>(finiArrayAddr);
+        const auto numEntries = finiArrayLen / sizeof(uintptr_t);
+
+        for(size_t i = 0; i < numEntries; i++) {
+            // read the value and add it to destructor func list
+            uintptr_t addr = 0;
+            memcpy(&addr, read, sizeof(uintptr_t));
+            addr = this->rebaseVmAddr(addr);
+
+            auto func = reinterpret_cast<void(*)(void)>(addr);
+            lib->finiFuncs.push_back(func);
+
+            // advance the pointer
+            read = reinterpret_cast<const void *>(reinterpret_cast<uintptr_t>(read) + sizeof(uintptr_t));
+        }
+    }
+}
