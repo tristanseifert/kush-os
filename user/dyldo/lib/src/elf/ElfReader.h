@@ -17,6 +17,8 @@
 #include <sys/queue.h>
 
 namespace dyldo {
+struct Library;
+
 /**
  * Protection level for a segment
  */
@@ -44,16 +46,27 @@ class ElfReader {
             return this->deps;
         }
 
+        /// Applies the given relocations.
+        virtual void processRelocs(const std::span<Elf32_Rel> &rels) = 0;
+        /// Gets the dynamic (data) relocation entries
+        bool getDynRels(std::span<Elf32_Rel> &outRels);
+        /// Gets the jump table (PLT) relocations
+        bool getPltRels(std::span<Elf32_Rel> &outRels);
+
+        /// Protects all loaded segments.
+        void applyProtection();
+
     protected:
         /// Loads a segment described by a program header into memory.
         void loadSegment(const Elf32_Phdr &phdr, const uintptr_t base = 0);
-        /// Protects all loaded segments.
-        void applyProtection();
 
         /// Reads the given number of bytes from the file at the specified offset.
         void read(const size_t nBytes, void * _Nonnull out, const uintptr_t offset);
         /// Parses the dynamic linker information.
         void parseDynamicInfo();
+
+        /// Processes relocations.
+        void patchRelocs(const std::span<Elf32_Rel> &rels, const uintptr_t base);
 
         /// Reads a string out of the string table at the given index.
         virtual const char * _Nullable readStrtab(const size_t i);
@@ -65,6 +78,10 @@ class ElfReader {
         virtual uintptr_t rebaseVmAddr(const uintptr_t in) const {
             return in;
         }
+
+        /// Processes a relocation indicating a copy from a shared object's data.
+        void relocCopyFromShlib(const Elf32_Rel &rel, const SymbolMap::Symbol * _Nonnull sym,
+                const uintptr_t base = 0);
 
     private:
         /// Determines the size of the file
@@ -123,11 +140,8 @@ class ElfReader {
 
         /// string table
         std::span<char> strtab;
-
-        /// location of the symbol table
-        const Elf32_Sym *_Nullable symtab = nullptr;
-        /// number of entries in symbol table
-        size_t symtabEnt = 0;
+        /// symbol table
+        std::span<Elf32_Sym> symtab;
 
         /// file offset to get to section headers
         uintptr_t shdrOff = 0;
@@ -145,6 +159,9 @@ class ElfReader {
         std::list<DependentLibrary> deps;
         /// segments we loaded from the file
         std::list<Segment> segments;
+
+    private:
+        static bool gLogSegments;
 };
 }
 

@@ -114,19 +114,19 @@ Use this line before header, if you don't want flags(T x) function to be impleme
 
 #define ENUM_FLAGS_EX_NO_FLAGS_FUNC(T,IntType) \
 enum class T: IntType;	\
-inline T	operator	&	(T x, T y)		{	return static_cast<T>	(static_cast<IntType>(x) & static_cast<IntType>(y));	}; \
-inline T	operator	|	(T x, T y)		{	return static_cast<T>	(static_cast<IntType>(x) | static_cast<IntType>(y));	}; \
-inline T	operator	^	(T x, T y)		{	return static_cast<T>	(static_cast<IntType>(x) ^ static_cast<IntType>(y));	}; \
-inline T	operator	~	(T x)			{	return static_cast<T>	(~static_cast<IntType>(x));							}; \
-inline T&	operator	&=	(T& x, T y)		{	x = x & y;	return x;	}; \
-inline T&	operator	|=	(T& x, T y)		{	x = x | y;	return x;	}; \
-inline T&	operator	^=	(T& x, T y)		{	x = x ^ y;	return x;	}; \
+__attribute__((__visibility__("hidden"))) inline T	operator	&	(T x, T y)		{	return static_cast<T>	(static_cast<IntType>(x) & static_cast<IntType>(y));	}; \
+__attribute__((__visibility__("hidden"))) inline T	operator	|	(T x, T y)		{	return static_cast<T>	(static_cast<IntType>(x) | static_cast<IntType>(y));	}; \
+__attribute__((__visibility__("hidden"))) inline T	operator	^	(T x, T y)		{	return static_cast<T>	(static_cast<IntType>(x) ^ static_cast<IntType>(y));	}; \
+__attribute__((__visibility__("hidden"))) inline T	operator	~	(T x)			{	return static_cast<T>	(~static_cast<IntType>(x));							}; \
+__attribute__((__visibility__("hidden"))) inline T&	operator	&=	(T& x, T y)		{	x = x & y;	return x;	}; \
+__attribute__((__visibility__("hidden"))) inline T&	operator	|=	(T& x, T y)		{	x = x | y;	return x;	}; \
+__attribute__((__visibility__("hidden"))) inline T&	operator	^=	(T& x, T y)		{	x = x ^ y;	return x;	}; \
 /*inline bool operator bool(T& x) { return static_cast<IntType>(x) != 0; }*/
 
 
 #if(USE_ENUM_FLAGS_FUNCTION)
     #define ENUM_FLAGS_EX(T,IntType) ENUM_FLAGS_EX_NO_FLAGS_FUNC(T,IntType) \
-    inline bool			TestFlags(T x)			{	return static_cast<IntType>(x) != 0;};
+    static inline bool			TestFlags(T x)			{	return static_cast<IntType>(x) != 0;};
 #else
     #define ENUM_FLAGS_EX(T,IntType) ENUM_FLAGS_EX_NO_FLAGS_FUNC(T,IntType)
 #endif

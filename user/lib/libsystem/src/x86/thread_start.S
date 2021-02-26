@@ -1,4 +1,5 @@
 .global __ThreadTrampoline
+.type __ThreadTrampoline, function
 
 __ThreadTrampoline:
     # set up stack

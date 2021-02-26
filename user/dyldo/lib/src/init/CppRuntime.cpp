@@ -1,8 +1,16 @@
 #include <cstddef>
+#include <cstdlib>
 #include <cstdint>
 #include <new>
 
 #include <malloc.h>
+
+/**
+ * Invoked if a pure virtual function is called.
+ */
+extern "C" void __cxa_pure_virtual() {
+    abort();
+}
 
 /// Allocates memory
 void *operator new(size_t size) {

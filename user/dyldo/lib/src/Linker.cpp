@@ -1,9 +1,18 @@
 #include "Linker.h"
+#include "Library.h"
+#include "link/SymbolMap.h"
 
 #include "elf/ElfExecReader.h"
 #include "elf/ElfLibReader.h"
 
 using namespace dyldo;
+
+extern "C" void __dyldo_jmp_to(const uintptr_t pc, const uintptr_t sp,
+        const kush_task_launchinfo_t *info);
+uintptr_t __dyldo_stack_start = 0;
+
+/// shared linker instance
+Linker *Linker::gShared = nullptr;
 
 #ifdef NDEBUG
 bool Linker::gLogTraceEnabled = false;
@@ -25,18 +34,91 @@ Linker::Linker(const char *path) {
 
     // load the exec file and its dependencies
     this->exec = new ElfExecReader(path);
+
+    // set up the symbol map
+    this->map = new SymbolMap;
 }
 
 /**
  * Discards all cached data and releases unneeded memory.
  */
 void Linker::cleanUp() {
-    // destroy hash map
-    hashmap_destroy(&this->loaded);
+    Trace("Total symbols: %u", this->map->getNumSymbols());
+
+    /**
+     * Ensure all library segments are properly protected; and then get rid of the readers. That
+     * will close the file handles as well.
+     *
+     * We've already extracted all symbol information, and relocations have been performed, so
+     * there is no need for anything else.
+     */
+    hashmap_iterate(&this->loaded, [](void *ctx, void * _lib) -> int {
+        auto lib = reinterpret_cast<Library *>(_lib);
+
+        if(lib->reader) {
+            lib->reader->applyProtection();
+
+            delete lib->reader;
+            lib->reader = nullptr;
+        }
+
+        return 1;
+    }, this);
 
     // tear down file readers
     delete this->exec;
     this->exec = nullptr;
+}
+
+/**
+ * Performs fixups: in the current implementation, this just performs relocations for all symbols
+ * in the executable and dependent libraries.
+ *
+ * All symbol resolution happens just-in-time by calling back into the runtime linking stub.
+ */
+void Linker::doFixups() {
+    // first, fix up the executable (data and PLT)
+    std::span<Elf32_Rel> rels;
+
+    if(this->exec->getDynRels(rels)) {
+        this->exec->processRelocs(rels);
+    }
+    if(this->exec->getPltRels(rels)) {
+        this->exec->processRelocs(rels);
+    }
+
+    // then, ALL loaded libraries
+    hashmap_iterate(&this->loaded, [](void *ctx, void *value) {
+        auto lib = reinterpret_cast<Library *>(value);
+        std::span<Elf32_Rel> rels;
+
+        // update its dynamic relocs
+        if(lib->reader->getDynRels(rels)) {
+            lib->reader->processRelocs(rels);
+        }
+        if(lib->reader->getPltRels(rels)) {
+            lib->reader->processRelocs(rels);
+        }
+
+        return 1;
+    }, this);
+
+    // get the entry point address
+    this->entryAddr = this->exec->getEntryAddress();
+}
+
+/**
+ * Jumps to the program entry point.
+ */
+void Linker::jumpToEntry(const kush_task_launchinfo_t *info) {
+    // round up stack address
+    const auto stack = ((__dyldo_stack_start + 256 - 1) / 256) * 256;
+
+    Trace("Entry point: %p sp %08x", this->entryAddr, stack);
+    __dyldo_jmp_to(this->entryAddr, stack, info);
+
+    // should really never get here...
+    abort();
 }
 
 /**
@@ -64,7 +146,8 @@ void Linker::loadSharedLib(const char *soname) {
     }
 
     // see if the library exists on disk
-    auto file = this->openSharedLib(soname);
+    const char *libPath = nullptr;
+    auto file = this->openSharedLib(soname, libPath);
     if(!file) {
         Abort("failed to load dependency '%s'", soname);
     }
@@ -77,10 +160,13 @@ void Linker::loadSharedLib(const char *soname) {
     auto info = new Library;
     if(!info) Abort("out of memory");
 
+    info->path = libPath;
     info->base = base;
     info->reader = loader;
+    info->soname = strdup(soname);
+    if(!info->soname) Abort("out of memory");
 
-    err = hashmap_put(&this->loaded, soname, strlen(soname), info);
+    err = hashmap_put(&this->loaded, info->soname, strlen(info->soname), info);
     if(err) {
         Abort("hashmap_put failed: %d", err);
     }
@@ -94,13 +180,22 @@ void Linker::loadSharedLib(const char *soname) {
      */
     loader->mapContents();
 
+    // register the library's VM range
+    info->vmBase = base;
+    info->vmLength = loader->getVmRequirements();
+
+    /**
+     * Get information about all exported symbols in the library. These are extracted from the
+     * .dynsym region of the binary.
+     */
+    loader->exportSymbols(info);
+
     // advance the pointer to place the next library
     const auto nextBase = base + loader->getVmRequirements();
     this->soBase = ((nextBase + kLibAlignment - 1) / kLibAlignment) * kLibAlignment;
 
     // process dependencies of the library that was just loaded
     for(const auto &dep : loader->getDeps()) {
-        Trace("Dep for %s: %s", soname, dep.name);
         this->loadSharedLib(dep.name);
     }
 }
@@ -114,9 +209,13 @@ void Linker::loadSharedLib(const char *soname) {
  * - /usr/local/lib
  * - Directory containing the executable
  *
+ * @param soname Object name to search for
+ * @param outPath A copy of the path string from which the library was loaded. You are responsible
+ * for calling free() on it when no longer needed.
+ *
  * @return File handle to the library, or `nullptr` if not found anywhere.
  */
-FILE *Linker::openSharedLib(const char *soname) {
+FILE *Linker::openSharedLib(const char *soname, const char* &outPath) {
     constexpr static const size_t kPathBufSz = 300;
     char pathBuf[kPathBufSz];
 
@@ -129,6 +228,8 @@ FILE *Linker::openSharedLib(const char *soname) {
 
         FILE *fp = fopen(pathBuf, "rb");
         if(fp) {
+            outPath = strdup(pathBuf);
+
             return fp;
         }
     }
@@ -139,6 +240,27 @@ FILE *Linker::openSharedLib(const char *soname) {
     return nullptr;
 }
 
+/**
+ * Resolves a global symbol.
+ */
+const SymbolMap::Symbol *Linker::resolveSymbol(const char *name, Library *inLibrary) {
+    return this->map->get(name, inLibrary);
+}
+
+/**
+ * Registers a symbol in the symbol map.
+ */
+void Linker::exportSymbol(const char * _Nonnull name, const Elf32_Sym &sym,
+        Library * _Nonnull library) {
+    this->map->add(name, sym, library);
+}
+
+/**
+ * Installs a symbol override.
+ */
+void Linker::overrideSymbol(const SymbolMap::Symbol *inSym, const uintptr_t newAddr) {
+    this->map->addOverride(inSym, newAddr);
+}
 
 
 #pragma clang diagnostic push

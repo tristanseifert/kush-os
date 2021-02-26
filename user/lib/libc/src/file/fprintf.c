@@ -13,7 +13,7 @@
  */
 static void _WriteStreamCallback(char ch, void *arg) {
     FILE *stream = (FILE *) arg;
-    stream->putc(stream, ch);
+    fputc(ch, stream);
 }
 
 /**

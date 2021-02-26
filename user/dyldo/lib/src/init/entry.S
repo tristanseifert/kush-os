@@ -2,6 +2,7 @@
 
 # secret libc api :D
 .extern __libc_set_heap_start
+.extern __dyldo_stack_start
 
 /**
  * When we enter here, we will have a stack frame that looks a little bit like the following:
@@ -9,6 +10,10 @@
  * /------------------------------\ Bottom - 4
  * |    Address of launch info    |
  * \------------------------------/ Bottom of stack
+ *
+ * We also store the stack pointer at this point, so that when we jump to the user code, we can
+ * restore it. This assumes that the bottom of the stack is aligned on a 256-byte boundary, as we
+ * simply round the address up.
  */
 __dyldo_start:
     # set up stack
@@ -25,6 +30,8 @@ __dyldo_start:
     rep stosb
 
 1:
+    mov         %esp, __dyldo_stack_start
+
     /*
      * Initialize the C library.
      *

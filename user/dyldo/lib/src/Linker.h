@@ -6,12 +6,18 @@
 #include <cstdio>
 #include <string_view>
 
+#include <sys/elf.h>
+
+#include "LaunchInfo.h"
+#include "link/SymbolMap.h"
 #include "struct/hashmap.h"
 
 namespace dyldo {
 class ElfReader;
 class ElfExecReader;
 class ElfLibReader;
+struct Library;
+class SymbolMap;
 
 /**
  * Global instance of the dynamic linker.
@@ -34,6 +40,18 @@ class Linker {
         };
 
     public:
+        /// Initializes the shared linker.
+        static void init(const char *_Nonnull execPath) {
+            gShared = new Linker(execPath);
+            if(!gShared) {
+                Abort("out of memory");
+            }
+        }
+        /// Returns the shared linker.
+        static Linker *_Nonnull the() {
+            return gShared;
+        }
+
         /// Outputs a message if trace logging is enabled
         static void Trace(const char * _Nonnull format, ...) __attribute__ ((format (printf, 1, 2)));
         /// Outputs an informational message
@@ -44,28 +62,32 @@ class Linker {
     public:
         Linker(const char * _Nonnull path);
 
+        /// Loads libraries required by the executable (and other libraries)
         void loadLibs();
+        /// Performs relocations and other fixups on loaded data.
+        void doFixups();
+        /// Releases caches and other buffers we don't need during runtime
         void cleanUp();
+        /// Transfers control to the entry point of the loaded program.
+        [[noreturn]] void jumpToEntry(const kush_task_launchinfo_t * _Nonnull);
 
-    private:
-        /**
-         * Information for a loaded library. This consists of the virtual address at which it was
-         * loaded.
-         */
-        struct Library {
-            /// base address
-            uintptr_t base = 0;
-            /// ELF reader for the library
-            ElfLibReader * _Nullable reader = nullptr;
-        };
+        /// Resolves a symbol.
+        const SymbolMap::Symbol* _Nullable resolveSymbol(const char *_Nonnull name,
+                Library * _Nullable inLibrary = nullptr);
+        /// Registers a symbol exported from a library
+        void exportSymbol(const char * _Nonnull name, const Elf32_Sym &sym, Library *_Nonnull lib);
+        /// Overrides a symbol's address.
+        void overrideSymbol(const SymbolMap::Symbol * _Nonnull inSym, const uintptr_t newAddr);
 
     private:
         /// Load a shared library
         void loadSharedLib(const char * _Nonnull soname);
         /// Searches for a library with the given name in system paths and open it
-        FILE * _Nullable openSharedLib(const char * _Nonnull soname);
+        FILE * _Nullable openSharedLib(const char * _Nonnull soname, const char * _Nullable &outPath);
 
     private:
+        /// shared linker instance
+        static Linker * _Nullable gShared;
         /// are trace logs enabled?
         static bool gLogTraceEnabled;
 
@@ -75,13 +97,23 @@ class Linker {
 
         /// base address to load the next shared library at
         uintptr_t soBase = kSharedLibBase;
+        /// memory address holding program entry point
+        uintptr_t entryAddr = 0;
 
         /**
-         * Map of libraries loaded; this is used exclusively during the loading and linking
-         * process and is deallocated when the app is about to be launched. Therefore, the keys do
-         * not need to be valid past that time.
+         * Map of libraries loaded; we build this up during the loading process, and it can be
+         * referred back to later using the dlsym-type calls.
+         *
+         * Additionally, all symbols in the global symbol table will map to a library object that's
+         * pointed to by this map.
          */
         struct hashmap_s loaded;
+
+        /**
+         * Symbol registration map; all symbols from loaded dynamic libraries are stored in here
+         * so we can look them up later, during relocations and during runtime.
+         */
+        SymbolMap * _Nonnull map;
 };
 }
 

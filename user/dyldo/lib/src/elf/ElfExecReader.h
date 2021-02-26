@@ -18,6 +18,10 @@ class ElfExecReader: public ElfReader {
         ElfExecReader(const char * _Nonnull path);
         virtual ~ElfExecReader();
 
+        void processRelocs(const std::span<Elf32_Rel> &rels) override {
+            this->patchRelocs(rels, 0);
+        }
+
         /// Returns the entry point address of the executable.
         const uintptr_t getEntryAddress() const {
             return this->entry;

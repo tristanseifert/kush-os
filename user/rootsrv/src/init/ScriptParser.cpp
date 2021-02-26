@@ -104,6 +104,9 @@ void ScriptParser::processServer(const std::string_view &line) {
         auto args = line;
         args.remove_prefix(std::min(firstSpace + 1, line.size()));
 
+        // argv[0] is the binary name
+        info.args.push_back(info.name);
+
         // parse all space-separated tokens out
         SplitStringArgs(args, info.args);
     }

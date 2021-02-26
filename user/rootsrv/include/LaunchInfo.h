@@ -5,6 +5,10 @@
 #ifndef ROOTSRV_TASK_LAUNCHINFO_H
 #define ROOTSRV_TASK_LAUNCHINFO_H
 
+#define LAUNCHINFO_OFF_NARGS    (8)
+#define LAUNCHINFO_OFF_ARGPTR   (12)
+
+#ifndef ASM_FILE
 #include <stdint.h>
 
 /**
@@ -24,7 +28,13 @@ typedef struct {
     const char **args;
 } kush_task_launchinfo_t;
 
+#ifdef __cplusplus
+static_assert(offsetof(kush_task_launchinfo_t, numArgs) == LAUNCHINFO_OFF_NARGS);
+static_assert(offsetof(kush_task_launchinfo_t, args) == LAUNCHINFO_OFF_ARGPTR);
+#endif
+
 /// Magic value for the task launch info
 #define TASK_LAUNCHINFO_MAGIC           'TASK'
+#endif
 
 #endif

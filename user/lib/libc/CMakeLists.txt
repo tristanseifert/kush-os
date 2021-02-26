@@ -115,8 +115,6 @@ add_library(c_objs OBJECT
     # error handling
     src/error/errno.c
     src/error/strerror.c
-    # stack stuff
-    src/stack/stack_guard.c
     # dynamic linking
     src/dylink/dlopen.c
     src/dylink/dlsym.c
@@ -194,6 +192,9 @@ add_library(c_gdtoa OBJECT
 target_compile_options(c_gdtoa PRIVATE -flto)
 target_compile_definitions(c_gdtoa PRIVATE BUILDING_LIBC=1)
 
+# copy launch info headers
+file(COPY ${CMAKE_CURRENT_LIST_DIR}/../../rootsrv/include/LaunchInfo.h  DESTINATION ${CMAKE_CURRENT_LIST_DIR}/include)
+
 # specify the include directories
 target_include_directories(c_objs PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 target_include_directories(c_objs PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
@@ -225,14 +226,19 @@ if(${KERNEL_ARCH} STREQUAL "x86")
         src/x86/crt0_static.S
         src/x86/crti.c
     )
+    target_include_directories(c_crt0T PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
+
     # compile the C library entry point (for dynamic executables)
     add_library(c_crt0 OBJECT
         src/x86/crt0.S
     )
+    target_include_directories(c_crt0 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
+
     # compile the C library entry point (for shared libraries)
     add_library(c_crt0S OBJECT
         src/x86/crt0_shared.S
     )
+    target_include_directories(c_crt0S PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
 
     # ensure crt0 objects are built and copied to the system library dir (so linker can find them)
     add_dependencies(c_objs c_crt0 c_crt0T c_crt0S)

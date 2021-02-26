@@ -1,5 +1,6 @@
 #include "ElfLibReader.h"
 #include "Linker.h"
+#include "Library.h"
 
 #include <cstdio>
 #include <cstring>
@@ -145,6 +146,24 @@ void ElfLibReader::loadDynamicInfo() {
 
     if(this->dynInfo.empty()) {
         Linker::Abort("PT_DYNAMIC missing");
+    }
+}
+
+/**
+ * Extracts all symbols from the library, and registers them with the linker. We'll in turn point
+ * at the specified runtime library structure.
+ */
+void ElfLibReader::exportSymbols(Library *lib) {
+    for(const auto &sym : this->symtab) {
+        // ignore symbols that aren't defined in this file
+        if(sym.st_shndx == STN_UNDEF) continue;
+
+        // get its name
+        auto namePtr = this->readStrtab(sym.st_name);
+        auto name = lib->strings.add(namePtr);
+
+        // register it
+        Linker::the()->exportSymbol(name, sym, lib);
     }
 }
 

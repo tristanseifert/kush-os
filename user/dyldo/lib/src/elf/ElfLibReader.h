@@ -4,6 +4,7 @@
 #include "ElfReader.h"
 
 #include <list>
+#include <vector>
 
 #include <sys/elf.h>
 
@@ -12,6 +13,8 @@ namespace dyldo {
  * ELF reader specialized for shared libraries.
  */
 class ElfLibReader: public ElfReader {
+    friend class SymbolMap;
+
     public:
         ElfLibReader(const uintptr_t vmBase, FILE * _Nonnull file);
         ElfLibReader(const uintptr_t vmBase, const char * _Nonnull path);
@@ -19,6 +22,12 @@ class ElfLibReader: public ElfReader {
 
         /// Loads the contents of the library and maps them into memory.
         void mapContents();
+        /// Registers all symbols exported from the ELF and registers them.
+        void exportSymbols(Library * _Nonnull lib);
+
+        void processRelocs(const std::span<Elf32_Rel> &rels) override {
+            this->patchRelocs(rels, this->base);
+        }
 
         /// Total of VM space required for the library; rounded up to the nearest page.
         const size_t getVmRequirements() const;

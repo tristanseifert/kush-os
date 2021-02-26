@@ -37,7 +37,7 @@ target_include_directories(system_dynamic PUBLIC include)
 # Link against libunwind.
 # This is required for building pretty backtraces, and also has the benefit that it'll make sure
 # that C++ exceptions will always work.
-target_link_libraries(system_static PUBLIC unwind)
+#target_link_libraries(system_static PUBLIC unwind)
 # target_link_libraries(system_dynamic PUBLIC unwind)
 
 # build the correct platform-specific code

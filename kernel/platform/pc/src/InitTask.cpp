@@ -135,8 +135,11 @@ static void RootSrvEntry(const uintptr_t) {
     RemoveSrvElfTempMap();
     MapInitBundle();
 
+    // XXX: offset from stack is to allow us to pop off the task info ptr (which is null)
+    reinterpret_cast<uintptr_t *>(kStackBottom)[-1] = 0;
+
     // we've finished setup; jump to the server code
-    sched::Thread::current()->returnToUser(entry, kStackBottom);
+    sched::Thread::current()->returnToUser(entry, kStackBottom - sizeof(uintptr_t));
 }
 
 /**
