@@ -88,6 +88,9 @@ class Linker {
 
         /// Registers the main executable's TLS requirements.
         void setExecTlsRequirements(const size_t totalLen, const std::span<std::byte> &tdata);
+        /// Registers a library's thread-local requirements.
+        void setLibTlsRequirements(const size_t totalLen, const std::span<std::byte> &tdata,
+                Library * _Nonnull library);
 
 
         ThreadLocal * _Nonnull getTls() {

@@ -1,5 +1,7 @@
 #include "ElfReader.h"
+#include "Library.h"
 #include "Linker.h"
+#include "runtime/ThreadLocal.h"
 
 #include <cstdlib>
 #include <cstdio>
@@ -359,13 +361,15 @@ void ElfReader::patchRelocs(const std::span<Elf32_Rel> &rels, const uintptr_t ba
             case R_386_GLOB_DAT:
             case R_386_JMP_SLOT:
             case R_386_32:
+            case R_386_TLS_TPOFF:
             {
                 // translate the symbol index into a name
                 const auto symIdx = ELF32_R_SYM(rel.r_info);
                 const auto sym = this->symtab[symIdx];
                 const auto name = this->readStrtab(sym.st_name);
                 if(!name) {
-                    Linker::Abort("failed to resolve name for symbol %u", symIdx);
+                    Linker::Abort("failed to resolve name for symbol %u (off %08x inf %08x base %08x)", symIdx,
+                            rel.r_offset, rel.r_info, base);
                 }
 
                 // resolve to symbol
@@ -442,6 +446,35 @@ void ElfReader::patchRelocs(const std::span<Elf32_Rel> &rels, const uintptr_t ba
                 auto from = reinterpret_cast<void *>(base + rel.r_offset);
                 memcpy(&value, from, sizeof(uintptr_t));
                 value += symbol->address;
+                memcpy(from, &value, sizeof(uintptr_t));
+                break;
+            }
+
+            /**
+             * Thread-local offset for an object. When we look up the symbol, we must add to it the
+             * TLS offset for the object, which we acquire from the thread-local handler. This will
+             * produce a negative value.
+             */
+            case R_386_TLS_TPOFF: {
+                // read current TLS value
+                uintptr_t value = 0;
+                auto from = reinterpret_cast<void *>(base + rel.r_offset);
+                memcpy(&value, from, sizeof(uintptr_t));
+
+                // add to it the library's TLS offset
+                auto tls = Linker::the()->getTls();
+                auto off = tls->getLibTlsOffset(symbol->library);
+                if(!off) {
+                    Linker::Abort("Invalid TLS offset for '%s' in %s: %d", symbol->name,
+                            symbol->library->soname, off);
+                }
+
+                // XXX: do we need to subtract the exec size?
+                //Linker::Trace("Original value: %08x sym %s addr %08x", value, symbol->name, symbol->address);
+                value += off - tls->getExecSize() + symbol->address;
+                //Linker::Trace("Relocation for '%s': off %d -> %08x", symbol->name, off, value);
+
+                // write it back
                 memcpy(from, &value, sizeof(uintptr_t));
                 break;
             }

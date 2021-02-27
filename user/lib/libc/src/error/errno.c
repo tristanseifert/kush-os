@@ -1,4 +1,3 @@
 #include <errno.h>
 
-// TODO: this should be thread-local
-int errno = 0;
+_Thread_local int errno = 0;

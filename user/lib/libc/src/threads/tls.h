@@ -4,6 +4,7 @@
 #include <_libc.h>
 #include <stddef.h>
 
+LIBC_INTERNAL void __libc_tls_main_init();
 LIBC_INTERNAL void __libc_tls_init();
 LIBC_INTERNAL void __libc_tls_fini();
 

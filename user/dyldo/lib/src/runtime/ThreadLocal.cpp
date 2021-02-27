@@ -1,4 +1,5 @@
 #include "ThreadLocal.h"
+#include "Library.h"
 #include "Linker.h"
 #include "link/SymbolMap.h"
 
@@ -14,23 +15,7 @@
 
 using namespace dyldo;
 
-/**
- * Exported function to allow C library to get information on the TLS size.
- */
-const size_t __dyldo_get_tls_info(void **outData, size_t *outDataLen) {
-    // get the shared instance from the linker
-    auto tl = Linker::the()->getTls();
-
-    // get info out of it
-    if(outData) {
-        *outData = tl->tdata.data();
-    }
-    if(outDataLen) {
-        *outDataLen = tl->tdata.size();
-    }
-
-    return tl->totalSize;
-}
+bool ThreadLocal::gLogAllocations = false;
 
 /**
  * Exported function to allow the C library to have us do the entire TLS allocation for the current
@@ -61,9 +46,13 @@ void __dyldo_teardown_tls() {
  * Registers the thread-local info interface.
  */
 ThreadLocal::ThreadLocal() {
+    // set up the library TLS allocation map
+    int err = hashmap_create(4, &this->libRegions);
+    if(err) {
+        Linker::Abort("%s failed: %d", "hashmap_create", err);
+    }
+
     // register symbols
-    Linker::the()->map->addLinkerExport("__dyldo_get_tls_info",
-            reinterpret_cast<void *>(&__dyldo_get_tls_info), 0);
     Linker::the()->map->addLinkerExport("__dyldo_setup_tls",
             reinterpret_cast<void *>(&__dyldo_setup_tls), 0);
     Linker::the()->map->addLinkerExport("__dyldo_teardown_tls",
@@ -74,13 +63,60 @@ ThreadLocal::ThreadLocal() {
  * Sets the size of the thread-local region requested by the main executable.
  */
 void ThreadLocal::setExecTlsInfo(const size_t size, const std::span<std::byte> &tdata) {
-    Linker::Trace("exec: .tdata %u TLS total %u", tdata.size(), size);
+    if(gLogAllocations) {
+        Linker::Trace("exec: .tdata %u TLS total %u", tdata.size(), size);
+    }
 
-    this->totalSize = size;
+    this->totalExecSize = size;
 
     if(!tdata.empty()) {
         this->tdata = tdata;
     }
+}
+
+/**
+ * Sets a thread-local reservation for a shared library.
+ */
+void ThreadLocal::setLibTlsInfo(const size_t size, const std::span<std::byte> &tdata,
+        Library *library) {
+    // build the info struct
+    auto region = new LibTlsRegion(library);
+    region->length = size;
+    region->tdata = tdata;
+
+    region->offset = this->nextSharedOffset - static_cast<off_t>(size);
+
+    // update offset for next allocation
+    this->totalSharedSize += size;
+    this->nextSharedOffset -= size;
+
+    if(gLogAllocations) {
+        Linker::Trace("lib '%s': .tdata %u TLS total %u off %d", library->soname,
+                tdata.size(), size, region->offset);
+    }
+
+    // register the region
+    int err = hashmap_put(&this->libRegions, library->path, strlen(library->path), region);
+    if(err) {
+        Linker::Abort("%s failed: %d", "hashmap_put", err);
+    }
+}
+
+/**
+ * Find the TLS offset for the given library.
+ *
+ * @return TLS offset, or 0 in case of error.
+ */
+off_t ThreadLocal::getLibTlsOffset(Library *library) {
+    // look up by its name
+    auto el = hashmap_get(&this->libRegions, library->path, strlen(library->path));
+    if(!el) {
+        return 0;
+    }
+
+    // return the offset
+    auto region = reinterpret_cast<const LibTlsRegion *>(el);
+    return region->offset;
 }
 
 /**
@@ -92,12 +128,20 @@ void ThreadLocal::setExecTlsInfo(const size_t size, const std::span<std::byte> &
 void *ThreadLocal::setUp() {
     // figure out alignment
     const auto alignment = std::max(alignof(uintptr_t), alignof(TlsBlock));
-    // actual required TLS space
-    const auto tlsActualSize = (((this->totalSize + alignment - 1) / alignment) * alignment);
-    // how much TLS space is allocated
-    const auto tlsSize = std::max(kTlsMinSize, tlsActualSize);
+
+    // actual required TLS space (for executable)
+    const auto tlsActualSize = (((this->totalExecSize + alignment - 1) / alignment) * alignment);
+    // actual required TLS space (for shared libraries)
+    const auto tlsSharedActualSize = (((this->totalSharedSize + alignment - 1) / alignment) * alignment);
+
+    // how much TLS space is to be allocated
+    const auto tlsSize = std::max(kTlsMinSize, tlsActualSize + tlsSharedActualSize);
     // size of final allocation
     const auto size = tlsSize + sizeof(TlsBlock);
+
+    if(gLogAllocations) {
+        Linker::Trace("Total TLS size: %u alloc %u (exec %u lib %u)", tlsSize, size, tlsActualSize, tlsSharedActualSize);
+    }
 
     // allocate the region and zero it
     void *base = nullptr;
@@ -114,7 +158,7 @@ void *ThreadLocal::setUp() {
     tb->self = tb;
     tb->memBase = base;
 
-    // copy in the TLS defaults
+    // copy in the TLS defaults (for the executable)
     const auto tlsBase = tbBase - tlsActualSize;
     auto tls = reinterpret_cast<void *>(tlsBase);
 
@@ -122,9 +166,23 @@ void *ThreadLocal::setUp() {
         memcpy(tls, this->tdata.data(), this->tdata.size());
     }
 
-    tb->tlsBase = tls;
+    // copy in TLS defaults (for all shared libraries)
+    hashmap_iterate(&this->libRegions, [](void *ctx, void *_region) -> int {
+        // get offset from the TLS
+        auto region = reinterpret_cast<const LibTlsRegion *>(_region);
+
+        const auto baseAddr = reinterpret_cast<uintptr_t>(ctx) + region->offset;
+        auto base = reinterpret_cast<void *>(baseAddr);
+
+        if(!region->tdata.empty()) {
+            memcpy(base, region->tdata.data(), region->tdata.size());
+        }
+
+        return 1;
+    }, tls);
 
     // update the thread's arch state and return
+    tb->tlsBase = tls;
     this->updateThreadArchState(tb);
 
     return tb;

@@ -182,7 +182,7 @@ extern "C" {
  * Declare the error number as an integer value that programs can access. We do some behind the
  * scenes magic to make this thread local.
  */
-extern int errno;
+extern _Thread_local int errno;
 
 #ifdef __cplusplus
 }

@@ -230,6 +230,7 @@ void Linker::loadSharedLib(const char *soname) {
      *
      * At this stage, we also get its initializers and destructors.
      */
+    loader->exportThreadLocals(info);
     loader->exportSymbols(info);
     loader->exportInitFiniFuncs(info);
 
@@ -311,6 +312,14 @@ void Linker::overrideSymbol(const SymbolMap::Symbol *inSym, const uintptr_t newA
  */
 void Linker::setExecTlsRequirements(const size_t totalLen, const std::span<std::byte> &tdata) {
     this->tls->setExecTlsInfo(totalLen, tdata);
+}
+
+/**
+ * Sets the thread-local requirements of a shared library.
+ */
+void Linker::setLibTlsRequirements(const size_t totalLen, const std::span<std::byte> &tdata,
+        Library * _Nonnull library) {
+    this->tls->setLibTlsInfo(totalLen, tdata, library);
 }
 
 #pragma clang diagnostic push

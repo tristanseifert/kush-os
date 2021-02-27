@@ -1,5 +1,9 @@
+#include "tss_private.h"
+#include "tls.h"
+
 #include <threads.h>
 
+#include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -48,10 +52,55 @@ static struct {
     tss_t nextKey;
 } gState;
 
+
+
+
+/**
+ * Per thread mapping of keys -> values for the thread-locals. The key is of type tss_t.
+ */
+_Thread_local struct hashmap *__libc_thread_tss = NULL;
+
+/**
+ * Returns a hash code for a TSS info struct; it computes the hash of the key.
+ */
+static uint64_t _HashmapTssHash(const void *item, uint64_t seed0, uint64_t seed1) {
+    const tss_entry_t *slot = (const tss_entry_t *) item;
+    return hashmap_sip(&slot->key, sizeof(slot->key), seed0, seed1);
+}
+/**
+ * Compares two threads by their handles.
+ */
+static int _HashmapTssCompare(const void *a, const void *b, void *udata) {
+    const tss_entry_t *ta = (const tss_entry_t *) a;
+    const tss_entry_t *tb = (const tss_entry_t *) b;
+
+    return ta->key < tb->key;
+}
+
+
+/**
+ * Initializes the per-thread storage struct.
+ */
+LIBC_INTERNAL void __libc_tss_thread_init() {
+    __libc_thread_tss = hashmap_new(sizeof(tss_entry_t), 0, 'TLS ', 'ENTR', _HashmapTssHash,
+            _HashmapTssCompare, NULL);
+    if(!__libc_thread_tss) abort();
+}
+
+/**
+ * Releases all entries in the calling thread's TSS hashmap.
+ */
+LIBC_INTERNAL void __libc_tss_thread_fini() {
+    // release the struct
+    hashmap_free(__libc_thread_tss);
+    __libc_thread_tss = NULL;
+}
+
+
 /**
  * Initializes the thread-local storage list.
  */
-void __libc_tss_init() {
+LIBC_INTERNAL void __libc_tss_init() {
     int err;
 
     // set up the lock
@@ -64,6 +113,9 @@ void __libc_tss_init() {
     gState.entries = hashmap_new(sizeof(struct tls_slot_info), 0, 'TLS ', 'SLOT', 
             _HashmapTlsSlotHash, _HashmapTlsSlotCompare, NULL);
     if(!gState.entries) abort();
+
+    // create TSS storage for the current (main) thread
+    __libc_tls_main_init();
 }
 
 
@@ -109,8 +161,23 @@ fail:;
  * Returns the value of a thread local storage slot.
  */
 void *tss_get(tss_t key) {
-    fprintf(stderr, "tss_get() unimplemented: key %08x\n", key);
-    return NULL;
+    // bail if no map allocated
+    if(!__libc_thread_tss) return NULL;
+
+    // read value for the key
+    tss_entry_t e;
+    memset(&e, 0, sizeof(e));
+    e.key = key;
+
+    void *ptr = hashmap_get(__libc_thread_tss, &e);
+    if(!ptr) {
+        // no entry
+        return NULL;
+    }
+
+    // return the object
+    tss_entry_t *found = (tss_entry_t *) ptr;
+    return found->value;
 }
 
 /**
@@ -134,8 +201,16 @@ int tss_set(tss_t key, void *value) {
     }
     item = (struct tls_slot_info *) _item;
 
-    // TODO: store item
-    fprintf(stderr, "tss_set() unimplemented: key %08x value %p\n", key, value);
+    // store item
+    if(__libc_thread_tss) {
+        tss_entry_t e;
+        e.key = key;
+        e.value = value;
+
+        hashmap_set(__libc_thread_tss, &e);
+    } else {
+        fprintf(stderr, "tss_set() unimplemented: key %08x value %p\n", key, value);
+    }
 
     // clean up
     mtx_unlock(&gState.lock);

@@ -135,10 +135,6 @@ void ElfLibReader::loadDynamicInfo() {
                 break;
             }
 
-            // not yet supported!
-            case PT_TLS:
-                Linker::Abort("Library $%08x requests TLS but not yet supported", this->base);
-
             // ignore all other types
             default:
                 continue;
@@ -259,3 +255,37 @@ void ElfLibReader::exportInitFiniFuncs(Library *lib) {
         }
     }
 }
+
+/**
+ * Exports the library's thread-local storage requirements.
+ */
+void ElfLibReader::exportThreadLocals(Library *lib) {
+    // read program headers
+    auto phdrs = reinterpret_cast<Elf32_Phdr *>(malloc(sizeof(Elf32_Phdr) * this->phdrNum));
+    if(!phdrs) {
+        Linker::Abort("out of memory");
+    }
+
+    this->read(sizeof(Elf32_Phdr) * this->phdrNum, phdrs, this->phdrOff);
+
+    for(size_t i = 0; i < this->phdrNum; i++) {
+        // ignore all non-TLS segments
+        const auto &hdr = phdrs[i];
+        if(hdr.p_type != PT_TLS) continue;
+
+        // get the .tdata (initialized) TLS info
+        std::span<std::byte> tdata;
+
+        if(hdr.p_filesz) {
+            tdata = std::span<std::byte>(reinterpret_cast<std::byte *>(hdr.p_vaddr), hdr.p_filesz);
+        }
+
+        // record this information, alongside the TOTAL size of the TLS
+        const size_t tlsSize = hdr.p_memsz;
+        Linker::the()->setLibTlsRequirements(tlsSize, tdata, lib);
+    }
+
+    // clean up
+    free(phdrs);
+}
+

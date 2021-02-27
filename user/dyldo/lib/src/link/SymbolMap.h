@@ -31,6 +31,8 @@ enum class SymbolFlags: uint16_t {
     TypeData                            = (1 << 4),
     /// Function (code)
     TypeFunction                        = (2 << 4),
+    /// Thread-local storage reference
+    TypeThreadLocal                     = (3 << 4),
     /// Mask for symbol type
     TypeMask                            = 0x00F0,
 

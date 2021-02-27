@@ -78,6 +78,18 @@ void SymbolMap::add(const char *name, const Elf32_Sym &sym, Library *library) {
             info->flags |= SymbolFlags::TypeData;
             break;
 
+        /**
+         * Thread local address; the value of the symbol is the offset into the library's own
+         * thread-local storage.
+         *
+         * When reading this symbol value out, it should have added to it the library's TLS
+         * offset.
+         */
+        case STT_TLS:
+            info->address = sym.st_value;
+            info->flags |= SymbolFlags::TypeThreadLocal;
+            break;
+
         default:
             Linker::Abort("unknown %s for '%s' in %s: %u (strtab %u, value %08x size %08x shdx %u)",
                     "symbol type", name, library->soname, ELF32_ST_TYPE(sym.st_info), sym.st_name,
