@@ -87,6 +87,14 @@ void ElfExecReader::loadDynamicInfo() {
                 this->loadTlsTemplate(phdr);
                 break;
 
+            // program headers in memory
+            case PT_PHDR: {
+                auto ptr = reinterpret_cast<Elf32_Phdr *>(phdr.p_vaddr);
+                this->phdrs = std::span<Elf32_Phdr>(ptr, this->phdrNum);
+                break;
+            }
+
+
             // ignore all other types
             default:
                 continue;
@@ -120,3 +128,86 @@ void ElfExecReader::loadTlsTemplate(const Elf32_Phdr &hdr) {
     const size_t tlsSize = hdr.p_memsz;
     Linker::the()->setExecTlsRequirements(tlsSize, tdata);
 }
+
+/**
+ * Extracts initializers and destructors from the binary.
+ */
+void ElfExecReader::exportInitFiniFuncs() {
+    uintptr_t initArrayAddr = 0, finiArrayAddr = 0;
+    size_t initArrayLen = 0, finiArrayLen = 0;
+
+    auto linker = Linker::the();
+
+    // find the old style INIT/FINI functions, and the addresses of the new arrays
+    for(const auto &dyn : this->dynInfo) {
+        switch(dyn.d_tag) {
+            case DT_INIT: {
+                const auto addr = this->rebaseVmAddr(dyn.d_un.d_ptr);
+                auto func = reinterpret_cast<void(*)(void)>(addr);
+                linker->execInitFuncs.push_back(func);
+                break;
+            }
+            case DT_FINI: {
+                const auto addr = this->rebaseVmAddr(dyn.d_un.d_ptr);
+                auto func = reinterpret_cast<void(*)(void)>(addr);
+                linker->execFiniFuncs.push_back(func);
+                break;
+            }
+
+            case DT_INIT_ARRAY:
+                initArrayAddr = this->rebaseVmAddr(dyn.d_un.d_ptr);
+                break;
+            case DT_INIT_ARRAYSZ:
+                initArrayLen = dyn.d_un.d_val;
+                break;
+            case DT_FINI_ARRAY:
+                finiArrayAddr = this->rebaseVmAddr(dyn.d_un.d_ptr);
+                break;
+            case DT_FINI_ARRAYSZ:
+                finiArrayLen = dyn.d_un.d_val;
+                break;
+
+            default:
+                continue;
+        }
+    }
+
+    if(initArrayLen) {
+        // read out the number of functions
+        auto read = reinterpret_cast<const void *>(initArrayAddr);
+        const auto numEntries = initArrayLen / sizeof(uintptr_t);
+
+        for(size_t i = 0; i < numEntries; i++) {
+            // read the value and add it to init func list
+            uintptr_t addr = 0;
+            memcpy(&addr, read, sizeof(uintptr_t));
+            addr = this->rebaseVmAddr(addr);
+
+            auto func = reinterpret_cast<void(*)(void)>(addr);
+            linker->execInitFuncs.push_back(func);
+
+            // advance the pointer
+            read = reinterpret_cast<const void *>(reinterpret_cast<uintptr_t>(read) + sizeof(uintptr_t));
+        }
+    }
+
+    if(finiArrayLen) {
+        // read out the number of functions
+        auto read = reinterpret_cast<const void *>(finiArrayAddr);
+        const auto numEntries = finiArrayLen / sizeof(uintptr_t);
+
+        for(size_t i = 0; i < numEntries; i++) {
+            // read the value and add it to destructor func list
+            uintptr_t addr = 0;
+            memcpy(&addr, read, sizeof(uintptr_t));
+            addr = this->rebaseVmAddr(addr);
+
+            auto func = reinterpret_cast<void(*)(void)>(addr);
+            linker->execFiniFuncs.push_back(func);
+
+            // advance the pointer
+            read = reinterpret_cast<const void *>(reinterpret_cast<uintptr_t>(read) + sizeof(uintptr_t));
+        }
+    }
+}
+

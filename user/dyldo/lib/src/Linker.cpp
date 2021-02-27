@@ -1,6 +1,7 @@
 #include "Linker.h"
 #include "Library.h"
 #include "link/SymbolMap.h"
+#include "runtime/DlInfo.h"
 #include "runtime/ThreadLocal.h"
 #include "elf/ElfExecReader.h"
 #include "elf/ElfLibReader.h"
@@ -20,24 +21,29 @@ bool Linker::gLogTraceEnabled = false;
 bool Linker::gLogTraceEnabled = true;
 #endif
 
-bool Linker::gLogInitFini = true;
+bool Linker::gLogOpenAttempts = false;
+bool Linker::gLogInitFini = false;
+bool Linker::gLogTls = false;
 
 /**
  * Initializes a new linker, for the executable at the path given.
  *
  * It's assumed the executable is properly mapped, and as are we, but that's it.
  */
-Linker::Linker(const char *path) {
+Linker::Linker(const char *_path) {
     // initialize containers
     int err = hashmap_create(1, &this->loaded);
     if(err) {
         Abort("%s failed: %d", "hashmap_create", err);
     }
 
-    // load the exec file and its dependencies
-    this->exec = new ElfExecReader(path);
+    // copy path
+    this->path = strdup(_path);
+    if(!this->path) Abort("out of memory");
 
-    // set up the symbol map and runtime components
+    // read executable file in
+    this->exec = new ElfExecReader(this->path);
+    // set up the symbol map
     this->map = new SymbolMap;
 }
 
@@ -47,17 +53,19 @@ Linker::Linker(const char *path) {
 void Linker::secondInit() {
     // set up runtime interfaces 
     this->tls = new ThreadLocal;
+    this->dlInfo = new DlInfo;
 
     // and parse more of the file
     this->exec->parseHeaders();
+    this->exec->exportInitFiniFuncs();
+
+    this->dlInfo->loadedExec(this->exec, this->path);
 }
 
 /**
  * Discards all cached data and releases unneeded memory.
  */
 void Linker::cleanUp() {
-    Trace("Total symbols: %u", this->map->getNumSymbols());
-
     /**
      * Ensure all library segments are properly protected; and then get rid of the readers. That
      * will close the file handles as well.
@@ -84,7 +92,7 @@ void Linker::cleanUp() {
 
     // set up the main thread's thread-local storage here.
     auto tls = this->tls->setUp();
-    Trace("Main thread tls: %p", tls);
+    if(gLogTls) Trace("Main thread tls: %p", tls);
 }
 
 /**
@@ -143,6 +151,7 @@ void Linker::jumpToEntry(const kush_task_launchinfo_t *info) {
  * which isn't entirely correct ¯\_(ツ)_/¯) and then those exported by the executable itself.
  */
 void Linker::runInit() {
+    // run libraries
     hashmap_iterate(&this->loaded, [](void *ctx, void *value) {
         auto lib = reinterpret_cast<Library *>(value);
         if(!lib->initFuncs.empty()) {
@@ -159,6 +168,16 @@ void Linker::runInit() {
 
         return 1;
     }, this);
+
+    // run executable
+    if(!this->execInitFuncs.empty()) {
+        if(gLogInitFini) Linker::Trace("Invoking %u init funcs for executable",
+                this->execInitFuncs.size());
+
+        for(auto init : this->execInitFuncs) {
+            init();
+        }
+    }
 }
 
 /**
@@ -234,6 +253,9 @@ void Linker::loadSharedLib(const char *soname) {
     loader->exportSymbols(info);
     loader->exportInitFiniFuncs(info);
 
+    // store it in the dynamic info
+    this->dlInfo->loadedLib(loader, info);
+
     // advance the pointer to place the next library
     const auto nextBase = base + loader->getVmRequirements();
     this->soBase = ((nextBase + kLibAlignment - 1) / kLibAlignment) * kLibAlignment;
@@ -268,7 +290,7 @@ FILE *Linker::openSharedLib(const char *soname, const char* &outPath) {
         memset(pathBuf, 0, kPathBufSz);
         snprintf(pathBuf, kPathBufSz, "%s/%s", base, soname);
 
-        Trace("trying '%s'", pathBuf);
+        if(gLogOpenAttempts) Trace("trying '%s'", pathBuf);
 
         FILE *fp = fopen(pathBuf, "rb");
         if(fp) {

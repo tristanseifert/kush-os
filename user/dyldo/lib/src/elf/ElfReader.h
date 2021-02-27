@@ -53,6 +53,12 @@ class ElfReader {
         /// Gets the jump table (PLT) relocations
         bool getPltRels(std::span<Elf32_Rel> &outRels);
 
+        /// Gets an in-memory copy of the program headers.
+        virtual bool getVmPhdrs(std::span<Elf32_Phdr> &outPhdrs) {
+            outPhdrs = this->phdrs;
+            return !(this->phdrs.empty());
+        }
+
         /// Protects all loaded segments.
         void applyProtection();
 
@@ -154,6 +160,8 @@ class ElfReader {
 
         /// dynamic linker info
         std::span<Elf32_Dyn> dynInfo;
+        /// program headers
+        std::span<Elf32_Phdr> phdrs;
 
         /// list head of dependent libraries
         std::list<DependentLibrary> deps;

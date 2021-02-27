@@ -34,6 +34,8 @@ add_library(c_objs OBJECT
     src/string/strnstr.c
     src/string/strcoll.c
     src/string/strxfrm.c
+    src/string/strcat.c
+    src/string/strcpy.c
     # wide strings
     src/string/wcpcpy.c
     src/string/wcpncpy.c

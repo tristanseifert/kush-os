@@ -66,7 +66,7 @@ int syscall::UpdateTaskIopb(const ::sys::Syscall::Args *args, const uintptr_t) {
     }
 
     // update its IOPB
-    log("writing to TSS %d at offset %u ptr %p bits %d", ai.tssIdx, offset, iopbBuf, iopbBits);
+    //log("writing to TSS %d at offset %u ptr %p bits %d", ai.tssIdx, offset, iopbBuf, iopbBits);
     tss_write_iopb(ai.tssIdx, offset, iopbBuf, iopbBits);
 
     const auto maxPort = iopbBits + offset;

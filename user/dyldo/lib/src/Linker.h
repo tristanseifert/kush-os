@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <list>
 #include <span>
 #include <string_view>
 
@@ -15,6 +16,7 @@
 #include "runtime/ThreadLocal.h"
 
 namespace dyldo {
+class DlInfo;
 class ElfReader;
 class ElfExecReader;
 class ElfLibReader;
@@ -28,6 +30,8 @@ class SymbolMap;
  * loaded.
  */
 class Linker {
+    friend class DlInfo;
+    friend class ElfExecReader;
     friend class ThreadLocal;
 
     public:
@@ -96,6 +100,9 @@ class Linker {
         ThreadLocal * _Nonnull getTls() {
             return this->tls;
         }
+        DlInfo * _Nonnull getDlInfo() {
+            return this->dlInfo;
+        }
 
     private:
         void secondInit();
@@ -111,19 +118,33 @@ class Linker {
         /// are trace logs enabled?
         static bool gLogTraceEnabled;
 
+        /// are we logging the files we open?
+        static bool gLogOpenAttempts;
         /// whether we log initializer/destructor invocations
         static bool gLogInitFini;
+        /// are we logging thread-local info
+        static bool gLogTls;
 
     private:
+        /// path from which the file is loaded
+        const char * _Nonnull path;
+
         /// ELF reader for the executable
         ElfExecReader * _Nullable exec = nullptr;
         /// thread local information
         ThreadLocal *_Nonnull tls;
+        /// dynamic linker runtime functions
+        DlInfo *_Nonnull dlInfo;
 
         /// base address to load the next shared library at
         uintptr_t soBase = kSharedLibBase;
         /// memory address holding program entry point
         uintptr_t entryAddr = 0;
+
+        /// executable initializer functions
+        std::list<void(*)(void)> execInitFuncs;
+        /// executable termination functions
+        std::list<void(*)(void)> execFiniFuncs;
 
         /**
          * Map of libraries loaded; we build this up during the loading process, and it can be

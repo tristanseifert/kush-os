@@ -255,6 +255,9 @@ beach:;
 
     // invalidate the address
     asm volatile ( "invlpg (%0)" : : "b"(destAddr) : "memory" );
+
+    // zero it
+    memset(reinterpret_cast<void *>(destAddr), 0, pageSz);
 }
 
 /**

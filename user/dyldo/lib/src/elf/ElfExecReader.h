@@ -23,9 +23,12 @@ class ElfExecReader: public ElfReader {
             this->init();
         }
 
+        /// Processes the given relocations.
         void processRelocs(const std::span<Elf32_Rel> &rels) override {
             this->patchRelocs(rels, 0);
         }
+        /// Finds all initialization and termination functions and registers them.
+        void exportInitFiniFuncs();
 
         /// Returns the entry point address of the executable.
         const uintptr_t getEntryAddress() const {

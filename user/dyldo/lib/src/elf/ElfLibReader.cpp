@@ -135,6 +135,13 @@ void ElfLibReader::loadDynamicInfo() {
                 break;
             }
 
+            // program headers in memory
+            case PT_PHDR: {
+                auto ptr = reinterpret_cast<Elf32_Phdr *>(this->rebaseVmAddr(phdr.p_vaddr));
+                this->phdrs = std::span<Elf32_Phdr>(ptr, this->phdrNum);
+                break;
+            }
+
             // ignore all other types
             default:
                 continue;

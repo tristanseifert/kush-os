@@ -10,6 +10,7 @@ endif()
 # system servers
 if(BUILD_SYSTEM_SERVERS)
     add_subdirectory(rootsrv)
+    add_subdirectory(acpi)
 endif()
 
 add_subdirectory(dyldo)

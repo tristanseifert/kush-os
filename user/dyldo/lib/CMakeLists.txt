@@ -17,6 +17,7 @@ add_executable(dyldo
     src/elf/ElfExecReader.cpp
     src/elf/ElfLibReader.cpp
     src/link/SymbolMap.cpp
+    src/runtime/DlInfo.cpp
     src/runtime/ThreadLocal.cpp
     src/Linker.cpp
 )

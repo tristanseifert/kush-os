@@ -19,6 +19,12 @@ struct timespec;
 struct __umutex {
     // mutex flag
     uintptr_t flag;
+    // when set, the lock is recursive
+    char recursive;
+    // thread that locked this mutex
+    struct uthread * _Nullable thread;
+    // ref count, if recursive
+    int recursion;
 };
 
 // condition variable

@@ -83,29 +83,21 @@ struct r_debug {
 
 #define	R_DEBUG_VERSION		1
 
-struct dl_phdr_info
-{
-	Elf_Addr dlpi_addr;			/* module relocation base */
-	const char *dlpi_name;			/* module name */
-	const Elf_Phdr *dlpi_phdr;		/* pointer to module's phdr */
-	Elf_Half dlpi_phnum;			/* number of entries in phdr */
-	unsigned long long int dlpi_adds;	/* total # of loads */
-	unsigned long long int dlpi_subs;	/* total # of unloads */
-	size_t dlpi_tls_modid;
-	void *dlpi_tls_data;
+struct dl_phdr_info {
+    Elf_Addr dlpi_addr;			/* module relocation base */
+    const char *dlpi_name;			/* module name */
+    const Elf_Phdr *dlpi_phdr;		/* pointer to module's phdr */
+    Elf_Half dlpi_phnum;			/* number of entries in phdr */
+    unsigned long long int dlpi_adds;	/* total # of loads */
+    unsigned long long int dlpi_subs;	/* total # of unloads */
+    size_t dlpi_tls_modid;
+    void *dlpi_tls_data;
 };
 
 __BEGIN_DECLS
 
 typedef int (*__dl_iterate_hdr_callback)(struct dl_phdr_info *, size_t, void *);
 extern int dl_iterate_phdr(__dl_iterate_hdr_callback, void *);
-int _rtld_addr_phdr(const void *, struct dl_phdr_info *);
-int _rtld_get_stack_prot(void);
-int _rtld_is_dlopened(void *);
-
-#ifdef __ARM_EABI__
-void * dl_unwind_find_exidx(const void *, int *);
-#endif
 
 __END_DECLS
 
