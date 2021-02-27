@@ -11,7 +11,6 @@ using namespace dyldo;
  */
 ElfExecReader::ElfExecReader(FILE * _Nonnull file) : ElfReader(file) {
     this->ensureExec();
-    this->init();
 }
 
 /**
@@ -20,7 +19,6 @@ ElfExecReader::ElfExecReader(FILE * _Nonnull file) : ElfReader(file) {
  */
 ElfExecReader::ElfExecReader(const char *path) : ElfReader(path) {
     this->ensureExec();
-    this->init();
 }
 
 /**
@@ -84,6 +82,11 @@ void ElfExecReader::loadDynamicInfo() {
                 break;
             }
 
+            // define the executable's thread-local region
+            case PT_TLS:
+                this->loadTlsTemplate(phdr);
+                break;
+
             // ignore all other types
             default:
                 continue;
@@ -98,3 +101,22 @@ void ElfExecReader::loadDynamicInfo() {
     }
 }
 
+/**
+ * Initializes the thread-local information. This consists of the "template" of values to yeet into
+ * the task's TLS region, as well as its size.
+ *
+ * It's assumed that all of the template data (i.e. what's not in the .tbss) is mapped into the
+ * address space of the process.
+ */
+void ElfExecReader::loadTlsTemplate(const Elf32_Phdr &hdr) {
+    // get the .tdata (initialized) TLS info
+    std::span<std::byte> tdata;
+
+    if(hdr.p_filesz) {
+        tdata = std::span<std::byte>(reinterpret_cast<std::byte *>(hdr.p_vaddr), hdr.p_filesz);
+    }
+
+    // record this information, alongside the TOTAL size of the TLS
+    const size_t tlsSize = hdr.p_memsz;
+    Linker::the()->setExecTlsRequirements(tlsSize, tdata);
+}

@@ -52,6 +52,7 @@ void gdt_init() {
     // User code and data segments
     gdt_set_entry((GDT_USER_CODE_SEG >> 3), 0x00000000, 0xFFFFFFFF, 0xFA, 0xCF);
     gdt_set_entry((GDT_USER_DATA_SEG >> 3), 0x00000000, 0xFFFFFFFF, 0xF2, 0xCF);
+    gdt_set_entry((GDT_USER_TLS_SEG >> 3), 0x00000000, 0xFFFFFFFF, 0xF2, 0xCF);
 
     // Create the correct number of TSS descriptors
     for(int i = 0; i < GDT_NUM_TSS; i++) {
@@ -77,6 +78,14 @@ void gdt_set_entry(uint16_t num, uint32_t base, uint32_t limit, uint8_t flags, u
 
     gdt[num].granularity |= gran & 0xF0;
     gdt[num].access = flags;
+}
+
+/**
+ * Updates the base address of the GDT entry corresponding to the %gs register, used for thread-
+ * local storage. This update affects only the current processor, and only user mode.
+ */
+void gdt_update_tls_user(const uintptr_t base) {
+    gdt_set_entry((GDT_USER_TLS_SEG >> 3), base, 0xFFFFFFFF, 0xF2, 0xCF);
 }
 
 /*

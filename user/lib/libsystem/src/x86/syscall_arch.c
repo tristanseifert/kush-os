@@ -26,3 +26,17 @@ int X86UpdateIopbFor(const uintptr_t taskHandle, const void *bitmap,
     return __do_syscall3(SYS_ARCH_X86_UPDATE_IOPB, taskHandle, (uintptr_t) bitmap, off);
 }
 
+/**
+ * Update the thread-local base of the current thread.
+ */
+int X86SetThreadLocalBase(const uintptr_t base) {
+    return X86SetThreadLocalBaseFor(0, base);
+}
+
+/**
+ * Update the thread-local base address for a particular thread. This is the base of the %gs
+ * segment register.
+ */
+int X86SetThreadLocalBaseFor(const uintptr_t threadHandle, const uintptr_t base) {
+    return __do_syscall2(SYS_ARCH_X86_SET_TLS_BASE, threadHandle, base);
+}

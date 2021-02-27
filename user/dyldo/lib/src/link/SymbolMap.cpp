@@ -18,12 +18,12 @@ SymbolMap::SymbolMap() {
 
     err = hashmap_create(kMapInitialSize, &this->map);
     if(err) {
-        Linker::Abort("hashmap_create failed: %d", err);
+        Linker::Abort("%s failed: %d", "hashmap_create", err);
     }
 
     err = hashmap_create(kOverrideMapInitialSize, &this->overridesMap);
     if(err) {
-        Linker::Abort("hashmap_create failed: %d", err);
+        Linker::Abort("%s failed: %d", "hashmap_create", err);
     }
 }
 
@@ -106,7 +106,7 @@ void SymbolMap::add(const char *name, const Elf32_Sym &sym, Library *library) {
     // insert it
     err = hashmap_put(&this->map, name, keyLen, info);
     if(err) {
-        Linker::Abort("hashmap_put failed: %d", err);
+        Linker::Abort("%s failed: %d", "hashmap_put", err);
     }
 }
 
@@ -127,7 +127,34 @@ void SymbolMap::addOverride(const Symbol * _Nonnull inSym, const uintptr_t newAd
     // insert it
     err = hashmap_put(&this->overridesMap, inSym->name, strlen(inSym->name), oSym);
     if(err) {
-        Linker::Abort("hashmap_put failed: %d", err);
+        Linker::Abort("%s failed: %d", "hashmap_put", err);
+    }
+}
+
+/**
+ * Adds a new symbol for a function exported from the linker.
+ *
+ * These symbols are added as overrides, so they will _always_ take precedence over symbols with
+ * the same name exported from other libraries.
+ */
+void SymbolMap::addLinkerExport(const char * _Nonnull name, const void *data, const size_t length) {
+    auto info = new Symbol;
+    info->name = name;
+    info->address = reinterpret_cast<uintptr_t>(data);
+    info->length = length;
+
+    info->flags = SymbolFlags::BindGlobal;
+
+    if(length) { // XXX: not technically right since functions can have length but whatever
+        info->flags |= SymbolFlags::TypeData;
+    } else {
+        info->flags |= SymbolFlags::TypeFunction;
+    }
+
+    // insert it
+    int err = hashmap_put(&this->overridesMap, name, strlen(name), info);
+    if(err) {
+        Linker::Abort("%s failed: %d", "hashmap_put", err);
     }
 }
 

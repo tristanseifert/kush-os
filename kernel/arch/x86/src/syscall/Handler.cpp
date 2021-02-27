@@ -22,10 +22,12 @@ extern "C" char _binary_syscall_stub_start[], _binary_syscall_stub_end[];
 extern "C" void arch_syscall_entry();
 
 /// Total number of architecture-specific syscalls
-static const size_t gNumArchSyscalls = 1;
+static const size_t gNumArchSyscalls = 2;
 static int (* const gArchSyscalls[])(const sys::Syscall::Args *, const uintptr_t) = {
     // 0x00: Update task IO permissions
     UpdateTaskIopb,
+    // 0x01: Update a thread's thread-local base address
+    UpdateThreadTlsBase,
 };
 
 

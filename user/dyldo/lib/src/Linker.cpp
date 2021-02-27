@@ -1,7 +1,7 @@
 #include "Linker.h"
 #include "Library.h"
 #include "link/SymbolMap.h"
-
+#include "runtime/ThreadLocal.h"
 #include "elf/ElfExecReader.h"
 #include "elf/ElfLibReader.h"
 
@@ -31,14 +31,25 @@ Linker::Linker(const char *path) {
     // initialize containers
     int err = hashmap_create(1, &this->loaded);
     if(err) {
-        Abort("hashmap_create failed: %d", err);
+        Abort("%s failed: %d", "hashmap_create", err);
     }
 
     // load the exec file and its dependencies
     this->exec = new ElfExecReader(path);
 
-    // set up the symbol map
+    // set up the symbol map and runtime components
     this->map = new SymbolMap;
+}
+
+/**
+ * Performs further initialization.
+ */
+void Linker::secondInit() {
+    // set up runtime interfaces 
+    this->tls = new ThreadLocal;
+
+    // and parse more of the file
+    this->exec->parseHeaders();
 }
 
 /**
@@ -70,6 +81,10 @@ void Linker::cleanUp() {
     // tear down file readers
     delete this->exec;
     this->exec = nullptr;
+
+    // set up the main thread's thread-local storage here.
+    auto tls = this->tls->setUp();
+    Trace("Main thread tls: %p", tls);
 }
 
 /**
@@ -290,6 +305,13 @@ void Linker::overrideSymbol(const SymbolMap::Symbol *inSym, const uintptr_t newA
     this->map->addOverride(inSym, newAddr);
 }
 
+
+/**
+ * Sets the size of the thread-local region required by the executable.
+ */
+void Linker::setExecTlsRequirements(const size_t totalLen, const std::span<std::byte> &tdata) {
+    this->tls->setExecTlsInfo(totalLen, tdata);
+}
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wformat-nonliteral"

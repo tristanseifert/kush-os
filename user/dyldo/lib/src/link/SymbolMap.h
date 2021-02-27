@@ -38,9 +38,6 @@ enum class SymbolFlags: uint16_t {
     VisibilityDefault                   = (0 << 8),
     /// Mask for symbol visibility
     VisibilityMask                      = 0x0F00,
-
-    /// When set, the symbol has been resolved.
-    ResolvedFlag                        = 0x8000,
 };
 
 /**
@@ -84,6 +81,13 @@ class SymbolMap {
         void add(const char * _Nonnull name, const Elf32_Sym &sym, Library * _Nonnull library);
         /// Registers a symbol override.
         void addOverride(const Symbol * _Nonnull inSym, const uintptr_t newAddr);
+        /// Adds a new linker exported symbol in the form of a function.
+        void addLinkerExport(const char * _Nonnull name, const void(* _Nonnull function)(void)) {
+            this->addLinkerExport(name, reinterpret_cast<void *>(function), 0);
+        }
+        /// Adds a new linker exported symbol as a blob of data.
+        void addLinkerExport(const char * _Nonnull name, const void * _Nonnull data,
+                const size_t length);
         /// Gets symbol information, if found.
         Symbol const * _Nullable get(const char * _Nonnull name, Library * _Nullable searchIn = nullptr);
 

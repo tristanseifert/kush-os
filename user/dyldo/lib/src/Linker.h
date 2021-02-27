@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <span>
 #include <string_view>
 
 #include <sys/elf.h>
@@ -11,6 +12,7 @@
 #include "LaunchInfo.h"
 #include "link/SymbolMap.h"
 #include "struct/hashmap.h"
+#include "runtime/ThreadLocal.h"
 
 namespace dyldo {
 class ElfReader;
@@ -26,6 +28,8 @@ class SymbolMap;
  * loaded.
  */
 class Linker {
+    friend class ThreadLocal;
+
     public:
         /// base address for shared libraries
         constexpr static const uintptr_t kSharedLibBase = 0xA0000000;
@@ -46,6 +50,7 @@ class Linker {
             if(!gShared) {
                 Abort("out of memory");
             }
+            gShared->secondInit();
         }
         /// Returns the shared linker.
         static Linker *_Nonnull the() {
@@ -81,7 +86,17 @@ class Linker {
         /// Overrides a symbol's address.
         void overrideSymbol(const SymbolMap::Symbol * _Nonnull inSym, const uintptr_t newAddr);
 
+        /// Registers the main executable's TLS requirements.
+        void setExecTlsRequirements(const size_t totalLen, const std::span<std::byte> &tdata);
+
+
+        ThreadLocal * _Nonnull getTls() {
+            return this->tls;
+        }
+
     private:
+        void secondInit();
+
         /// Load a shared library
         void loadSharedLib(const char * _Nonnull soname);
         /// Searches for a library with the given name in system paths and open it
@@ -99,6 +114,8 @@ class Linker {
     private:
         /// ELF reader for the executable
         ElfExecReader * _Nullable exec = nullptr;
+        /// thread local information
+        ThreadLocal *_Nonnull tls;
 
         /// base address to load the next shared library at
         uintptr_t soBase = kSharedLibBase;

@@ -135,6 +135,10 @@ void ElfLibReader::loadDynamicInfo() {
                 break;
             }
 
+            // not yet supported!
+            case PT_TLS:
+                Linker::Abort("Library $%08x requests TLS but not yet supported", this->base);
+
             // ignore all other types
             default:
                 continue;

@@ -1,4 +1,5 @@
 #include "thread_info.h"
+#include "tls.h"
 
 #include <assert.h>
 #include <malloc.h>
@@ -55,6 +56,9 @@ static void __ThreadEntry(uintptr_t arg) {
     // extract the entry point and release the info structure
     uintptr_t yes = 1;
     __atomic_store(&info->thrd->isRunning, &yes, __ATOMIC_RELEASE);
+
+    // initialize thread-locals
+    __libc_tls_init();
 
     // TODO: more initialization
 
@@ -180,6 +184,9 @@ void thrd_exit(int res) {
     TIBRelease(thread);
 
     // TODO: get rid of the stack
+
+    // release thread locals
+    __libc_tls_fini();
 
     // terminate the thread
     err = ThreadDestroy(handle);

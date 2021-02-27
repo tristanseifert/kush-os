@@ -97,7 +97,7 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
         //}
     }
 
-    // update TSS
+    // update TSS and thread-local pointer
     auto task = to->task;
     if(task) {
         const auto &taskState = task->archState;
@@ -119,6 +119,8 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
             }
         }
     }
+
+    gdt_update_tls_user(to->regs.gsBase);
 
     // update syscall handler state
     syscall::Handler::handleCtxSwitch(to);

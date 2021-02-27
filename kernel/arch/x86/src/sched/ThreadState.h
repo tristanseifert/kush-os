@@ -34,6 +34,9 @@ struct ThreadState {
 
     /// number of times we've taken an FPU fault in this thread
     size_t fpuFaults = 0;
+
+    /// base address to update the %gs segment with on context switch
+    uintptr_t gsBase = 0;
 };
 
 /**

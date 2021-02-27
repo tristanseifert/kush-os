@@ -5,8 +5,9 @@
 #define GDT_KERN_DATA_SEG       0x10
 #define GDT_USER_CODE_SEG       0x18
 #define GDT_USER_DATA_SEG       0x20
+#define GDT_USER_TLS_SEG        0x28
 
-#define GDT_FIRST_TSS           0x28
+#define GDT_FIRST_TSS           0x30
 #define GDT_NUM_TSS             2
 
 #ifndef ASM_FILE
@@ -63,6 +64,7 @@ typedef struct i386_task_gate {
 
 void gdt_init();
 void gdt_set_entry(uint16_t num, uint32_t base, uint32_t limit, uint8_t flags, uint8_t gran);
+void gdt_update_tls_user(const uintptr_t base);
 
 void gdt_setup_tss();
 void tss_set_esp0(void *ptr);

@@ -18,6 +18,11 @@ class ElfExecReader: public ElfReader {
         ElfExecReader(const char * _Nonnull path);
         virtual ~ElfExecReader();
 
+        /// Parses the program headers and extracts dependencies.
+        void parseHeaders() {
+            this->init();
+        }
+
         void processRelocs(const std::span<Elf32_Rel> &rels) override {
             this->patchRelocs(rels, 0);
         }
@@ -32,6 +37,7 @@ class ElfExecReader: public ElfReader {
         void init();
 
         void loadDynamicInfo();
+        void loadTlsTemplate(const Elf32_Phdr &);
 
     private:
         /// entry point of the binary

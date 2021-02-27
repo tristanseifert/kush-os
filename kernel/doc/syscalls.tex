@@ -538,4 +538,11 @@ Its length is specified as a number of ports (i.e. bits) but it will always be r
 
 If the task does not already have a TSS associated with it, this will allocate one. This TSS has the full 8K (plus one byte) allocated to map all 64K IO ports on the platform. This is a little wasteful, but avoids several common bugs resulting from partial TSS IO permission bitmaps.
 
+%%%%%
+\subsubsection{{\tt 0x01}: Set thread-local base}
+\textbf{Arguments:} (2) Thread handle, TSS base address \\
+\textbf{Returns:} 0 on success, or a negative error code \\
+
+Sets the thread-local base to the given address. This updates the value of \texttt{\%gs} that's updated every time the thread is switched in. The initial value of the register is 0.
+
 \end{document}  

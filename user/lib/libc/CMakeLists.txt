@@ -200,12 +200,18 @@ target_include_directories(c_objs PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 target_include_directories(c_objs PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 
 # set up the static and dynamic targets
-add_library(c_static STATIC $<TARGET_OBJECTS:c_objs> $<TARGET_OBJECTS:c_gdtoa>)
+add_library(c_static STATIC $<TARGET_OBJECTS:c_objs> $<TARGET_OBJECTS:c_gdtoa>
+    src/threads/tls_static.c
+)
+target_compile_definitions(c_static PRIVATE BUILDING_LIBC=1)
 set_target_properties(c_static PROPERTIES OUTPUT_NAME "c")
 target_include_directories(c_static PUBLIC include)
 target_link_libraries(c_static PUBLIC system_static)
 
-add_library(c_dynamic SHARED $<TARGET_OBJECTS:c_objs> $<TARGET_OBJECTS:c_gdtoa>)
+add_library(c_dynamic SHARED $<TARGET_OBJECTS:c_objs> $<TARGET_OBJECTS:c_gdtoa>
+    src/threads/tls_dynamic.c
+)
+target_compile_definitions(c_dynamic PRIVATE BUILDING_LIBC=1)
 set_target_properties(c_dynamic PROPERTIES OUTPUT_NAME "c")
 target_include_directories(c_dynamic PUBLIC include)
 target_link_libraries(c_dynamic PUBLIC system_dynamic rpc_dynamic)

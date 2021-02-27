@@ -17,6 +17,8 @@ LIBC_EXPORT int X86UpdateIopb(const void *bitmap, const uintptr_t bits, const ui
 LIBC_EXPORT int X86UpdateIopbFor(const uintptr_t taskHandle, const void *bitmap,
         const uintptr_t bits, const uintptr_t offset);
 
+LIBC_EXPORT int X86SetThreadLocalBase(const uintptr_t base);
+LIBC_EXPORT int X86SetThreadLocalBaseFor(const uintptr_t threadHandle, const uintptr_t base);
 
 #ifdef __cplusplus
 }

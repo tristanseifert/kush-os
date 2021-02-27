@@ -142,6 +142,7 @@ x86_ring3_return:
     mov         %ax, %ds
     mov         %ax, %es
     mov         %ax, %fs
+    mov         $GDT_USER_TLS_SEG|0x3, %eax
     mov         %ax, %gs
 
     // restore the argument

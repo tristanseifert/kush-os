@@ -63,6 +63,7 @@ LIBSYSTEM_INTERNAL int __do_syscall4(const uintptr_t number, const uintptr_t arg
 #define SYS_TASK_DBG_OUT                0x36
 
 #define SYS_ARCH                        0x38
-#define SYS_ARCH_X86_UPDATE_IOPB        (SYS_ARCH | 0x0000)
+#define SYS_ARCH_X86_UPDATE_IOPB        (SYS_ARCH | (0x0000 << 16))
+#define SYS_ARCH_X86_SET_TLS_BASE       (SYS_ARCH | (0x0001 << 16))
 
 #endif
