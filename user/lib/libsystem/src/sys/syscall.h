@@ -31,6 +31,9 @@ LIBSYSTEM_INTERNAL int __do_syscall4(const uintptr_t number, const uintptr_t arg
 #define SYS_IPC_DESTROY_PORT            0x04
 #define SYS_IPC_SHARE_VM                0x05
 
+#define SYS_IPC_NOTE_RECEIVE            0x08
+#define SYS_IPC_NOTE_SEND               0x09
+
 #define SYS_VM_CREATE                   0x10
 #define SYS_VM_CREATE_ANON              0x11
 #define SYS_VM_UPDATE_FLAGS             0x13
@@ -62,7 +65,9 @@ LIBSYSTEM_INTERNAL int __do_syscall4(const uintptr_t number, const uintptr_t arg
 
 #define SYS_TASK_DBG_OUT                0x36
 
-#define SYS_ARCH                        0x38
+#define SYS_ARCH_INSTALL_IRQ            0x38
+#define SYS_ARCH_UNINSTALL_IRQ          0x39
+#define SYS_ARCH                        0x3A
 #define SYS_ARCH_X86_UPDATE_IOPB        (SYS_ARCH | (0x0000 << 16))
 #define SYS_ARCH_X86_SET_TLS_BASE       (SYS_ARCH | (0x0001 << 16))
 

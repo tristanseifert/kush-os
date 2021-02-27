@@ -43,12 +43,15 @@ add_executable(kernel
     src/sched/Task.cpp
     src/sched/Thread.cpp
     src/sched/IdleWorker.cpp
+    src/sys/Interrupts.cpp
+    src/sys/Notifications.cpp
     src/sys/Port.cpp
     src/sys/Syscall.cpp
     src/sys/Task.cpp
     src/sys/Thread.cpp
     src/sys/VM.cpp
     src/handle/Manager.cpp
+    src/ipc/Interrupts.cpp
     src/ipc/Port.cpp
     ${version_file}
 )

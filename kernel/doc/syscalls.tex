@@ -508,10 +508,26 @@ Waits for the specified task to exit, up to the specified the timeout, then retu
 \section{Architecture Specific Calls}
 Architecture code may expose its own system calls to userspace applications, for tasks such as interrupt routing or other per-task configuration. Note that the kernel does not do any permissions checks; you are responsible for doing these.
 
-All arch specific calls are filtered through syscall \texttt{0x38} as described below:
+Some of these architecture calls are abstracted by the kernel into one regular syscall-style API: this is the case for interrupt handling. However, all arch specific (such as for x86 only) calls are filtered through syscall \texttt{0x3A} as described below.
 
 %%%%%
-\subsubsection{{\tt 0x38}: Arch specific syscall}
+\subsubsection{{\tt 0x38}: Register IRQ handler}
+\textbf{Arguments:} (3) IRQ number, thread handle, notification bits \\
+\textbf{Flags:} None \\
+\textbf{Returns:} Handler token on success ($> 0$) or error code ($\leq0$) \\
+
+Installs an interrupt handler for the given platform-specific interrupt. When the interrupt fires, the specified thread will have the requested notification bit(s) set. The interrupt is unmasked and enabled in any associated interrupt controllers when the first registration is added for it.
+
+%%%%%
+\subsubsection{{\tt 0x39}: Unregister IRQ handler}
+\textbf{Arguments:} (1) IRQ handler token \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success or error code ($\leq0$) \\
+
+Removes a previously registered interrupt handler. If there are no other handlers for the interrupt this handler belongs to, it is masked and disabled in all relevant interrupt controllers. 
+
+%%%%%
+\subsubsection{{\tt 0x3A}: Arch specific syscall}
 \textbf{Arguments:} Varies \\
 \textbf{Flags:} Used for the "real" architecture syscall number \\
 \textbf{Returns:} Varies \\
@@ -521,7 +537,7 @@ Performs an architecture specific system call. The 16 bits reserved for the flag
 %%%%%%%%%%
 \subsection{x86}
 %%%%%
-\subsubsection{{\tt 0x00}: Set IO bitmap}
+\subsubsection{{\tt 0x00}: Set IO permission bitmap}
 \textbf{Arguments:} (3) Task handle, IO bitmap buffer, IO bitmap offset/length \\
 \textbf{Returns:} 0 on success, or a negative error code \\
 
@@ -540,9 +556,10 @@ If the task does not already have a TSS associated with it, this will allocate o
 
 %%%%%
 \subsubsection{{\tt 0x01}: Set thread-local base}
-\textbf{Arguments:} (2) Thread handle, TSS base address \\
+\textbf{Arguments:} (2) Thread handle, Thread-local base address \\
 \textbf{Returns:} 0 on success, or a negative error code \\
 
 Sets the thread-local base to the given address. This updates the value of \texttt{\%gs} that's updated every time the thread is switched in. The initial value of the register is 0.
+
 
 \end{document}  

@@ -43,7 +43,7 @@ IoApic::IoApic(const uint64_t _phys, const uint32_t _base) : physBase(_phys), ir
     this->id = (this->read(IOAPICID) >> 24) & 0xF0;
     this->numIrqs = ((this->read(IOAPICVER) >> 16) & 0x7F) + 1;
 
-    log("APIC ID %u, version %02x, num irqs %u (base %u)", this->id, apicVer, this->numIrqs, this->irqBase);
+    log("IOAPIC ID %u, version %02x, num irqs %u (base %u)", this->id, apicVer, this->numIrqs, this->irqBase);
 
     // only map ISA IRQs for the APIC with base 0
     if(this->irqBase == 0) {

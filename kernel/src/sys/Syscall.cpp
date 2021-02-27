@@ -43,9 +43,14 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     UnimplementedSyscall,
     // 0x06-0x07: Reserved
     UnimplementedSyscall, UnimplementedSyscall,
-    // 0x08-0x0F: Notifications
+
+    // 0x08: Receive notification
+    NotifyReceive,
+    // 0x09: Send notification
+    NotifySend,
+    // 0x0A-0x0F: Reserved
     UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall,
-    UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall,
+    UnimplementedSyscall, UnimplementedSyscall,
 
     // 0x10: Create VM region
     VmAlloc,
@@ -139,10 +144,14 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     // 0x37: Reserved
     UnimplementedSyscall,
 
-    // 0x38: Architecture specific syscall
+    // 0x38: Register IRQ handler
+    IrqHandlerInstall,
+    // 0x39: Unregister IRQ handler
+    IrqHandlerRemove,
+    // 0x3A: Architecture specific syscall
     arch::HandleSyscall,
 };
-static const size_t gNumSyscalls = 0x38;
+static const size_t gNumSyscalls = 0x3A;
 
 /**
  * Initializes the syscall handler.

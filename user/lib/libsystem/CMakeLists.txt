@@ -7,6 +7,8 @@
 
 add_library(system_objs OBJECT
     src/sys/port.c
+    src/sys/notification.c
+    src/sys/irq.c
     src/sys/scheduler.c
     src/sys/task.c
     src/sys/vm.c

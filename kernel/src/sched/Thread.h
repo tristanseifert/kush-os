@@ -4,12 +4,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <runtime/List.h>
 #include <runtime/Queue.h>
 #include <runtime/Vector.h>
 #include <handle/Manager.h>
 
 #include <arch/ThreadState.h>
 #include <arch/rwlock.h>
+
+namespace ipc {
+class IrqHandler;
+}
 
 namespace sched {
 class Blockable;
@@ -141,14 +146,22 @@ struct Thread {
          * Each thread defines a notification mask, which indicates on which bits (set) of the
          * notification set the thread is interested in; when the notification mask is updated, it
          * is compared against the mask, and if any bits are set, the thread can be unblocked.
+         *
+         * The notifications flag is set whenever a thread is blocking on notification bits. It
+         * should be signalled whenever a notification is received that activates the thread.
          */
         uintptr_t notifications = 0;
         uintptr_t notificationMask = 0;
+        bool notified = false;
+        SignalFlag *notificationsFlag = nullptr;
 
         /**
          * Objects this thread is currently blocking on
          */
         Blockable *blockingOn = nullptr;
+
+        /// Interrupt handlers owned by the thread; they're removed when we deallocate
+        rt::List<ipc::IrqHandler *> irqHandlers;
 
         /**
          * The thread can be accessed read-only by multiple processes, but the scheduler will
@@ -213,6 +226,11 @@ struct Thread {
 
         /// Blocks the thread on the given object.
         int blockOn(Blockable *b, const uint64_t until = 0);
+
+        /// Sets the given notification bits.
+        void notify(const uintptr_t bits);
+        /// Blocks the thread waiting to receive notifications, optionally with a mask.
+        uintptr_t blockNotify(const uintptr_t mask = 0);
 
         /// Adds a DPC to the thread's queue.
         int addDpc(void (*handler)(Thread *, void *), void *context = nullptr);

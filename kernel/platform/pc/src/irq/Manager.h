@@ -3,6 +3,7 @@
 
 #include "handlers.h"
 
+#include <stdint.h>
 #include <platform.h>
 #include <bitflags.h>
 #include <runtime/Vector.h>
@@ -57,6 +58,9 @@ class Manager {
         /// System timebase, in microseconds
         constexpr static const uint32_t kTimebaseInterval = 2000;
 
+        /// Highest interrupt number supported (for ref counting)
+        constexpr static const size_t kMaxIrq = 128;
+
     public:
         Manager();
         ~Manager();
@@ -78,6 +82,12 @@ class Manager {
         uintptr_t addHandler(const uint32_t irq, bool (*callback)(void *, const uint32_t), void *ctx);
         /// Removes an irq handler.
         void removeHandler(const uintptr_t token);
+
+        /// Registers an external IRQ handler
+        uintptr_t addExtHandler(const uint32_t irqNum, bool (*callback)(void *, const uintptr_t),
+                void *ctx);
+        /// Removes an external IRQ handler
+        void removeExtHandler(const uintptr_t token);
 
         /// Gets the global IRQ manager instance.
         static Manager *get() {
@@ -120,6 +130,24 @@ class Manager {
             Handler(uint32_t _irq) : irq(_irq) {}
         };
 
+        /// External IRQ handler
+        struct ExtHandler {
+            /// registration token
+            uintptr_t token = 0;
+            /// token of the vector irq handler
+            uintptr_t vecToken = 0;
+
+            /// function to invoke; return true to acknowledge the irq
+            bool (*callback)(void *, const uint32_t) = nullptr;
+            /// context pointer to provide to callback
+            void *callbackCtx = nullptr;
+
+            /// platform IRQ number
+            uintptr_t irqNum = 0;
+            /// vector
+            uint8_t vector = 0;
+        };
+
     private:
         // Configures all APIC registers
         void configure();
@@ -132,6 +160,8 @@ class Manager {
         // Configures any APIC-local timers to operate as the system timebase.
         void setupTimebase();
 
+        /// Converts a platform-specific IRQ number to a vector number
+        uint8_t irqToVec(const uintptr_t irq);
         /// Handles an ISR.
         void handleIsr(const uint32_t type);
         /// Acknowledges an IRQ
@@ -151,6 +181,15 @@ class Manager {
         /// token for the next irq handler
         uintptr_t nextHandlerToken = 1;
 
+        /// lock on irq handlers
+        DECLARE_RWLOCK(extHandlersLock);
+        /// list of all installed external handlers (TODO: this could be stored more efficiently)
+        rt::Vector<ExtHandler *> extHandlers;
+        /// token for the next external irq handler
+        uintptr_t nextExtHandlerToken = 1;
+
+        /// reference counts for controlling masking of irqs
+        uint8_t irqRefCounts[kMaxIrq];
 
         /// all IOAPICs in the system (usually, only one)
         rt::Vector<IoApic *> ioapics;

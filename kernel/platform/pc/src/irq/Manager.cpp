@@ -68,7 +68,7 @@ void Manager::setupIrqs() {
  * Sets up a new interrupt manager.
  */
 Manager::Manager() {
-
+    memset(&this->irqRefCounts, 0, this->kMaxIrq);
 }
 
 /**
@@ -338,6 +338,84 @@ void Manager::removeHandler(const uintptr_t token) {
 
 
 
+/**
+ * Installs a new external IRQ handler.
+ *
+ * If there are not yet any handlers for the IRQ, we'll go ahead and unmask it.
+ */
+uintptr_t Manager::addExtHandler(const uint32_t irq, bool (*callback)(void *, const uintptr_t),
+        void *ctx) {
+    const auto vector = this->irqToVec(irq);
+
+    // unmask the interrupt if needed
+    if(!this->irqRefCounts[irq]++) {
+        for(auto &apic : this->ioapics) {
+            if(apic->handlesIrq(irq)) {
+                apic->setIrqMasked(irq, false);
+            }
+        }
+    }
+
+    // create handler
+    RW_LOCK_WRITE_GUARD(this->extHandlersLock);
+
+    auto info = new ExtHandler;
+    info->token = this->nextExtHandlerToken++;
+    info->callback = callback;
+    info->callbackCtx = ctx;
+    info->irqNum = irq;
+    info->vector = vector;
+
+    info->vecToken = this->addHandler(vector, [](void *ctx, const uint32_t) {
+        auto info = reinterpret_cast<ExtHandler *>(ctx);
+        info->callback(info->callbackCtx, info->irqNum);
+        return true;
+    }, info);
+
+    this->extHandlers.push_back(info);
+
+    // return token
+    return info->token;
+}
+
+
+/**
+ * Removes the given external IRQ handler.
+ *
+ * If this is the last handler for the given IRQ, the interrupt is masked again.
+ */
+void Manager::removeExtHandler(const uintptr_t token) {
+    RW_LOCK_WRITE_GUARD(this->extHandlersLock);
+
+    size_t i = 0;
+    while(i < this->extHandlers.size()) {
+        // skip values with the incorrect token
+        const auto ent = this->extHandlers[i];
+        if(ent->token != token) {
+            i++;
+            continue;
+        }
+
+        // mask the interrupt if needed
+        const auto irq = ent->irqNum;
+
+        if(!--this->irqRefCounts[irq]) {
+            for(auto &apic : this->ioapics) {
+                if(apic->handlesIrq(irq)) {
+                    apic->setIrqMasked(irq, true);
+                }
+            }
+        }
+
+        // remove the vector handler then delete it
+        this->removeHandler(ent->vecToken);
+
+        this->extHandlers.remove(i);
+        delete ent;
+    }
+}
+
+
 
 /**
  * Handles and routes an ISR appropriately.
@@ -411,8 +489,40 @@ void Manager::acknowledgeIrq(const uint32_t type) {
     }
 }
 
+/**
+ * Converts a platform interrupt number to a vector number.
+ */
+uint8_t Manager::irqToVec(const uintptr_t irq) {
+    // legacy ISA range
+    if(irq >= 0 && irq <= 15) {
+        return ISR_ISA_0 + (irq % 16);
+    }
+    // unknown vectors
+    else {
+        log("%s unknown IRQ %u", __FUNCTION__, irq);
+        return 0;
+    }
+}
+
 /// Stub to forward into the irq manager
 int platform_irq_ack(const uintptr_t token) {
     Manager::gShared->acknowledgeIrq(token);
     return 0;
+}
+
+/**
+ * Registers an interrupt handler.
+ *
+ * @return A positive interrupt token (used to later remove the handler) or 0.
+ */
+int platform_irq_register(const uintptr_t irq, bool(*callback)(void *, const uintptr_t), void *ctx) {
+    return Manager::get()->addExtHandler(irq, callback, ctx);
+
+}
+
+/**
+ * Removes a previously set up interrupt handler.
+ */
+void platform_irq_unregister(const uintptr_t token) {
+    Manager::get()->removeExtHandler(token);
 }

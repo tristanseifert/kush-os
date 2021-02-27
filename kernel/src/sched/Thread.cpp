@@ -7,6 +7,7 @@
 
 #include "TimerBlocker.h"
 
+#include "ipc/Interrupts.h"
 #include "mem/StackPool.h"
 #include "mem/SlabAllocator.h"
 
@@ -79,6 +80,11 @@ Thread::Thread(Task *_parent, const uintptr_t pc, const uintptr_t param, const b
  * Destroys all resources associated with this thread.
  */
 Thread::~Thread() {
+    // remove IRQ handlers
+    for(const auto handler : this->irqHandlers) {
+        delete handler;
+    }
+
     // invoke termination handlers
     while(!this->terminateSignals.empty()) {
         auto signal = this->terminateSignals.pop();
@@ -496,3 +502,76 @@ unhandled:;
             this->name, context, pc, buf);
     this->task->terminate(-1);
 }
+
+
+
+/**
+ * Sends a notification to the thread.
+ *
+ * We'll OR the provided bit mask against the existing notification mask. If the result of ANDing
+ * this and the notification mask is nonzero, the thread is unblocked (if it is blocked.)
+ */
+void Thread::notify(const uintptr_t bits) {
+    uintptr_t mask;
+
+    bool no = false, yes = true;
+
+    // set the bits
+    const auto set = __atomic_or_fetch(&this->notifications, bits, __ATOMIC_RELEASE);
+    __atomic_load(&this->notificationMask, &mask, __ATOMIC_RELAXED);
+
+    if(set & mask) {
+        // unblock me boi
+        if(this->notificationsFlag &&
+                __atomic_compare_exchange(&this->notified, &no, &yes, false, __ATOMIC_RELEASE,
+                    __ATOMIC_RELAXED)) {
+            this->notificationsFlag->signal();
+        }
+    }
+}
+
+/**
+ * Blocks the thread waiting for notifications to arrive.
+ *
+ * @param mask If nonzero, a new value to set for the thread's notification mask.
+ * @return The bitwise AND of the notification bits and the notification mask.
+ */
+uintptr_t Thread::blockNotify(const uintptr_t _mask) {
+    uintptr_t mask;
+
+    DECLARE_CRITICAL();
+    CRITICAL_ENTER();
+
+    // update mask
+    if(_mask) {
+        mask = _mask;
+        __atomic_store(&this->notificationMask, &mask, __ATOMIC_RELAXED);
+    } else {
+        __atomic_load(&this->notificationMask, &mask, __ATOMIC_RELAXED);
+    }
+
+    // clear all bits covered by the mask, return old value
+    const auto oldBits = __atomic_fetch_and(&this->notifications, ~mask, __ATOMIC_RELAXED);
+    // if any bits coincided with the mask were set, return them
+    if(oldBits & mask) {
+        CRITICAL_EXIT();
+        return (oldBits & mask);
+    }
+
+    // prepare for blocking
+    auto flag = new SignalFlag;
+    this->notificationsFlag = flag;
+
+    CRITICAL_EXIT();
+
+    // block on it
+    this->blockOn(this->notificationsFlag);
+
+    // woke up from blocking. return the set bits
+    this->notificationsFlag = nullptr;
+    __atomic_clear(&this->notified, __ATOMIC_RELEASE);
+    delete flag;
+
+    const auto newBits = __atomic_fetch_and(&this->notifications, ~mask, __ATOMIC_RELAXED);
+    return (newBits & mask);
+} 

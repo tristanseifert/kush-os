@@ -18,6 +18,7 @@ class MapEntry;
 }
 namespace ipc {
 class Port;
+class IrqHandler;
 }
 namespace sched {
 struct Task;
@@ -42,6 +43,7 @@ class Manager {
             Thread                      = 0x02,
             Port                        = 0x03,
             VmRegion                    = 0x04,
+            IrqHandler                  = 0x05,
         };
 
     public:
@@ -160,6 +162,36 @@ class Manager {
             RW_LOCK_READ_GUARD(gShared->portHandlesLock);
             return gShared->get(h, gShared->portHandles);
         }
+
+        /// Allocates a new handle for the given IRQ handler.
+        static Handle makeIrqHandle(ipc::IrqHandler *handler) {
+            RW_LOCK_WRITE_GUARD(gShared->irqHandlesLock);
+            return gShared->allocate(handler, gShared->irqHandles, Type::IrqHandler);
+        }
+        /// Releases the previously allocated IRQ handler handle.
+        static bool releaseIrqHandle(const Handle h) {
+            // validate type
+            const auto type = getType(h);
+            if(type != Type::Port) {
+                return false;
+            }
+
+            // update the list
+            RW_LOCK_WRITE_GUARD(gShared->irqHandlesLock);
+            return gShared->release(h, gShared->irqHandles);
+        }
+        /// Returns the IRQ handler object the given handle points to.
+        static ipc::IrqHandler *getIrq(const Handle h) {
+            // validate type
+            const auto type = getType(h);
+            if(type != Type::IrqHandler) {
+                return nullptr;
+            }
+
+            RW_LOCK_READ_GUARD(gShared->portHandlesLock);
+            return gShared->get(h, gShared->irqHandles);
+        }
+
     private:
         /// wraps a handle slot with an epoch counter
         template<class T>
@@ -321,6 +353,11 @@ class Manager {
         DECLARE_RWLOCK(portHandlesLock);
         // storage for port handles
         rt::Vector<HandleInfo<ipc::Port>> portHandles;
+
+        // lock for the IRQ handlers handles
+        DECLARE_RWLOCK(irqHandlesLock);
+        // storage for IRQ handler handles
+        rt::Vector<HandleInfo<ipc::IrqHandler>> irqHandles;
 };
 }
 

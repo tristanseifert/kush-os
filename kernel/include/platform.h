@@ -115,6 +115,24 @@ int platform_section_get_info(const platform_section_t section, uint64_t *physAd
 int platform_irq_ack(const uintptr_t token);
 
 /**
+ * Registers an interrupt handler.
+ *
+ * @note The second argument to the callback is the platform IRQ vector number, which can be used
+ * to acknowledge/defer the interrupt. You're probably going to ignore this.
+ *
+ * @note Return true from the callback to indicate you've handled the interrupt.
+ *
+ * @return A positive interrupt token (used to later remove the handler) or 0.
+ */
+int platform_irq_register(const uintptr_t irq, bool(*callback)(void *, const uintptr_t), void *ctx);
+
+/**
+ * Removes a previously set up interrupt handler.
+ */
+void platform_irq_unregister(const uintptr_t token);
+
+
+/**
  * Raises the interrupt priority level of the current processor. The previous irql is returned.
  */
 platform::Irql platform_raise_irql(const platform::Irql irql, const bool enableIrq = true);

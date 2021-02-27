@@ -12,6 +12,8 @@ extern "C" {
 
 // IPC syscalls
 #include <sys/syscalls_msg.h>
+#include <sys/syscalls_note.h>
+#include <sys/syscalls_irq.h>
 
 // VM syscalls
 #include <sys/syscalls_vm.h>
