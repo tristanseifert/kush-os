@@ -43,6 +43,8 @@ enum class MapMode {
 
     /// Userspace text segments
     kUserExec           = (READ | EXECUTE | ACCESS_USER),
+    /// Userspace read-only
+    kUserRead           = (READ | ACCESS_USER),
 
     /// Device memory; bypass caches
     MMIO                = (CACHE_DISABLE),

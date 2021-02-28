@@ -12,12 +12,25 @@
 extern "C" uintptr_t arch_syscall_handle(const uintptr_t number, const void *args);
 extern "C" uintptr_t arch_syscall_msgsend_slow(const uintptr_t eax);
 
-namespace arch { namespace syscall {
+namespace arch::syscall {
+/**
+ * Format of the time info page
+ */
+struct TimeInfo {
+    /// Seconds of kernel uptime
+    uint32_t timeSecs;
+    /// Nanoseconds component of uptime
+    uint32_t timeNsec;
+    /// Seconds component again; used to detect if time changed while reading
+    uint32_t timeSecs2;
+};
+
 /**
  * Implements syscalls via the fast SYSENTER/SYSEXIT mechanism.
  */
 class Handler {
     friend void ::arch_vm_available();
+    friend void arch::Tick();
 
     private:
         /// SYSENTER code segment MSR (IA32_SYSENTER_CS)
@@ -32,6 +45,11 @@ class Handler {
         /// Userspace VM address for the syscall stub page
         constexpr static const uintptr_t kStubUserVmAddr = 0xBF5F0000;
 
+        /// Kernel VM address for the system time page
+        constexpr static const uintptr_t kTimeKernelVmAddr = 0xF3005000;
+        /// Userspace VM address for the system time page
+        constexpr static const uintptr_t kTimeUserVmAddr = 0xBF5FD000;
+
     public:
         /**
          * Handles a context switch to the given thread. We'll update the syscall entry stack to
@@ -45,6 +63,7 @@ class Handler {
         /// Prepares the given task
         static inline void taskCreated(sched::Task *task) {
             gShared->mapSyscallStub(task);
+            gShared->mapTimePage(task);
         }
 
     private:
@@ -52,14 +71,22 @@ class Handler {
 
         Handler();
         void mapSyscallStub(sched::Task *);
+        void mapTimePage(sched::Task *);
+
+        void updateTime();
 
     private:
         static Handler *gShared;
 
         // physical page holding the stub
         uint64_t stubPage = 0;
+        // physical page holding the time information struct
+        uint64_t timePage = 0;
+
+        /// pointer to the in-memory time info struct
+        TimeInfo *timeInfo = nullptr;
 };
-}}
+}
 #endif
 
 /// Last syscall number that uses the fast path (all calls incl+above this use slow path)

@@ -17,10 +17,13 @@ namespace rpc {
  * Message type
  */
 enum class RootSrvTaskEpType: uint32_t {
+    /// reply flag
+    Reply                               = 0x80000000,
+
     /// Client -> server; create task
-    kTaskCreate                         = 'TSKC',
+    TaskCreate                          = 'TSKC',
     /// server -> client; create task response
-    kTaskCreateReply                    = 'TSKR',
+    TaskCreateReply                     = (TaskCreate | Reply),
 };
 
 /**

@@ -362,6 +362,8 @@ void ElfReader::patchRelocs(const std::span<Elf32_Rel> &rels, const uintptr_t ba
             case R_386_JMP_SLOT:
             case R_386_32:
             case R_386_TLS_TPOFF:
+            case R_386_TLS_DTPMOD32:
+            case R_386_TLS_DTPOFF32:
             {
                 // translate the symbol index into a name
                 const auto symIdx = ELF32_R_SYM(rel.r_info);
@@ -475,6 +477,37 @@ void ElfReader::patchRelocs(const std::span<Elf32_Rel> &rels, const uintptr_t ba
                 //Linker::Trace("Relocation for '%s': off %d -> %08x", symbol->name, off, value);
 
                 // write it back
+                memcpy(from, &value, sizeof(uintptr_t));
+                break;
+            }
+
+            /**
+             * Reference to a thread-local value in another object
+             *
+             * This writes the module index in which this thread-local object is defined.
+             */
+            case R_386_TLS_DTPMOD32: {
+                // get module id (in this case, the TLS offset)
+                uintptr_t value = 0;
+                auto tls = Linker::the()->getTls();
+                value = tls->getLibTlsOffset(symbol->library);
+
+                // write the value
+                auto from = reinterpret_cast<void *>(base + rel.r_offset);
+                memcpy(from, &value, sizeof(uintptr_t));
+                break;
+            }
+            /**
+             * Reference to a thread-local value in another object
+             *
+             * Writes the per-module index of a thread-local variable into the given GOT entry. In
+             * this case, it's the raw "address" of the symbol.
+             */
+            case R_386_TLS_DTPOFF32: {
+                uintptr_t value = symbol->address;
+
+                // write the value
+                auto from = reinterpret_cast<void *>(base + rel.r_offset);
                 memcpy(from, &value, sizeof(uintptr_t));
                 break;
             }

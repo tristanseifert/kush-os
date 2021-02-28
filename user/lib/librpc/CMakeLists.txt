@@ -11,6 +11,9 @@ add_library(rpc_objs OBJECT
     src/file/Connection.cpp
     src/file/Open.cpp
     src/file/Read.cpp
+    # task creation
+    src/task/Connection.cpp
+    src/task/Create.cpp
 )
 target_compile_options(rpc_objs PRIVATE -fPIC)
 

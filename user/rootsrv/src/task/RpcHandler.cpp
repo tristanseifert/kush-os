@@ -1,9 +1,11 @@
 #include "RpcHandler.h"
+#include "Task.h"
 
 #include <sys/syscalls.h>
 #include <cista/serialization.h>
 
 #include <cstring>
+#include <span>
 
 #include "log.h"
 #include "dispensary/Dispensary.h"
@@ -13,6 +15,7 @@
 
 using namespace std::literals;
 using namespace task;
+using namespace rpc;
 
 // declare the constants for the handler
 const std::string_view RpcHandler::kPortName = "me.blraaz.rpc.rootsrv.task"sv;
@@ -30,8 +33,6 @@ RpcHandler::RpcHandler() {
     // set up the port
     err = PortCreate(&this->portHandle);
     REQUIRE(!err, "failed to create task rpc port: %d", err);
-
-    LOG("Task rpc port: $%08x'h", this->portHandle);
 
     // create the thread next
     this->run = true;
@@ -77,7 +78,8 @@ void RpcHandler::main() {
 
             // invoke the appropriate handler
             switch(packet->type) {
-                case static_cast<uint32_t>(rpc::RootSrvTaskEpType::kTaskCreate):
+                case static_cast<uint32_t>(rpc::RootSrvTaskEpType::TaskCreate):
+                    this->handleCreate(msg, packet);
                     break;
 
                 default:
@@ -93,5 +95,66 @@ void RpcHandler::main() {
 
     // clean up
     free(rxBuf);
+}
+
+/**
+ * Processes the create task request.
+ */
+void RpcHandler::handleCreate(const struct MessageHeader *msg, const RpcPacket *packet) {
+    // get at the data and try to deserialize
+    auto reqBuf = std::span(packet->payload, msg->receivedBytes - sizeof(RpcPacket));
+    auto req = cista::deserialize<RootSrvTaskCreate>(reqBuf);
+
+    // create the task
+    const std::string path(req->path);
+    std::vector<std::string> params;
+
+    for(const auto &arg : req->args) {
+        params.emplace_back(arg);
+    }
+
+    auto taskHandle = Task::createFromFile(path, params);
+
+    // build reply
+    RootSrvTaskCreateReply reply;
+    reply.handle = taskHandle;
+    reply.status = (taskHandle ? 0 : -1);
+
+    // send it
+    auto buf = cista::serialize(reply);
+    this->reply(packet, RootSrvTaskEpType::TaskCreateReply, buf);
+
+}
+
+/**
+ * Sends an RPC message.
+ */
+void RpcHandler::reply(const rpc::RpcPacket *packet, const rpc::RootSrvTaskEpType type,
+        const std::span<uint8_t> &buf) {
+    int err;
+    void *txBuf = nullptr;
+
+    // allocate the reply buffer
+    const auto replySize = buf.size() + sizeof(rpc::RpcPacket);
+    err = posix_memalign(&txBuf, 16, replySize);
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "posix_memalign");
+    }
+
+    auto txPacket = reinterpret_cast<rpc::RpcPacket *>(txBuf);
+    txPacket->type = static_cast<uint32_t>(type);
+    txPacket->replyPort = 0;
+
+    memcpy(txPacket->payload, buf.data(), buf.size());
+
+    // send it
+    const auto replyPort = packet->replyPort;
+    err = PortSend(replyPort, txPacket, replySize);
+
+    free(txBuf);
+
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "PortSend");
+    }
 }
 

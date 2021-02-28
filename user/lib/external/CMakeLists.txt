@@ -5,6 +5,7 @@
 # these have native cmake-based build systems
 add_subdirectory(bzip2)
 add_subdirectory(lzfse)
+add_subdirectory(CLI11)
 
 # Cista is used rather extensively for RPC serialization
 add_subdirectory(cista)

@@ -52,3 +52,8 @@ __attribute__((weak)) void __dyldo_teardown_tls() {
     fprintf(stderr, "%s unimplemented!\n", __FUNCTION__);
     abort();
 }
+__attribute__((weak)) void *___tls_get_addr(void *ctx) {
+    fprintf(stderr, "%s unimplemented!\n", __FUNCTION__);
+    abort();
+}
+

@@ -18,6 +18,15 @@ using namespace dyldo;
 bool ThreadLocal::gLogAllocations = false;
 
 /**
+ * Information of a thread-local storage object. This contains the module and offset values, which
+ * we wrote into the GOT earlier with the R_386_TLS_DTPMOD32 and R_386_TLS_DTPOFF32 relocs.
+ */
+typedef struct {
+    unsigned long int ti_module;
+    unsigned long int ti_offset;
+} tls_index_t;
+
+/**
  * Exported function to allow the C library to have us do the entire TLS allocation for the current
  * thread.
  *
@@ -41,6 +50,18 @@ void __dyldo_teardown_tls() {
     Linker::the()->getTls()->tearDown();
 }
 
+/**
+ * Stub function used to get the address of a thread-local that belongs to another shared object.
+ *
+ * I _think_ the argument is passed in %eax; 
+ *
+ * TODO: implement
+ */
+__attribute__ ((__regparm__ (1))) void *__dyldo_tls_get_addr(tls_index_t *ctx) {
+    Linker::Abort("%s unimplemented: %p (mod %p off %p)", __FUNCTION__, ctx, ctx->ti_module,
+            ctx->ti_offset);
+}
+
 
 /**
  * Registers the thread-local info interface.
@@ -57,6 +78,8 @@ ThreadLocal::ThreadLocal() {
             reinterpret_cast<void *>(&__dyldo_setup_tls), 0);
     Linker::the()->map->addLinkerExport("__dyldo_teardown_tls",
             reinterpret_cast<void *>(&__dyldo_teardown_tls), 0);
+    Linker::the()->map->addLinkerExport("___tls_get_addr",
+            reinterpret_cast<void *>(&__dyldo_tls_get_addr), 0);
 }
 
 /**

@@ -1,6 +1,7 @@
 #ifndef _SYS_STAT_H_
 #define	_SYS_STAT_H_
 
+#include <_libc.h>
 #include <sys/types.h>
 #include <time.h>
 
@@ -108,22 +109,22 @@ struct stat {
 extern "C" {
 #endif
 
-int    chmod(const char *, mode_t);
-int    fchmod(int, mode_t);
-int    fchmodat(int, const char *, mode_t, int);
-int    fstat(int, struct stat *);
-int    fstatat(int, const char *, struct stat *, int);
-int    futimens(int, const struct timespec [2]);
-int    lstat(const char *, struct stat *);
-int    mkdir(const char *, mode_t);
-int    mkdirat(int, const char *, mode_t);
-int    mkfifo(const char *, mode_t);
-int    mkfifoat(int, const char *, mode_t);
-int    mknod(const char *, mode_t, dev_t);
-int    mknodat(int, const char *, mode_t, dev_t);
-int    stat(const char *, struct stat *);
-mode_t umask(mode_t);
-int    utimensat(int, const char *, const struct timespec [2], int);
+LIBC_EXPORT int    chmod(const char *, mode_t);
+LIBC_EXPORT int    fchmod(int, mode_t);
+LIBC_EXPORT int    fchmodat(int, const char *, mode_t, int);
+LIBC_EXPORT int    fstat(int, struct stat *);
+LIBC_EXPORT int    fstatat(int, const char *, struct stat *, int);
+LIBC_EXPORT int    futimens(int, const struct timespec [2]);
+LIBC_EXPORT int    lstat(const char *, struct stat *);
+LIBC_EXPORT int    mkdir(const char *, mode_t);
+LIBC_EXPORT int    mkdirat(int, const char *, mode_t);
+LIBC_EXPORT int    mkfifo(const char *, mode_t);
+LIBC_EXPORT int    mkfifoat(int, const char *, mode_t);
+LIBC_EXPORT int    mknod(const char *, mode_t, dev_t);
+LIBC_EXPORT int    mknodat(int, const char *, mode_t, dev_t);
+LIBC_EXPORT int    stat(const char *, struct stat *);
+LIBC_EXPORT mode_t umask(mode_t);
+LIBC_EXPORT int    utimensat(int, const char *, const struct timespec [2], int);
 
 #ifdef __cplusplus
 }

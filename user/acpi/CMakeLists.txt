@@ -207,7 +207,7 @@ target_include_directories(acpisrv PRIVATE src)
 
 # required libraries
 add_dependencies(acpisrv c_dynamic system_dynamic)
-target_link_libraries(acpisrv PRIVATE rpc fmt::fmt-header-only)
+target_link_libraries(acpisrv PRIVATE rpc)
 
 # install it to boot directory in sysroot
 install(TARGETS acpisrv RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)

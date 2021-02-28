@@ -118,7 +118,7 @@ static void ThreadThymeCock(uintptr_t) {
                 mem::PhysicalAllocator::getAllocPages() * 4,
                 mem::PhysicalAllocator::getTotalPages() * 4,
                 ((double) mem::PhysicalAllocator::getAllocPages()) / 
-                ((double) mem::PhysicalAllocator::getTotalPages())
+                ((double) mem::PhysicalAllocator::getTotalPages()) * 100.
                 );
 
         static size_t x = 0, y = 0;

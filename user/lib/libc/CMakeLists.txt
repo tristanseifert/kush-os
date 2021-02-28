@@ -66,6 +66,7 @@ add_library(c_objs OBJECT
     src/sys/atexit.c
     src/sys/exit.c
     # stdlib math stuff
+    src/stdlib/abs.c
     src/stdlib/div.c
     src/stdlib/labs.c
     src/stdlib/ldiv.c
@@ -132,6 +133,7 @@ add_library(c_objs OBJECT
     src/file/fseek.c
     src/file/fopen.c
     src/file/fclose.c
+    src/file/stat.c
     # POSIX standard stuff
     src/posix/sysconf.c
     # C11 threading implementation

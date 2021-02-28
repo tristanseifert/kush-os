@@ -12,7 +12,6 @@
 ## define the contents of the init bundle
 FILE /boot/rootsrv
 FILE /etc/default.init
-FILE /sbin/dyldosrv
 FILE /lib/libsystem.so
 FILE /lib/libc.so
 FILE /lib/libc++.so.1
@@ -20,9 +19,12 @@ FILE /lib/libc++abi.so.1
 FILE /lib/libunwind.so.1
 FILE /lib/librpc.so
 FILE /sbin/ldyldo
+FILE /sbin/dyldosrv
+FILE /sbin/driverman
 FILE /sbin/acpisrv
 
 ###############
 ## now, start all of the servers
 #SERVER dyldosrv -test -flags arg1 arg2 "arg3 is longer with spaces" arg4
-SERVER acpisrv -p pc_x86
+SERVER driverman --expert=pc_x86
+# SERVER acpisrv -p pc_x86

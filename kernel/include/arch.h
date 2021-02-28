@@ -109,6 +109,11 @@ void ReturnToUser(const uintptr_t pc, const uintptr_t stack, const uintptr_t arg
  * Handles architecture-specific system call.
  */
 int HandleSyscall(const sys::Syscall::Args *args, const uintptr_t number);
+
+/**
+ * Tick callback
+ */
+void Tick();
 }
 #endif
 #endif

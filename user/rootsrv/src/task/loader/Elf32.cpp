@@ -108,6 +108,11 @@ void Elf32::processProgHdr(Task *task, const Elf32_Phdr &phdr) {
             this->phdrInterp(task, phdr);
             break;
 
+        // dynamic and TLS info is handled by dynamic linker
+        case PT_DYNAMIC:
+        case PT_TLS:
+            break;
+
         // unhandled program header type
         default:
             LOG("Unhandled phdr type %08x offset %08x vaddr %08x filesz %08x memsz %08x"

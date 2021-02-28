@@ -49,6 +49,7 @@
  */
 #define CLOCK_REALTIME          0
 #define CLOCK_MONOTONIC         4
+#define CLOCK_UPTIME_RAW        6
 
 #ifndef _CLOCK_T_DECLARED
 typedef	uint64_t clock_t;

@@ -6,6 +6,8 @@
 #include <log.h>
 #include <new>
 
+#include <platform.h>
+
 #include <mem/PhysicalAllocator.h>
 #include <vm/Mapper.h>
 #include <vm/Map.h>
@@ -48,6 +50,7 @@ void Handler::init() {
  */
 Handler::Handler() {
     int err;
+    auto m = ::vm::Map::kern();
 
     // configure code segment and entry point
     x86_msr_write(kSysenterCsMsr, GDT_KERN_CODE_SEG, 0);
@@ -57,7 +60,6 @@ Handler::Handler() {
     this->stubPage = mem::PhysicalAllocator::alloc();
     REQUIRE(this->stubPage, "failed to allocate syscall stub page");
 
-    auto m = ::vm::Map::kern();
     err = m->add(this->stubPage & ~0xFFF, 0x1000, kStubKernelVmAddr, ::vm::MapMode::kKernelRW);
     REQUIRE(!err, "failed to map syscall stub: %d", err);
 
@@ -66,6 +68,15 @@ Handler::Handler() {
     memcpy((void *) kStubKernelVmAddr, _binary_syscall_stub_start, SIZE_OF_STUB);
 
     // TODO: unmap it from kernel again
+
+    // allocate the time page
+    this->timePage = mem::PhysicalAllocator::alloc();
+    REQUIRE(this->timePage, "failed to allocate time page");
+
+    err = m->add(this->timePage & ~0xFFF, 0x1000, kTimeKernelVmAddr, ::vm::MapMode::kKernelRW);
+    REQUIRE(!err, "failed to map time page: %d", err);
+
+    this->timeInfo = reinterpret_cast<TimeInfo *>(kTimeKernelVmAddr);
 }
 
 /**
@@ -79,6 +90,34 @@ void Handler::mapSyscallStub(sched::Task *task) {
 
     err = map->add(this->stubPage & ~0xFFF, 0x1000, kStubUserVmAddr, ::vm::MapMode::kUserExec);
     REQUIRE(!err, "failed to map syscall stub into task %p (%s): %d", task, task->name, err);
+}
+/**
+ * Maps the kernel time info page into the specified task.
+ */
+void Handler::mapTimePage(sched::Task *task) {
+    int err;
+
+    // map the stub into the userspace
+    auto map = task->vm;
+
+    err = map->add(this->timePage & ~0xFFF, 0x1000, kTimeUserVmAddr, ::vm::MapMode::kUserRead);
+    REQUIRE(!err, "failed to map time page into task %p (%s): %d", task, task->name, err);
+}
+
+/**
+ * Writes to the time page.
+ */
+void Handler::updateTime() {
+    // get current time in nsec, and break into seconds and nsec component
+    const auto now = platform_timer_now();
+
+    uint32_t secs = now / 1000000000ULL;
+    uint32_t nsec = now % 1000000000ULL;
+
+    // do the atomic writes
+    __atomic_store(&this->timeInfo->timeSecs, &secs, __ATOMIC_RELAXED);
+    __atomic_store(&this->timeInfo->timeNsec, &nsec, __ATOMIC_SEQ_CST);
+    __atomic_store(&this->timeInfo->timeSecs2, &secs, __ATOMIC_RELAXED);
 }
 
 
@@ -129,4 +168,8 @@ int arch::HandleSyscall(const sys::Syscall::Args *args, const uintptr_t _number)
 
     // dispatch it
     return (gArchSyscalls[index])(args, _number);
+}
+
+void arch::Tick() {
+    Handler::gShared->updateTime();
 }

@@ -291,6 +291,8 @@ void Manager::setupTimebase() {
             timer::Manager::gShared->tick(kTimebaseInterval * 1000);
             platform_kern_tick(type);
 
+            arch::Tick();
+
             platform_lower_irql(prevIrql);
             return true;
         }, apic);
