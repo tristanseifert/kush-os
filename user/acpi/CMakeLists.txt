@@ -8,6 +8,7 @@ add_executable(acpisrv
     src/main.cpp
     src/Log.cpp
     src/AcpicaWrapper.cpp
+    src/bus/PciBus.cpp
     # ACPICA OS layer
     src/osl/init.cpp
     src/osl/irq.cpp

@@ -1,9 +1,13 @@
 #include "AcpicaWrapper.h"
 #include "log.h"
 
+#include "bus/PciBus.h"
+
 #include <cassert>
 #include <cstddef>
 #include <acpi.h>
+
+using namespace acpi;
 
 /// Shared ACPICA wrapper
 AcpicaWrapper *AcpicaWrapper::gShared = nullptr;
@@ -24,7 +28,9 @@ AcpicaWrapper::AcpicaWrapper() {
 
     // debug all the things
     // AcpiDbgLevel = ACPI_DEBUG_ALL;
-    AcpiDbgLayer = ACPI_ALL_COMPONENTS;
+    AcpiDbgLevel = ACPI_LV_ALL_EXCEPTIONS;
+    AcpiDbgLevel = ACPI_NORMAL_DEFAULT;
+    //AcpiDbgLayer = ACPI_ALL_COMPONENTS;
 
     // initialize ACPICA subsystem
     status = AcpiInitializeSubsystem();
@@ -117,7 +123,7 @@ void AcpicaWrapper::configureApic() {
     args.Count = 1;
     args.Pointer = &arg1;
 
-    auto status = AcpiEvaluateObject(ACPI_ROOT_OBJECT, "_PIC", &args, nullptr);
+    auto status = AcpiEvaluateObject(nullptr, "\\_PIC", &args, nullptr);
 
     if(!ACPI_SUCCESS(status)) {
         if(status == AE_NOT_FOUND) {
@@ -126,6 +132,20 @@ void AcpicaWrapper::configureApic() {
             Abort("failed to set IRQ controller mode: %s", AcpiFormatException(status));
         }
     }
+}
+
+/**
+ * Gets information on all busses detected in the ACPI tables.
+ */
+void AcpicaWrapper::probeBusses() {
+    // probe the busses
+    gShared->probePci();
+
+    // yeet
+    for(const auto &bus : gShared->busses) {
+        Trace("Discovered bus %s at %s: %p", bus->getName().c_str(), bus->getAcpiPath().c_str(), bus.get());
+    }
+
 }
 
 
@@ -226,101 +246,11 @@ void AcpicaWrapper::foundPciRoot(ACPI_HANDLE object) {
 
     Trace("Bridge %s: address %08x bus %u segment %u", name, addr, bus, seg);
 
-    // get the interrupt routing for it
-    this->pciGetIrqRoutes(object);
+    // create the bus
+    auto bobj = std::make_shared<PciBus>(nullptr, std::string(name), bus);
+    bobj->getIrqRoutes(object);
+
+    // store bus
+    this->busses.emplace_back(std::dynamic_pointer_cast<Bus>(bobj));
 }
 
-/**
- * Reads out the PCI interrupt routing tables.
- */
-void AcpicaWrapper::pciGetIrqRoutes(ACPI_HANDLE object) {
-    ACPI_STATUS status;
-
-    // set up the buffer
-    ACPI_BUFFER buf;
-    buf.Length = ACPI_ALLOCATE_BUFFER;
-    buf.Pointer = nullptr;
-
-    // read tables
-    status = AcpiGetIrqRoutingTable(object, &buf);
-    if(status != AE_OK) {
-        Abort("AcpiGetIrqRoutingTable failed: %s", AcpiFormatException(status));
-    }
-
-    // iterate over the interrupts
-    std::byte *scan = reinterpret_cast<std::byte *>(buf.Pointer);
-
-    while(true) {
-        // get table and exit if we've reached the end
-        auto table = reinterpret_cast<const ACPI_PCI_ROUTING_TABLE *>(scan);
-        if(!table->Length) {
-            break;
-        }
-
-        uint8_t slot = (table->Address >> 16);
-
-        // static interrupt assignment
-        if(!table->Source[0]) {
-            Trace("gsi %u pin %u (slot %u)", table->SourceIndex, table->Pin, slot);
-        }
-        // the assignment is dynamic
-        else {
-            // get PCI link
-            ACPI_HANDLE linkObject;
-            status = AcpiGetHandle(object, table->Source, &linkObject);
-            if(status != AE_OK) {
-                Abort("failed to get source '%s': %s", table->Source, AcpiFormatException(status));
-            }
-
-            // get associated IRQ
-            ACPI_BUFFER resbuf;
-            resbuf.Length = ACPI_ALLOCATE_BUFFER;
-            resbuf.Pointer = NULL;
-
-            status = AcpiGetCurrentResources(linkObject, &resbuf);
-            if(status != AE_OK) {
-                Abort("AcpiGetCurrentResources failed for '%s': %s", table->Source, AcpiFormatException(status));
-            }
-
-            auto rscan = reinterpret_cast<std::byte *>(resbuf.Pointer);
-            int devIRQ = -1;
-            while(1) {
-                auto res = reinterpret_cast<ACPI_RESOURCE *>(rscan);
-
-                if(res->Type == ACPI_RESOURCE_TYPE_END_TAG) {
-                    break;
-                }
-
-                // XXX: is this code right?
-                else if(res->Type == ACPI_RESOURCE_TYPE_IRQ) {
-                    devIRQ = res->Data.Irq.Interrupts[table->SourceIndex];
-                    break;
-                }
-                else if(res->Type == ACPI_RESOURCE_TYPE_EXTENDED_IRQ) {
-                    const auto &ext = res->Data.ExtendedIrq;
-                    devIRQ = ext.Interrupts[table->SourceIndex];
-                    break;
-                }
-
-                // check next resource
-                rscan += res->Length;
-            }
-
-            // release resource buffer
-            free(resbuf.Pointer);
-
-            // record the interrupt we got
-            if(devIRQ == -1) {
-                Abort("failed to derive IRQ for device %d from '%s'", (int)slot, table->Source);
-            }
-
-            Trace("DEVICE %d intpin INT%c# -> IRQ %d (from '%s')", (int) slot, 'A'+table->Pin, devIRQ, table->Source);
-        }
-
-        // go to next
-        scan += table->Length;
-    }
-
-    // clean up
-    free(buf.Pointer);
-}

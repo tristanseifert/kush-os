@@ -18,7 +18,7 @@ constexpr static const uint16_t kConfigAddress  = 0xCF8;
 constexpr static const uint16_t kConfigData     = 0xCFC;
 
 /// Whether PCI configuration accesses are logged
-static bool gLogAcpicaPciIo = true;
+static bool gLogAcpicaPciIo = false;
 
 /**
  * Initializes the PCI bus configuration mechanism.
