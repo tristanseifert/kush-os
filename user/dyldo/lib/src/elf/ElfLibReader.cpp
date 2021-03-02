@@ -167,6 +167,12 @@ void ElfLibReader::exportSymbols(Library *lib) {
 
         // get its name
         auto namePtr = this->readStrtab(sym.st_name);
+
+        // XXX: skip _start exported from dynamic libs
+        if(!strcmp(namePtr, "_start")) {
+            continue;
+        }
+
         auto name = lib->strings.add(namePtr);
 
         // register it

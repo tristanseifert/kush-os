@@ -59,6 +59,10 @@ class PciBus: public Bus {
         };
 
     private:
+        /// whether interrupt mappings are logged
+        static bool gLogInterrupts;
+
+    private:
         /// Bus number
         uint8_t bus = 0;
 

@@ -14,8 +14,7 @@ void X86PcExpert::probe() {
 
     // start ACPI server
     const char *args[] = {
-        "fucker",
-        "bitch cube",
+        kAcpiServerPath,
         nullptr
     };
 

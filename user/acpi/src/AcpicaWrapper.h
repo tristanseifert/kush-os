@@ -3,7 +3,7 @@
 
 #include <cstdint>
 #include <memory>
-#include <vector>
+#include <unordered_map>
 
 #include <acpi.h>
 
@@ -27,6 +27,9 @@ class AcpicaWrapper {
     private:
         static AcpicaWrapper *gShared;
 
+        /// whether found busses are logged
+        static bool gLogBusses;
+
     private:
         AcpicaWrapper();
 
@@ -38,8 +41,10 @@ class AcpicaWrapper {
         void pciGetIrqRoutes(ACPI_HANDLE, std::shared_ptr<acpi::PciBus> &);
 
     private:
+        /// ID for the next bus we discover
+        uintptr_t nextBusId = 1;
         /// all busses we've discovered
-        std::vector<std::shared_ptr<acpi::Bus>> busses;
+        std::unordered_map<uintptr_t, std::shared_ptr<acpi::Bus>> busses;
 };
 
 #endif

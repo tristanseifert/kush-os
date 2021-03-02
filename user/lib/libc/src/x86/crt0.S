@@ -2,6 +2,8 @@
 #include "LaunchInfo.h"
 
 .global _start
+.type _start, function
+
 .extern __libc_task_info
 
 /**

@@ -10,7 +10,7 @@ add_executable(kernel_arch_x86_syscall_stub
 set(ARCH_SYSCALL_STUB_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/syscall_stub.ld CACHE STRING "x86 syscall stub linker script" FORCE)
 set_target_properties(kernel_arch_x86_syscall_stub PROPERTIES LINK_DEPENDS ${ARCH_SYSCALL_STUB_LINKER_SCRIPT})
 target_compile_options(kernel_arch_x86_syscall_stub PRIVATE -ffreestanding -nostdlib)
-target_link_options(kernel_arch_x86_syscall_stub PUBLIC -ffreestanding -nostdlib "-Wl,-T${ARCH_SYSCALL_STUB_LINKER_SCRIPT}")
+target_link_options(kernel_arch_x86_syscall_stub PUBLIC -ffreestanding -nostdlib -nostartfiles "-Wl,-T${ARCH_SYSCALL_STUB_LINKER_SCRIPT}")
 
 set_target_properties(kernel_arch_x86_syscall_stub PROPERTIES OUTPUT_NAME "x86_syscall_stub")
 set_target_properties(kernel_arch_x86_syscall_stub PROPERTIES SUFFIX "${PLATFORM_KERNEL_EXTENSION}")

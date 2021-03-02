@@ -295,6 +295,7 @@ FILE *Linker::openSharedLib(const char *soname, const char* &outPath) {
         FILE *fp = fopen(pathBuf, "rb");
         if(fp) {
             outPath = strdup(pathBuf);
+            if(gLogOpenAttempts) Trace("  found library: '%s'", pathBuf);
 
             return fp;
         }

@@ -7,6 +7,8 @@ using namespace acpi;
 
 std::string const PciBus::kBusName = "PCI";
 
+bool PciBus::gLogInterrupts = false;
+
 /**
  * Extracts the interrupt routing from a given ACPI object.
  *
@@ -142,6 +144,8 @@ void PciBus::getIrqRoutes(ACPI_HANDLE object) {
             d = (*map.intd).irq;
         }
 
-        Trace("Device %2u: INTA %2d INTB %2d INTC %2d INTD %2d", device, a, b, c, d);
+        if(gLogInterrupts) {
+            Trace("Device %2u: INTA %2d INTB %2d INTC %2d INTD %2d", device, a, b, c, d);
+        }
     }
 }

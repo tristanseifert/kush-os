@@ -8,6 +8,7 @@ add_executable(driverman
     src/main.cpp
     src/Log.cpp
     src/experts/Expert.cpp
+    src/forest/Forest.cpp
 )
 
 if(${KERNEL_ARCH} STREQUAL "x86")
@@ -26,7 +27,7 @@ target_include_directories(driverman PRIVATE src)
 
 # required libraries
 add_dependencies(driverman c_dynamic system_dynamic)
-target_link_libraries(driverman PRIVATE rpc)
+target_link_libraries(driverman PRIVATE rpc driver)
 
 # we can remove this when it gets implemented :D
 target_compile_definitions(driverman PRIVATE -DCLI11_HAS_FILESYSTEM=0)

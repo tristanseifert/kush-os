@@ -12,6 +12,8 @@ using namespace acpi;
 /// Shared ACPICA wrapper
 AcpicaWrapper *AcpicaWrapper::gShared = nullptr;
 
+bool AcpicaWrapper::gLogBusses = true;
+
 /**
  * Initialize the shared ACPICA handler.
  */
@@ -142,10 +144,11 @@ void AcpicaWrapper::probeBusses() {
     gShared->probePci();
 
     // yeet
-    for(const auto &bus : gShared->busses) {
-        Trace("Discovered bus %s at %s: %p", bus->getName().c_str(), bus->getAcpiPath().c_str(), bus.get());
+    if(gLogBusses) {
+        for(const auto &[id, bus] : gShared->busses) {
+            Trace("Discovered bus %u:%s at %s: %p", id, bus->getName().c_str(), bus->getAcpiPath().c_str(), bus.get());
+        }
     }
-
 }
 
 
@@ -204,8 +207,8 @@ void AcpicaWrapper::foundPciRoot(ACPI_HANDLE object) {
     buffer.Pointer = name;
 
     status = AcpiGetName(object, ACPI_FULL_PATHNAME, &buffer);
-    if(status == AE_OK) {
-        Trace("PCI root bridge: %s", name);
+    if(ACPI_FAILURE(status)) {
+        Abort("Failed to get PCI root bridge name: %s", AcpiFormatException(status));
     }
 
     // initialize buffer
@@ -244,13 +247,15 @@ void AcpicaWrapper::foundPciRoot(ACPI_HANDLE object) {
         addr = ret1.Integer.Value;
     } 
 
-    Trace("Bridge %s: address %08x bus %u segment %u", name, addr, bus, seg);
+    if(gLogBusses) {
+        Trace("Bridge %s: address %08x bus %u segment %u", name, addr, bus, seg);
+    }
 
     // create the bus
     auto bobj = std::make_shared<PciBus>(nullptr, std::string(name), bus);
     bobj->getIrqRoutes(object);
 
     // store bus
-    this->busses.emplace_back(std::dynamic_pointer_cast<Bus>(bobj));
+    this->busses.emplace(this->nextBusId++, std::dynamic_pointer_cast<Bus>(bobj));
 }
 

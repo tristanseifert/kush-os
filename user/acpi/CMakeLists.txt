@@ -193,6 +193,9 @@ add_library(acpisrv_acpica OBJECT
     src/acpica/utilities/utxfinit.c
     src/acpica/utilities/utxfmutex.c
 )
+
+target_compile_options(acpisrv_acpica PRIVATE -O2)
+
 target_compile_options(acpisrv_acpica PRIVATE -Wno-incompatible-pointer-types-discards-qualifiers
     -Wno-cast-qual)
 target_include_directories(acpisrv_acpica PRIVATE src/acpica/include)

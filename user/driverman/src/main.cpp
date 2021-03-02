@@ -7,6 +7,7 @@
 #include "CLI/Formatter.hpp"
 #include "CLI/Config.hpp"
 
+#include "forest/Forest.h"
 #include "experts/Expert.h"
 
 const char *gLogTag = "driverman";
@@ -22,8 +23,10 @@ int main(const int argc, const char **argv) {
     app.add_option("-e,--expert", expertName, "Platform expert to initialize");
     CLI11_PARSE(app, argc, argv);
 
-    // yeet
+    // load the driver database and set up forest
     Success("driverman starting (pexpert '%s')", expertName.c_str());
+
+    Forest::init();
 
     // create platform export
     auto expert = Expert::create(expertName);

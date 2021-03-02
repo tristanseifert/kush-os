@@ -139,6 +139,12 @@ static void DispatcherMain() {
         throw std::system_error(err, std::system_category(), "ThreadGetHandle");
     }
 
+    // set a high priority
+    err = ThreadSetPriority(gDispatcherHandle, 80);
+    if(err) {
+        throw std::system_error(err, std::system_category(), "ThreadSetPriority");
+    }
+
     Success("IRQ dispatcher ready");
 
     // process requests
