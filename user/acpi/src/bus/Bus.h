@@ -15,6 +15,9 @@ class Bus {
 
         virtual ~Bus() = default;
 
+        /// Sends the driver server a discover message about this bus.
+        virtual void loadDriver(const uintptr_t id) = 0;
+
         /// Returns the bus name
         virtual const std::string &getName() const = 0;
         /// Returns the ACPI path at which the bus was found.

@@ -127,6 +127,7 @@ add_library(c_objs OBJECT
     src/file/default_streams.c
     src/file/rpc_file_streams.c
     src/file/fflush.c
+    src/file/ferror.c
     src/file/fprintf.c
     src/file/fwrite.c
     src/file/fread.c

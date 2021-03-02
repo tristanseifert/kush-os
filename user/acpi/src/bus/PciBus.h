@@ -18,6 +18,7 @@ namespace acpi {
 class PciBus: public Bus {
     private:
         static const std::string kBusName;
+        static const std::string kDriverName;
 
     public:
         /**
@@ -41,6 +42,8 @@ class PciBus: public Bus {
         const std::string &getName() const override {
             return kBusName;
         }
+
+        void loadDriver(const uintptr_t) override;
 
     private:
         /**

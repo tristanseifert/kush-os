@@ -9,6 +9,7 @@
 
 #include "forest/Forest.h"
 #include "experts/Expert.h"
+#include "rpc/MessageLoop.h"
 
 const char *gLogTag = "driverman";
 
@@ -27,6 +28,7 @@ int main(const int argc, const char **argv) {
     Success("driverman starting (pexpert '%s')", expertName.c_str());
 
     Forest::init();
+    MessageLoop::init();
 
     // create platform export
     auto expert = Expert::create(expertName);
@@ -38,7 +40,5 @@ int main(const int argc, const char **argv) {
     expert->probe();
 
     // enter main message loop
-    while(1) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(250));
-    }
+    MessageLoop::the()->run();
 }

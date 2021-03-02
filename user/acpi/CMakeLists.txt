@@ -211,7 +211,7 @@ target_include_directories(acpisrv PRIVATE src)
 
 # required libraries
 add_dependencies(acpisrv c_dynamic system_dynamic)
-target_link_libraries(acpisrv PRIVATE rpc)
+target_link_libraries(acpisrv PRIVATE rpc driver)
 
 # install it to boot directory in sysroot
 install(TARGETS acpisrv RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)

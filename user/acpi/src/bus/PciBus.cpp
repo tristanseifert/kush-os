@@ -3,9 +3,12 @@
 #include "acpi.h"
 #include "log.h"
 
+#include <driver/Discovery.hpp>
+
 using namespace acpi;
 
 std::string const PciBus::kBusName = "PCI";
+std::string const PciBus::kDriverName = "PciRootBridge";
 
 bool PciBus::gLogInterrupts = false;
 
@@ -148,4 +151,22 @@ void PciBus::getIrqRoutes(ACPI_HANDLE object) {
             Trace("Device %2u: INTA %2d INTB %2d INTC %2d INTD %2d", device, a, b, c, d);
         }
     }
+}
+
+/**
+ * Loads a driver for this PCI bus.
+ */
+void PciBus::loadDriver(const uintptr_t) {
+    // TODO: serialize interrupt routing
+
+    // build the message and send it
+    auto msg = new libdriver::DeviceDiscovered;
+    auto match = new libdriver::DeviceNameMatch(kDriverName);
+    msg->matches.push_back(match);
+
+    libdriver::SendToSrv(msg);
+
+    // clean up
+    delete match;
+    delete msg;
 }

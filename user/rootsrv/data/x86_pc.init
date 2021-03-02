@@ -18,7 +18,7 @@ FILE /lib/libc++.so.1
 FILE /lib/libc++abi.so.1
 FILE /lib/libunwind.so.1
 FILE /lib/librpc.so
-FILE /lib/libdriver.so
+FILE /lib/libmpack.so
 FILE /sbin/ldyldo
 FILE /sbin/dyldosrv
 FILE /sbin/driverman

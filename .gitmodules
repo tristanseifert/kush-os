@@ -10,3 +10,6 @@
 [submodule "user/lib/external/CLI11"]
 	path = user/lib/external/CLI11
 	url = git@github.com:CLIUtils/CLI11.git
+[submodule "user/lib/external/mpack"]
+	path = user/lib/external/mpack
+	url = git@github.com:ludocode/mpack.git

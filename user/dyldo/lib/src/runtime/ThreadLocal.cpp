@@ -58,6 +58,21 @@ void __dyldo_teardown_tls() {
  * TODO: implement
  */
 __attribute__ ((__regparm__ (1))) void *__dyldo_tls_get_addr(tls_index_t *ctx) {
+    // read out TLS block base
+    uintptr_t tlsBlockBase = 0;
+#if defined(__i386__)
+    asm volatile("mov   %%gs:0x00, %0" : "=r" (tlsBlockBase));
+#else
+#error Update ThreadLocal for current arch
+#endif
+
+    // get address
+    const auto addr = tlsBlockBase + ctx->ti_module + ctx->ti_offset;
+    Linker::Trace("%s %p (mod %p off %p) = %08x", __FUNCTION__, ctx, ctx->ti_module,
+            ctx->ti_offset, addr);
+
+    return reinterpret_cast<void *>(addr);
+
     Linker::Abort("%s unimplemented: %p (mod %p off %p)", __FUNCTION__, ctx, ctx->ti_module,
             ctx->ti_offset);
 }

@@ -27,6 +27,8 @@ class DlInfo {
         /// Iterates all loaded objects
         int iterateObjs(int (* _Nonnull callback)(struct dl_phdr_info * _Nonnull, size_t,
                     void* _Nullable), void * _Nullable ctx);
+        /// Resolves a symbol.
+        void * _Nullable resolve(void * _Nullable handle, const char * _Nonnull name);
 
         /// Provides executable info for the dynamic runtime info
         void loadedExec(ElfExecReader * _Nonnull elf, const char * _Nonnull path);

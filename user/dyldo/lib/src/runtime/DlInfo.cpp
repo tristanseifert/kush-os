@@ -15,7 +15,15 @@ int __dyldo_dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t si
     auto info = Linker::the()->getDlInfo();
     return info->iterateObjs(callback, ctx);
 }
+void *__dyldo_dlsym(void *handle, const char *name) {
+    auto info = Linker::the()->getDlInfo();
+    return info->resolve(handle, name);
+}
 
+const char *__dyldo_dlerror() {
+    Linker::Abort("%s unimplemented", "dlerror");
+    return nullptr;
+}
 
 
 /**
@@ -25,6 +33,8 @@ DlInfo::DlInfo() {
     // register symbols
     Linker::the()->map->addLinkerExport("dl_iterate_phdr",
             reinterpret_cast<void *>(&__dyldo_dl_iterate_phdr), 0);
+    Linker::the()->map->addLinkerExport("dlsym", reinterpret_cast<void *>(&__dyldo_dlsym), 0);
+    Linker::the()->map->addLinkerExport("dlerror", reinterpret_cast<void *>(&__dyldo_dlerror), 0);
 }
 
 /**
@@ -62,6 +72,13 @@ int DlInfo::iterateObjs(int (*callback)(struct dl_phdr_info *, size_t, void*), v
 
 beach:;
     return last;
+}
+
+/**
+ * Resolve a symbol.
+ */
+void *DlInfo::resolve(void *handle, const char *name) {
+    Linker::Abort("dlsym(%p, %s) unimplemented", handle, name);
 }
 
 /**

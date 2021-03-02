@@ -1,6 +1,6 @@
 .global _start
 .type _start, function
-.hidden
+.weak
 
 /**
  * Shared library initialization

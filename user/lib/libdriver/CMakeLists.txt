@@ -3,22 +3,25 @@
 #
 # Helpers for writing driver servers.
 ###############################################################################
-add_library(driver SHARED
-    # serialization
+add_library(driver STATIC
+    # serialization helpers
     src/serialize/base85.c
+    # message implementations
+    src/messages/Send.cpp
+    src/messages/Messages.cpp
+    src/messages/Discovery.cpp
+    src/messages/Pci.cpp
 )
 
 # allow the library to have link time optimization
 target_compile_options(driver PRIVATE -flto)
-target_compile_options(driver PRIVATE -fno-exceptions -fno-rtti)
-target_link_options(driver PUBLIC -fno-exceptions -fno-rtti)
 
 # specify the include directories
 target_include_directories(driver PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 target_include_directories(driver PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 
 # for rpc stuff we need Cista
-target_link_libraries(driver PRIVATE cista)
+target_link_libraries(driver PRIVATE mpack_dynamic)
 
 # install the library to the sysroot
 set_target_properties(driver PROPERTIES OUTPUT_NAME "driver")

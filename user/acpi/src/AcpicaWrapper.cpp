@@ -144,10 +144,14 @@ void AcpicaWrapper::probeBusses() {
     gShared->probePci();
 
     // yeet
-    if(gLogBusses) {
-        for(const auto &[id, bus] : gShared->busses) {
+    for(const auto &[id, bus] : gShared->busses) {
+        // log the loaded busses
+        if(gLogBusses) {
             Trace("Discovered bus %u:%s at %s: %p", id, bus->getName().c_str(), bus->getAcpiPath().c_str(), bus.get());
         }
+
+        // load its driver
+        bus->loadDriver(id);
     }
 }
 
