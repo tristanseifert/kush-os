@@ -4,11 +4,12 @@
 #include "log.h"
 
 #include <driver/Discovery.hpp>
+#include <mpack/mpack.h>
 
 using namespace acpi;
 
 std::string const PciBus::kBusName = "PCI";
-std::string const PciBus::kDriverName = "PciRootBridge";
+std::string const PciBus::kDriverName = "AcpiPciRootBridge";
 
 bool PciBus::gLogInterrupts = false;
 
@@ -157,16 +158,111 @@ void PciBus::getIrqRoutes(ACPI_HANDLE object) {
  * Loads a driver for this PCI bus.
  */
 void PciBus::loadDriver(const uintptr_t) {
-    // TODO: serialize interrupt routing
-
     // build the message and send it
     auto msg = new libdriver::DeviceDiscovered;
     auto match = new libdriver::DeviceNameMatch(kDriverName);
     msg->matches.push_back(match);
+
+    this->serializeAuxData(msg->aux);
 
     libdriver::SendToSrv(msg);
 
     // clean up
     delete match;
     delete msg;
+}
+
+/**
+ * Serializes the interrupt map to an msgpack object. It's basically identical to the
+ * representation used in memory. Additionally, bus address is added.
+ */
+void PciBus::serializeAuxData(std::vector<std::byte> &out) {
+    char *data;
+    size_t size;
+
+    // set up writer
+    mpack_writer_t writer;
+    mpack_writer_init_growable(&writer, &data, &size);
+
+    mpack_start_map(&writer, 4);
+    mpack_write_cstr(&writer, "bus");
+    mpack_write_u8(&writer, this->bus);
+    mpack_write_cstr(&writer, "segment");
+    mpack_write_u8(&writer, this->segment);
+    mpack_write_cstr(&writer, "address");
+    mpack_write_u32(&writer, this->address);
+
+    // serialize
+    mpack_write_cstr(&writer, "irqs");
+    if(!this->irqMap.empty()) {
+        mpack_start_map(&writer, this->irqMap.size());
+
+        for(const auto &[device, info] : this->irqMap) {
+            mpack_write_u8(&writer, device);
+            info.serialize(&writer);
+        }
+
+        mpack_finish_map(&writer);
+    } else {
+        mpack_write_nil(&writer);
+    }
+
+    // clean up
+    mpack_finish_map(&writer);
+
+    auto status = mpack_writer_destroy(&writer);
+    if(status != mpack_ok) {
+        Warn("%s failed: %d", "mpack_writer_destroy", status);
+        return;
+    }
+
+    // copy to output buffer
+    out.resize(size);
+    out.assign(reinterpret_cast<std::byte *>(data), reinterpret_cast<std::byte *>(data + size));
+}
+
+/**
+ * Serializes an interrupt info object.
+ */
+void PciBus::DeviceIrqInfo::serialize(mpack_writer_t *writer) const {
+    mpack_start_map(writer, 4);
+
+    // INTA
+    //mpack_write_cstr(writer, "a");
+    mpack_write_u8(writer, 0);
+    if(this->inta) {
+        this->inta->serialize(writer);
+    } else {
+        mpack_write_nil(writer);
+    }
+
+    // INTB
+    //mpack_write_cstr(writer, "b");
+    mpack_write_u8(writer, 1);
+    if(this->intb) {
+        this->intb->serialize(writer);
+    } else {
+        mpack_write_nil(writer);
+    }
+
+    // INTC
+    //mpack_write_cstr(writer, "c");
+    mpack_write_u8(writer, 2);
+    if(this->intc) {
+        this->intc->serialize(writer);
+    } else {
+        mpack_write_nil(writer);
+    }
+
+    // INTD
+    //mpack_write_cstr(writer, "d");
+    mpack_write_u8(writer, 3);
+    if(this->intd) {
+        this->intd->serialize(writer);
+    } else {
+        mpack_write_nil(writer);
+    }
+
+    // clean up
+    mpack_finish_map(writer);
 }

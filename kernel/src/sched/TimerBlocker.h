@@ -47,7 +47,10 @@ class TimerBlocker: public Blockable {
 
             this->timer = platform_timer_add(deadline, [](const uintptr_t tok, void *ctx) {
                 if(!ctx) return;
-                reinterpret_cast<TimerBlocker *>(ctx)->timerFired(tok);
+                auto blocker = reinterpret_cast<TimerBlocker *>(ctx);
+
+                // log("timer blocker %p", ctx);
+                blocker->timerFired(tok);
             }, this);
 
             REQUIRE(this->timer, "failed to allocate timer");
@@ -58,12 +61,14 @@ class TimerBlocker: public Blockable {
          * Unblocks the task when the timer has fired.
          */
         void timerFired(const uintptr_t tok) {
-            // set the flag
-            bool yes = true;
-            __atomic_store(&this->hasFired, &yes, __ATOMIC_RELEASE);
+            bool no = false, yes = true;
+            if(__atomic_compare_exchange(&this->hasFired, &no, &yes, false, __ATOMIC_RELEASE,
+                        __ATOMIC_RELAXED)) {
+                // log("unblocking %p", this->blocker);
 
-            // unblock the task
-            this->unblock();
+                // unblock the task
+                this->unblock();
+            }
         }
 
     private:

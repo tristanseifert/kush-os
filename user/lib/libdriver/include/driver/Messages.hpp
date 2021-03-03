@@ -24,17 +24,17 @@ struct Message {
         /**
          * Serializes the message into the given msgbuf writer.
          */
-        virtual void serialize(mpack_writer_t * _Nonnull writer);
+        virtual void serialize(mpack_writer_t * _Nonnull writer) = 0;
 
         /**
          * Decodes the given memory buffer as the structure, MsgPack encoded, and replaces the
          * current object's contents with it.
          */
-        virtual void deserialize(const std::span<std::byte> &in);
+        virtual void deserializeFull(const std::span<std::byte> &in);
         /**
          * Decodes the object from a given MsgPack node.
          */
-        virtual void deserialize(mpack_node_t &root);
+        virtual void deserialize(mpack_node_t &root) = 0;
 
         /**
          * Returns the RPC type value for this message.

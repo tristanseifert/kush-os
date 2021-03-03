@@ -23,6 +23,7 @@ FILE /sbin/ldyldo
 FILE /sbin/dyldosrv
 FILE /sbin/driverman
 FILE /sbin/acpisrv
+FILE /sbin/pcisrv
 
 ###############
 ## now, start all of the servers

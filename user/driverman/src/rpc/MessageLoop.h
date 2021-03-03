@@ -5,6 +5,12 @@
 #include <cassert>
 #include <cstdint>
 
+struct MessageHeader;
+
+namespace rpc {
+struct RpcPacket;
+}
+
 class MessageLoop {
     public:
         /// Set up the global message loop.
@@ -23,6 +29,9 @@ class MessageLoop {
 
         MessageLoop();
         ~MessageLoop();
+
+    private:
+        void handleDiscover(MessageHeader * _Nonnull, rpc::RpcPacket * _Nonnull);
 
     private:
         /// name of the service to register

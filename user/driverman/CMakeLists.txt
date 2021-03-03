@@ -10,6 +10,8 @@ add_executable(driverman
     src/experts/Expert.cpp
     src/forest/Forest.cpp
     src/rpc/MessageLoop.cpp
+    src/db/Driver.cpp
+    src/db/DriverDb.cpp
 )
 
 if(${KERNEL_ARCH} STREQUAL "x86")

@@ -88,10 +88,6 @@ void DeviceDiscovered::deserialize(mpack_node_t &root) {
     }
 }
 
-const uint32_t DeviceDiscovered::getRpcType() const {
-    return 'DDSC';
-}
-
 
 
 /**
@@ -151,8 +147,4 @@ void DeviceNameMatch::deserialize(mpack_node_t &root) {
     } else {
         this->name.clear();
     }
-}
-
-const uint32_t DeviceNameMatch::getRpcType() const {
-    return 'DMN ';
 }

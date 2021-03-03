@@ -19,14 +19,14 @@ extern "C" {
   * @param src Source binary memory block.
   * @param size Size in bytes of source binary memory block.
   * @return A pointer to the null character of the base85 null-terminated string. */
-char *bintob85(char* restrict dest, void const* restrict src, size_t size);
+char *bintob85(char* dest, void const* src, size_t size);
 
 /** Convert a base85 string to binary format.
   * @param dest Destination memory block.
   * @param src Source base85 string.
   * @return If success a pointer to the next byte in memory block.
   *         Null if string has a bad format.  */
-void *b85tobin(void* restrict dest, char const* restrict src);
+void *b85tobin(void* dest, char const* src);
 
 /** @ } */
 

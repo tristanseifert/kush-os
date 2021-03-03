@@ -105,10 +105,16 @@ void Manager::checkTimers() {
     this->timers.removeMatching([](void *ctx, TimerInfo &timer) {
         bool yes = true;
         auto info = reinterpret_cast<IterInfo *>(ctx);
+        if(!info) return true;
 
-        if(timer.deadline <= info->time) {
+        if(timer.deadline <= info->time && !timer.fired) {
+            // log("thymer %x fired (%llu) cb %p ctx %p", timer.token, timer.deadline, timer.callback, timer.callbackCtx);
+
             __atomic_store(&timer.fired, &yes, __ATOMIC_RELEASE);
+            if(!timer.callback) return true;
             timer.callback(timer.token, timer.callbackCtx);
+
+            // log("back from %x", timer.token);
 
             return true;
         }

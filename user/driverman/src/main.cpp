@@ -7,6 +7,7 @@
 #include "CLI/Formatter.hpp"
 #include "CLI/Config.hpp"
 
+#include "db/DriverDb.h"
 #include "forest/Forest.h"
 #include "experts/Expert.h"
 #include "rpc/MessageLoop.h"
@@ -29,6 +30,8 @@ int main(const int argc, const char **argv) {
 
     Forest::init();
     MessageLoop::init();
+
+    DriverDb::init();
 
     // create platform export
     auto expert = Expert::create(expertName);

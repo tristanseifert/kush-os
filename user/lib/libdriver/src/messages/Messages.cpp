@@ -33,7 +33,7 @@ size_t Message::serialize(std::span<std::byte> &out) {
 /**
  * Deserializes the message from the given buffer's top level node.
  */
-void Message::deserialize(const std::span<std::byte> &in) {
+void Message::deserializeFull(const std::span<std::byte> &in) {
     // read message and parse it
     mpack_tree_t tree;
     mpack_tree_init_data(&tree, reinterpret_cast<const char *>(in.data()), in.size());
@@ -48,16 +48,6 @@ void Message::deserialize(const std::span<std::byte> &in) {
     if(status != mpack_ok) {
         throw std::runtime_error("mpack_tree_destroy() failed");
     }
-}
-
-void Message::serialize(mpack_writer_t *writer) {
-    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
-    abort();
-}
-
-void Message::deserialize(mpack_node_t &root) {
-    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
-    abort();
 }
 
 const uint32_t Message::getRpcType() const {

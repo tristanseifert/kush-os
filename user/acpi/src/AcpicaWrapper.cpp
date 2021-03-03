@@ -256,7 +256,7 @@ void AcpicaWrapper::foundPciRoot(ACPI_HANDLE object) {
     }
 
     // create the bus
-    auto bobj = std::make_shared<PciBus>(nullptr, std::string(name), bus);
+    auto bobj = std::make_shared<PciBus>(nullptr, std::string(name), bus, addr, seg);
     bobj->getIrqRoutes(object);
 
     // store bus

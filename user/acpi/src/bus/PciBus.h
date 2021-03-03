@@ -10,6 +10,8 @@
 #include "Bus.h"
 #include "resource/Irq.h"
 
+struct mpack_writer_t;
+
 namespace acpi {
 /**
  * PCI bus: these are discovered during the scanning of the ACPI tables for root ports. Each bus
@@ -26,8 +28,9 @@ class PciBus: public Bus {
          *
          * The given bus number is assigned as the base for this bus.
          */
-        PciBus(Bus * _Nullable parent, const std::string &acpiPath, const uint8_t _bus) :
-            Bus(parent, acpiPath), bus(_bus) {
+        PciBus(Bus * _Nullable parent, const std::string &acpiPath, const uint8_t _bus,
+                const uint32_t _address, const uint8_t _segment) :
+            Bus(parent, acpiPath), bus(_bus), address(_address), segment(_segment) {
             // nothing... yet
         }
 
@@ -59,7 +62,12 @@ class PciBus: public Bus {
             std::optional<resource::Irq> intc;
             /// IRQ associated with INTD
             std::optional<resource::Irq> intd;
+
+            void serialize(mpack_writer_t * _Nonnull) const;
         };
+
+    private:
+        void serializeAuxData(std::vector<std::byte> &out);
 
     private:
         /// whether interrupt mappings are logged
@@ -68,6 +76,10 @@ class PciBus: public Bus {
     private:
         /// Bus number
         uint8_t bus = 0;
+        /// address (high word = function, low word = device)
+        uint32_t address = 0;
+        /// segment number
+        uint8_t segment = 0;
 
         /// Interrupt mappings from device IRQ pins to host IRQs
         std::unordered_map<uint8_t, DeviceIrqInfo> irqMap;

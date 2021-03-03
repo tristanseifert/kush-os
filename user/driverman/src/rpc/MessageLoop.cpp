@@ -1,8 +1,13 @@
 #include "MessageLoop.h"
 #include "Log.h"
 
+#include "db/Driver.h"
+#include "db/DriverDb.h"
+
 #include <malloc.h>
 #include <system_error>
+
+#include <driver/Discovery.hpp>
 
 #include <rpc/dispensary.h>
 #include <rpc/RpcPacket.hpp>
@@ -67,7 +72,68 @@ void MessageLoop::run() {
             throw std::system_error(err, std::generic_category(), "PortReceive");
         }
 
-        // process the message
-        Trace("Received message %u bytes", buf->receivedBytes);
+        // read out the packet header
+        if(buf->receivedBytes < sizeof(rpc::RpcPacket)) {
+            Warn("Received %u bytes (too small)", buf->receivedBytes);
+            continue;
+        }
+
+        auto packet = reinterpret_cast<rpc::RpcPacket *>(buf->data);
+        Trace("Received %u bytes", buf->receivedBytes);
+
+        // invoke the appropriate handler
+        switch(packet->type) {
+            case libdriver::DeviceDiscovered::kRpcType:
+                this->handleDiscover(buf, packet);
+                break;
+
+            default:
+                Warn("Unknown RPC type $%08x", packet->type);
+                break;
+        }
     }
 }
+
+/**
+ * Handles a newly discovered device.
+ */
+void MessageLoop::handleDiscover(MessageHeader *msg, rpc::RpcPacket *packet) {
+    // try to deserialize it
+    const auto reqBuf = std::span(reinterpret_cast<std::byte *>(packet->payload),
+            msg->receivedBytes - sizeof(rpc::RpcPacket));
+
+    libdriver::DeviceDiscovered disc;
+    disc.deserializeFull(reqBuf);
+
+    // find a driver
+    Trace("Discovered device: %u match descriptors, %u aux bytes", disc.matches.size(),
+            disc.aux.size());
+
+/*    for(auto _match : disc.matches) {
+        switch(_match->getRpcType()) {
+            case libdriver::DeviceNameMatch::kRpcType: {
+                auto match = reinterpret_cast<libdriver::DeviceNameMatch *>(_match);
+                Trace("Name match: '%s'", match->name.c_str());
+                break;
+            }
+
+            default:
+                Warn("Unknown match type (obj %p type %08x)", _match, _match->getRpcType());
+                break;
+        }
+    }
+    */
+
+    auto driver = DriverDb::the()->findDriver(disc.matches);
+    Trace("Found driver: %p path %s", driver.get(), (driver ? driver->getPath().c_str() : "(null)"));
+
+    // failed to find driver
+    if(!driver) {
+        Warn("Failed to find driver for device!");
+    } 
+    // create an instance thereof
+    else {
+        driver->start(disc.aux);
+    }
+}
+

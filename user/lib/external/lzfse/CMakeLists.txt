@@ -14,7 +14,7 @@ add_library(lzfse_objs OBJECT
 target_include_directories(lzfse_objs PRIVATE src)
 target_include_directories(lzfse_objs PUBLIC include)
 
-target_compile_options(lzfse_objs PRIVATE -fPIC)
+target_compile_options(lzfse_objs PRIVATE -fPIC -O3)
 target_compile_options(lzfse_objs PRIVATE "-Wno-implicit-fallthrough")
 
 # create the static and dynamic targets

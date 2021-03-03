@@ -7,6 +7,8 @@
 
 #include "Resource.h"
 
+#include <mpack/mpack.h>
+
 namespace acpi::resource {
 /**
  * Describes various attributes of an interrupt, including its polarity, triggering mode, and
@@ -69,6 +71,19 @@ struct Irq: public Resource {
         }
 
         this->irq = in.Interrupts[0];
+    }
+
+    /// Serializes an IRQ resource
+    void serialize(mpack_writer_t * _Nonnull writer) const {
+        mpack_start_map(writer, 2);
+
+        mpack_write_u8(writer, 0);
+        mpack_write_u8(writer, this->irq);
+
+        mpack_write_u8(writer, 1);
+        mpack_write_u32(writer, static_cast<uint32_t>(this->flags));
+
+        mpack_finish_map(writer);
     }
 
     private:
