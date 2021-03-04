@@ -72,3 +72,8 @@ make install -j40
 ```
 
 We can enable `LIBUNWIND_ENABLE_THREADS` when we've got a pthreads compatibility layer.
+
+## Documentation
+There's not a whole lot of documentation about the project as of yet.
+
+Some blog posts describing the OS design and motivations are [available here.](https://blraaz.me/archive.html?tag=kush-os)
