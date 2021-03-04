@@ -219,6 +219,7 @@ void PciBus::serializeAuxData(std::vector<std::byte> &out) {
     // copy to output buffer
     out.resize(size);
     out.assign(reinterpret_cast<std::byte *>(data), reinterpret_cast<std::byte *>(data + size));
+    free(data);
 }
 
 /**

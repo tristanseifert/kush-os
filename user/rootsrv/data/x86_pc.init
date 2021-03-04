@@ -24,6 +24,7 @@ FILE /sbin/dyldosrv
 FILE /sbin/driverman
 FILE /sbin/acpisrv
 FILE /sbin/pcisrv
+FILE /sbin/ps2drv
 
 ###############
 ## now, start all of the servers

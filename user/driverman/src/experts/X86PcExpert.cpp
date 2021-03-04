@@ -24,4 +24,14 @@ void X86PcExpert::probe() {
     }
 
     Trace("ACPI task handle: $%08x'h", this->acpiTaskHandle);
+
+    // export fixed devices
+    this->exportFixed();
+}
+
+/**
+ * Exports fixed platform devices, i.e. those that are present on all x86 PCs.
+ */
+void X86PcExpert::exportFixed() {
+
 }

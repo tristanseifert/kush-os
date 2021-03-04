@@ -1,7 +1,9 @@
 #include "AcpicaWrapper.h"
+#include "AcpiUtils.h"
 #include "log.h"
 
 #include "bus/PciBus.h"
+#include "bus/Ps2Bus.h"
 
 #include <cassert>
 #include <cstddef>
@@ -29,10 +31,9 @@ AcpicaWrapper::AcpicaWrapper() {
     ACPI_STATUS status;
 
     // debug all the things
-    // AcpiDbgLevel = ACPI_DEBUG_ALL;
     AcpiDbgLevel = ACPI_LV_ALL_EXCEPTIONS;
     AcpiDbgLevel = ACPI_NORMAL_DEFAULT;
-    //AcpiDbgLayer = ACPI_ALL_COMPONENTS;
+    AcpiDbgLayer = ACPI_ALL_COMPONENTS;
 
     // initialize ACPICA subsystem
     status = AcpiInitializeSubsystem();
@@ -142,6 +143,7 @@ void AcpicaWrapper::configureApic() {
 void AcpicaWrapper::probeBusses() {
     // probe the busses
     gShared->probePci();
+    gShared->probePcDevices();
 
     // yeet
     for(const auto &[id, bus] : gShared->busses) {
@@ -153,6 +155,13 @@ void AcpicaWrapper::probeBusses() {
         // load its driver
         bus->loadDriver(id);
     }
+}
+
+/**
+ * Finds all platform devices in the ACPI.
+ */
+void AcpicaWrapper::probeDevices() {
+    // nothing... yet
 }
 
 
@@ -204,16 +213,7 @@ void AcpicaWrapper::foundPciRoot(ACPI_HANDLE object) {
     ACPI_BUFFER retBuf;
 
     // get its name
-    ACPI_BUFFER buffer;
-    char name[128];
-
-    buffer.Length = sizeof(name);
-    buffer.Pointer = name;
-
-    status = AcpiGetName(object, ACPI_FULL_PATHNAME, &buffer);
-    if(ACPI_FAILURE(status)) {
-        Abort("Failed to get PCI root bridge name: %s", AcpiFormatException(status));
-    }
+    const auto name = AcpiUtils::getName(object);
 
     // initialize buffer
     ret1.Type = ACPI_TYPE_INTEGER;
@@ -225,7 +225,7 @@ void AcpicaWrapper::foundPciRoot(ACPI_HANDLE object) {
 
     status = AcpiEvaluateObjectTyped(object, "_ADR", nullptr, &retBuf, ACPI_TYPE_INTEGER);
     if(status != AE_OK) {
-        Abort("Failed to evaluate %s on %s: %s", "_ADR", name, AcpiFormatException(status));
+        Abort("Failed to evaluate %s on %s: %s", "_ADR", name.c_str(), AcpiFormatException(status));
     } else {
         addr = ret1.Integer.Value;
     }
@@ -235,7 +235,7 @@ void AcpicaWrapper::foundPciRoot(ACPI_HANDLE object) {
 
     status = AcpiEvaluateObjectTyped(object, "_BBN", nullptr, &retBuf, ACPI_TYPE_INTEGER);
     if(status != AE_OK) {
-        Warn("Failed to evaluate %s on %s: %s", "_BBN", name, AcpiFormatException(status));
+        Warn("Failed to evaluate %s on %s: %s", "_BBN", name.c_str(), AcpiFormatException(status));
     } else {
         addr = ret1.Integer.Value;
     } 
@@ -246,20 +246,36 @@ void AcpicaWrapper::foundPciRoot(ACPI_HANDLE object) {
     status = AcpiEvaluateObjectTyped(object, "_SEG", nullptr, &retBuf, ACPI_TYPE_INTEGER);
     if(status != AE_OK) {
         seg = 0; // assume segment as 0 if method is unavailable
-        Warn("Failed to evaluate %s on %s: %s", "_SEG", name, AcpiFormatException(status));
+        Warn("Failed to evaluate %s on %s: %s", "_SEG", name.c_str(), AcpiFormatException(status));
     } else {
         addr = ret1.Integer.Value;
     } 
 
     if(gLogBusses) {
-        Trace("Bridge %s: address %08x bus %u segment %u", name, addr, bus, seg);
+        Trace("Bridge %s: address %08x bus %u segment %u", name.c_str(), addr, bus, seg);
     }
 
     // create the bus
-    auto bobj = std::make_shared<PciBus>(nullptr, std::string(name), bus, addr, seg);
+    auto bobj = std::make_shared<PciBus>(nullptr, name, bus, addr, seg);
     bobj->getIrqRoutes(object);
 
     // store bus
     this->busses.emplace(this->nextBusId++, std::dynamic_pointer_cast<Bus>(bobj));
+}
+
+
+
+/**
+ * Search for devices commonly found on a PC, including:
+ *
+ * - PS/2 keyboard and mouse controller
+ */
+void AcpicaWrapper::probePcDevices() {
+    // test for a PS/2 keyboard/mouse controller
+    auto ps2 = Ps2Bus::probe();
+
+    if(ps2) {
+        this->busses.emplace(this->nextBusId++, std::dynamic_pointer_cast<Bus>(ps2));
+    }
 }
 

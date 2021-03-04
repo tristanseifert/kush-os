@@ -23,6 +23,8 @@ class AcpicaWrapper {
         static void init();
         /// Enumerate busses and initialize drivers for them
         static void probeBusses();
+        /// Enumerate all platform devices.
+        static void probeDevices();
 
     private:
         static AcpicaWrapper *gShared;
@@ -39,6 +41,8 @@ class AcpicaWrapper {
         void probePci();
         void foundPciRoot(ACPI_HANDLE);
         void pciGetIrqRoutes(ACPI_HANDLE, std::shared_ptr<acpi::PciBus> &);
+
+        void probePcDevices();
 
     private:
         /// ID for the next bus we discover

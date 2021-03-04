@@ -17,6 +17,12 @@ DriverDb::DriverDb() {
     pciRoot->addMatch(static_cast<libdriver::DeviceMatch *>(
                 new libdriver::DeviceNameMatch("AcpiPciRootBridge")));
     this->addDriver(pciRoot);
+
+    // PS/2 controller
+    auto ps2Controller = std::make_shared<Driver>("/sbin/ps2drv");
+    ps2Controller->addMatch(static_cast<libdriver::DeviceMatch *>(
+                new libdriver::DeviceNameMatch("AcpiPs2Controller")));
+    this->addDriver(ps2Controller);
 }
 
 

@@ -9,6 +9,7 @@ add_executable(acpisrv
     src/Log.cpp
     src/AcpicaWrapper.cpp
     src/bus/PciBus.cpp
+    src/bus/Ps2Bus.cpp
     # ACPICA OS layer
     src/osl/init.cpp
     src/osl/irq.cpp
@@ -26,6 +27,20 @@ add_executable(acpisrv
 )
 
 target_include_directories(acpisrv PRIVATE src/acpica/include)
+
+#### Serialization of ACPI structures
+add_library(acpisrv_serialization OBJECT
+    src/resource/Deserialize.cpp
+    src/resource/Serialize.cpp
+)
+
+target_compile_options(acpisrv_serialization PRIVATE -flto)
+
+target_link_libraries(acpisrv_serialization PRIVATE mpack_dynamic)
+target_include_directories(acpisrv_serialization PUBLIC src/resource)
+target_include_directories(acpisrv_serialization PUBLIC src/acpica/include)
+
+target_link_libraries(acpisrv PRIVATE acpisrv_serialization)
 
 #### ACPICA sources
 add_library(acpisrv_acpica OBJECT

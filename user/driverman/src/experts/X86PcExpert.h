@@ -14,6 +14,9 @@ class X86PcExpert: public Expert {
         constexpr static const char *kAcpiServerPath = "/sbin/acpisrv";
 
     private:
+        void exportFixed();
+
+    private:
         /// Task handle to ACPI server
         uintptr_t acpiTaskHandle = 0;
 };

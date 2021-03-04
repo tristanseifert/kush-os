@@ -24,6 +24,7 @@ int main(const int argc, const char **argv) {
 
     // probe any busses and load drivers for built-in devices
     AcpicaWrapper::probeBusses();
+    AcpicaWrapper::probeDevices();
 
     // enter main message loop
     Trace("Entering message loop");
