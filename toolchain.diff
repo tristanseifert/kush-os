@@ -1,0 +1,640 @@
+diff --git a/clang/lib/Basic/Targets.cpp b/clang/lib/Basic/Targets.cpp
+index 90a67d03b..5793fdef6 100644
+--- a/clang/lib/Basic/Targets.cpp
++++ b/clang/lib/Basic/Targets.cpp
+@@ -140,6 +140,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
+       return new CloudABITargetInfo<AArch64leTargetInfo>(Triple, Opts);
+     case llvm::Triple::FreeBSD:
+       return new FreeBSDTargetInfo<AArch64leTargetInfo>(Triple, Opts);
++    case llvm::Triple::Kush:
++      return new KushTargetInfo<AArch64leTargetInfo>(Triple, Opts);
+     case llvm::Triple::Fuchsia:
+       return new FuchsiaTargetInfo<AArch64leTargetInfo>(Triple, Opts);
+     case llvm::Triple::Linux:
+@@ -164,6 +166,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
+     switch (os) {
+     case llvm::Triple::FreeBSD:
+       return new FreeBSDTargetInfo<AArch64beTargetInfo>(Triple, Opts);
++    case llvm::Triple::Kush:
++      return new KushTargetInfo<AArch64beTargetInfo>(Triple, Opts);
+     case llvm::Triple::Fuchsia:
+       return new FuchsiaTargetInfo<AArch64beTargetInfo>(Triple, Opts);
+     case llvm::Triple::Linux:
+@@ -497,6 +501,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
+       return new OpenBSDI386TargetInfo(Triple, Opts);
+     case llvm::Triple::FreeBSD:
+       return new FreeBSDTargetInfo<X86_32TargetInfo>(Triple, Opts);
++    case llvm::Triple::Kush:
++      return new KushTargetInfo<X86_32TargetInfo>(Triple, Opts);
+     case llvm::Triple::Fuchsia:
+       return new FuchsiaTargetInfo<X86_32TargetInfo>(Triple, Opts);
+     case llvm::Triple::KFreeBSD:
+@@ -556,6 +562,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
+       return new OpenBSDX86_64TargetInfo(Triple, Opts);
+     case llvm::Triple::FreeBSD:
+       return new FreeBSDTargetInfo<X86_64TargetInfo>(Triple, Opts);
++    case llvm::Triple::Kush:
++      return new KushTargetInfo<X86_64TargetInfo>(Triple, Opts);
+     case llvm::Triple::Fuchsia:
+       return new FuchsiaTargetInfo<X86_64TargetInfo>(Triple, Opts);
+     case llvm::Triple::KFreeBSD:
+diff --git a/clang/lib/Basic/Targets/OSTargets.h b/clang/lib/Basic/Targets/OSTargets.h
+index 67fa1a537..9b2bfd509 100644
+--- a/clang/lib/Basic/Targets/OSTargets.h
++++ b/clang/lib/Basic/Targets/OSTargets.h
+@@ -947,6 +947,32 @@ public:
+       : WebAssemblyOSTargetInfo<Target>(Triple, Opts) {}
+ };
+ 
++/// Kush target
++template <typename Target>
++class LLVM_LIBRARY_VISIBILITY KushTargetInfo : public OSTargetInfo<Target> {
++protected:
++  void getOSDefines(const LangOptions &Opts, const llvm::Triple &Triple,
++                    MacroBuilder &Builder) const override {
++    Builder.defineMacro("__Kush__");
++    Builder.defineMacro("__ELF__");
++    if (Opts.POSIXThreads)
++      Builder.defineMacro("_REENTRANT");
++    // Required by the libc++ locale support.
++    if (Opts.CPlusPlus)
++      Builder.defineMacro("_GNU_SOURCE");
++  }
++
++public:
++  KushTargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
++      : OSTargetInfo<Target>(Triple, Opts) {
++    this->MCountName = "__mcount";
++    // the itanium ABI is the standard for most open source stuff
++    this->TheCXXABI.set(TargetCXXABI::GenericItanium);
++  }
++};
++
++
++
+ } // namespace targets
+ } // namespace clang
+ #endif // LLVM_CLANG_LIB_BASIC_TARGETS_OSTARGETS_H
+diff --git a/clang/lib/Driver/CMakeLists.txt b/clang/lib/Driver/CMakeLists.txt
+index aeffcf0bb..d34ff2b0b 100644
+--- a/clang/lib/Driver/CMakeLists.txt
++++ b/clang/lib/Driver/CMakeLists.txt
+@@ -49,6 +49,7 @@ add_clang_library(clangDriver
+   ToolChains/Flang.cpp
+   ToolChains/FreeBSD.cpp
+   ToolChains/Fuchsia.cpp
++  ToolChains/Kush.cpp
+   ToolChains/Gnu.cpp
+   ToolChains/Haiku.cpp
+   ToolChains/HIP.cpp
+diff --git a/clang/lib/Driver/Driver.cpp b/clang/lib/Driver/Driver.cpp
+index 418e1d3e8..74123acd2 100644
+--- a/clang/lib/Driver/Driver.cpp
++++ b/clang/lib/Driver/Driver.cpp
+@@ -22,6 +22,7 @@
+ #include "ToolChains/DragonFly.h"
+ #include "ToolChains/FreeBSD.h"
+ #include "ToolChains/Fuchsia.h"
++#include "ToolChains/Kush.h"
+ #include "ToolChains/Gnu.h"
+ #include "ToolChains/HIP.h"
+ #include "ToolChains/Haiku.h"
+@@ -5125,6 +5126,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
+     case llvm::Triple::NaCl:
+       TC = std::make_unique<toolchains::NaClToolChain>(*this, Target, Args);
+       break;
++    case llvm::Triple::Kush:
++      TC = std::make_unique<toolchains::Kush>(*this, Target, Args);
++      break;
+     case llvm::Triple::Fuchsia:
+       TC = std::make_unique<toolchains::Fuchsia>(*this, Target, Args);
+       break;
+diff --git a/clang/lib/Driver/ToolChain.cpp b/clang/lib/Driver/ToolChain.cpp
+index b2ddef141..f4d6d13f2 100644
+--- a/clang/lib/Driver/ToolChain.cpp
++++ b/clang/lib/Driver/ToolChain.cpp
+@@ -398,6 +398,8 @@ StringRef ToolChain::getOSLibName() const {
+     return "sunos";
+   case llvm::Triple::AIX:
+     return "aix";
++  case llvm::Triple::Kush:
++    return "kush";
+   default:
+     return getOS();
+   }
+diff --git a/clang/lib/Driver/ToolChains/Kush.cpp b/clang/lib/Driver/ToolChains/Kush.cpp
+new file mode 100644
+index 000000000..9592c5e80
+--- /dev/null
++++ b/clang/lib/Driver/ToolChains/Kush.cpp
+@@ -0,0 +1,296 @@
++//===--- Kush.cpp - Kush ToolChain Implementations --------*- C++ -*-===//
++//
++// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
++// See https://llvm.org/LICENSE.txt for license information.
++// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
++//
++//===----------------------------------------------------------------------===//
++
++#include "Kush.h"
++#include "CommonArgs.h"
++#include "clang/Config/config.h"
++#include "clang/Driver/Compilation.h"
++#include "clang/Driver/Driver.h"
++#include "clang/Driver/DriverDiagnostic.h"
++#include "clang/Driver/Options.h"
++#include "clang/Driver/SanitizerArgs.h"
++#include "llvm/Option/ArgList.h"
++#include "llvm/ProfileData/InstrProf.h"
++#include "llvm/Support/FileSystem.h"
++#include "llvm/Support/Path.h"
++#include "llvm/Support/VirtualFileSystem.h"
++
++using namespace clang::driver;
++using namespace clang::driver::toolchains;
++using namespace clang::driver::tools;
++using namespace clang;
++using namespace llvm::opt;
++
++void kush::Linker::ConstructJob(Compilation &C, const JobAction &JA,
++                                   const InputInfo &Output,
++                                   const InputInfoList &Inputs,
++                                   const ArgList &Args,
++                                   const char *LinkingOutput) const {
++  const toolchains::Kush &ToolChain =
++      static_cast<const toolchains::Kush &>(getToolChain());
++  const Driver &D = ToolChain.getDriver();
++
++  ArgStringList CmdArgs;
++
++  // Silence warning for "clang -g foo.o -o foo"
++  Args.ClaimAllArgs(options::OPT_g_Group);
++  // and "clang -emit-llvm foo.o -o foo"
++  Args.ClaimAllArgs(options::OPT_emit_llvm);
++  // and for "clang -w foo.o -o foo". Other warning options are already
++  // handled somewhere else.
++  Args.ClaimAllArgs(options::OPT_w);
++
++  const char *Exec = Args.MakeArgString(ToolChain.GetLinkerPath());
++  /*if (llvm::sys::path::filename(Exec).equals_lower("ld.lld") ||
++      llvm::sys::path::stem(Exec).equals_lower("ld.lld")) {
++    CmdArgs.push_back("-z");
++    CmdArgs.push_back("rodynamic");
++    CmdArgs.push_back("-z");
++    CmdArgs.push_back("separate-loadable-segments");
++    CmdArgs.push_back("--pack-dyn-relocs=relr");
++  }*/
++
++  // currently, we don't support protected relro 
++  CmdArgs.push_back("-znorelro");
++
++  if (!D.SysRoot.empty())
++    CmdArgs.push_back(Args.MakeArgString("--sysroot=" + D.SysRoot));
++
++  const bool IsPIE =
++      !Args.hasArg(options::OPT_shared) &&
++      (Args.hasArg(options::OPT_pie) || ToolChain.isPIEDefault());
++
++  if (IsPIE)
++    CmdArgs.push_back("-pie");
++
++  if (Args.hasArg(options::OPT_s))
++    CmdArgs.push_back("-s");
++
++  // static linking flags
++  if (Args.hasArg(options::OPT_static)) {
++    CmdArgs.push_back("-Bstatic");
++  } 
++    // dynamic linking flags
++  else {
++    if (Args.hasArg(options::OPT_rdynamic))
++      CmdArgs.push_back("-export-dynamic");
++    if (Args.hasArg(options::OPT_shared)) {
++      CmdArgs.push_back("-Bshareable");
++    } else {
++      CmdArgs.push_back("-dynamic-linker");
++      CmdArgs.push_back("/sbin/ldyldo");
++    }
++    CmdArgs.push_back("--enable-new-dtags");
++  }
++
++  CmdArgs.push_back("-o");
++  CmdArgs.push_back(Output.getFilename());
++
++  // standard C library
++  /*
++  if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nostartfiles)) {
++    if (!Args.hasArg(options::OPT_shared)) {
++      CmdArgs.push_back(Args.MakeArgString(ToolChain.GetFilePath("Scrt1.o")));
++    }
++  }
++  */
++
++  // c library startup files
++  if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nostartfiles)) {
++    // static executable entry point
++    if (Args.hasArg(options::OPT_static)) {
++      CmdArgs.push_back(Args.MakeArgString(ToolChain.GetFilePath("crt0T.o")));
++    }
++    // shared library or position-independent executable entry point 
++    else if (Args.hasArg(options::OPT_shared) || IsPIE) {
++      CmdArgs.push_back(Args.MakeArgString(ToolChain.GetFilePath("crt0S.o")));
++    }
++    // regular executable entry point
++    else {
++      CmdArgs.push_back(Args.MakeArgString(ToolChain.GetFilePath("crt0.o")));
++    }
++
++    // static executables need the C initializer (_init/_fini) as well
++    if(Args.hasArg(options::OPT_static)) {
++      CmdArgs.push_back(Args.MakeArgString(ToolChain.GetFilePath("crti.o")));
++    }
++  }
++ 
++
++  Args.AddAllArgs(CmdArgs, options::OPT_L);
++  Args.AddAllArgs(CmdArgs, options::OPT_u);
++
++  ToolChain.AddFilePathLibArgs(Args, CmdArgs);
++
++  if (D.isUsingLTO()) {
++    assert(!Inputs.empty() && "Must have at least one input.");
++    addLTOOptions(ToolChain, Args, CmdArgs, Output, Inputs[0],
++                  D.getLTOMode() == LTOK_Thin);
++  }
++
++  AddLinkerInputs(ToolChain, Inputs, Args, CmdArgs, JA);
++
++  if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs)) {
++    if (Args.hasArg(options::OPT_static)) {
++      CmdArgs.push_back("-Bstatic");
++    }
++
++    if (D.CCCIsCXX()) {
++      if (ToolChain.ShouldLinkCXXStdlib(Args)) {
++        bool OnlyLibstdcxxStatic = Args.hasArg(options::OPT_static_libstdcxx) &&
++                                   !Args.hasArg(options::OPT_static);
++        CmdArgs.push_back("--push-state");
++        CmdArgs.push_back("--as-needed");
++        if (OnlyLibstdcxxStatic)
++          CmdArgs.push_back("-Bstatic");
++        ToolChain.AddCXXStdlibLibArgs(Args, CmdArgs);
++        if (OnlyLibstdcxxStatic)
++          CmdArgs.push_back("-Bdynamic");
++        // we always use OpenLibM
++        CmdArgs.push_back("-lopenlibm");
++        CmdArgs.push_back("--pop-state");
++      }
++    }
++
++    AddRunTimeLibs(ToolChain, D, CmdArgs, Args);
++
++    // libc will always pull in libsystem (for syscalls)
++    if (!Args.hasArg(options::OPT_nolibc)){
++      CmdArgs.push_back("-lc");
++      CmdArgs.push_back("-lsystem");
++    }
++  }
++
++  C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
++                                         Exec, CmdArgs, Inputs, Output));
++}
++
++/// Kush - Kush tool chain which can call as(1) and ld(1) directly.
++
++Kush::Kush(const Driver &D, const llvm::Triple &Triple,
++                 const ArgList &Args)
++    : ToolChain(D, Triple, Args) {
++  getProgramPaths().push_back(getDriver().getInstalledDir());
++  if (getDriver().getInstalledDir() != D.Dir)
++    getProgramPaths().push_back(D.Dir);
++
++  // default search paths for libraries
++  if (!D.SysRoot.empty()) {
++    SmallString<128> P(D.SysRoot);
++    llvm::sys::path::append(P, "lib");
++    getFilePaths().push_back(std::string(P.str()));
++  }
++  if (!D.SysRoot.empty()) {
++    SmallString<128> P(D.SysRoot);
++    llvm::sys::path::append(P, "usr", "lib");
++    getFilePaths().push_back(std::string(P.str()));
++  }
++}
++
++std::string Kush::ComputeEffectiveClangTriple(const ArgList &Args,
++                                                 types::ID InputType) const {
++  llvm::Triple Triple(ComputeLLVMTriple(Args, InputType));
++  return Triple.str();
++}
++
++Tool *Kush::buildLinker() const {
++  return new tools::kush::Linker(*this);
++}
++
++ToolChain::RuntimeLibType Kush::GetRuntimeLibType(
++    const ArgList &Args) const {
++  if (Arg *A = Args.getLastArg(clang::driver::options::OPT_rtlib_EQ)) {
++    StringRef Value = A->getValue();
++    if (Value != "compiler-rt")
++      getDriver().Diag(clang::diag::err_drv_invalid_rtlib_name)
++          << A->getAsString(Args);
++  }
++
++  return ToolChain::RLT_CompilerRT;
++}
++
++void Kush::addClangTargetOptions(const ArgList &DriverArgs,
++                                    ArgStringList &CC1Args,
++                                    Action::OffloadKind) const {
++  if (!DriverArgs.hasFlag(options::OPT_fuse_init_array,
++                          options::OPT_fno_use_init_array, true)) {
++    CC1Args.push_back("-fno-use-init-array");
++  }
++
++    // this puts functions into their own section for better optimization
++    CC1Args.push_back("-ffunction-sections");
++    CC1Args.push_back("-fdata-sections");
++}
++
++void Kush::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
++                                        ArgStringList &CC1Args) const {
++  const Driver &D = getDriver();
++
++  if (DriverArgs.hasArg(options::OPT_nostdinc))
++    return;
++
++  // built in includes
++  if (!DriverArgs.hasArg(options::OPT_nobuiltininc)) {
++    SmallString<128> P(D.ResourceDir);
++    llvm::sys::path::append(P, "include");
++    addSystemInclude(DriverArgs, CC1Args, P);
++  }
++
++  if (DriverArgs.hasArg(options::OPT_nostdlibinc))
++    return;
++
++  // standard library for system
++  if (!D.SysRoot.empty()) {
++    SmallString<128> P(D.SysRoot);
++    llvm::sys::path::append(P, "usr", "include");
++    addSystemInclude(DriverArgs, CC1Args, P.str());
++  }
++  if (!D.SysRoot.empty()) {
++    SmallString<128> P(D.SysRoot);
++    llvm::sys::path::append(P, "usr", "include", "openlibm");
++    addSystemInclude(DriverArgs, CC1Args, P.str());
++  }
++}
++
++void Kush::AddCXXStdlibLibArgs(const ArgList &Args,
++                                  ArgStringList &CmdArgs) const {
++  switch (GetCXXStdlibType(Args)) {
++  case ToolChain::CST_Libcxx:
++    CmdArgs.push_back("-lc++abi");
++    CmdArgs.push_back("-lc++");
++
++    if(!Args.hasArg(options::OPT_static)) {
++      CmdArgs.push_back("-lunwind");
++    }
++    break;
++
++  default:
++    llvm_unreachable("invalid stdlib name");
++  }
++}
++
++void Kush::AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
++                                           ArgStringList &CC1Args) const {
++  const Driver &D = getDriver();
++
++  if (DriverArgs.hasArg(options::OPT_nostdlibinc) ||
++      DriverArgs.hasArg(options::OPT_nostdincxx))
++    return;
++
++  switch (GetCXXStdlibType(DriverArgs)) {
++  case ToolChain::CST_Libcxx: {
++    SmallString<128> P(D.SysRoot);
++    llvm::sys::path::append(P, "usr", "include", "c++", "v1");
++    addSystemInclude(DriverArgs, CC1Args, P.str());
++    break;
++  }
++
++  default:
++    llvm_unreachable("invalid stdlib name");
++  }
++}
+diff --git a/clang/lib/Driver/ToolChains/Kush.h b/clang/lib/Driver/ToolChains/Kush.h
+new file mode 100644
+index 000000000..b29d4f1e5
+--- /dev/null
++++ b/clang/lib/Driver/ToolChains/Kush.h
+@@ -0,0 +1,99 @@
++//===--- Kush.h - Kush ToolChain Implementations ----------*- C++ -*-===//
++//
++// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
++// See https://llvm.org/LICENSE.txt for license information.
++// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
++//
++//===----------------------------------------------------------------------===//
++
++#ifndef LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_KUSH_H
++#define LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_KUSH_H
++
++#include "Gnu.h"
++#include "clang/Basic/LangOptions.h"
++#include "clang/Driver/Tool.h"
++#include "clang/Driver/ToolChain.h"
++
++namespace clang {
++namespace driver {
++namespace tools {
++namespace kush {
++class LLVM_LIBRARY_VISIBILITY Linker : public Tool {
++public:
++  Linker(const ToolChain &TC) : Tool("kush::Linker", "ld.lld", TC) {}
++
++  bool hasIntegratedCPP() const override { return false; }
++  bool isLinkJob() const override { return true; }
++
++  void ConstructJob(Compilation &C, const JobAction &JA,
++                    const InputInfo &Output, const InputInfoList &Inputs,
++                    const llvm::opt::ArgList &TCArgs,
++                    const char *LinkingOutput) const override;
++};
++} // end namespace kush
++} // end namespace tools
++
++namespace toolchains {
++
++class LLVM_LIBRARY_VISIBILITY Kush : public ToolChain {
++public:
++  Kush(const Driver &D, const llvm::Triple &Triple,
++          const llvm::opt::ArgList &Args);
++
++  bool HasNativeLLVMSupport() const override { return true; }
++  bool IsIntegratedAssemblerDefault() const override { return true; }
++  bool IsMathErrnoDefault() const override { return false; }
++  bool useRelaxRelocations() const override { return true; };
++  // use clang native runtime libraries
++  RuntimeLibType GetDefaultRuntimeLibType() const override {
++    return ToolChain::RLT_CompilerRT;
++  }
++  // we only support the llvm libc++
++  CXXStdlibType GetDefaultCXXStdlibType() const override {
++    return ToolChain::CST_Libcxx;
++  }
++  bool IsUnwindTablesDefault(const llvm::opt::ArgList &Args) const override {
++    return true;
++  }
++  bool isPICDefault() const override { return false; }
++  bool isPIEDefault() const override { return false; }
++  bool isPICDefaultForced() const override { return false; }
++  llvm::DebuggerKind getDefaultDebuggerTuning() const override {
++    return llvm::DebuggerKind::GDB;
++  }
++
++  LangOptions::StackProtectorMode
++  GetDefaultStackProtectorLevel(bool KernelOrKext) const override {
++    return LangOptions::SSPStrong;
++  }
++
++  std::string ComputeEffectiveClangTriple(const llvm::opt::ArgList &Args,
++                                          types::ID InputType) const override;
++
++  RuntimeLibType
++  GetRuntimeLibType(const llvm::opt::ArgList &Args) const override;
++
++  void addClangTargetOptions(const llvm::opt::ArgList &DriverArgs,
++                             llvm::opt::ArgStringList &CC1Args,
++                             Action::OffloadKind DeviceOffloadKind) const override;
++  void
++  AddClangSystemIncludeArgs(const llvm::opt::ArgList &DriverArgs,
++                            llvm::opt::ArgStringList &CC1Args) const override;
++  void AddCXXStdlibLibArgs(const llvm::opt::ArgList &Args,
++                           llvm::opt::ArgStringList &CmdArgs) const override;
++  void AddClangCXXStdlibIncludeArgs(const llvm::opt::ArgList &DriverArgs,
++                                    llvm::opt::ArgStringList &CC1Args) const override;
++
++  const char *getDefaultLinker() const override {
++    return "ld.lld";
++  }
++
++protected:
++  Tool *buildLinker() const override;
++};
++
++} // end namespace toolchains
++} // end namespace driver
++} // end namespace clang
++
++#endif // LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_KUSH_H
+diff --git a/clang/lib/Frontend/InitHeaderSearch.cpp b/clang/lib/Frontend/InitHeaderSearch.cpp
+index bc31445d6..bf9d4dabc 100644
+--- a/clang/lib/Frontend/InitHeaderSearch.cpp
++++ b/clang/lib/Frontend/InitHeaderSearch.cpp
+@@ -229,6 +229,7 @@ void InitHeaderSearch::AddDefaultCIncludePaths(const llvm::Triple &triple,
+     case llvm::Triple::PS4:
+     case llvm::Triple::ELFIAMCU:
+     case llvm::Triple::Fuchsia:
++    case llvm::Triple::Kush:
+       break;
+     case llvm::Triple::Win32:
+       if (triple.getEnvironment() != llvm::Triple::Cygnus)
+@@ -338,6 +339,7 @@ void InitHeaderSearch::AddDefaultCIncludePaths(const llvm::Triple &triple,
+   case llvm::Triple::NaCl:
+   case llvm::Triple::ELFIAMCU:
+   case llvm::Triple::Fuchsia:
++  case llvm::Triple::Kush:
+     break;
+   case llvm::Triple::PS4: {
+     // <isysroot> gets prepended later in AddPath().
+diff --git a/libcxx/CMakeLists.txt b/libcxx/CMakeLists.txt
+index 9bf1a02f0..49236f21e 100644
+--- a/libcxx/CMakeLists.txt
++++ b/libcxx/CMakeLists.txt
+@@ -432,8 +432,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${LIBCXX_LIBRARY_DIR})
+ # LIBCXX_COMPILE_FLAGS: Compile only flags.
+ # LIBCXX_LINK_FLAGS: Linker only flags.
+ # LIBCXX_LIBRARIES: libraries libc++ is linked to.
+-set(LIBCXX_COMPILE_FLAGS "")
+-set(LIBCXX_LINK_FLAGS "")
++set(LIBCXX_COMPILE_FLAGS "-flto")
++set(LIBCXX_LINK_FLAGS "-flto")
+ set(LIBCXX_LIBRARIES "")
+ 
+ # Include macros for adding and removing libc++ flags.
+diff --git a/libcxx/include/__config b/libcxx/include/__config
+index a3838c89e..b270ace0c 100644
+--- a/libcxx/include/__config
++++ b/libcxx/include/__config
+@@ -1228,7 +1228,7 @@ extern "C" _LIBCPP_FUNC_VIS void __sanitizer_annotate_contiguous_container(
+ 
+ #if defined(__BIONIC__) || defined(__CloudABI__) || defined(__NuttX__) ||      \
+     defined(__Fuchsia__) || defined(__wasi__) || defined(_LIBCPP_HAS_MUSL_LIBC) || \
+-    defined(__MVS__) || defined(__OpenBSD__)
++    defined(__MVS__) || defined(__OpenBSD__) || defined(__Kush__)
+ #define _LIBCPP_PROVIDES_DEFAULT_RUNE_TABLE
+ #endif
+ 
+diff --git a/libunwind/src/CMakeLists.txt b/libunwind/src/CMakeLists.txt
+index dc2c5e008..1577702e3 100644
+--- a/libunwind/src/CMakeLists.txt
++++ b/libunwind/src/CMakeLists.txt
+@@ -85,14 +85,14 @@ add_link_flags_if_supported(-nodefaultlibs)
+ # MINGW_LIBRARIES is defined in config-ix.cmake
+ add_library_flags_if(MINGW "${MINGW_LIBRARIES}")
+ 
+-if (LIBUNWIND_ENABLE_SHARED AND
+-    NOT (LIBUNWIND_SUPPORTS_FNO_EXCEPTIONS_FLAG AND
+-         LIBUNWIND_SUPPORTS_FUNWIND_TABLES_FLAG))
+-  message(FATAL_ERROR
+-          "Compiler doesn't support generation of unwind tables if exception "
+-          "support is disabled.  Building libunwind DSO with runtime dependency "
+-          "on C++ ABI library is not supported.")
+-endif()
++#if (LIBUNWIND_ENABLE_SHARED AND
++#    NOT (LIBUNWIND_SUPPORTS_FNO_EXCEPTIONS_FLAG AND
++#         LIBUNWIND_SUPPORTS_FUNWIND_TABLES_FLAG))
++#  message(FATAL_ERROR
++#          "Compiler doesn't support generation of unwind tables if exception "
++#          "support is disabled.  Building libunwind DSO with runtime dependency "
++#          "on C++ ABI library is not supported.")
++#endif()
+ 
+ if (APPLE)
+   add_compile_flags("-U__STRICT_ANSI__")
+diff --git a/llvm/include/llvm/ADT/Triple.h b/llvm/include/llvm/ADT/Triple.h
+index eed315c92..9909422ca 100644
+--- a/llvm/include/llvm/ADT/Triple.h
++++ b/llvm/include/llvm/ADT/Triple.h
+@@ -198,7 +198,8 @@ public:
+     Hurd,       // GNU/Hurd
+     WASI,       // Experimental WebAssembly OS
+     Emscripten,
+-    LastOSType = Emscripten
++    Kush,
++    LastOSType = Kush
+   };
+   enum EnvironmentType {
+     UnknownEnvironment,
+diff --git a/llvm/lib/Support/Triple.cpp b/llvm/lib/Support/Triple.cpp
+index 4f483c965..2d8e7f809 100644
+--- a/llvm/lib/Support/Triple.cpp
++++ b/llvm/lib/Support/Triple.cpp
+@@ -220,6 +220,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
+   case WatchOS: return "watchos";
+   case Win32: return "windows";
+   case ZOS: return "zos";
++  case Kush: return "kush";
+   }
+ 
+   llvm_unreachable("Invalid OSType");
+@@ -500,6 +501,7 @@ static Triple::OSType parseOS(StringRef OSName) {
+     .StartsWith("darwin", Triple::Darwin)
+     .StartsWith("dragonfly", Triple::DragonFly)
+     .StartsWith("freebsd", Triple::FreeBSD)
++    .StartsWith("kush", Triple::Kush)
+     .StartsWith("fuchsia", Triple::Fuchsia)
+     .StartsWith("ios", Triple::IOS)
+     .StartsWith("kfreebsd", Triple::KFreeBSD)

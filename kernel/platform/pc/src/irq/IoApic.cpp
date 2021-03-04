@@ -28,7 +28,7 @@ size_t IoApic::numAllocated = 0;
  */
 IoApic::IoApic(const uint64_t _phys, const uint32_t _base) : physBase(_phys), irqBase(_base) {
     int err;
-    auto m = vm::Map::kern();
+    auto m = vm::Map::current();
 
     // map it
     const auto virt = kPlatformRegionMmioIoApic + (numAllocated++ * 0x1000);
@@ -37,6 +37,9 @@ IoApic::IoApic(const uint64_t _phys, const uint32_t _base) : physBase(_phys), ir
     REQUIRE(!err, "failed to map IOAPIC: %d", err);
 
     this->baseAddr = static_cast<uint32_t>(virt + (_phys & 0xFFF));
+
+    asm volatile("invlpg (%0)" :: "b" (virt) : "memory");
+    log("mapping IOAPIC %016llx to %08x %08x", _phys, virt, this->baseAddr);
 
     // read some APIC info
     const uint8_t apicVer = this->read(IOAPICVER) & 0xFF;

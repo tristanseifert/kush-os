@@ -16,6 +16,8 @@ We use CMake to build everything. The single `CMakeLists.txt` in this directory 
 - sysroot: Base directory of the OS root directory. Automatically built up as kernel/userspace is built.
 - toolchain: Created by the `build_toolchain.sh` script.
 
+The `toolchain.diff` file contains a patch that should be applied against the checked-out LLVM source to build the toolchain required to build the kernel and userland.
+
 ## LLVM Toolchain
 You can use the `build_toolchain.sh` script to build a toolchain to use for compiling the system. This sets up most of the libraries required: you'll also have to build a few supporting libraries.
 

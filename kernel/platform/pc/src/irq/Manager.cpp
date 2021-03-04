@@ -101,7 +101,7 @@ void Manager::detectedLapic(const uint64_t phys, const uint8_t id, const uint8_t
 
     // perform virtual mapping if needed
     if(!this->apicVirtBase) {
-        auto m = vm::Map::kern();
+        auto m = vm::Map::current();
 
         err = m->add(phys & ~0xFFF, 0x1000, kPlatformRegionMmioApic, vm::MapMode::kKernelRW | vm::MapMode::MMIO);
         REQUIRE(!err, "failed to map APIC: %d", err);
@@ -117,6 +117,8 @@ void Manager::detectedLapic(const uint64_t phys, const uint8_t id, const uint8_t
     // allocate apic
     auto apic = new Apic(this->apicVirtBase, cpu, id, enabled, onlineable);
     this->apics.push_back(apic);
+
+    log("APIC %p: base %08x", apic, this->apicVirtBase);
 }
 
 /**

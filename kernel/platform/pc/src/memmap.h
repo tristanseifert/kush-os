@@ -15,9 +15,9 @@ constexpr static const uintptr_t kPlatformRegionAcpiTables = 0xF0000000;
  */
 constexpr static const uintptr_t kPlatformRegionMmio = 0xF1000000;
 
-/// APIC base (0x10000 bytes)
+/// APIC base (0x8000 bytes)
 constexpr static const uintptr_t kPlatformRegionMmioApic = kPlatformRegionMmio;
-/// IOAPIC base (0x10000 bytes reserved)
-constexpr static const uintptr_t kPlatformRegionMmioIoApic = kPlatformRegionMmioApic + 0x10000;
+/// IOAPIC base (0x8000 bytes reserved)
+constexpr static const uintptr_t kPlatformRegionMmioIoApic = kPlatformRegionMmioApic + 0x8000;
 
 #endif

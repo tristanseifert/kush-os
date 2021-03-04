@@ -63,9 +63,13 @@ void multiboot_parse() {
                 acpi::Manager::init(info);
                 break;
             }
-            case MULTIBOOT_TAG_TYPE_ACPI_NEW:
-                panic("New style ACPI table not supported");
+            case MULTIBOOT_TAG_TYPE_ACPI_NEW: {
+                auto info = (struct multiboot_tag_old_acpi *) tag;
+                acpi::Manager::init(info);
                 break;
+            } 
+                //panic("New style ACPI table not supported");
+                //break;
 
             // modules provided by bootloader
             case MULTIBOOT_TAG_TYPE_MODULE: {

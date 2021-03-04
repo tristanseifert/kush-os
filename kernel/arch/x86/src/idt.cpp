@@ -52,7 +52,7 @@ static void load_idt(void *base, const uint16_t size) {
         uint32_t base;
     } __attribute__((__packed__)) IDTR;
 
-    IDTR.length = size;
+    IDTR.length = size - 1;
     IDTR.base = (uint32_t) base;
     asm volatile("lidt (%0)": : "r"(&IDTR));
 }
