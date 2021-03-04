@@ -38,15 +38,9 @@ int main(const int argc, const char **argv) {
     // initialize a controller instance
     std::span<std::byte> aux(reinterpret_cast<std::byte *>(data), binBytes);
     gController = std::make_shared<Ps2Controller>(aux);
-
-    // clean up
     free(data);
 
-    // TODO: start message loop
-    while(1) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(420));
-    }
-
-    // clean up
+    // enter run loop
+    gController->workerMain();
     gController = nullptr;
 }

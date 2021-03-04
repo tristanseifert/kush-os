@@ -42,6 +42,10 @@ class RootBridge {
         };
 
     private:
+        /// when set, IRQ map entries are logged.
+        static bool gLogIrqMap;
+
+    private:
         /// address of the bus behind the bridge
         uint8_t bus;
         /// bus segment (if any)

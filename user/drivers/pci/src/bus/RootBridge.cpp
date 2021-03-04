@@ -5,6 +5,7 @@
 
 #include <mpack/mpack.h>
 
+bool RootBridge::gLogIrqMap = false;
 
 /**
  * Creates a root bridge, with binary encoded msgpack message that indicates, at a minimum, the
@@ -63,22 +64,24 @@ RootBridge::RootBridge(const std::span<std::byte> &in) {
         Trace("no irq map for bridge %p", this);
     }
 
-    for(const auto &[device, info] : this->irqMap) {
-        int a = -1, b = -1, c = -1, d = -1;
-        if(info.inta) {
-            a = info.inta->num;
-        }
-        if(info.intb) {
-            b = info.intb->num;
-        }
-        if(info.intc) {
-            c = info.intc->num;
-        }
-        if(info.intd) {
-            d = info.intd->num;
-        }
+    if(gLogIrqMap) {
+        for(const auto &[device, info] : this->irqMap) {
+            int a = -1, b = -1, c = -1, d = -1;
+            if(info.inta) {
+                a = info.inta->num;
+            }
+            if(info.intb) {
+                b = info.intb->num;
+            }
+            if(info.intc) {
+                c = info.intc->num;
+            }
+            if(info.intd) {
+                d = info.intd->num;
+            }
 
-        Trace("device %2u: INTA %2d INTB %2d INTC %2d INTD %2d", device, a, b, c, d);
+            Trace("device %2u: INTA %2d INTB %2d INTC %2d INTD %2d", device, a, b, c, d);
+        }
     }
 
     // clean up

@@ -107,8 +107,9 @@ void IoApic::remap(const uint8_t irq, const uint32_t dest, const IrqFlags f) {
     this->setRedirEntry(idx, r);
 
 #if LOG_IRQ_REMAP
-    log("remapping IOAPIC relative irq %lu (system irq %lu) to %u (%08lx %08lx)", idx, dest, irq,
-            r.upper, r.lower);
+    log("remapping IOAPIC relative irq %lu (system irq %lu) to %u (%08lx %08lx) "
+            "active %s, %s triggerd", idx, dest, irq, r.upper, r.lower, 
+            r.pinPolarity ? "low" : "high", r.triggerMode ? "level" : "edge");
 #endif
 }
 
