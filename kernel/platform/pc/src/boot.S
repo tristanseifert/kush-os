@@ -61,6 +61,8 @@ _osentry:
     or          $0x80000000, %ecx
     mov         %ecx, %cr0
 
+    wbinvd
+
     // jump to the higher half kernel
     lea         jmp_highhalf, %ecx
     jmp         *%ecx

@@ -1,6 +1,7 @@
 #ifndef PS2CONTROLLER_H
 #define PS2CONTROLLER_H
 
+#include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -10,6 +11,8 @@
 
 struct mpack_node_t;
 struct acpi_resource_io;
+
+class PortDetector;
 
 /**
  * Encapsulates the 8042 PS/2 controller. This supports the most commonly found dual-port variant
@@ -97,6 +100,7 @@ class Ps2Controller {
 
     public:
         Ps2Controller(const std::span<std::byte> &aux);
+        ~Ps2Controller();
 
         /// Enters the driver's run loop
         void workerMain();
@@ -150,6 +154,9 @@ class Ps2Controller {
         uintptr_t kbdIrqHandler = 0;
         /// Interrupt handler token for the mouse irq
         uintptr_t mouseIrqHandler = 0;
+
+        /// detector instances for each port
+        std::array<PortDetector *, 2> detectors;
 };
 
 #endif

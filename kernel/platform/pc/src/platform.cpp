@@ -27,10 +27,13 @@ void platform_init() {
 
     // parse multiboot info
     multiboot_parse();
+    *((volatile uint16_t *) 0xb800C) = 0x4146;
 
     // set up and remap the PICs and other interrupt controllers
     pic_init();
     timer::LegacyPIT::disable();
+
+    *((volatile uint16_t *) 0xb800E) = 0x4147;
 }
 
 /**

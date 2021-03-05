@@ -31,6 +31,8 @@ struct stackframe {
  * mode operation.
  */
 void arch_init() {
+    *((volatile uint16_t *) 0xb8004) = 0x4142;
+    
     // determine if we support the NX bit; enable the feature if needed
     update_supports_nx();
 
@@ -45,7 +47,9 @@ void arch_init() {
 
     // initialize descriptors
     gdt_init();
+    *((volatile uint16_t *) 0xb8006) = 0x4143;
     idt_init();
+    *((volatile uint16_t *) 0xb8008) = 0x4144;
 }
 
 /**

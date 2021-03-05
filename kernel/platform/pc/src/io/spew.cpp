@@ -1,6 +1,7 @@
 #include "spew.h"
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <platform.h>
 #include <arch/x86_io.h>
 
@@ -24,7 +25,7 @@ void serial_spew_init() {
     io_outb(SPEW_IO_BASE + 1, 0x00);    // Disable all interrupts
     // write the divisor
     io_outb(SPEW_IO_BASE + 3, 0x80);    // Enable DLAB (set baud rate divisor)
-    io_outb(SPEW_IO_BASE + 0, 0x00);    // Set divisor to 0 (lo byte) 38400 baud
+    io_outb(SPEW_IO_BASE + 0, 0x01);    // Set divisor to 1 (lo byte) 115200 baud
     io_outb(SPEW_IO_BASE + 1, 0x00);    //                  (hi byte)
 
     // 8N1
@@ -44,6 +45,8 @@ void serial_spew_init() {
 
    // set operation mode
    io_outb(SPEW_IO_BASE + 4, 0x0F);
+
+    *((volatile uint16_t *) 0xb800A) = 0x4145;
 }
 
 /**

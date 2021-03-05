@@ -1,4 +1,6 @@
 #include "Ps2Controller.h"
+#include "Ps2Device.h"
+#include "PortDetector.h"
 #include "Log.h"
 
 #include <thread>
@@ -51,6 +53,19 @@ Ps2Controller::Ps2Controller(const std::span<std::byte> &aux) {
 
     // initialize the run loop
     this->run = true;
+}
+
+/**
+ * Tears down PS/2 controller resources.
+ */
+Ps2Controller::~Ps2Controller() {
+    // shut down devices
+
+    // destroy detectors
+    delete this->detectors[0];
+    if(this->hasMouse) {
+        delete this->detectors[1];
+    }
 }
 
 /**
@@ -145,6 +160,12 @@ void Ps2Controller::workerMain() {
     err = ThreadSetPriority(this->threadHandle, 80);
     if(err) {
         Abort("%s failed: %d", "ThreadSetPriority", err);
+    }
+
+    // create the controllers
+    this->detectors[0] = new PortDetector(this, Port::Primary);
+    if(this->hasMouse) {
+        this->detectors[1] = new PortDetector(this, Port::Secondary);
     }
 
     // initialize the controller

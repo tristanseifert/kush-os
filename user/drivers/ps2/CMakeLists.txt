@@ -8,6 +8,7 @@ add_executable(ps2drv
     src/main.cpp
     src/Log.cpp
     src/Ps2Controller.cpp
+    src/PortDetector.cpp
 )
 
 target_include_directories(ps2drv PRIVATE src/acpica/include)

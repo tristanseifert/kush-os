@@ -30,6 +30,8 @@ sched::Task *gRootServer = nullptr;
  * Early kernel initialization
  */
 void kernel_init() {
+    *((volatile uint16_t *) 0xb8010) = 0x5148;
+    
     // set up the physical allocator and VM system
     mem::PhysicalAllocator::init();
 
@@ -93,7 +95,7 @@ static void ThreadThymeCock(uintptr_t) {
     auto last = platform_timer_now();
     uint64_t lastIdle = 0;
 
-    static uint16_t *base = (uint16_t *) 0xfc000000;
+    static uint16_t *base = (uint16_t *) 0xfc0000a0;
 
     while(1) {
         const auto nsec = platform_timer_now();
