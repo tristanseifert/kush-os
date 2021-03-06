@@ -110,7 +110,11 @@ class PhysicalAllocator {
 
         // TODO: this should be retrieved from the arch/platform code
         /// virtual address to map the next physical region allocation bitmap in
-        uint32_t nextBitmapVmAddr = 0xC0400000;
+#if defined(__i386__)
+        uintptr_t nextBitmapVmAddr = 0xC0400000;
+#elif defined(__amd64__)
+        uintptr_t nextBitmapVmAddr = 0xFFFF820000000000;
+#endif
 
         /// total number of available pages
         size_t totalPages = 0;

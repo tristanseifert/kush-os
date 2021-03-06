@@ -7,13 +7,13 @@ set(KERNEL_COMPILE_OPTS -static -ffreestanding -nodefaultlibs -nostdlib -fno-exc
 
 # select the correct architecture code and build it
 set(KERNEL_ARCH "x86" CACHE STRING "Kernel CPU architecture")
-set_property(CACHE KERNEL_ARCH PROPERTY STRINGS x86)
+set_property(CACHE KERNEL_ARCH PROPERTY STRINGS x86 x86_64)
 
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/arch/${KERNEL_ARCH})
 
 # select the correct platform code and build it
 set(KERNEL_PLATFORM "pc" CACHE STRING "Kernel system platform")
-set_property(CACHE KERNEL_PLATFORM PROPERTY STRINGS pc)
+set_property(CACHE KERNEL_PLATFORM PROPERTY STRINGS pc pc64)
 
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/platform/${KERNEL_PLATFORM})
 

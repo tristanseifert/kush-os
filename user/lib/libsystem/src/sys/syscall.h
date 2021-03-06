@@ -68,7 +68,10 @@ LIBSYSTEM_INTERNAL int __do_syscall4(const uintptr_t number, const uintptr_t arg
 #define SYS_ARCH_INSTALL_IRQ            0x38
 #define SYS_ARCH_UNINSTALL_IRQ          0x39
 #define SYS_ARCH                        0x3A
+
 #define SYS_ARCH_X86_UPDATE_IOPB        (SYS_ARCH | (0x0000 << 16))
 #define SYS_ARCH_X86_SET_TLS_BASE       (SYS_ARCH | (0x0001 << 16))
+
+#define SYS_ARCH_AMD64_SET_FGS_BASE     (SYS_ARCH | (0x0001 << 16))
 
 #endif

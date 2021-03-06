@@ -5,8 +5,18 @@
 #ifndef ROOTSRV_TASK_LAUNCHINFO_H
 #define ROOTSRV_TASK_LAUNCHINFO_H
 
+// 32-bit platforms
+#if defined(__i386__)
 #define LAUNCHINFO_OFF_NARGS    (8)
 #define LAUNCHINFO_OFF_ARGPTR   (12)
+// 64-bit platforms
+#elif defined(__x86_64__)
+#define LAUNCHINFO_OFF_NARGS    (16)
+#define LAUNCHINFO_OFF_ARGPTR   (20)
+#else
+#error unsupported architecture
+#endif
+
 
 #ifndef ASM_FILE
 #include <stdint.h>

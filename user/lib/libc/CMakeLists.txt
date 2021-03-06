@@ -267,6 +267,45 @@ if(${KERNEL_ARCH} STREQUAL "x86")
 
     # export settings to build statically linked executables
     set(C_STATIC_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/x86/app_static.ld CACHE FILEPATH "Statically linked C executable linker script")
+elseif(${KERNEL_ARCH} STREQUAL "x86_64")
+    target_compile_definitions(c_objs PRIVATE LIBC_ARCH_X86_64=1)
+
+    # compile the C library entry point (for static executables)
+    add_library(c_crt0T OBJECT
+        src/x86_64/crt0_static.S
+        src/x86_64/crti.c
+    )
+    target_include_directories(c_crt0T PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
+
+    # compile the C library entry point (for dynamic executables)
+    add_library(c_crt0 OBJECT
+        src/x86_64/crt0.S
+    )
+    target_include_directories(c_crt0 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
+
+    # compile the C library entry point (for shared libraries)
+    add_library(c_crt0S OBJECT
+        src/x86_64/crt0_shared.S
+    )
+    target_include_directories(c_crt0S PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
+
+    # ensure crt0 objects are built and copied to the system library dir (so linker can find them)
+    add_dependencies(c_objs c_crt0 c_crt0T c_crt0S)
+
+    add_custom_command(TARGET c_static POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/c_crt0T.dir/src/x86_64/crt0_static.S.obj ${SYSROOT_DIR}/lib/crt0T.o
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/c_crt0T.dir/src/x86_64/crti.c.obj ${SYSROOT_DIR}/lib/crti.o
+    )
+    add_custom_command(TARGET c_static POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/c_crt0.dir/src/x86_64/crt0.S.obj ${SYSROOT_DIR}/lib/crt0.o
+    )
+    add_custom_command(TARGET c_static POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/c_crt0S.dir/src/x86_64/crt0_shared.S.obj ${SYSROOT_DIR}/lib/crt0S.o
+    )
+
+    # export settings to build statically linked executables
+    set(C_STATIC_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/x86_64/app_static.ld CACHE FILEPATH "Statically linked C executable linker script")
+
 else()
     message(FATAL_ERROR "libc does not know how architecture '${KERNEL_ARCH}'")
 endif()

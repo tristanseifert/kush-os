@@ -13,3 +13,6 @@
 [submodule "user/lib/external/mpack"]
 	path = user/lib/external/mpack
 	url = git@github.com:ludocode/mpack.git
+[submodule "kernel/platform/pc64/bootboot"]
+	path = kernel/platform/pc64/bootboot
+	url = https://gitlab.com/bztsrc/bootboot.git

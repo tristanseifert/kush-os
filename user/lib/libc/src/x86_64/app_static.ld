@@ -1,5 +1,5 @@
 ENTRY(_start)
-OUTPUT_FORMAT(elf32-i386)
+OUTPUT_FORMAT(elf64-x86-64)
 
 SECTIONS {
     /* default load address */
@@ -9,31 +9,40 @@ SECTIONS {
     .text ALIGN(4K) : {
         *(.text)
         *(.text*)
+    }
+
+    /* read only data */
+    .rodata ALIGN(4K) : {
         *(.rodata)
         *(.rodata*)
-    }
 
-    /* Include the list of initialization functions sorted. */
-    .init_array : {
-        _init_array_start = .;
-        KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .init_array.*)))
-        KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .init_array))
-        _init_array_end = .;
-    }
-
-    /* Include the list of termination functions sorted. */
-    .fini_array : {
-        _fini_array_start = .;
-        KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .fini_array.*)))
-        KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .fini_array))
-        _fini_array_end = .;
+        /* exception handling */
+        *(.gcc_except_table)
+        *(.gcc_except_table*)
+        *(.eh_frame)
     }
 
     /* data (mutable) section */
     .data ALIGN(4K) : {
+        /* Include the list of initialization functions sorted. */
+        _init_array_start = .;
+        KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .init_array.*)))
+        KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .init_array))
+        _init_array_end = .;
+
+        /* Include the list of termination functions sorted. */
+        _fini_array_start = .;
+        KEEP (*(SORT(EXCLUDE_FILE(crti.o crtn.o) .fini_array.*)))
+        KEEP (*(EXCLUDE_FILE(crti.o crtn.o) .fini_array))
+        _fini_array_end = .;
+
         __data_start = .;
         *(*.data)
         *(*.data*)
+
+        /* relocations; is this ok? */
+        (*.got)
+        *(*.got*)
     }
     __data_size = SIZEOF(.data);
 

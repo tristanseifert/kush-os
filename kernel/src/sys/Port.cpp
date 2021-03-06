@@ -27,11 +27,8 @@ struct RecvInfo {
     /// length of the message (bytes)
     uint16_t messageLength;
 
-    /// reserved fields (for padding)
-    uint32_t reserved[1];
-
     /// data buffer; must be allocated in 16-byte chunks
-    uint8_t data[];
+    uint8_t data[] __attribute__((aligned(64)));
 } __attribute__((aligned(16)));
 
 static_assert(offsetof(RecvInfo, data) % 16 == 0, "RecvInfo data must be 16 byte aligned");

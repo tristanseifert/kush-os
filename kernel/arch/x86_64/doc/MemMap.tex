@@ -1,0 +1,66 @@
+\documentclass[11pt]{letter}
+\usepackage[margin=2cm]{geometry}
+\geometry{a4paper}
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{epstopdf}
+\usepackage{bytefield}
+\usepackage{xcolor}
+
+% facilitates the creation of memory maps. Start address at the bottom, end address at the top.
+% syntax: \memsection{end address}{start address}{height in lines}{text in box}
+\newcommand{\memsection}[4]{
+\bytefieldsetup{bitheight=#3\baselineskip}    % define the height of the memsection
+\bitbox[]{14}{
+\texttt{#1}     % print end address
+\\ \vspace{#3\baselineskip} \vspace{-2\baselineskip} \vspace{-#3pt} % do some spacing
+\texttt{#2} % print start address
+}
+\bitbox{32}{#4} % print box with caption
+}
+
+\DeclareGraphicsRule{.tif}{png}{.png}{`convert #1 `dirname #1`/`basename #1 .tif`.png}
+
+\title{\textsc{x86_64} Memory Map}
+
+\begin{document}
+
+\begin{bytefield}{32}	
+	\memsection{ffff ffff ffff ffff}{ffff ffff fffe 0000}{2}{\sc -- reseved --}\\
+	\memsection{ffff ffff ffdf ffff}{ffff ffff ff00 0000}{3}{Kernel \texttt{.text}/\texttt{.data}} \\
+	\memsection{ffff ffff feff ffff}{ffff ffff fe00 0000}{2}{Bootloader env/info}\\
+	\memsection{ffff ffff fdff ffff}{ffff ffff f800 0000}{2}{Bootup framebuffer}\\
+	%\memsection{ffff ffff ffff ffff}{ffff ff80 0000 0000}{4}{Recursive page table mapping}\\
+	
+	
+	\memsection{ffff ffff}{f800 0000}{4}{-- reseved --}\\
+		
+	\begin{rightwordgroup}{Platform}
+%		\memsection{f7ff ffff}{f400 0000}{3}{-- reseved --}\\
+%		\memsection{f3ff ffff}{f300 0000}{2}{Arch temp mappings}\\
+%		\memsection{f2ff ffff}{f200 0000}{2}{Temporary paging mapping area}\\
+%		\memsection{f1ff ffff}{f100 0000}{2}{MMIO (\textsc{apic}, \textsc{hpet}, etc.)}\\
+%		\memsection{f0ff ffff}{f000 0000}{2}{ACPI Tables}
+		\memsection{ffff ff00 ffff ffff}{ffff ff00 0000 0000}{2}{Arch mappings}
+	\end{rightwordgroup}\\
+	
+	\memsection{ffff 82ff ffff ffff}{ffff 8210 0000 0000}{8}{Anonymous memory pool}\\
+	
+	\memsection{ffff 820f ffff ffff}{ffff 8208 0000 0000}{2}{\sc -- reseved --}\\
+	
+	\memsection{ffff 8208 ffff ffff}{ffff 8201 0000 0000}{3}{Kernel stacks\\512K x 64K stacks} \\
+	\memsection{ffff 8200 ffff ffff}{ffff 8200 4000 0000}{2}{\sc -- reseved --}\\
+	\memsection{ffff 8200 3fff ffff}{ffff 8200 0000 0000}{2}{Physical memory alloc bitmaps} \\
+	
+	\memsection{ffff 81ff ffff ffff}{ffff 8000 0000 0000}{4}{Physical identity map (2TB)}\\
+	
+	%%%
+	\memsection{0000 7fff ffff ffff}{0000 7fff 0000 0000}{2}{Kernel info region}\\
+	\memsection{0000 7ffe ffff ffff}{0000 0000 0000 0000}{3}{\it User Space}\\
+\end{bytefield}
+
+All sections marked as reserved are currently not mapped.
+
+During early boot-up, before VM is available, the first 16G of physical memory are identity mapped at address \texttt{0000 0000 0000 0000} through \texttt{0000 0003 ffff ffff}. It's guaranteed that the initial ramdisk will be mapped somewhere here. 
+
+\end{document}  

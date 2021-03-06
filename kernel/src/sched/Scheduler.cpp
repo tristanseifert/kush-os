@@ -284,7 +284,7 @@ void Scheduler::receivedDispatchIpi(const uintptr_t irqToken) {
 
     // define the callback for irq acknowledgement
     auto ackFxn = [](void *ctx) {
-        const auto irq = reinterpret_cast<uint32_t>(ctx);
+        const auto irq = reinterpret_cast<uintptr_t>(ctx);
         platform_irq_ack(irq);
     };
 
