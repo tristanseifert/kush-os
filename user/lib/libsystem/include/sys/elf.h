@@ -39,6 +39,8 @@
 
 #if defined(__i386__)
 #include <sys/x86/elf.h>
+#elif defined(__amd64__)
+#include <sys/amd64/elf.h>
 #else
 #error "Unsupported platform"
 #endif

@@ -14,6 +14,8 @@
 
 #if defined(__i386__)
 #include <ieeefp_x86.h>
+#elif defined(__amd64__)
+#include <ieeefp_amd64.h>
 #else
 #error Add support to ieeefp.h for this architecture
 #endif

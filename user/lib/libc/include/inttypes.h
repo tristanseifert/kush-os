@@ -33,6 +33,8 @@
 
 #if defined(__i386__)
 #include <sys/x86/_inttypes.h>
+#elif defined(__amd64__)
+#include <sys/amd64/_inttypes.h>
 #else
 #error "Unsupported platform"
 #endif

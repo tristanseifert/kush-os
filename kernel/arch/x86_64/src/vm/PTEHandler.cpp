@@ -65,6 +65,10 @@ PTEHandler::~PTEHandler() {
  * Updates the processor's translation table register to use our translation tables.
  */
 void PTEHandler::activate() {
+    //*((volatile uint8_t *) 0x123456789ABC);
+
+    panic("%s unimplemented", __PRETTY_FUNCTION__);
+
     // set the PDPT
     log("switching to PML4 $%016lx", this->pml4Phys);
     asm volatile("movq %0, %%cr3" :: "r" (this->pml4Phys));

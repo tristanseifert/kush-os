@@ -29,8 +29,10 @@ void LegacyPIT::disable() {
  * To do this, we use the HW retriggerable one shot mode of the timer. The timer will begin to
  * count on a rising edge on the gate input, decrementing it from the reload value set at a rate
  * of 1.193182 MHz, until it eventually decrements to zero.
+ *
+ * @return Number of picoseconds that we actually slept for
  */
-float LegacyPIT::configBusyWait(const uint32_t micros) {
+uint64_t LegacyPIT::configBusyWait(const uint32_t micros) {
     uint16_t reload = 0xFFFF;
 
     // calculate the reload value
@@ -58,7 +60,7 @@ float LegacyPIT::configBusyWait(const uint32_t micros) {
     io_outb(kCh2DataPort, (reload & 0xFF00) >> 8);
 
     // return the actual number of microseconds we'll sleep
-    return actualMicros;
+    return static_cast<uint64_t>(actualMicros * 1000. * 1000.);
 }
 
 

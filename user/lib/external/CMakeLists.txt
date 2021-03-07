@@ -21,9 +21,9 @@ ExternalProject_Add(openlibm
         AR=${CMAKE_AR}
         CC=${CMAKE_C_COMPILER}
         LD=${CMAKE_C_COMPILER}
-        LDFLAGS="--target=i386-pc-kush-elf --sysroot=${CMAKE_SYSROOT}"
-        CFLAGS="--target=i386-pc-kush-elf --sysroot=${CMAKE_SYSROOT}"
-        SFLAGS="--target=i386-pc-kush-elf --sysroot=${CMAKE_SYSROOT}"
+        LDFLAGS="--target=${TARGET_TRIPLE} --sysroot=${CMAKE_SYSROOT}"
+        CFLAGS="--target=${TARGET_TRIPLE} --sysroot=${CMAKE_SYSROOT}"
+        SFLAGS="--target=${TARGET_TRIPLE} --sysroot=${CMAKE_SYSROOT}"
         make -C ${CMAKE_CURRENT_SOURCE_DIR}/openlibm
     BUILD_IN_SOURCE TRUE
     INSTALL_COMMAND make DESTDIR=${CMAKE_SYSROOT} libdir=/lib includedir=/usr/include install

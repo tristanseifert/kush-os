@@ -13,11 +13,21 @@ add_executable(rootsrv
     src/task/RpcHandler.cpp
     src/task/InfoPage.cpp
     src/task/DyldoPipe.cpp
-    src/task/loader/Elf32.cpp
     src/dispensary/Dispensary.cpp
     src/dispensary/Registry.cpp
     src/dispensary/RpcHandler.cpp
 )
+
+#### arch specific ELF loader code
+if(${KERNEL_ARCH} STREQUAL "x86")
+target_sources(rootsrv
+    src/task/loader/Elf32.cpp
+)
+elseif(${KERNEL_ARCH} STREQUAL "x86_64")
+
+else()
+    message(FATAL_ERROR "rootsrv does not have binary loader for arch '${KERNEL_ARCH}'")
+endif()
 
 #####
 # allow link time optimization (strips C library functions we don't use)

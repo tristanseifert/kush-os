@@ -51,9 +51,9 @@ target_link_libraries(kernel_arch_amd64 PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/sysc
 
 add_dependencies(kernel_arch_amd64 kernel_arch_amd64_syscall_stub)
 
-set(KERNEL_COMPILE_OPTS -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 ${KERNEL_COMPILE_OPTS})
+set(ARCH_COMPILE_OPTS -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 CACHE STRING "Architecture specific compile flags")
 
-target_compile_options(kernel_arch_amd64 PRIVATE ${KERNEL_COMPILE_OPTS})
+target_compile_options(kernel_arch_amd64 PRIVATE ${KERNEL_COMPILE_OPTS} ${ARCH_COMPILE_OPTS})
 
 target_include_directories(kernel_arch_amd64 PUBLIC include)
 target_include_directories(kernel_arch_amd64 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../include)
@@ -62,3 +62,4 @@ target_include_directories(kernel_arch_amd64 PRIVATE src)
 
 set(ARCH_TARGET_NAME "kernel_arch_amd64" CACHE STRING "Architecture target name" FORCE)
 set(ARCH_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include CACHE FILEPATH "Architecture include directory" FORCE)
+

@@ -33,8 +33,13 @@ typedef int16_t INT16;
 typedef int32_t INT32;
 typedef int64_t INT64;
 
+#define COMPILER_DEPENDENT_INT64   int64_t
+#define COMPILER_DEPENDENT_UINT64  uint64_t
+
 #if defined(__i386__)
 #define ACPI_MACHINE_WIDTH          32
+#elif defined(__amd64__)
+#define ACPI_MACHINE_WIDTH          64
 #else
 #error Define ACPI_MACHINE_WIDTH for current arch
 #endif

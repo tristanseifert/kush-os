@@ -5,13 +5,13 @@
 #define GDT_KERN_DATA_SEG       0x10
 #define GDT_USER_CODE_SEG       0x18
 #define GDT_USER_DATA_SEG       0x20
-#define GDT_USER_TLS_SEG        0x28
+#define GDT_RESERVED            0x28
 
 #define GDT_FIRST_TSS           0x30
-#define GDT_NUM_TSS             2
 
 #ifndef ASM_FILE
 #include <stdint.h>
+#include <stddef.h>
 
 /**
  * 32-bit i386 GDT entry
@@ -31,12 +31,30 @@ typedef struct arch_gdt_descriptor {
  * TSS segments. (Code/data segments in long mode are ignored.)
  */
 typedef struct arch_gdt_descriptor_64 {
-
+    /// limit 15..0
+    uint16_t limit0;
+    /// base 15..0
+    uint16_t base0;
+    /// base 23..16
+    uint8_t base1;
+    /// present flag, DPL, type
+    uint8_t typeFlags;
+    /// granularity, available flag, bits 19..16 of limit
+    uint8_t granularityLimit;
+    /// base address 31..24
+    uint8_t base2;
+    /// base address 63..32
+    uint32_t base3;
+    /// reserved (always zero)
+    uint32_t reserved;
 } __attribute__((packed)) gdt_descriptor64_t;
 
 
-/// Describes a task gate
-typedef struct i386_task_gate {
+/**
+ * Task state structure for amd64 mode. The only part of this structure that we really care about
+ * and use are the interrupt stacks.
+ */
+typedef struct amd64_tss {
     // High word ignored
     uint32_t backlink;
 
@@ -72,21 +90,40 @@ typedef struct i386_task_gate {
 
     uint16_t trap;
     uint16_t iomap; // low word ignored
-} __attribute__((packed)) gdt_task_gate_t;
+} __attribute__((packed)) amd64_tss_t;
 
-void gdt_init();
-void gdt_set_entry(uint16_t num, uint32_t base, uint32_t limit, uint8_t flags, uint8_t gran);
-void gdt_set_entry64(uint16_t num, uint64_t base, uint32_t limit, uint8_t flags, uint8_t gran);
-void gdt_update_tls_user(const uintptr_t base);
+namespace arch {
+/**
+ * In 64-bit mode, the GDT is basically unused, but we still have pointers to TSS structures for
+ * each processor, so they can have known-good interrupt and exception stacks.
+ */
+class Gdt {
+    public:
+        /// Initializes the global GDT and loads it.
+        static void Init();
 
-void gdt_setup_tss();
-void tss_set_esp0(void *ptr);
+        /// Initializes a TSS.
+        static void InitTss(amd64_tss_t *tss);
+        /// Installs the given TSS at the specified index.
+        static void InstallTss(const size_t i, amd64_tss_t *tss);
 
-void tss_activate(const uintptr_t idx, const uintptr_t stackAddr);
-const int tss_allocate(uintptr_t &idx);
-void tss_release(const uintptr_t idx);
-void tss_write_iopb(const uintptr_t idx, const uintptr_t portOffset, const uint8_t *iopb,
-        const uintptr_t iopbBits);
+    private:
+        /// Sets a standard 32-bit segment GDT entry.
+        static void Set32(const size_t idx, const uint32_t base, const uint32_t limit, const uint8_t flags, const uint8_t gran);
+
+        /// Sets a 64-bit GDT entry.
+        static void Set64(const size_t idx, const uintptr_t base, const uint32_t limit, const uint8_t flags, const uint8_t granularity);
+
+        /// Loads the GDT into the processor
+        static void Load(const size_t numTss = 1);
+
+    private:
+        /// Total number of GDT entries to allocate
+        constexpr static const size_t kGdtSize = 128;
+        /// Storage for the system's GDT
+        static gdt_descriptor_t gGdt[kGdtSize];
+};
+}
 
 #endif // ASM_FILE
 #endif

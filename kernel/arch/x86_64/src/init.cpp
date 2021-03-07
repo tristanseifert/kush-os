@@ -12,6 +12,8 @@
 #include "gdt.h"
 #include "idt.h"
 
+using namespace arch;
+
 static bool nxEnabled = false;
 static void update_supports_nx();
 
@@ -43,9 +45,11 @@ void arch_init() {
         x86_msr_write(X86_MSR_EFER, lo, hi);
     }*/
 
+    
+
     // initialize descriptors
-    gdt_init();
-    idt_init();
+    Gdt::Init();
+    Idt::Init();
 }
 
 /**
@@ -53,8 +57,6 @@ void arch_init() {
  */
 void arch_vm_available() {
     arch::syscall::Handler::init();
-
-    gdt_setup_tss();
 }
 
 /**

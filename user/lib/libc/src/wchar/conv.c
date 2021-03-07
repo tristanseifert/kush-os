@@ -8,7 +8,7 @@
  */
 int mbtowc(wchar_t *pwc, const char *s, size_t n) {
     fprintf(stderr, "%s unimplemented", __PRETTY_FUNCTION__);
-    return (size_t) -1;
+    return -1;
 }
 
 /**

@@ -10,6 +10,8 @@
 #include <printf.h>
 #include <log.h>
 
+using namespace arch;
+
 /**
  * Mapping of exception number to name
  */
@@ -83,25 +85,25 @@ extern "C" void amd64_exception_virtualization();
  * Installs the default set of exception handlers.
  */
 void exception_install_handlers() {
-    idt_set_entry(X86_EXC_DIVIDE, (uintptr_t) amd64_exception_div0, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_DEBUG, (uintptr_t) amd64_exception_debug, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_NMI, (uintptr_t) amd64_exception_nmi, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR);
-    idt_set_entry(X86_EXC_BREAKPOINT, (uintptr_t) amd64_exception_breakpoint, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_OVERFLOW, (uintptr_t) amd64_exception_overflow, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_BOUNDS, (uintptr_t) amd64_exception_bounds, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_ILLEGAL_OPCODE, (uintptr_t) amd64_exception_invalid_instruction, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_DEVICE_UNAVAIL, (uintptr_t) amd64_exception_device_unavailable, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_DOUBLE_FAULT, (uintptr_t) amd64_exception_double_fault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_INVALID_TSS, (uintptr_t) amd64_exception_tss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_SEGMENT_NP, (uintptr_t) amd64_exception_segment_missing, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_SS, (uintptr_t) amd64_exception_ss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_GPF, (uintptr_t) amd64_exception_gpf, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_PAGING, (uintptr_t) amd64_exception_pagefault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_FP, (uintptr_t) amd64_exception_float, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_ALIGNMENT, (uintptr_t) amd64_exception_alignment_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_MCE, (uintptr_t) amd64_exception_machine_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_SIMD_FP, (uintptr_t) amd64_exception_simd, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    idt_set_entry(X86_EXC_VIRT, (uintptr_t) amd64_exception_virtualization, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_DIVIDE, (uintptr_t) amd64_exception_div0, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_DEBUG, (uintptr_t) amd64_exception_debug, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_NMI, (uintptr_t) amd64_exception_nmi, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR);
+    Idt::Set(X86_EXC_BREAKPOINT, (uintptr_t) amd64_exception_breakpoint, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_OVERFLOW, (uintptr_t) amd64_exception_overflow, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_BOUNDS, (uintptr_t) amd64_exception_bounds, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_ILLEGAL_OPCODE, (uintptr_t) amd64_exception_invalid_instruction, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_DEVICE_UNAVAIL, (uintptr_t) amd64_exception_device_unavailable, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_DOUBLE_FAULT, (uintptr_t) amd64_exception_double_fault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_INVALID_TSS, (uintptr_t) amd64_exception_tss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_SEGMENT_NP, (uintptr_t) amd64_exception_segment_missing, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_SS, (uintptr_t) amd64_exception_ss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_GPF, (uintptr_t) amd64_exception_gpf, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_PAGING, (uintptr_t) amd64_exception_pagefault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_FP, (uintptr_t) amd64_exception_float, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_ALIGNMENT, (uintptr_t) amd64_exception_alignment_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_MCE, (uintptr_t) amd64_exception_machine_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_SIMD_FP, (uintptr_t) amd64_exception_simd, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_VIRT, (uintptr_t) amd64_exception_virtualization, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
 }
 
 /**
@@ -150,7 +152,7 @@ void amd64_handle_pagefault(amd64_exception_info_t *info) {
 
     // forward userspace page faults to the VM manager
     if(faultAddr < 0x8000000000000000 && (info->errCode & 0x04)) {
-        auto vm = vm::Map::current();
+        auto vm = ::vm::Map::current();
         bool handled = vm->handlePagefault(faultAddr, (info->errCode & 0x01), (info->errCode & 0x02));
 
         if(handled) {

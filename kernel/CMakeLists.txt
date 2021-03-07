@@ -77,7 +77,7 @@ set_target_properties(kernel PROPERTIES OUTPUT_NAME "kernel-${KERNEL_ARCH}-${KER
 set_target_properties(kernel PROPERTIES SUFFIX "${PLATFORM_KERNEL_EXTENSION}")
 
 # kernel is freestanding
-target_compile_options(kernel PRIVATE ${KERNEL_COMPILE_OPTS})
+target_compile_options(kernel PRIVATE ${KERNEL_COMPILE_OPTS} ${ARCH_COMPILE_OPTS})
 target_compile_options(kernel PRIVATE -Os)
 target_link_options(kernel PRIVATE ${KERNEL_COMPILE_OPTS} -fno-pie --static -nostartfiles)
 

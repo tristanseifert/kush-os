@@ -20,6 +20,8 @@ class Bundle {
         /// Virtual load address of init bundle
 #if defined(__i386__)
         constexpr static const uintptr_t kBundleAddr = 0x90000000;
+#elif defined(__amd64__)
+        constexpr static const uintptr_t kBundleAddr = 0x000000dead000000;
 #else
 #error Update init::Bundle::kBundleAddr for this architecture!
 #endif

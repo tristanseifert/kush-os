@@ -88,7 +88,7 @@ LIBC_INTERNAL void *__fake_sbrk(const intptr_t inc) {
         void *endPtr = ((void *) (gHeapStart + gHeapSize));
 
         // resize it
-        const size_t newSize = gHeapSize - abs(inc);
+        const size_t newSize = gHeapSize - labs(inc);
         err = ResizeVirtualRegion(gHeapHandle, newSize);
         if(err) {
             abort();

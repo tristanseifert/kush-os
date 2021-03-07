@@ -12,7 +12,7 @@
 // 64-bit platforms
 #elif defined(__x86_64__)
 #define LAUNCHINFO_OFF_NARGS    (16)
-#define LAUNCHINFO_OFF_ARGPTR   (20)
+#define LAUNCHINFO_OFF_ARGPTR   (24)
 #else
 #error unsupported architecture
 #endif

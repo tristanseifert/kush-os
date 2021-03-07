@@ -3,14 +3,14 @@
 
 __ThreadTrampoline:
     # set up stack
-    xor     %ebp, %ebp
+    xor         %rbp, %rbp
 
     # read out the args
-    mov     -4(%esp), %eax
-    mov     -8(%esp), %ebx
+    mov         -8(%rsp), %rax
+    mov         -16(%rsp), %rbx
 
-    push    %eax
-    call    *%ebx
+    mov         %rax, %rdi
+    call        *%rbx
 
     # destroy thread
     # TODO: this should be done from C

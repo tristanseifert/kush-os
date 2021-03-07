@@ -9,6 +9,9 @@
  */
 #if defined(__i386__)
 const kush_sysinfo_page_t *__kush_infopg = (const kush_sysinfo_page_t *) 0xBF5FE000;
+#elif defined(__amd64__)
+const kush_sysinfo_page_t *__kush_infopg = (const kush_sysinfo_page_t *) 0x00007FFF00200000;
+
 #else
 #error Define sysinfo page address for current arch
 #endif

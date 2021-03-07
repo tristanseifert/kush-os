@@ -56,4 +56,7 @@ __attribute__((weak)) void *___tls_get_addr(void *ctx) {
     fprintf(stderr, "%s unimplemented!\n", __FUNCTION__);
     abort();
 }
-
+__attribute__((weak)) void *__tls_get_addr(void *ctx) {
+    fprintf(stderr, "%s unimplemented!\n", __FUNCTION__);
+    abort();
+}

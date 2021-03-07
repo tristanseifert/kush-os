@@ -19,13 +19,13 @@
 int __do_syscall0(const uintptr_t number) {
     int ret;
     asm volatile(
-        "call  %1\n" :
+        "call  *%1\n" :
         // outputs: return code of the syscall
         "=a" (ret) :
         // inputs: stub address, syscall number
-        "r" (SYSCALL_STUB_ADDR), "a" (number) :
-        // ecx and edx get clobbered
-        "ecx", "edx"
+        "r"(SYSCALL_STUB_ADDR), "a" (number) :
+        // rcx and r11 are clobbered by sysenter
+        "rcx", "r11"
     );
     return ret;
 }
@@ -36,11 +36,11 @@ int __do_syscall0(const uintptr_t number) {
 int __do_syscall1(const uintptr_t number, const uintptr_t arg0) {
     int ret;
     asm volatile(
-        "call  %1\n" :
+        "call  *%1\n" :
         // outputs: return code of the syscall
         "=a" (ret) :
-        // inputs: stub address, syscall number, arguments
-        "r" (SYSCALL_STUB_ADDR), "a" (number), "Rdi" (arg0) :
+        // inputs: syscall number, arguments
+        "r"(SYSCALL_STUB_ADDR), "a" (number), "Rdi" (arg0) :
         // ecx and edx get clobbered
         "ecx", "edx"
     );
@@ -53,11 +53,11 @@ int __do_syscall1(const uintptr_t number, const uintptr_t arg0) {
 int __do_syscall2(const uintptr_t number, const uintptr_t arg0, const uintptr_t arg1) {
     int ret;
     asm volatile(
-        "call  %1\n" :
+        "call *%1\n" :
         // outputs: return code of the syscall
         "=a" (ret) :
-        // inputs: stub address, syscall number, arguments
-        "r" (SYSCALL_STUB_ADDR), "a" (number), "Rdi" (arg0), "Rsi" (arg1) :
+        // inputs: syscall number, arguments
+        "r"(SYSCALL_STUB_ADDR), "a" (number), "Rdi" (arg0), "Rsi" (arg1) :
         // ecx and edx get clobbered
         "ecx", "edx"
     );
@@ -70,11 +70,11 @@ int __do_syscall2(const uintptr_t number, const uintptr_t arg0, const uintptr_t 
 int __do_syscall3(const uintptr_t number, const uintptr_t arg0, const uintptr_t arg1, const uintptr_t arg2) {
     int ret;
     asm volatile(
-        "call  %1\n" :
+        "call  *%1\n" :
         // outputs: return code of the syscall
         "=a" (ret) :
-        // inputs: stub address, syscall number, arguments
-        "r" (SYSCALL_STUB_ADDR), "a" (number), "Rdi" (arg0), "Rsi" (arg1) , "d" (arg2) :
+        // inputs: syscall number, arguments
+        "r"(SYSCALL_STUB_ADDR), "a" (number), "Rdi" (arg0), "Rsi" (arg1) , "d" (arg2) :
         // no explicitly listed clobbers
     );
     return ret;
@@ -87,11 +87,11 @@ int __do_syscall4(const uintptr_t number, const uintptr_t arg0, const uintptr_t 
         const uintptr_t arg2, const uintptr_t arg3) {
     int ret;
     asm volatile(
-        "call  %1\n" :
+        "call  *%1\n" :
         // outputs: return code of the syscall
         "=a" (ret) :
-        // inputs: stub address, syscall number, arguments
-        "r" (SYSCALL_STUB_ADDR), "a" (number), "Rdi" (arg0), "Rsi" (arg1) , "d" (arg2), "c" (arg3) :
+        // inputs: syscall number, arguments
+        "r"(SYSCALL_STUB_ADDR), "a" (number), "Rdi" (arg0), "Rsi" (arg1) , "d" (arg2), "c" (arg3) :
         // no explicitly listed clobbers
     );
     return ret;

@@ -29,7 +29,8 @@ class LegacyPIT {
     public:
         static void disable();
 
-        static float configBusyWait(const uint32_t micros);
+        /// Returns the number of picoseconds the actual wait was for
+        static uint64_t configBusyWait(const uint32_t micros);
         static void busyWait();
 };
 }}

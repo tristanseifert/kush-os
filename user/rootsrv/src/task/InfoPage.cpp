@@ -32,6 +32,8 @@ InfoPage::InfoPage() {
 
 #if defined(__i386__)
     this->info->pageSz = 0x1000;
+#elif defined(__amd64__)
+    this->info->pageSz = 0x1000;
 #else
 #warning Don't know page size for this arch!
 #endif

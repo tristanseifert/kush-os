@@ -120,6 +120,23 @@ std::shared_ptr<loader::Loader> Task::getLoaderFor(const std::string &path, FILE
 
     using namespace loader;
 
+    // check 64-bit ELF header if on a 64-bit platform
+#if defined(__amd64__)
+    Elf64_Ehdr hdr;
+    memset(&hdr, 0, sizeof(Elf64_Ehdr));
+
+    err = fseek(fp, 0, SEEK_SET);
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "Failed to read ELF header");
+    }
+
+    err = fread(&hdr, 1, sizeof(Elf64_Ehdr), fp);
+    if(err != sizeof(Elf64_Ehdr)) {
+        throw std::system_error(err, std::generic_category(), "Failed to read ELF header");
+    }
+
+    // TODO: implement the rest of this
+#else   // otherwise, read a 32-bit header
     // read out the header
     Elf32_Ehdr hdr;
     memset(&hdr, 0, sizeof(Elf32_Ehdr));
@@ -147,6 +164,7 @@ std::shared_ptr<loader::Loader> Task::getLoaderFor(const std::string &path, FILE
     } else {
         throw LoaderError(fmt::format("Invalid ELF class: {:02x}", hdr.e_ident[EI_CLASS]));
     }
+#endif
 
     // we should not get here
     return nullptr;

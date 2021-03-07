@@ -130,7 +130,7 @@ int LookupService(const char * _Nonnull _name, uintptr_t * _Nonnull outPort) {\
         // deserialize the request
         auto packet = reinterpret_cast<RpcPacket *>(rxMsg->data);
 
-        auto data = std::span(packet->payload, std::min(err - sizeof(RpcPacket), (unsigned int) err));
+        auto data = std::span(packet->payload, std::min(err - sizeof(RpcPacket), (size_t) err));
         if(data.size() < sizeof(RootSrvDispensaryLookupReply)) {
             err = -1;
             goto fail;
@@ -237,7 +237,7 @@ int RegisterService(const char * _Nonnull _name, const uintptr_t port) {
 
         // deserialize the request
         auto packet = reinterpret_cast<RpcPacket *>(rxMsg->data);
-        auto data = std::span(packet->payload, std::min(err - sizeof(RpcPacket), (unsigned int) err));
+        auto data = std::span(packet->payload, std::min(err - sizeof(RpcPacket), (size_t) err));
         if(data.size() < sizeof(RootSrvDispensaryRegisterReply)) {
             err = -1;
             goto fail;

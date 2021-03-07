@@ -7,7 +7,7 @@
  * Updates the base of the %fs register for the thread.
  */
 int Amd64SetThreadLocalBase(const int which, const uintptr_t base) {
-    return Amd64SetThreadLocalBaseFor(0, base);
+    return Amd64SetThreadLocalBaseFor(0, which, base);
 }
 
 /**

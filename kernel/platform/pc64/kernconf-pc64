@@ -1,0 +1,7 @@
+// loader variables
+screen=1024x768
+kernel=kernel-x86_64-pc64.elf
+
+// kernel variables
+blazington=kush
+nx=off

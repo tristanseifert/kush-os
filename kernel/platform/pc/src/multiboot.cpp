@@ -39,6 +39,8 @@ void multiboot_parse() {
     for(tag = (struct multiboot_tag *) (x86_multiboot_info + 8);
        tag->type != MULTIBOOT_TAG_TYPE_END;
        tag = (struct multiboot_tag *) ((uint8_t *) tag + ((tag->size + 7) & ~7))) {
+        log("tag %p type %u", tag, tag->type);
+
         // handle tag type
         switch(tag->type) {
             // kernel command line

@@ -25,6 +25,9 @@ static size_t gThreadStackSz = 0;
 #if defined(__i386__)
 // 128K
 #define kDefaultStackSz                 ((128 * 1024) / sizeof(uintptr_t))
+#elif defined(__amd64__)
+// 256K
+#define kDefaultStackSz                 ((128 * 1024) / sizeof(uintptr_t))
 #else
 #error Update threads/c11_threads.c with this arch's default stack size
 #endif

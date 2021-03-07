@@ -2,45 +2,55 @@
 #include "gdt.h"
 #include "exceptions.h"
 
+#include <log.h>
 #include <string.h>
+
+using namespace arch;
 
 static void load_idt(void *location, const uint16_t size);
 
 // the descriptor table is allocated in BSS
-static idt_entry_t sys_idt[256];
+idt_entry64_t Idt::gIdts[Idt::kNumIdt];
 
 
 /*
  * Builds the Interrupt Descriptor Table at a fixed location in memory.
  */
-void idt_init() {
-    // clear the IDT and install dummy IRQ handlers
-    idt_entry_t* idt = (idt_entry_t *) &sys_idt;
-    memset(idt, 0, sizeof(idt_entry_t)*256);
-
-    for(int i = 0; i < 256; i++) {
-        // idt_set_entry(i, (uint32_t) sys_dummy_irq, GDT_KERN_CODE_SEG, 0x8E);
-    }
+void Idt::Init() {
+    memset(&gIdts, 0, sizeof(idt_entry64_t)*kNumIdt);
 
     // install CPU exception handlers
     exception_install_handlers();
 
     // load the IDT into the processor
-    load_idt((void *) idt, sizeof(idt_entry_t)*256);
+    load_idt((void *) &gIdts, sizeof(idt_entry64_t)*kNumIdt);
 }
 
 
 /**
  * Sets the value of an IDT gate.
+ *
+ * XXX: does this need a lock of some sort?
+ *
+ * @param entry Index into the IDT to set
+ * @param function Address to set the entry to (its offset field)
+ * @param segment Code segment to associate with the entry (these must be 64 bit)
+ * @param flags Present flag, DPL, and 4-bit type. Should always have 0x80
+ * @param stack Interrupt stack to select (out of current TSS) for this interrupt; a value of 0
+ * uses the legacy TSS lookup, which we don't support. There are a total of 7 stack slots in the
+ * TSS, which are all allocated for each core.
  */
-void idt_set_entry(uint8_t entry, uintptr_t function, uint8_t segment, uint8_t flags) {
-    idt_entry_t *ptr = (idt_entry_t *) &sys_idt;
+void Idt::Set(const size_t entry, const uintptr_t function, const uintptr_t segment, const uintptr_t flags, const size_t stack) {
+    REQUIRE(entry < kNumIdt, "IDT index out of bounds: %u", entry);
+    REQUIRE(stack <= 7, "stack offset ouf of bounds: %u", stack);
 
-    ptr[entry].offset_1 = function & 0xFFFF;
-    ptr[entry].offset_2 = (function >> 0x10) & 0xFFFF;
-    ptr[entry].selector = segment;
-    ptr[entry].flags = flags; // OR with 0x60 for user level
-    ptr[entry].zero = 0x00;
+    gIdts[entry].offset1 = function & 0xFFFF;
+    gIdts[entry].offset2 = (function & 0xFFFF0000 >> 16) & 0xFFFF;
+    gIdts[entry].selector = segment;
+    gIdts[entry].ist = stack;
+    gIdts[entry].flags = flags; // OR with 0x60 for user level
+    gIdts[entry].reserved = 0;
+    gIdts[entry].offset3 = (function & 0xFFFFFFFF00000000) >> 32;
 }
 
 /**

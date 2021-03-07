@@ -1,4 +1,11 @@
+.extern kernel_init
+.extern kernel_main
+
+.extern arch_init
+.extern platform_init
+
 .section .entry, "ax"
+.global _osentry
 /**
  * Entry point from the BOOTBOOT loader. At this point, we're executing in 64-bit mode, with
  * the floating point unit and SSE enabled. Interrupts are masked, and ALL cores in the system
@@ -8,9 +15,7 @@
  * VM address space.
  */
 _osentry:
-    // clear caches
     cli
-    wbinvd
 
     /**
      * Determine the CPU number; this only supports up to 256 cores, we need to support x2APIC for
@@ -24,14 +29,6 @@ _osentry:
     cmpw        %bx, bootboot + 0xC
     jne         ap_start
 
-
-.extern kernel_init
-.extern kernel_main
-
-.extern arch_init
-.extern platform_init
-
-jmp_highhalf:
     // set up a NULL stack frame, so stack unwinding can stop here
     xor         %rbp, %rbp
 
@@ -40,10 +37,7 @@ jmp_highhalf:
     xor         %rax, %rax
     mov         $__kern_bss_size_dwords-1, %rcx
     cld
-    rep stosb
-
-    // clear caches
-    wbinvd
+    rep stosl // XXX: should be STOSL?
 
     // perform initializations
     call        arch_init
@@ -71,6 +65,10 @@ jmp_highhalf:
  * It's likely each processor will have an APIC that needs configuring too.
  */
 ap_start:
+    // per-processor init
+
+    // for now, just chill and do nothing
+.Lyeet:
     cli
     hlt
-    jmp         ap_start
+    jmp         .Lyeet
