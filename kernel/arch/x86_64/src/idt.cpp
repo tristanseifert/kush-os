@@ -7,11 +7,11 @@
 
 using namespace arch;
 
-static void load_idt(void *location, const uint16_t size);
-
 // the descriptor table is allocated in BSS
-idt_entry64_t Idt::gIdts[Idt::kNumIdt];
+idt_entry64_t Idt::gIdts[Idt::kNumIdt] __attribute__((aligned((64))));
 
+bool Idt::gLogLoad = false;
+bool Idt::gLogSet = false;
 
 /*
  * Builds the Interrupt Descriptor Table at a fixed location in memory.
@@ -23,7 +23,7 @@ void Idt::Init() {
     exception_install_handlers();
 
     // load the IDT into the processor
-    load_idt((void *) &gIdts, sizeof(idt_entry64_t)*kNumIdt);
+    Load();
 }
 
 
@@ -40,29 +40,32 @@ void Idt::Init() {
  * uses the legacy TSS lookup, which we don't support. There are a total of 7 stack slots in the
  * TSS, which are all allocated for each core.
  */
-void Idt::Set(const size_t entry, const uintptr_t function, const uintptr_t segment, const uintptr_t flags, const size_t stack) {
+void Idt::Set(const size_t entry, const uintptr_t function, const uintptr_t segment, const uintptr_t flags, const Stack stack) {
     REQUIRE(entry < kNumIdt, "IDT index out of bounds: %u", entry);
-    REQUIRE(stack <= 7, "stack offset ouf of bounds: %u", stack);
+
+    if(gLogSet) log("IDT index %2u: addr %016llx segment %04x flags %08x stack %u", entry, 
+            function, segment, flags, (uint8_t) stack);
 
     gIdts[entry].offset1 = function & 0xFFFF;
-    gIdts[entry].offset2 = (function & 0xFFFF0000 >> 16) & 0xFFFF;
+    gIdts[entry].offset2 = function >> 16;
     gIdts[entry].selector = segment;
-    gIdts[entry].ist = stack;
+    gIdts[entry].ist = static_cast<uint8_t>(stack);
     gIdts[entry].flags = flags; // OR with 0x60 for user level
-    gIdts[entry].reserved = 0;
-    gIdts[entry].offset3 = (function & 0xFFFFFFFF00000000) >> 32;
+    gIdts[entry].offset3 = function >> 32ULL;
 }
 
 /**
- * Loads an interrupt descriptor table.
+ * Loads the IDT.
  */
-static void load_idt(void *base, const uint16_t size) {
+void Idt::Load() {
     struct {
         uint16_t length;
         uint64_t base;
     } __attribute__((__packed__)) IDTR;
 
-    IDTR.length = size - 1;
-    IDTR.base = (uint64_t) base;
+    IDTR.length = (sizeof(idt_entry64_t) * kNumIdt) - 1;
+    IDTR.base = reinterpret_cast<uintptr_t>(&gIdts);
     asm volatile("lidt (%0)": : "r"(&IDTR));
+
+    if(gLogLoad) log("Loaded IDT %p len %u", IDTR.base, IDTR.length);
 }

@@ -53,43 +53,28 @@ typedef struct arch_gdt_descriptor_64 {
 /**
  * Task state structure for amd64 mode. The only part of this structure that we really care about
  * and use are the interrupt stacks.
- */
+ *
+ * All reserved fields should be initialized to zero.
+*/
 typedef struct amd64_tss {
-    // High word ignored
-    uint32_t backlink;
+    uint32_t reserved1;
 
-    // All 32 bits significant for ESP, high word ignored for SS
-    uint32_t esp0;
-    uint32_t ss0;
-    uint32_t esp1;
-    uint32_t ss1;
-    uint32_t esp2;
-    uint32_t ss2;
+    // stack pointers
+    uint32_t rsp0Low, rsp0High;
+    uint32_t rsp1Low, rsp1High;
+    uint32_t rsp2Low, rsp2High;
 
-    // All 32 bits are significant
-    uint32_t cr3;
-    uint32_t eip;
-    uint32_t eflags;
-    uint32_t eax;
-    uint32_t ecx;
-    uint32_t edx;
-    uint32_t ebx;
-    uint32_t esp;
-    uint32_t ebp;
-    uint32_t esi;
-    uint32_t edi;
+    uint32_t reserved2[2];
 
-    // High word is ignored in all these
-    uint32_t es;
-    uint32_t cs;
-    uint32_t ss;
-    uint32_t ds;
-    uint32_t fs;
-    uint32_t gs;
-    uint32_t ldt;
+    // interrupt stacks
+    struct {
+        uint32_t low, high;
+    } __attribute__((packed)) ist[7];
 
-    uint16_t trap;
-    uint16_t iomap; // low word ignored
+    uint32_t reserved3[2];
+
+    // IO map offset (should be sizeof(amd64_tss) as we don't use it). use high word
+    uint32_t ioMap;
 } __attribute__((packed)) amd64_tss_t;
 
 namespace arch {
@@ -116,12 +101,17 @@ class Gdt {
 
         /// Loads the GDT into the processor
         static void Load(const size_t numTss = 1);
+        /// Switches to the TSS with the given index.
+        static void ActivateTask(const size_t task);
 
     private:
         /// Total number of GDT entries to allocate
         constexpr static const size_t kGdtSize = 128;
         /// Storage for the system's GDT
         static gdt_descriptor_t gGdt[kGdtSize];
+
+        /// whehter GDT loads are logged
+        static bool gLogLoad;
 };
 }
 

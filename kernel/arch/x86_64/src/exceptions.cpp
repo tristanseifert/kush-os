@@ -85,25 +85,25 @@ extern "C" void amd64_exception_virtualization();
  * Installs the default set of exception handlers.
  */
 void exception_install_handlers() {
-    Idt::Set(X86_EXC_DIVIDE, (uintptr_t) amd64_exception_div0, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_DEBUG, (uintptr_t) amd64_exception_debug, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_NMI, (uintptr_t) amd64_exception_nmi, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR);
-    Idt::Set(X86_EXC_BREAKPOINT, (uintptr_t) amd64_exception_breakpoint, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_OVERFLOW, (uintptr_t) amd64_exception_overflow, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_BOUNDS, (uintptr_t) amd64_exception_bounds, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_ILLEGAL_OPCODE, (uintptr_t) amd64_exception_invalid_instruction, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_DEVICE_UNAVAIL, (uintptr_t) amd64_exception_device_unavailable, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_DOUBLE_FAULT, (uintptr_t) amd64_exception_double_fault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_INVALID_TSS, (uintptr_t) amd64_exception_tss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_SEGMENT_NP, (uintptr_t) amd64_exception_segment_missing, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_SS, (uintptr_t) amd64_exception_ss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_GPF, (uintptr_t) amd64_exception_gpf, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_PAGING, (uintptr_t) amd64_exception_pagefault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_FP, (uintptr_t) amd64_exception_float, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_ALIGNMENT, (uintptr_t) amd64_exception_alignment_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_MCE, (uintptr_t) amd64_exception_machine_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_SIMD_FP, (uintptr_t) amd64_exception_simd, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
-    Idt::Set(X86_EXC_VIRT, (uintptr_t) amd64_exception_virtualization, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP);
+    Idt::Set(X86_EXC_DIVIDE, (uintptr_t) amd64_exception_div0, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    Idt::Set(X86_EXC_DEBUG, (uintptr_t) amd64_exception_debug, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack4);
+    Idt::Set(X86_EXC_NMI, (uintptr_t) amd64_exception_nmi, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR, Idt::Stack::Stack3);
+    Idt::Set(X86_EXC_BREAKPOINT, (uintptr_t) amd64_exception_breakpoint, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack4);
+    Idt::Set(X86_EXC_OVERFLOW, (uintptr_t) amd64_exception_overflow, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    Idt::Set(X86_EXC_BOUNDS, (uintptr_t) amd64_exception_bounds, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    Idt::Set(X86_EXC_ILLEGAL_OPCODE, (uintptr_t) amd64_exception_invalid_instruction, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    Idt::Set(X86_EXC_DEVICE_UNAVAIL, (uintptr_t) amd64_exception_device_unavailable, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    Idt::Set(X86_EXC_DOUBLE_FAULT, (uintptr_t) amd64_exception_double_fault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    Idt::Set(X86_EXC_INVALID_TSS, (uintptr_t) amd64_exception_tss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    Idt::Set(X86_EXC_SEGMENT_NP, (uintptr_t) amd64_exception_segment_missing, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    Idt::Set(X86_EXC_SS, (uintptr_t) amd64_exception_ss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    Idt::Set(X86_EXC_GPF, (uintptr_t) amd64_exception_gpf, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    Idt::Set(X86_EXC_PAGING, (uintptr_t) amd64_exception_pagefault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    Idt::Set(X86_EXC_FP, (uintptr_t) amd64_exception_float, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    Idt::Set(X86_EXC_ALIGNMENT, (uintptr_t) amd64_exception_alignment_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    Idt::Set(X86_EXC_MCE, (uintptr_t) amd64_exception_machine_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack4);
+    Idt::Set(X86_EXC_SIMD_FP, (uintptr_t) amd64_exception_simd, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    Idt::Set(X86_EXC_VIRT, (uintptr_t) amd64_exception_virtualization, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
 }
 
 /**
@@ -118,22 +118,38 @@ int amd64_exception_format_info(char *outBuf, const size_t outBufLen,
     asm volatile("mov %%cr2, %0" : "=r" (cr2));
     asm volatile("mov %%cr3, %0" : "=r" (cr3));
 
+    uint64_t xmm[8][2];
+    memcpy(&xmm, &info->xmm, 16 * 8);
+
     return snprintf(outBuf, outBufLen, "Exception %3llu ($%016llx)\n"
             "CR0 $%016llx CR2 $%016llx CR3 $%016llx\n"
-            " CS $%016llx  SS $%016llx\n"
+            " CS $%04llx  SS $%04llx RFLAGS $%016llx\n"
             "RAX $%016llx RBX $%016llx RCX $%016llx RDX $%016llx\n"
             "RDI $%016llx RSI $%016llx RBP $%016llx RSP $%016llx\n"
-            "RIP $%016llx RFLAGS $%016llx\n"
-            " R8 $%016llx  R9 $%016llx R10 $%016llx R11 %016llx\n"
-            "R12 $%016llx R13 $%016llx R14 $%016llx R15 %016llx",
+            " R8 $%016llx  R9 $%016llx R10 $%016llx R11 $%016llx\n"
+            "R12 $%016llx R13 $%016llx R14 $%016llx R15 $%016llx\n"
+            "RIP $%016llx\n"
+            "XMM0 $%016llx%016llx\n"
+            "XMM1 $%016llx%016llx\n"
+            "XMM2 $%016llx%016llx\n"
+            "XMM3 $%016llx%016llx\n"
+            "XMM4 $%016llx%016llx\n"
+            "XMM5 $%016llx%016llx\n"
+            "XMM6 $%016llx%016llx\n"
+            "XMM7 $%016llx%016llx\n"
+            ,
             info->intNo, info->errCode,
             cr0, cr2, cr3,
-            info->cs, info->ss,
+            info->cs, info->ss, info->rflags,
             info->rax, info->rbx, info->rcx, info->rdx,
             info->rdi, info->rsi, info->rbp, info->rsp,
-            info->rip, info->rflags,
             info->r8, info->r9, info->r10, info->r11,
-            info->r12, info->r13, info->r14, info->r15
+            info->r12, info->r13, info->r14, info->r15,
+            info->rip,
+            xmm[0][1], xmm[0][0], xmm[1][1], xmm[1][0],
+            xmm[2][1], xmm[2][0], xmm[3][1], xmm[3][0],
+            xmm[4][1], xmm[4][0], xmm[5][1], xmm[5][0],
+            xmm[6][1], xmm[6][0], xmm[7][1], xmm[7][0]
     );
 }
 

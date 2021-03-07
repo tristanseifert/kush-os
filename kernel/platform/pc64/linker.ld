@@ -5,10 +5,8 @@ OUTPUT_FORMAT(elf64-x86-64)
  * Define the addresses of some stuff for the bootloader, as well as the per core init stack
  * sizes
  */
-/*mmio = 0xfffffffff4000000;
-fb = 0xfffffffff8000000;*/
-mmio = 0xfffffffff8000000;
-fb = 0xfffffffffc000000;
+mmio = 0xfffffffff4000000;
+fb = 0xfffffffff8000000;
 initstack = 4096;
 
 /**
@@ -20,7 +18,8 @@ PHDRS {
 
 SECTIONS {
     /* base address for the code and all, minus two pages for bootboot info and env */
-    . = 0xffffffffffe00000;
+    /*. = 0xffffffffffe00000; */
+    . = 0xffffffffff000000 - 0x2000;
 
     bootboot    = .; . += 0x1000;
     environment = .; . += 0x1000;

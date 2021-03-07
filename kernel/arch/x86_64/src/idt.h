@@ -41,13 +41,40 @@ class Idt {
     constexpr static const size_t kNumIdt = 256;
 
     public:
+        /// Stack to use for an interrupt
+        enum class Stack: uint8_t {
+            /// Do not use an interrupt stack
+            None                        = 0,
+            /// First interrupt stack: exceptions
+            Stack1                      = 1,
+            /// Second interrupt stack: faults
+            Stack2                      = 2,
+            /// Third interrupt stack: NMI
+            Stack3                      = 3,
+            /// Fourth interrupt stack: MCE/Debug
+            Stack4                      = 4,
+            /// Fifth interrupt stack: IPIs
+            Stack5                      = 5,
+            /// Sixth interrupt stack: General IRQs
+            Stack6                      = 6,
+            Stack7                      = 7,
+        };
+
+    public:
         /// Initialize the IDT memory and load it into the processor register.
         static void Init();
         /// Sets an IDT entry
-        static void Set(const size_t entry, const uintptr_t addr, const uintptr_t seg, const uintptr_t flags, const uintptr_t stack = 0);
+        static void Set(const size_t entry, const uintptr_t addr, const uintptr_t seg, const uintptr_t flags, const Stack stack = Stack::None);
+
+        static void Load();
 
     private:
-        static idt_entry64_t gIdts[kNumIdt] __attribute__((aligned(64)));
+        static idt_entry64_t gIdts[kNumIdt];
+
+        /// whether loading of the IDT is logged
+        static bool gLogLoad;
+        /// whether inserting an entry in the IDT is logged
+        static bool gLogSet;
 };
 }
 

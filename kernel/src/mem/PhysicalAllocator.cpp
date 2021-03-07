@@ -41,7 +41,8 @@ PhysicalAllocator::PhysicalAllocator() {
 
     const auto numEntries = platform_phys_num_regions();
     if(numEntries <= 0 || numEntries >= (int) kMaxRegions) {
-        panic("invalid number of physical regions: %d", numEntries);
+        panic("invalid number of physical regions: %d (max %u entries %u)", numEntries,
+                kMaxRegions, numEntries);
     }
 
     for(int i = 0; i < numEntries; i++) {

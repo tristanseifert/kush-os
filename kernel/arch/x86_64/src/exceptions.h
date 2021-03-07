@@ -11,11 +11,15 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
+#include <x86intrin.h>
 
 /**
  * Stack frame pushed by the assembly exception handler routines
  */
 typedef struct amd64_exception_info {
+    // SSE registers
+    __m128i xmm[8];
+
     // registers added for 64-bit mode
     uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
     // basic registers (in common with 32-bit mode, in same order as PUSHA)

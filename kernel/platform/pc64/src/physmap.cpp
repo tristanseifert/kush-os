@@ -19,6 +19,9 @@ extern size_t __kern_keep_start, __kern_keep_end;
 /// Maximum number of physical memory regions to allocate space for
 #define MAX_REGIONS             10
 
+/// Minimum length of allocatable regions (anything smaller is ignored)
+constexpr static const size_t kRegionSizeThreshold = (512 * 1024);
+
 /// Total number of allocatable physical RAM regions
 static size_t gNumPhysRegions = 0;
 /// Info on each of the physical regions
@@ -28,6 +31,9 @@ static physmap_region_t gPhysRegions[MAX_REGIONS] = {
 
 /// end address of the modules region
 static uintptr_t gModulesEnd = 0;
+
+/// log allocated physical regions
+static bool gLogPhysRegions = false;
 
 static void create_kernel_hole();
 
@@ -55,12 +61,24 @@ void physmap_parse_bootboot(const BOOTBOOT *boot) {
                 continue;
             }
 
+            // ignore if the region is too small (< 512K)
+            if(MMapEnt_Size(mmap) < kRegionSizeThreshold) {
+                log("Ignoring memory at %016x (size %u bytes): too small", MMapEnt_Ptr(mmap),
+                        MMapEnt_Size(mmap));
+                continue;
+            }
+
+            // store it
             gPhysRegions[gNumPhysRegions].start = MMapEnt_Ptr(mmap);
             gPhysRegions[gNumPhysRegions].length = MMapEnt_Size(mmap);
+
+            if(gLogPhysRegions) log("phys region %2u: start %016x len %016x", gNumPhysRegions,
+                    gPhysRegions[gNumPhysRegions].start, gPhysRegions[gNumPhysRegions].length);
+
             gNumPhysRegions++;
         } else {
-            log("Unused Entry: addr %016llx size %016llx flags %08x", MMapEnt_Ptr(mmap),
-                    MMapEnt_Size(mmap), MMapEnt_Type(mmap));
+            /*log("Unused Entry: addr %016llx size %016llx flags %08x", MMapEnt_Ptr(mmap),
+                    MMapEnt_Size(mmap), MMapEnt_Type(mmap));*/
         }
     }
 

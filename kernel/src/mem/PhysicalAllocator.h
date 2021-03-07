@@ -99,7 +99,7 @@ class PhysicalAllocator {
 
     private:
         /// maximum number of physical regions to store info for
-        constexpr static const size_t kMaxRegions = 5;
+        constexpr static const size_t kMaxRegions = 10;
 
     private:
         static PhysicalAllocator *gShared;

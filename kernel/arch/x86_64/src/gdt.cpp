@@ -14,6 +14,13 @@ gdt_descriptor_t Gdt::gGdt[Gdt::kGdtSize] __attribute__((aligned(64)));
 /// TSS for bootstrap processor
 static amd64_tss_t gBspTss;
 
+/// Size of the IRQ stack (in 8 byte units)
+constexpr static const size_t kIrqStackSz = 256;
+/// Interrupt stacks for the bootstrap processor
+static __attribute__((aligned(64))) uintptr_t gBspIrqStacks[7][kIrqStackSz];
+
+bool Gdt::gLogLoad = false;
+
 /**
  * Loads the task register with the TSS in the given descriptor.
  */
@@ -43,11 +50,31 @@ void Gdt::Init() {
 
     // set up the first TSS
     InitTss(&gBspTss);
+
+    for(size_t i = 0; i < 7; i++) {
+        const auto stack = reinterpret_cast<uintptr_t>(&gBspIrqStacks[i]) + (kIrqStackSz * sizeof(uintptr_t));
+
+        gBspTss.ist[i].low = stack & 0xFFFFFFFF;
+        gBspTss.ist[i].high = stack >> 32ULL;
+    }
+
     InstallTss(0, &gBspTss);
 
-    // Load the GDT into the processor
+    // Load the GDT into the processor and activate TSS
     Load();
+    ActivateTask(0);
 }
+
+/**
+ * Activates a task.
+ */
+void Gdt::ActivateTask(const size_t task) {
+    const uint16_t sel = ((task * 2) * 8) + GDT_FIRST_TSS;
+
+    if(gLogLoad) log("Load task: %04x", sel);
+    asm volatile("ltr %0" : : "r" (sel) : "memory");
+}
+
 
 /**
  * Sets a GDT entry.
@@ -79,6 +106,7 @@ void Gdt::Set64(const size_t num, const uintptr_t base, const uint32_t limit, co
 
     // build the descriptor
     gdt_descriptor64_t desc;
+    memset(&desc, 0, sizeof(desc));
 
     desc.limit0 = (limit & 0xFFFF);
     desc.granularityLimit = (limit >> 16) & 0x0F;
@@ -87,8 +115,6 @@ void Gdt::Set64(const size_t num, const uintptr_t base, const uint32_t limit, co
     desc.base1 = (base >> 16) & 0xFF;
     desc.base2 = (base >> 24) & 0xFF;
     desc.base3 = (base >> 32ULL);
-
-    desc.reserved = 0;
 
     desc.typeFlags = flags;
 
@@ -110,8 +136,10 @@ void Gdt::Load(const size_t numTss) {
 
     // each TSS slot occupies 16 bytes
     GDTR.length = (GDT_FIRST_TSS + (numTss * 16)) - 1;
-    GDTR.base = (uint64_t) &gGdt;
+    GDTR.base = reinterpret_cast<uintptr_t>(&gGdt);
     asm volatile("lgdt (%0)" : : "r"(&GDTR) : "memory");
+
+    if(gLogLoad) log("Load GDT %p len %u", GDTR.base, GDTR.length);
 }
 
 /**
@@ -121,6 +149,9 @@ void Gdt::Load(const size_t numTss) {
  */
 void Gdt::InitTss(amd64_tss_t *tss) {
     memset(tss, 0, sizeof(amd64_tss_t));
+
+    // no IO map
+    tss->ioMap = (sizeof(amd64_tss_t) - 1) << 16;
 }
 
 /**
@@ -129,6 +160,6 @@ void Gdt::InitTss(amd64_tss_t *tss) {
  * @param i TSS index slot, this is typically the CPU ID.
  */
 void Gdt::InstallTss(const size_t i, amd64_tss_t *tss) {
-    Set64((i * 2) + (GDT_FIRST_TSS >> 3), reinterpret_cast<uintptr_t>(tss),
+    Set64((i * 2) + (GDT_FIRST_TSS / 8), reinterpret_cast<uintptr_t>(tss),
             sizeof(amd64_tss_t) - 1, 0x89, 0);
 }
