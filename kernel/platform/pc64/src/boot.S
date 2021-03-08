@@ -18,6 +18,14 @@ _osentry:
     cli
 
     /**
+     * Enable global pages and page-size extension. (XXX: should we test whether these are
+     * supported before enabling them?)
+     */
+    mov         %cr4, %rax
+    or          $((1 << 7) | (1 << 4)), %rax
+    mov         %rax, %cr4
+
+    /**
      * Determine the CPU number; this only supports up to 256 cores, we need to support x2APIC for
      * supporting more than this
      */

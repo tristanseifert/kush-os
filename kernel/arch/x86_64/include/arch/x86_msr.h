@@ -6,6 +6,8 @@
 /// extended feature enable register
 #define X86_MSR_EFER                    0xC0000080
 
+/// EFER flag for SYSCALL/SYSRET
+#define X86_MSR_EFER_SCE                (1 << 0)
 /// EFER flag for NX bit
 #define X86_MSR_EFER_NX                 (1 << 11)
 

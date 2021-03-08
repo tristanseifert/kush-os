@@ -35,17 +35,16 @@ void arch_init() {
     // determine if we support the NX bit; enable the feature if needed
     update_supports_nx();
 
-    /*
+    uint32_t lo, hi;
+    x86_msr_read(X86_MSR_EFER, &lo, &hi);
+
     if(nxEnabled) {
-        uint32_t lo, hi;
-        x86_msr_read(X86_MSR_EFER, &lo, &hi);
-
         lo |= X86_MSR_EFER_NX;
+    }
 
-        x86_msr_write(X86_MSR_EFER, lo, hi);
-    }*/
+    lo |= X86_MSR_EFER_SCE; // always enable the SYSCALL bit
 
-    
+    x86_msr_write(X86_MSR_EFER, lo, hi);
 
     // initialize descriptors
     Gdt::Init();
