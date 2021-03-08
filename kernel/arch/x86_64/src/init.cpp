@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <printf.h>
 
+#include "PerCpuInfo.h"
 #include "vm/PTEHandler.h"
 #include "syscall/Handler.h"
 
@@ -49,6 +50,9 @@ void arch_init() {
     // initialize descriptors
     Gdt::Init();
     Idt::Init();
+
+    // set up the per-CPU info struct for the BSP
+    PerCpuInfo::BspInit();
 }
 
 /**

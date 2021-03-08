@@ -37,6 +37,9 @@ _osentry:
     cmpw        %bx, bootboot + 0xC
     jne         ap_start
 
+    // switch to the bootstrap stack
+    lea         bsp_stack_bottom, %rsp
+
     // set up a NULL stack frame, so stack unwinding can stop here
     xor         %rbp, %rbp
 
@@ -80,3 +83,10 @@ ap_start:
     cli
     hlt
     jmp         .Lyeet
+
+
+/// bootstrap processor stack
+.section .bss
+bsp_stack_top:
+.skip 0x2000
+bsp_stack_bottom:

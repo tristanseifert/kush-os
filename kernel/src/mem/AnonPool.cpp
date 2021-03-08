@@ -15,6 +15,9 @@ using namespace mem;
 
 AnonPool *AnonPool::gShared = nullptr;
 
+/// whether anonymous memory pages are mapped globally
+bool AnonPool::gMapGlobal = false;
+
 /**
  * Sets up the anon pool.
  */
@@ -194,7 +197,12 @@ beach:;
         // get virtual address and map it
         const auto virtAddr = this->virtBase + (idx * pageSz);
 
-        err = map->add(physPages[i], pageSz, virtAddr, vm::MapMode::kKernelRW | vm::MapMode::GLOBAL);
+        vm::MapMode flags = vm::MapMode::kKernelRW;
+        if(gMapGlobal) {
+            flags |= vm::MapMode::GLOBAL;
+        }
+
+        err = map->add(physPages[i], pageSz, virtAddr, flags);
         if(err) {
             // TODO: undo any previous virtual mappings!
             goto fail;

@@ -49,7 +49,8 @@ void panic(const char *format, ...) {
     platform_raise_irql(platform::Irql::CriticalSection, false);
 
     // get current thread
-    auto thread = sched::Scheduler::get()->runningThread();
+    auto sched = sched::Scheduler::get();
+    auto thread = sched ? sched->runningThread() : nullptr;
     auto task = (thread ? thread->task : nullptr);
 
     // set up panic buffer

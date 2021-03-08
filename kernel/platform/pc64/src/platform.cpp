@@ -44,6 +44,9 @@ void platform_init() {
     // set up and remap the PICs and other interrupt controllers
     irq::LegacyPic::disable();
     timer::LegacyPIT::disable();
+
+    // detect some shit
+    Physmap::DetectKernelPhys();
 }
 
 /**

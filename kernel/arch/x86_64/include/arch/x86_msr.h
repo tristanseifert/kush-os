@@ -11,6 +11,15 @@
 /// EFER flag for NX bit
 #define X86_MSR_EFER_NX                 (1 << 11)
 
+/// Base address of the %fs segment
+#define X86_MSR_FSBASE                  0xC0000100
+/// Base address of the %gs segment
+#define X86_MSR_GSBASE                  0xC0000101
+/// Base address of the kernel space %gs segment (for use with swapgs)
+#define X86_MSR_KERNEL_GSBASE           0xC0000102
+
+
+
 /**
  * Writes a model-specific register.
  */

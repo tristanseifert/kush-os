@@ -10,11 +10,25 @@
 #include <stdint.h>
 #include <string.h>
 
+// XXX: we should pull this in from the x86_64 arch headers
+namespace arch::vm {
+int ResolvePml4Virt(const uintptr_t pml4, const uintptr_t virt, uintptr_t &phys);
+}
+
+using namespace platform;
+
 extern size_t __kern_keep_start;
 extern size_t __kern_code_start, __kern_code_end;
 extern size_t __kern_data_start, __kern_data_size;
 extern size_t __kern_bss_start, __kern_bss_size;
 extern size_t __kern_keep_start, __kern_keep_end;
+
+/// Physical base address of kernel text region
+uintptr_t Physmap::gKernelTextPhys = 0xBADBADBEEF;
+/// Physical base address of the kernel data region
+uintptr_t Physmap::gKernelDataPhys = 0xBADBADBEEF;
+/// Physical base address of the kernel zero initialized (bss) region
+uintptr_t Physmap::gKernelBssPhys = 0xBADBADBEEF;
 
 /// Maximum number of physical memory regions to allocate space for
 #define MAX_REGIONS             10
@@ -141,18 +155,21 @@ int platform_section_get_info(const platform_section_t section, uint64_t *physAd
         case kSectionKernelText:
             *virtAddr = (uintptr_t) (&__kern_code_start);
             *length = ((uintptr_t) &__kern_code_end) - ((uintptr_t) &__kern_code_start);
+            *physAddr = Physmap::gKernelTextPhys;
             return 0;
 
         // kernel data segment
         case kSectionKernelData:
             *virtAddr = (uintptr_t) &__kern_data_start;
             *length = (uintptr_t) &__kern_data_size;
+            *physAddr = Physmap::gKernelDataPhys;
             return 0;
 
         // kernel BSS segment
         case kSectionKernelBss:
             *virtAddr = (uintptr_t) &__kern_bss_start;
             *length = (uintptr_t) &__kern_bss_size;
+            *physAddr = Physmap::gKernelBssPhys;
             return 0;
 
         // unsupported section
@@ -175,3 +192,32 @@ void physmap_module_reserve(const uintptr_t start, const uintptr_t end) {
     }
 }
 
+/**
+ * Determines the base address of the kernel's .text, .data, and .bss segments in physical memory
+ * space by resolving the virtual addresses in the current memory mamp.
+ *
+ * This assumes that the segments are loaded in contiguous physical memory pages.
+ */
+void Physmap::DetectKernelPhys() {
+    using namespace arch::vm;
+    int err;
+
+    // figure out what page table the bootloader gave us
+    uintptr_t pml4 = 0;
+    asm volatile("mov %%cr3, %0" : "=r"(pml4));
+
+    // determine text base
+    const uintptr_t textBase = reinterpret_cast<uintptr_t>(&__kern_code_start);
+    err = ResolvePml4Virt(pml4, textBase, gKernelTextPhys);
+    REQUIRE(!err, "failed to resolve kernel .%s base (%p): %u", "text", textBase, err);
+
+    // determine data base
+    const uintptr_t dataBase = reinterpret_cast<uintptr_t>(&__kern_data_start);
+    err = ResolvePml4Virt(pml4, dataBase, gKernelDataPhys);
+    REQUIRE(!err, "failed to resolve kernel .%s base (%p): %u", "data", dataBase, err);
+
+    // determine bss base
+    const uintptr_t bssBase = reinterpret_cast<uintptr_t>(&__kern_bss_start);
+    err = ResolvePml4Virt(pml4, bssBase, gKernelBssPhys);
+    REQUIRE(!err, "failed to resolve kernel .%s base (%p): %u", "bss", bssBase, err);
+}

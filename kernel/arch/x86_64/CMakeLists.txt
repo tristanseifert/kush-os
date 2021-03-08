@@ -33,6 +33,7 @@ add_library(kernel_arch_amd64 OBJECT
     src/gdt.cpp
     src/gdt.S
     src/idt.cpp
+    src/PerCpuInfo.cpp
     src/vm/PTEHandler.cpp
     src/sched/Thread.cpp
     src/sched/switchto.S

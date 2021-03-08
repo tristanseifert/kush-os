@@ -31,7 +31,7 @@ void StackPool::init() {
  */
 StackPool::StackPool() {
     // mark all stacks as available
-    memset(&this->freeMap, 0, sizeof(uint32_t) * (kNumStacks / 4));
+    memset(&this->freeMap, 0, sizeof(uint32_t) * (kNumStacks / 4 / 8));
 
     for(size_t i = 0; i < kNumStacks; i++) {
         this->freeMap[i / 32] |= (1 << (i % 32));
@@ -47,7 +47,7 @@ void *StackPool::alloc() {
     int err;
     const auto pageSz = arch_page_size();
 
-    vm::Map *m = vm::Map::current();;
+    vm::Map *m = vm::Map::current();
     if(!m) {
         m = vm::Map::kern();
     }

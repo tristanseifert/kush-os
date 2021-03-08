@@ -50,13 +50,25 @@ class AnonPool {
         void free(void *virtAddr, const size_t numPages = 1);
 
     private:
+#if defined(__i386__)
         /// base address of the anon pool region
         static const uintptr_t kBaseAddr = 0xC8000000;
         /// size of the anon pool region
         static const uintptr_t kRegionLength = (0xF0000000 - kBaseAddr);
+#elif defined(__amd64__)
+        /// base address of the anon pool region
+        static const uintptr_t kBaseAddr = 0xFFFF821000000000;
+        /// size of the anon pool region (2G for now)
+        static const uintptr_t kRegionLength = 0x80000000;
+#else
+#error Unsupported architecture
+#endif
 
         /// shared anon pool instance
         static AnonPool *gShared;
+
+        /// Whether memory pages returned by the pool are mapped as global or not
+        static bool gMapGlobal;
 
     private:
         /// spin lock for the entire free map
