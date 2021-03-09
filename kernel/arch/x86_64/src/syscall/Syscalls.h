@@ -6,8 +6,7 @@
 #include <sys/Syscall.h>
 
 namespace arch::syscall {
-int UpdateTaskIopb(const sys::Syscall::Args *, const uintptr_t);
-int UpdateThreadTlsBase(const sys::Syscall::Args *, const uintptr_t);
+intptr_t UpdateThreadTlsBase(const sys::Syscall::Args *, const uintptr_t);
 }
 
 #endif

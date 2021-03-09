@@ -115,6 +115,7 @@ class PTEHandler: public ::vm::IPTEHandler {
 
     private:
         void initKernel();
+        void initWithParent(PTEHandler *parent);
 
         /// Returns the physical address of a zeroed page.
         static uintptr_t allocPage();

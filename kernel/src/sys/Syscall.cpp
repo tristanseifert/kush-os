@@ -21,14 +21,14 @@ Syscall *Syscall::gShared = nullptr;
 /**
  * Stub for an unimplemented syscall
  */
-static int UnimplementedSyscall(const Syscall::Args *, const uintptr_t) {
+static intptr_t UnimplementedSyscall(const Syscall::Args *, const uintptr_t) {
     return Errors::InvalidSyscall;
 }
 
 /**
  * Global syscall table
  */
-static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
+static intptr_t (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     // 0x00: Receive message
     PortReceive,
     // 0x01: Send message
@@ -78,7 +78,7 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     UnimplementedSyscall, UnimplementedSyscall,
 
     // 0x20: Return current thread handle
-    [](auto, auto) -> int {
+    [](auto, auto) -> intptr_t {
         auto thread = sched::Thread::current();
         if(!thread) {
             return Errors::GeneralError;
@@ -86,12 +86,12 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
         return static_cast<int>(thread->handle);
     },
     // 0x21: Give up remaining CPU quantum
-    [](auto, auto) -> int {
+    [](auto, auto) -> intptr_t {
         sched::Thread::yield();
         return Errors::Success;
     },
     // 0x22: Microsecond granularity sleep
-    [](auto args, auto) -> int {
+    [](auto args, auto) -> intptr_t {
         // validate args
         const uint64_t sleepNs = 1000ULL * args->args[0];
         if(!sleepNs) return Errors::InvalidArgument;
@@ -121,7 +121,7 @@ static int (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
     UnimplementedSyscall,
 
     // 0x30: Get task handle
-    [](auto, auto) -> int {
+    [](auto, auto) -> intptr_t {
         auto thread = sched::Thread::current();
         if(!thread || !thread->task) {
             return Errors::GeneralError;
@@ -164,7 +164,7 @@ void Syscall::init() {
 /**
  * Handles a syscall that wasn't handled by fast path code, nor platform or architecture code.
  */
-int Syscall::_handle(const Args *args, const uintptr_t code) {
+intptr_t Syscall::_handle(const Args *args, const uintptr_t code) {
     // validate syscall number
     const size_t syscallIdx = (code & 0xFFFF);
     if(syscallIdx > gNumSyscalls) {

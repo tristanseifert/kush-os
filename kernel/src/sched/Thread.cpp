@@ -494,7 +494,7 @@ unhandled:;
     REQUIRE(this->task, "no task for thread %p with fault %d", this, (int) type);
 
     // print the register info
-    constexpr static const size_t kBufSize = 512;
+    constexpr static const size_t kBufSize = 1024;
     char buf[kBufSize];
     arch::PrintState(arch, buf, kBufSize);
 

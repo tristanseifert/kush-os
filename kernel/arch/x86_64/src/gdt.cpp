@@ -46,6 +46,8 @@ void Gdt::Init() {
 
     // User code and data segments
     Set32((GDT_USER_CODE_SEG >> 3), 0x00000000, 0xFFFFFFFF, 0xFA, 0xAF);
+    Set32((GDT_USER_CODE64_SEG >> 3), 0x00000000, 0xFFFFFFFF, 0xFA, 0xAF);
+
     Set32((GDT_USER_DATA_SEG >> 3), 0x00000000, 0xFFFFFFFF, 0xF2, 0xCF);
 
     // set up the first TSS
@@ -83,7 +85,7 @@ void Gdt::ActivateTask(const size_t task) {
  */
 void Gdt::Set32(const size_t num, const uint32_t base, const uint32_t limit, const uint8_t flags, const uint8_t gran) {
     // validate inputs
-    REQUIRE(num < (GDT_RESERVED / 8), "%u-bit GDT index out of range: %u", 32, num);
+    REQUIRE(num <= (GDT_USER_CODE64_SEG / 8), "%u-bit GDT index out of range: %u", 32, num);
 
     // write it
     gGdt[num].base_low = (base & 0xFFFF);
@@ -102,7 +104,7 @@ void Gdt::Set32(const size_t num, const uint32_t base, const uint32_t limit, con
  */
 void Gdt::Set64(const size_t num, const uintptr_t base, const uint32_t limit, const uint8_t flags, const uint8_t granularity) {
     // ensure this is past the 32-bit descriptors
-    REQUIRE(num >= (GDT_RESERVED / 8), "%u-bit GDT index out of range: %u", 64, num);
+    REQUIRE(num >= (GDT_USER_CODE64_SEG / 8), "%u-bit GDT index out of range: %u", 64, num);
 
     // build the descriptor
     gdt_descriptor64_t desc;

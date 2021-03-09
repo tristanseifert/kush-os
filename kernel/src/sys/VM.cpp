@@ -12,6 +12,13 @@
 
 using namespace sys;
 
+/// Cutoff for the user/kernel boundary
+#if defined(__i386__)
+constexpr static const uintptr_t kKernelVmBound = 0xC0000000;
+#elif defined(__amd64__)
+constexpr static const uintptr_t kKernelVmBound = (1ULL << 63);
+#endif
+
 /**
  * Info buffer written to userspace for the "get VM region info" syscall
  */
@@ -67,7 +74,7 @@ static vm::MappingFlags ConvertFlags(const uintptr_t flags);
  * @note On 32-bit platform, this does not let us map memory above the 4G barrier, even if the
  * system supports some physical address extension mechanism! We need to address this later.
  */
-int sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
     int err;
     vm::MapEntry *region = nullptr;
     const auto pageSz = arch_page_size();
@@ -79,7 +86,7 @@ int sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
     auto vmAddr = args->args[1];
     const auto length = args->args[2];
 
-    if((vmAddr + length) >= 0xC0000000 || (length % pageSz)) {
+    if((vmAddr + length) >= kKernelVmBound || (length % pageSz)) {
         // must specify virtual address entirely in user region, and length must be aligned
         return Errors::InvalidAddress;
     }
@@ -113,13 +120,13 @@ int sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
     }
 
     // return the handle of the region
-    return static_cast<int>(region->getHandle());
+    return static_cast<intptr_t>(region->getHandle());
 }
 
 /**
  * Allocates an anonymous memory region, backed by physical memory.
  */
-int sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
     vm::MapEntry *region = nullptr;
     int err;
     const auto pageSz = arch_page_size();
@@ -130,7 +137,7 @@ int sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
     auto vmAddr = args->args[0];
     const auto length = args->args[1];
 
-    if(vmAddr + length >= 0xC0000000) {
+    if(vmAddr + length >= kKernelVmBound) {
         return Errors::InvalidAddress;
     }
     if(length % pageSz) {
@@ -161,7 +168,7 @@ int sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
     }
 
     // return the handle of the region
-    return static_cast<int>(region->getHandle());
+    return static_cast<intptr_t>(region->getHandle());
 }
 
 /**
@@ -169,7 +176,7 @@ int sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
  *
  * This takes the same flags as the creation functions, but only the RWX flags are considered.
  */
-int sys::VmRegionUpdatePermissions(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::VmRegionUpdatePermissions(const Syscall::Args *args, const uintptr_t number) {
     int err;
     // get the VM map
     auto map = handle::Manager::getVmObject(static_cast<Handle>(args->args[0]));
@@ -196,7 +203,7 @@ int sys::VmRegionUpdatePermissions(const Syscall::Args *args, const uintptr_t nu
 /**
  * Resizes a VM region.
  */
-int sys::VmRegionResize(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::VmRegionResize(const Syscall::Args *args, const uintptr_t number) {
     int err;
 
     // get the VM map
@@ -218,7 +225,7 @@ int sys::VmRegionResize(const Syscall::Args *args, const uintptr_t number) {
  * This will perform the update immediately if this is the executing task, otherwise it defers the
  * update to the next time that task is switched to.
  */
-int sys::VmRegionMap(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::VmRegionMap(const Syscall::Args *args, const uintptr_t number) {
     int err;
     sched::Task *task = nullptr;
 
@@ -240,7 +247,7 @@ int sys::VmRegionMap(const Syscall::Args *args, const uintptr_t number) {
 
     // validate the base address
     const auto base = args->args[2];
-    if(base && (base + region->getLength()) >= 0xC0000000) {
+    if(base && (base + region->getLength()) >= kKernelVmBound) {
         return Errors::InvalidAddress;
     }
 
@@ -262,7 +269,7 @@ int sys::VmRegionMap(const Syscall::Args *args, const uintptr_t number) {
 /**
  * Unmaps the given VM region.
  */
-int sys::VmRegionUnmap(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::VmRegionUnmap(const Syscall::Args *args, const uintptr_t number) {
     sched::Task *task = nullptr;
 
     // get the task handle
@@ -289,7 +296,7 @@ int sys::VmRegionUnmap(const Syscall::Args *args, const uintptr_t number) {
 /**
  * Gets info for a VM region.
  */
-int sys::VmRegionGetInfo(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::VmRegionGetInfo(const Syscall::Args *args, const uintptr_t number) {
     int err;
     sched::Task *task = nullptr;
 
@@ -368,7 +375,7 @@ int sys::VmRegionGetInfo(const Syscall::Args *args, const uintptr_t number) {
 /**
  * Retrieves information about a task's VM environment.
  */
-int sys::VmTaskGetInfo(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::VmTaskGetInfo(const Syscall::Args *args, const uintptr_t number) {
     sched::Task *task = nullptr;
 
     // validate the info region buffer and size
@@ -402,7 +409,7 @@ int sys::VmTaskGetInfo(const Syscall::Args *args, const uintptr_t number) {
 /**
  * Determines the virtual memory region that contains the given virtual address.
  */
-int sys::VmAddrToRegion(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::VmAddrToRegion(const Syscall::Args *args, const uintptr_t number) {
     sched::Task *task = nullptr;
 
     // get the task handle
@@ -418,7 +425,7 @@ int sys::VmAddrToRegion(const Syscall::Args *args, const uintptr_t number) {
     // validate the virtual address
     const auto vmAddr = args->args[1];
 
-    if(vmAddr >= 0xC0000000) {
+    if(vmAddr >= kKernelVmBound) {
         return Errors::InvalidAddress;
     }
 
@@ -432,7 +439,7 @@ int sys::VmAddrToRegion(const Syscall::Args *args, const uintptr_t number) {
     bool found = vm->findRegion(vmAddr, regionHandle, offset);
 
     if(found) {
-        return static_cast<int>(regionHandle);
+        return static_cast<intptr_t>(regionHandle);
     } else {
         return 0; // = Errors::Success
     }

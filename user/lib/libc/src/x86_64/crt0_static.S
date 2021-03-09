@@ -40,8 +40,8 @@ _start:
     test        %rax, %rax
     jz          2f
 
-    mov         LAUNCHINFO_OFF_ARGPTR(%rax), %rdi
-    mov         LAUNCHINFO_OFF_NARGS(%rax), %rsi
+    mov         LAUNCHINFO_OFF_ARGPTR(%rax), %rsi
+    mov         LAUNCHINFO_OFF_NARGS(%rax), %rdi
     call        main
     jmp         3f
 
@@ -51,7 +51,7 @@ _start:
     call        main
 
 3:
-    add         $8, %esp
+    add         $0x10, %esp
 
     // global destructors
     call        _fini

@@ -16,11 +16,6 @@ typedef struct physmap_region {
 } physmap_region_t;
 
 /**
- * Parses a memory map entry provided by the bootloader
- */
-void physmap_parse_bootboot(const BOOTBOOT *boot);
-
-/**
  * Reserves memory for a module.
  */
 void physmap_module_reserve(const uintptr_t start, const uintptr_t end);
@@ -29,13 +24,17 @@ namespace platform {
 class Physmap {
     friend int ::platform_section_get_info(const platform_section_t, uint64_t *, uintptr_t *,
             uintptr_t *);
+    friend void KernelMapEarlyInit();
 
     public:
+        /// Parse the VM info structure in the bootboot header
+        static void Init();
         /// Determine the kernel physical load address
         static void DetectKernelPhys();
 
     private:
         static uintptr_t gKernelTextPhys, gKernelDataPhys, gKernelBssPhys;
+        static uintptr_t gBootInfoPhys, gBootEnvPhys;
 };
 }
 

@@ -36,10 +36,10 @@ void platform_init() {
 
     // parse phys mapping
     log("BootBoot info: %p (protocol %u, %u cores)", &bootboot, bootboot.protocol, bootboot.numcores);
-
     const auto &ar = bootboot.arch.x86_64;
     log("ACPI %p SMBI %p EFI %p MB %p", ar.acpi_ptr, ar.smbi_ptr, ar.efi_ptr, ar.mp_ptr);
-    physmap_parse_bootboot(&bootboot);
+
+    Physmap::Init();
 
     // set up and remap the PICs and other interrupt controllers
     irq::LegacyPic::disable();

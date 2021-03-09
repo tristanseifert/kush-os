@@ -1,5 +1,6 @@
 #include "PTEHandler.h"
 
+#include <platform.h>
 #include <vm/Map.h>
 #include <mem/PhysicalAllocator.h>
 #include <arch.h>
@@ -19,7 +20,7 @@ bool PTEHandler::gPhysApertureAvailable = false;
 bool PTEHandler::gPhysApertureGlobal = true;
 
 /// Whether allocations of paging structures are logged
-bool PTEHandler::gLogAlloc = true;
+bool PTEHandler::gLogAlloc = false;
 /// Whether mappings are logged
 bool PTEHandler::gLogMapAdd = false;
 /// Whether removing of mappings are logged
@@ -45,7 +46,7 @@ PTEHandler::PTEHandler(::vm::IPTEHandler *_parent) : IPTEHandler(_parent) {
 
     // perform the rest of the initialization
     if(kernelPte) {
-        // TODO: reference all the kernel tables for above 0x80000000'00000000
+        this->initWithParent(kernelPte);
     } else {
         this->initKernel();
     }
@@ -106,6 +107,19 @@ void PTEHandler::initKernel() {
     }
 }
 
+/**
+ * Initializes a page table that references the given parent table for all kernel-mode mappings.
+ *
+ * XXX: Currently, all PML4 entries above the kernel break are copied; any PML4 entries the kernel
+ * adds later will NOT automatically be reflected here. This needs to be adressed.
+ */
+void PTEHandler::initWithParent(PTEHandler *parent) {
+    // simply copy the last 256 entries of PML4
+    for(size_t i = 255; i < 512; i++) {
+        const auto in = readTable(parent->pml4Phys, i);
+        writeTable(this->pml4Phys, i, in);
+    }
+}
 
 
 
@@ -137,6 +151,8 @@ void PTEHandler::activate() {
  */
 void PTEHandler::InitialKernelMapLoad() {
     gPhysApertureAvailable = true;
+
+    platform::KernelMapEarlyInit();
 }
 
 /**

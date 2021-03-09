@@ -27,7 +27,7 @@ struct InitTaskDpcInfo {
 /**
  * Allocates a new task.
  */
-int sys::TaskCreate(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::TaskCreate(const Syscall::Args *args, const uintptr_t number) {
     sched::Task *parent = nullptr;
 
     // set the parent
@@ -51,7 +51,7 @@ int sys::TaskCreate(const Syscall::Args *args, const uintptr_t number) {
     }
 
     // return task handle
-    return static_cast<int>(task->handle);
+    return static_cast<intptr_t>(task->handle);
 }
 
 /**
@@ -60,7 +60,7 @@ int sys::TaskCreate(const Syscall::Args *args, const uintptr_t number) {
  * The first argument is the task handle; if zero, the current task is terminated. The second
  * argument specifies the return code.
  */
-int sys::TaskTerminate(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::TaskTerminate(const Syscall::Args *args, const uintptr_t number) {
     int err;
     sched::Task *task = nullptr;
 
@@ -93,7 +93,7 @@ int sys::TaskTerminate(const Syscall::Args *args, const uintptr_t number) {
  * you're interested in determining that the process properly started, wait on the task object and
  * see if an unexpected exit code is returned before looking up the task handle.
  */
-int sys::TaskInitialize(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::TaskInitialize(const Syscall::Args *args, const uintptr_t number) {
     int err;
 
     // get the task handle
@@ -125,7 +125,7 @@ int sys::TaskInitialize(const Syscall::Args *args, const uintptr_t number) {
 /**
  * Sets the task's new name.
  */
-int sys::TaskSetName(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::TaskSetName(const Syscall::Args *args, const uintptr_t number) {
     sched::Task *task = nullptr;
 
     // get the task
@@ -151,7 +151,7 @@ int sys::TaskSetName(const Syscall::Args *args, const uintptr_t number) {
     return Errors::Success;
 }
 
-int sys::TaskDbgOut(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::TaskDbgOut(const Syscall::Args *args, const uintptr_t number) {
     // validate the user pointer
     auto namePtr = reinterpret_cast<const char *>(args->args[0]);
     const auto nameLen = args->args[1];

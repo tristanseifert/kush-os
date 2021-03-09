@@ -18,7 +18,14 @@
 /// Base address of the kernel space %gs segment (for use with swapgs)
 #define X86_MSR_KERNEL_GSBASE           0xC0000102
 
-
+/// Ring 0 and 3 segment bases
+#define X86_MSR_IA32_STAR               0xC0000081
+/// %RIP value to load for the 64-bit SYSCALL entry
+#define X86_MSR_IA32_LSTAR              0xC0000082
+/// %RIP value for SYSCALL entry from compatibility mode code
+#define X86_MSR_IA32_CSTAR              0xC0000083
+/// Low 32 bits define which bits to mask off in RFLAGS on SYSCALL
+#define X86_MSR_IA32_FMASK              0xC0000084
 
 /**
  * Writes a model-specific register.

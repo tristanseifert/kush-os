@@ -29,8 +29,8 @@ _start:
     test        %rax, %rax
     jz          2f
 
-    mov         LAUNCHINFO_OFF_ARGPTR(%rax), %rdi
-    mov         LAUNCHINFO_OFF_NARGS(%rax), %rsi
+    mov         LAUNCHINFO_OFF_ARGPTR(%rax), %rsi
+    mov         LAUNCHINFO_OFF_NARGS(%rax), %rdi
     call        main
     jmp         3f
 

@@ -5,10 +5,15 @@
 #include <log.h>
 #include <platform.h>
 
+#include <vm/Map.h>
+
 #include <arch.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+
+extern "C" BOOTBOOT bootboot;
+extern unsigned char environment[4096];
 
 // XXX: we should pull this in from the x86_64 arch headers
 namespace arch::vm {
@@ -29,6 +34,11 @@ uintptr_t Physmap::gKernelTextPhys = 0xBADBADBEEF;
 uintptr_t Physmap::gKernelDataPhys = 0xBADBADBEEF;
 /// Physical base address of the kernel zero initialized (bss) region
 uintptr_t Physmap::gKernelBssPhys = 0xBADBADBEEF;
+
+/// Physical base address of bootboot info
+uintptr_t Physmap::gBootInfoPhys = 0xBADBADBEEF;
+/// Physical base address of the bootboot environment block
+uintptr_t Physmap::gBootEnvPhys = 0;
 
 /// Maximum number of physical memory regions to allocate space for
 #define MAX_REGIONS             10
@@ -56,14 +66,16 @@ static void create_kernel_hole();
 /**
  * Parse the multiboot structure for all of the memory in the machine.
  */
-void physmap_parse_bootboot(const BOOTBOOT *boot) {
+void Physmap::Init() {
+    auto &boot = bootboot;
+
     // prepare our buffer
     gNumPhysRegions = 0;
     memclr(&gPhysRegions, sizeof(physmap_region_t) * MAX_REGIONS);
 
     // iterate over all entries
     const MMapEnt *mmap = nullptr;
-    for(mmap = &boot->mmap; (const uint8_t *) mmap < (const uint8_t *) boot + boot->size; mmap++) {
+    for(mmap = &boot.mmap; (const uint8_t *) mmap < (const uint8_t *) &boot + boot.size; mmap++) {
         const auto type = MMapEnt_Type(mmap);
 
         // handle entries of the allocatable memory type
@@ -209,15 +221,52 @@ void Physmap::DetectKernelPhys() {
     // determine text base
     const uintptr_t textBase = reinterpret_cast<uintptr_t>(&__kern_code_start);
     err = ResolvePml4Virt(pml4, textBase, gKernelTextPhys);
-    REQUIRE(!err, "failed to resolve kernel .%s base (%p): %u", "text", textBase, err);
+    REQUIRE(!err, "failed to resolve kernel %s base (%p): %u", ".text", textBase, err);
 
     // determine data base
     const uintptr_t dataBase = reinterpret_cast<uintptr_t>(&__kern_data_start);
     err = ResolvePml4Virt(pml4, dataBase, gKernelDataPhys);
-    REQUIRE(!err, "failed to resolve kernel .%s base (%p): %u", "data", dataBase, err);
+    REQUIRE(!err, "failed to resolve kernel %s base (%p): %u", ".data", dataBase, err);
 
     // determine bss base
     const uintptr_t bssBase = reinterpret_cast<uintptr_t>(&__kern_bss_start);
     err = ResolvePml4Virt(pml4, bssBase, gKernelBssPhys);
-    REQUIRE(!err, "failed to resolve kernel .%s base (%p): %u", "bss", bssBase, err);
+    REQUIRE(!err, "failed to resolve kernel %s base (%p): %u", ".bss", bssBase, err);
+
+    // get bootboot phys address: it's always required
+    const uintptr_t bootBase = reinterpret_cast<uintptr_t>(&bootboot);
+    err = ResolvePml4Virt(pml4, bootBase, gBootInfoPhys);
+    REQUIRE(!err, "failed to resolve kernel %s base (%p): %u", "bootboot", bootBase, err);
+
+    // then, check the environment block
+    const uintptr_t envBase = reinterpret_cast<uintptr_t>(&environment);
+    err = ResolvePml4Virt(pml4, envBase, gBootEnvPhys);
+    REQUIRE(!err, "failed to resolve kernel %s base (%p): %u", "environment", envBase, err);
+}
+
+/**
+ * Perform some platform-specific updates to the kernel VM map.
+ *
+ * In our case, this ensures the bootboot info and environment blocks are mapped at the correct
+ * addresses. This is really just necessary for the root server but it's probably good to just do
+ * this (the memory isn't going away) so we can continue to refer back to it.
+ */
+void platform::KernelMapEarlyInit() {
+    int err;
+
+    auto vm = vm::Map::kern();
+    REQUIRE(vm, "failed to get kernel vm map");
+
+    const auto pageSz = arch_page_size();
+
+    // map the bootboot structure
+    const uintptr_t bootBase = reinterpret_cast<uintptr_t>(&bootboot);
+    err = vm->add(Physmap::gBootInfoPhys, pageSz, bootBase, vm::MapMode::kKernelRead);
+    REQUIRE(!err, "failed to map %s: %u", "bootboot info", err);
+
+    // map the environment structure
+    const uintptr_t envBase = reinterpret_cast<uintptr_t>(&environment);
+    err = vm->add(Physmap::gBootEnvPhys, pageSz, envBase, vm::MapMode::kKernelRead);
+    REQUIRE(!err, "failed to map %s: %u", "boot environment", err);
+
 }

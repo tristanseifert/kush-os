@@ -19,7 +19,7 @@ using namespace sys;
  * - Arg0: Thread handle
  * - Arg1: Notification bits to send
  */
-int sys::NotifySend(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::NotifySend(const Syscall::Args *args, const uintptr_t number) {
     // resolve thread handle
     auto thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
     if(!thread) {
@@ -42,7 +42,7 @@ int sys::NotifySend(const Syscall::Args *args, const uintptr_t number) {
  *
  * - Arg0: Notification mask to use, a value of 0 is equivalent to setting all bits
  */
-int sys::NotifyReceive(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::NotifyReceive(const Syscall::Args *args, const uintptr_t number) {
     auto thread = sched::Thread::current();
 
     // get mask

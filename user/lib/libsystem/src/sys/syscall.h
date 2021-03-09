@@ -11,15 +11,15 @@
 #include <stdint.h>
 
 /// Makes a syscall with no arguments.
-LIBSYSTEM_INTERNAL int __do_syscall0(const uintptr_t number);
+LIBSYSTEM_INTERNAL intptr_t __do_syscall0(const uintptr_t number);
 /// Makes a syscall with a single argument.
-LIBSYSTEM_INTERNAL int __do_syscall1(const uintptr_t number, const uintptr_t arg0);
+LIBSYSTEM_INTERNAL intptr_t __do_syscall1(const uintptr_t number, const uintptr_t arg0);
 /// Makes a syscall with two arguments.
-LIBSYSTEM_INTERNAL int __do_syscall2(const uintptr_t number, const uintptr_t arg0, const uintptr_t arg1);
+LIBSYSTEM_INTERNAL intptr_t __do_syscall2(const uintptr_t number, const uintptr_t arg0, const uintptr_t arg1);
 /// Makes a syscall with three arguments.
-LIBSYSTEM_INTERNAL int __do_syscall3(const uintptr_t number, const uintptr_t arg0, const uintptr_t arg1, const uintptr_t arg2);
+LIBSYSTEM_INTERNAL intptr_t __do_syscall3(const uintptr_t number, const uintptr_t arg0, const uintptr_t arg1, const uintptr_t arg2);
 /// Makes a syscall with four arguments.
-LIBSYSTEM_INTERNAL int __do_syscall4(const uintptr_t number, const uintptr_t arg0, const uintptr_t arg1, const uintptr_t arg2, const uintptr_t arg3);
+LIBSYSTEM_INTERNAL intptr_t __do_syscall4(const uintptr_t number, const uintptr_t arg0, const uintptr_t arg1, const uintptr_t arg2, const uintptr_t arg3);
 
 /*
  * Define syscall numbers.

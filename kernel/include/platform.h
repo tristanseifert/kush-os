@@ -44,6 +44,9 @@ enum class Irql {
      */
     Passive                             = 0,
 };
+
+/// Invoked immediately after the kernel VM map is activated the first time
+void KernelMapEarlyInit();
 }
 
 /**

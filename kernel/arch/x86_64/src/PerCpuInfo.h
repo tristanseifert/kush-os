@@ -1,6 +1,8 @@
 #ifndef ARCH_x86_64_PERCPUINFO_H
 #define ARCH_x86_64_PERCPUINFO_H
 
+#define PROCI_OFF_SYSCALL_STACK         (16)
+
 #ifndef ASM_FILE
 
 #include <platform.h>
@@ -23,6 +25,7 @@ struct ProcInfo {
         this->selfPtr = this;
     }
 };
+static_assert(offsetof(ProcInfo, syscallStack) == PROCI_OFF_SYSCALL_STACK);
 
 /**
  * Handles per-processor information, which is accessible via the %gs segment in kernel space; like

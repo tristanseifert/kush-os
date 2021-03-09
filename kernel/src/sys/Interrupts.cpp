@@ -19,7 +19,7 @@ using namespace sys;
  * - Arg1: Thread handle (0 = current thread)
  * - Arg2: Notification bits to send
  */
-int sys::IrqHandlerInstall(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::IrqHandlerInstall(const Syscall::Args *args, const uintptr_t number) {
     sched::Thread *thread = nullptr;
 
     // resolve thread handle
@@ -47,7 +47,7 @@ int sys::IrqHandlerInstall(const Syscall::Args *args, const uintptr_t number) {
     }
 
     thread->irqHandlers.append(handler);
-    return static_cast<int>(handler->getHandle());
+    return static_cast<intptr_t>(handler->getHandle());
 }
 
 /**
@@ -56,7 +56,7 @@ int sys::IrqHandlerInstall(const Syscall::Args *args, const uintptr_t number) {
  * The calling thread must be in the same task as the thread to which the interrupt is delivering
  * notifications to.
  */
-int sys::IrqHandlerRemove(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::IrqHandlerRemove(const Syscall::Args *args, const uintptr_t number) {
     // get the interrupt handler
     auto irq = handle::Manager::getIrq(static_cast<Handle>(args->args[0]));
     if(!irq) {

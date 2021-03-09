@@ -28,7 +28,7 @@ class Syscall {
 
     public:
         /// Invokes a syscall handler.
-        static int handle(const Args *args, const uintptr_t callNo) {
+        static intptr_t handle(const Args *args, const uintptr_t callNo) {
             return gShared->_handle(args, callNo);
         }
 
@@ -37,7 +37,7 @@ class Syscall {
 
     private:
         static void init();
-        int _handle(const Args *args, const uintptr_t code);
+        intptr_t _handle(const Args *args, const uintptr_t code);
 
     private:
         static Syscall *gShared;

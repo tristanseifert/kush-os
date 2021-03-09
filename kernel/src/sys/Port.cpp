@@ -41,7 +41,7 @@ static_assert(offsetof(RecvInfo, data) % 16 == 0, "RecvInfo data must be 16 byte
  * Arg1: Message buffer pointer (16-byte aligned)
  * Arg2: Message length
  */
-int sys::PortSend(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::PortSend(const Syscall::Args *args, const uintptr_t number) {
     int err;
 
     // validate the message buffer
@@ -72,7 +72,7 @@ int sys::PortSend(const Syscall::Args *args, const uintptr_t number) {
 /**
  * Receives a message on the given port.
  */
-int sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
     int err;
     auto task = sched::Task::current();
     if(!task) {
@@ -162,7 +162,7 @@ int sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
  *
  * Arg0: New port queue size
  */
-int sys::PortSetParams(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::PortSetParams(const Syscall::Args *args, const uintptr_t number) {
     auto task = sched::Task::current();
     if(!task) {
         return Errors::GeneralError;
@@ -188,7 +188,7 @@ int sys::PortSetParams(const Syscall::Args *args, const uintptr_t number) {
 /**
  * Allocates a new port.
  */
-int sys::PortAlloc(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::PortAlloc(const Syscall::Args *args, const uintptr_t number) {
     // allocate the port
     auto port = ipc::Port::alloc();
     if(!port) {
@@ -200,7 +200,7 @@ int sys::PortAlloc(const Syscall::Args *args, const uintptr_t number) {
     task->addPort(port);
 
     // return its handle
-    return static_cast<int>(port->getHandle());
+    return static_cast<intptr_t>(port->getHandle());
 }
 
 /**
@@ -208,7 +208,7 @@ int sys::PortAlloc(const Syscall::Args *args, const uintptr_t number) {
  *
  * Arg0 is the port handle. The calling task must have been the one that created the port.
  */
-int sys::PortDealloc(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::PortDealloc(const Syscall::Args *args, const uintptr_t number) {
     auto task = sched::Task::current();
     if(!task) {
         return Errors::GeneralError;

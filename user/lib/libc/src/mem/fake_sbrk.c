@@ -14,7 +14,12 @@ static size_t gHeapSize = 0;
 static void *gSbrkBase = NULL;
 
 /// VM base of the heap
+#if defined(__i386__)
 LIBC_INTERNAL static uintptr_t gHeapInitialAddr = 0x30000000;
+#elif defined(__amd64__)
+LIBC_INTERNAL static uintptr_t gHeapInitialAddr = 0x1000000000;
+#endif
+
 /// Maximum heap size: 0 indicates unlimited (we'll grow til we hit something else)
 LIBC_INTERNAL static size_t gHeapMaxSize = 0;
 

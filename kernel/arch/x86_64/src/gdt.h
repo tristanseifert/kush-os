@@ -5,7 +5,7 @@
 #define GDT_KERN_DATA_SEG       0x10
 #define GDT_USER_CODE_SEG       0x18
 #define GDT_USER_DATA_SEG       0x20
-#define GDT_RESERVED            0x28
+#define GDT_USER_CODE64_SEG     0x28
 
 #define GDT_FIRST_TSS           0x30
 

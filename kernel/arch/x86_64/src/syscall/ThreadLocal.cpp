@@ -24,7 +24,7 @@ using namespace arch;
  * XXX: What validation, if any, do we need to do on the base address? Seems like paging should
  * protect us from everything.
  */
-int syscall::UpdateThreadTlsBase(const ::sys::Syscall::Args *args, const uintptr_t) {
+intptr_t syscall::UpdateThreadTlsBase(const ::sys::Syscall::Args *args, const uintptr_t) {
     auto thread = sched::Thread::current();
 
     // get the thread

@@ -38,7 +38,7 @@ static void CreateThreadEntryStub(uintptr_t arg);
 /**
  * Creates a new userspace thread.
  */
-int sys::ThreadCreate(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::ThreadCreate(const Syscall::Args *args, const uintptr_t number) {
     // get running task
     auto running = sched::Thread::current();
     if(!running || !running->task) {
@@ -76,7 +76,7 @@ int sys::ThreadCreate(const Syscall::Args *args, const uintptr_t number) {
     }
 
     // return handle of newly created thread
-    return static_cast<int>(thread->handle);
+    return static_cast<intptr_t>(thread->handle);
 }
 
 /**
@@ -85,7 +85,7 @@ int sys::ThreadCreate(const Syscall::Args *args, const uintptr_t number) {
  * @note To guard against mis-use, you cannot use the shorthand of the thread handle 0 = current
  * thread.
  */
-int sys::ThreadDestroy(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::ThreadDestroy(const Syscall::Args *args, const uintptr_t number) {
     sched::Thread *thread = nullptr;
 
     // get the thread
@@ -108,7 +108,7 @@ int sys::ThreadDestroy(const Syscall::Args *args, const uintptr_t number) {
  * Sets the priority of the thread in the first argument to the value in the second. It must be a
  * value on [-100, 100].
  */
-int sys::ThreadSetPriority(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::ThreadSetPriority(const Syscall::Args *args, const uintptr_t number) {
     sched::Thread *thread = nullptr;
 
     // get the thread
@@ -135,7 +135,7 @@ int sys::ThreadSetPriority(const Syscall::Args *args, const uintptr_t number) {
 /**
  * Sets the notification mask of the specified thread.
  */
-int sys::ThreadSetNoteMask(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::ThreadSetNoteMask(const Syscall::Args *args, const uintptr_t number) {
     sched::Thread *thread = nullptr;
 
     // get the thread
@@ -155,7 +155,7 @@ int sys::ThreadSetNoteMask(const Syscall::Args *args, const uintptr_t number) {
 /**
  * Sets the thread's new name.
  */
-int sys::ThreadSetName(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::ThreadSetName(const Syscall::Args *args, const uintptr_t number) {
     sched::Thread *thread = nullptr;
 
     // get the thread
@@ -184,7 +184,7 @@ int sys::ThreadSetName(const Syscall::Args *args, const uintptr_t number) {
 /**
  * Resumes a currently paused thread.
  */
-int sys::ThreadResume(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::ThreadResume(const Syscall::Args *args, const uintptr_t number) {
     // look up the thread
     auto thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
     if(!thread) {
@@ -206,7 +206,7 @@ int sys::ThreadResume(const Syscall::Args *args, const uintptr_t number) {
 /**
  * Waits for the given thread to terminate.
  */
-int sys::ThreadJoin(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::ThreadJoin(const Syscall::Args *args, const uintptr_t number) {
     int err;
 
     // look up the thread; reject if it's the currently running thread

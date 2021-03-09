@@ -14,12 +14,14 @@
  * macro cannot be used.
  *
  * First arg to this macro is the stack offset to the code segment.
+ *
+ * TODO: fix this
  */
 .macro MaybeSwapGs off
-    cmpq        $GDT_KERN_CODE_SEG, \off(%rsp)
+/*    cmpq        $GDT_KERN_CODE_SEG, \off(%rsp)
     je          1f
     swapgs
-1:
+1:*/
 .endm
 
 /// divide-by-zero
@@ -192,22 +194,23 @@ amd64_exception_pagefault:
     pushq       $X86_EXC_PAGING
 
     // save registers pls
-    push        %rax
-    push        %rcx
-    push        %rdx
-    push        %rbx
-    push        %rbp
-    push        %rsi
-    push        %rdi
-    push        %r8
-    push        %r9
-    push        %r10
-    push        %r11
-    push        %r12
-    push        %r13
-    push        %r14
-    push        %r15
+    pushq        %rax
+    pushq        %rcx
+    pushq        %rdx
+    pushq        %rbx
+    pushq        %rbp
+    pushq        %rsi
+    pushq        %rdi
+    pushq        %r8
+    pushq        %r9
+    pushq        %r10
+    pushq        %r11
+    pushq        %r12
+    pushq        %r13
+    pushq        %r14
+    pushq        %r15
 
+/*
     sub         $16, %rsp
     movdqu      %xmm7, (%rsp)
     sub         $16, %rsp
@@ -224,6 +227,7 @@ amd64_exception_pagefault:
     movdqu      %xmm1, (%rsp)
     sub         $16, %rsp
     movdqu      %xmm0, (%rsp)
+*/
 
     // set up a NULL stack frame, so stack unwinding can stop here
     xor         %rbp, %rbp
@@ -233,24 +237,24 @@ amd64_exception_pagefault:
     call        amd64_handle_pagefault
 
     // the XMM registers don't need to be restored
-    add         $(16*8), %rsp
+    //add         $(16*8), %rsp
 
     // restore registers
-    pop         %r15
-    pop         %r14
-    pop         %r13
-    pop         %r12
-    pop         %r11
-    pop         %r10
-    pop         %r9
-    pop         %r8
-    pop         %rdi
-    pop         %rsi
-    pop         %rbp
-    pop         %rbx
-    pop         %rdx
-    pop         %rcx
-    pop         %rax
+    popq         %r15
+    popq         %r14
+    popq         %r13
+    popq         %r12
+    popq         %r11
+    popq         %r10
+    popq         %r9
+    popq         %r8
+    popq         %rdi
+    popq         %rsi
+    popq         %rbp
+    popq         %rbx
+    popq         %rdx
+    popq         %rcx
+    popq         %rax
 
     // clear the error code and interrupt number
     add         $0x10, %rsp
@@ -261,22 +265,23 @@ amd64_exception_pagefault:
 .extern amd64_handle_exception
 error_common_stub:
     // save registers
-    push        %rax
-    push        %rcx
-    push        %rdx
-    push        %rbx
-    push        %rbp
-    push        %rsi
-    push        %rdi
-    push        %r8
-    push        %r9
-    push        %r10
-    push        %r11
-    push        %r12
-    push        %r13
-    push        %r14
-    push        %r15
+    pushq        %rax
+    pushq        %rcx
+    pushq        %rdx
+    pushq        %rbx
+    pushq        %rbp
+    pushq        %rsi
+    pushq        %rdi
+    pushq        %r8
+    pushq        %r9
+    pushq        %r10
+    pushq        %r11
+    pushq        %r12
+    pushq        %r13
+    pushq        %r14
+    pushq        %r15
 
+/*
     sub         $16, %rsp
     movdqu      %xmm7, (%rsp)
     sub         $16, %rsp
@@ -293,6 +298,7 @@ error_common_stub:
     movdqu      %xmm1, (%rsp)
     sub         $16, %rsp
     movdqu      %xmm0, (%rsp)
+*/
 
     // set up a NULL stack frame, so stack unwinding can stop here
     xor         %rbp, %rbp
@@ -300,24 +306,24 @@ error_common_stub:
     call        amd64_handle_exception
 
     // the XMM registers don't need to be restored
-    add         $(16*8), %rsp
+    //add         $(16*8), %rsp
 
     // restore registers
-    pop         %r15
-    pop         %r14
-    pop         %r13
-    pop         %r12
-    pop         %r11
-    pop         %r10
-    pop         %r9
-    pop         %r8
-    pop         %rdi
-    pop         %rsi
-    pop         %rbp
-    pop         %rbx
-    pop         %rdx
-    pop         %rcx
-    pop         %rax
+    popq         %r15
+    popq         %r14
+    popq         %r13
+    popq         %r12
+    popq         %r11
+    popq         %r10
+    popq         %r9
+    popq         %r8
+    popq         %rdi
+    popq         %rsi
+    popq         %rbp
+    popq         %rbx
+    popq         %rdx
+    popq         %rcx
+    popq         %rax
 
     // clear the error code and interrupt number
     add         $0x10, %rsp

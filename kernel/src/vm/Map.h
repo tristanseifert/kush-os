@@ -130,10 +130,15 @@ class Map {
 
         static void initAllocator();
 
+#if defined(__i386__)
         /// VM address at which we test for free VM space
         constexpr static const uintptr_t kVmSearchBase = 0x10000000;
         /// maximum address that can be mapped
         constexpr static const uintptr_t kVmMaxAddr = 0xBF800000;
+#elif defined(__amd64__)
+        constexpr static const uintptr_t kVmSearchBase = 0x400000000000;
+        constexpr static const uintptr_t kVmMaxAddr =    0x7E0000000000;
+#endif
 
     private:
         friend class arch::vm::PTEHandler;

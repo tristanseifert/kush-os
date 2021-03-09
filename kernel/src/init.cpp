@@ -30,8 +30,6 @@ sched::Task *gRootServer = nullptr;
  * Early kernel initialization
  */
 void kernel_init() {
-    *((volatile uint16_t *) 0xb8010) = 0x5148;
-    
     // set up the physical allocator and VM system
     mem::PhysicalAllocator::init();
 
@@ -76,9 +74,7 @@ void kernel_main() {
     auto thread8 = sched::Thread::kernelThread(task2, &ThreadThymeCock, 0);
     thread8->setName("thyme caulk");
 
-    sched::Scheduler::get()->scheduleRunnable(task2);
-
-    *((uint32_t *) 0xfc000000) = 0x04410E41;
+    //sched::Scheduler::get()->scheduleRunnable(task2);
 
     // kernel is initialized. launch the root server
     gRootServer = platform_init_rootsrv();

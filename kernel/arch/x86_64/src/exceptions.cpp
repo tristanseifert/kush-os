@@ -10,6 +10,9 @@
 #include <printf.h>
 #include <log.h>
 
+#include <arch/x86_msr.h>
+
+
 using namespace arch;
 
 /**
@@ -118,38 +121,55 @@ int amd64_exception_format_info(char *outBuf, const size_t outBufLen,
     asm volatile("mov %%cr2, %0" : "=r" (cr2));
     asm volatile("mov %%cr3, %0" : "=r" (cr3));
 
+    /*
     uint64_t xmm[8][2];
     memcpy(&xmm, &info->xmm, 16 * 8);
+*/
 
+    // get the FS/GS base
+    uint32_t tempLo, tempHi;
+    uint64_t gsBase = 0, fsBase = 0, gsKernBase = 0;
+
+    x86_msr_read(X86_MSR_FSBASE, &tempLo, &tempHi);
+    fsBase = (tempLo) | (static_cast<uint64_t>(tempHi) << 32);
+
+    x86_msr_read(X86_MSR_GSBASE, &tempLo, &tempHi);
+    gsBase = (tempLo) | (static_cast<uint64_t>(tempHi) << 32);
+    x86_msr_read(X86_MSR_KERNEL_GSBASE, &tempLo, &tempHi);
+    gsKernBase = (tempLo) | (static_cast<uint64_t>(tempHi) << 32);
+
+    // format
     return snprintf(outBuf, outBufLen, "Exception %3llu ($%016llx)\n"
             "CR0 $%016llx CR2 $%016llx CR3 $%016llx\n"
-            " CS $%04llx  SS $%04llx RFLAGS $%016llx\n"
+            " CS $%04x SS $%04x RFLAGS $%016llx\n"
+            " FS $%016llx  GS $%016llx KGS $%016llx\n"
             "RAX $%016llx RBX $%016llx RCX $%016llx RDX $%016llx\n"
             "RDI $%016llx RSI $%016llx RBP $%016llx RSP $%016llx\n"
             " R8 $%016llx  R9 $%016llx R10 $%016llx R11 $%016llx\n"
             "R12 $%016llx R13 $%016llx R14 $%016llx R15 $%016llx\n"
             "RIP $%016llx\n"
-            "XMM0 $%016llx%016llx\n"
+            /*"XMM0 $%016llx%016llx\n"
             "XMM1 $%016llx%016llx\n"
             "XMM2 $%016llx%016llx\n"
             "XMM3 $%016llx%016llx\n"
             "XMM4 $%016llx%016llx\n"
             "XMM5 $%016llx%016llx\n"
             "XMM6 $%016llx%016llx\n"
-            "XMM7 $%016llx%016llx\n"
+            "XMM7 $%016llx%016llx\n"*/
             ,
             info->intNo, info->errCode,
             cr0, cr2, cr3,
             info->cs, info->ss, info->rflags,
+            fsBase, gsBase,
             info->rax, info->rbx, info->rcx, info->rdx,
             info->rdi, info->rsi, info->rbp, info->rsp,
             info->r8, info->r9, info->r10, info->r11,
             info->r12, info->r13, info->r14, info->r15,
-            info->rip,
+            info->rip/*,
             xmm[0][1], xmm[0][0], xmm[1][1], xmm[1][0],
             xmm[2][1], xmm[2][0], xmm[3][1], xmm[3][0],
             xmm[4][1], xmm[4][0], xmm[5][1], xmm[5][0],
-            xmm[6][1], xmm[6][0], xmm[7][1], xmm[7][0]
+            xmm[6][1], xmm[6][0], xmm[7][1], xmm[7][0]*/
     );
 }
 
@@ -160,6 +180,7 @@ void amd64_handle_pagefault(amd64_exception_info_t *info) {
     // get some info on the fault
     uint64_t faultAddr;
     asm volatile("mov %%cr2, %0" : "=r" (faultAddr));
+
 
     // if the fault is a reserved bit violation, fail immediately
     if(info->errCode & 0x08) {
@@ -184,6 +205,7 @@ void amd64_handle_pagefault(amd64_exception_info_t *info) {
     }
 
 unhandled:;
+
     // page fault is unhandled (or in kernel)
     constexpr static const size_t kBufSz = 1024;
     char buf[kBufSz] = {0};

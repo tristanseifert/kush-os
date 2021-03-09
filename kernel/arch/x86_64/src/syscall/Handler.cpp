@@ -25,7 +25,7 @@ extern "C" void arch_syscall_entry();
 
 /// Total number of architecture-specific syscalls
 static const size_t gNumArchSyscalls = 2;
-static int (* const gArchSyscalls[])(const sys::Syscall::Args *, const uintptr_t) = {
+static intptr_t (* const gArchSyscalls[])(const sys::Syscall::Args *, const uintptr_t) = {
     // 0x00: reserved 
     nullptr,
     // 0x01: Update a thread's thread-local base address (%fs/%gs base)
@@ -44,30 +44,20 @@ void Handler::init() {
 /**
  * Initializes a syscall handler.
  *
- * We'll program the MSRs to make use of the SYSENTER/SYSEXIT instructions for fast syscalls. This
- * will land in the fast assembly stubs (in entry.S) so we can do really fast message passing, or
- * for a real syscall, fall back into the C++ "slow path."
+ * We'll program the MSRs for the SYSCALL/SYSRET instruction. We don't program in compatibility
+ * mode entry points since we simply don't support this.
  */
 Handler::Handler() {
     int err;
     auto m = ::vm::Map::kern();
 
     // configure code segment and entry point
-    x86_msr_write(kSysenterCsMsr, GDT_KERN_CODE_SEG, 0);
-    x86_msr_write(kSysenterEipMsr, reinterpret_cast<uintptr_t>(&arch_syscall_entry), 0);
+    const auto entryAddr = reinterpret_cast<uintptr_t>(&arch_syscall_entry);
+    x86_msr_write(X86_MSR_IA32_STAR, 0, (GDT_USER_CODE_SEG << 16) | (GDT_KERN_CODE_SEG));
+    x86_msr_write(X86_MSR_IA32_LSTAR, entryAddr, entryAddr >> 32);
 
-    // allocate the syscall stub page and map it as RW into the kernel so we can initialize it
-    this->stubPage = mem::PhysicalAllocator::alloc();
-    REQUIRE(this->stubPage, "failed to allocate syscall stub page");
-
-    err = m->add(this->stubPage & ~0xFFF, 0x1000, kStubKernelVmAddr, ::vm::MapMode::kKernelRW);
-    REQUIRE(!err, "failed to map syscall stub: %d", err);
-
-    // copy over the code
-    memset((void *) kStubKernelVmAddr, 0, 0x1000);
-    memcpy((void *) kStubKernelVmAddr, _binary_syscall_stub_start, SIZE_OF_STUB);
-
-    // TODO: unmap it from kernel again
+    // mask IRQ, clear dir flag
+    x86_msr_write(X86_MSR_IA32_FMASK, 0x600, 0);
 
     // allocate the time page
     this->timePage = mem::PhysicalAllocator::alloc();
@@ -79,18 +69,6 @@ Handler::Handler() {
     this->timeInfo = reinterpret_cast<TimeInfo *>(kTimeKernelVmAddr);
 }
 
-/**
- * Maps the kernel syscall stub into the specified task.
- */
-void Handler::mapSyscallStub(sched::Task *task) {
-    int err;
-
-    // map the stub into the userspace
-    auto map = task->vm;
-
-    err = map->add(this->stubPage & ~0xFFF, 0x1000, kStubUserVmAddr, ::vm::MapMode::kUserExec);
-    REQUIRE(!err, "failed to map syscall stub into task %p (%s): %d", task, task->name, err);
-}
 /**
  * Maps the kernel time info page into the specified task.
  */
@@ -134,8 +112,8 @@ uintptr_t arch_syscall_handle(const uintptr_t number, const void *_args) {
     // handle HW specific syscalls
 
     // kernel syscalls
-    return sys::Syscall::handle(args, number);
-    return 0;
+    auto ret = sys::Syscall::handle(args, number);
+    return ret;
 }
 
 /**
@@ -160,7 +138,7 @@ void arch::TaskWillStart(sched::Task *task) {
 /**
  * Dispatch an architecture-specific system call.
  */
-int arch::HandleSyscall(const sys::Syscall::Args *args, const uintptr_t _number) {
+intptr_t arch::HandleSyscall(const sys::Syscall::Args *args, const uintptr_t _number) {
     // validate the arch specific syscall number
     const auto index = (_number & 0xFFFF0000) >> 16;
     if(index > gNumArchSyscalls) {

@@ -206,6 +206,7 @@ class Manager {
         };
 
     private:
+#if defined(__i386__)
         /// Index mask
         constexpr static const uintptr_t kIndexMask = 0xFFFFF;
         /// Epoch mask
@@ -229,6 +230,26 @@ class Manager {
         static inline uint8_t getType(const Handle h) {
             return (static_cast<uintptr_t>(h) & 0x78000000) >> kTypePos;
         }
+#elif defined(__amd64__)
+        constexpr static const uintptr_t kIndexMask = 0xFFFFFFFF;
+        constexpr static const uintptr_t kEpochMask = 0xFFFFF;
+        constexpr static const uintptr_t kEpochPos = 32;
+        constexpr static const uintptr_t kTypeMask = 0xF;
+        constexpr static const uintptr_t kTypePos = 52;
+
+        static inline uintptr_t getIndex(const Handle h) {
+            return static_cast<uintptr_t>(h) & kIndexMask;
+        }
+        static inline uintptr_t getEpoch(const Handle h) {
+            return (static_cast<uintptr_t>(h) & (kEpochMask << kEpochPos)) >> kEpochPos;
+        }
+        static inline uint8_t getType(const Handle h) {
+            return (static_cast<uintptr_t>(h) & (kTypeMask << kTypePos)) >> kTypePos;
+        }
+#else
+#error Unsupported architecture
+#endif
+
 
         /// Creates a new handle.
         static inline Handle makeHandle(const Type t, const uintptr_t index, const uintptr_t epoch) {
