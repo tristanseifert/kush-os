@@ -5,7 +5,7 @@
  * Allocates a new port.
  */
 int PortCreate(uintptr_t *outHandle) {
-    int err = __do_syscall0(SYS_IPC_CREATE_PORT);
+    intptr_t err = __do_syscall0(SYS_IPC_CREATE_PORT);
 
     if(outHandle && err > 0) {
         *outHandle = err;

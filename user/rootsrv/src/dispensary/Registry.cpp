@@ -21,7 +21,7 @@ bool Registry::registerPort(const std::string_view &_key, const uintptr_t port) 
     // get the lock and insert
     std::lock_guard<std::mutex> lg(this->lock);
 
-    LOG("Registered port $%08x'h for '%s'", port, key.c_str());
+    LOG("Registered port $%p'h for '%s'", port, key.c_str());
     bool exists = this->storage.contains(key);
 
     this->storage[key] = port;

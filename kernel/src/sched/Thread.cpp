@@ -498,7 +498,7 @@ unhandled:;
     char buf[kBufSize];
     arch::PrintState(arch, buf, kBufSize);
 
-    log("Unhandled fault %d in thread $%08x'h (%s) info %08x pc %08x\n%s", (int) type, this->handle, 
+    log("Unhandled fault %d in thread $%p'h (%s) info %p pc %p\n%s", (int) type, this->handle, 
             this->name, context, pc, buf);
     this->task->terminate(-1);
 }

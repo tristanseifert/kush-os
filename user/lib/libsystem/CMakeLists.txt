@@ -61,7 +61,6 @@ elseif(${KERNEL_ARCH} STREQUAL "x86_64")
         src/x86_64/threads.c
         src/x86_64/thread_start.S
         src/x86_64/syscall_arch.c
-        src/x86_64/syscall_impl.c
         src/x86_64/syscall_impl.S
     )
 

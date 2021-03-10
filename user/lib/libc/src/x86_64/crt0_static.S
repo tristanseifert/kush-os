@@ -26,7 +26,7 @@ _start:
     mov         $__bss_start, %rdi
     xor         %rax, %rax
     cld
-    rep stosb
+    rep stosl
 
 1:
     mov         %rbx, __libc_task_info

@@ -47,11 +47,12 @@
  */
 
 /* Magic numbers for the algorithm */
-// TODO: fix this to properly look at the current CPU width!
-#if 1
+#if defined(__i386__)
+#define IS_64BIT 0
 static const unsigned long mask01 = 0x01010101;
 static const unsigned long mask80 = 0x80808080;
-#elif 0
+#elif defined(__amd64__)
+#define IS_64BIT 1
 static const unsigned long mask01 = 0x0101010101010101;
 static const unsigned long mask80 = 0x8080808080808080;
 #else
@@ -107,12 +108,12 @@ strlen(const char *str)
 			testbyte(1);
 			testbyte(2);
 			testbyte(3);
-/*#if (LONG_BIT >= 64)
+#if IS_64BIT
 			testbyte(4);
 			testbyte(5);
 			testbyte(6);
 			testbyte(7);
-#endif*/
+#endif
 		}
 	}
 

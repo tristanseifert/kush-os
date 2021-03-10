@@ -13,7 +13,7 @@ int IrqHandlerInstall(const uintptr_t irqNum, const uintptr_t threadHandle,
     }
 
     // do syscall
-    int err = __do_syscall3(SYS_ARCH_INSTALL_IRQ, irqNum, threadHandle, bits);
+    intptr_t err = __do_syscall3(SYS_ARCH_INSTALL_IRQ, irqNum, threadHandle, bits);
 
     if(err > 0) {
         *outHandle = err;

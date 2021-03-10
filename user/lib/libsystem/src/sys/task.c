@@ -14,7 +14,7 @@ int TaskCreateWithParent(const uintptr_t parent, uintptr_t *outHandle) {
         return -1;
     }
 
-    int err = __do_syscall1(SYS_TASK_CREATE, parent);
+    intptr_t err = __do_syscall1(SYS_TASK_CREATE, parent);
 
     if(err > 0) {
         *outHandle = err;
@@ -42,7 +42,7 @@ int TaskInitialize(const uintptr_t taskHandle, const uintptr_t pc, const uintptr
  * Returns the current task's handle.
  */
 int TaskGetHandle(uintptr_t *outHandle) {
-    int err = __do_syscall0(SYS_TASK_GET_HANDLE);
+    intptr_t err = __do_syscall0(SYS_TASK_GET_HANDLE);
 
     if(outHandle && err > 0) {
         *outHandle = err;

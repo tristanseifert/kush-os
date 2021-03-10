@@ -18,7 +18,7 @@ extern "C" BOOTBOOT bootboot;
 using namespace platform;
 
 // output logs about setting up the root server environment
-#define LOG_SETUP                       1
+#define LOG_SETUP                       0
 
 /// VM address at which the init bundle is mapped in the task
 constexpr static const uintptr_t kInitBundleVmAddr = 0x690000000;
@@ -42,7 +42,10 @@ sched::Task *platform_init_rootsrv() {
     REQUIRE(task, "failed to allocate rootsrv task");
 
     task->setName("rootsrv");
+
+#if LOG_SETUP
     log("created rootsrv task: %p $%016llx'h", task, task->handle);
+#endif
 
     // create the main thread
     auto main = sched::Thread::kernelThread(task, &RootSrvEntry);
@@ -94,7 +97,9 @@ static void RootSrvEntry(const uintptr_t) {
     const auto entry = ValidateSrvElf(elfBase, elfLength);
     MapSrvSegments(elfPhys, elfBase, elfLength);
 
+#if LOG_SETUP
     log("rootsrv entry: %p (file at %p len %u)", entry, elfBase, elfLength);
+#endif
 
     // set up a 128K stack
     constexpr static const uintptr_t kStackTop    = 0x7fff80000000;
@@ -105,7 +110,9 @@ static void RootSrvEntry(const uintptr_t) {
     // XXX: offset from stack is to allow us to pop off the task info ptr (which is null)
     reinterpret_cast<uintptr_t *>(kStackBottom)[-1] = 0;
     // we've finished setup; jump to the server code
+#if LOG_SETUP
     log("going to: %p (stack %p)", entry, kStackBottom);
+#endif
     sched::Thread::current()->returnToUser(entry, kStackBottom - sizeof(uintptr_t));
 }
 

@@ -56,8 +56,8 @@ Handler::Handler() {
     x86_msr_write(X86_MSR_IA32_STAR, 0, (GDT_USER_CODE_SEG << 16) | (GDT_KERN_CODE_SEG));
     x86_msr_write(X86_MSR_IA32_LSTAR, entryAddr, entryAddr >> 32);
 
-    // mask IRQ, clear dir flag
-    x86_msr_write(X86_MSR_IA32_FMASK, 0x600, 0);
+    // mask IRQ, clear dir, trace flags, alignment check
+    x86_msr_write(X86_MSR_IA32_FMASK, 0x4700, 0);
 
     // allocate the time page
     this->timePage = mem::PhysicalAllocator::alloc();

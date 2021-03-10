@@ -11,6 +11,8 @@
 struct InitHeader;
 struct InitFileHeader;
 
+struct posix_header;
+
 namespace init {
 /**
  * Provides access to an in-memory init bundle.
@@ -21,7 +23,7 @@ class Bundle {
 #if defined(__i386__)
         constexpr static const uintptr_t kBundleAddr = 0x90000000;
 #elif defined(__amd64__)
-        constexpr static const uintptr_t kBundleAddr = 0x000000dead000000;
+        constexpr static const uintptr_t kBundleAddr = 0x690000000;
 #else
 #error Update init::Bundle::kBundleAddr for this architecture!
 #endif
@@ -52,7 +54,7 @@ class Bundle {
                 }
 
                 // you should not call this; only public for std::shared_ptr
-                File(void *base, const InitFileHeader *hdr);
+                File(void *base, const struct posix_header *hdr);
 
             private:
                 std::string name;
@@ -76,9 +78,8 @@ class Bundle {
         void *base = nullptr;
         /// handle to the VM region containing the init bundle
         uintptr_t baseHandle = 0;
-
-        /// once validated, a pointer to the bundle's header
-        const InitHeader *header = nullptr;
+        /// length of the VM region
+        size_t size = 0;
 
         /// cache of opened files
         std::unordered_map<std::string, std::weak_ptr<File>> fileCache;

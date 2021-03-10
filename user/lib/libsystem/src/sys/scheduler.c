@@ -10,7 +10,7 @@ extern void __ThreadTrampoline();
  * Returns the current thread's handle.
  */
 int ThreadGetHandle(uintptr_t *outHandle) {
-    int err = __do_syscall0(SYS_THREAD_GET_HANDLE);
+    intptr_t err = __do_syscall0(SYS_THREAD_GET_HANDLE);
 
     if(outHandle && err > 0) {
         *outHandle = err;
@@ -54,7 +54,7 @@ int ThreadCreateFlags(void (*entry)(uintptr_t), const uintptr_t entryArg, const 
     }
 
     // create the thread
-    int err = __do_syscall3(SYS_THREAD_CREATE | (flags & 0xFFFF) << 16, 
+    intptr_t err = __do_syscall3(SYS_THREAD_CREATE | (flags & 0xFFFF) << 16, 
             (uintptr_t) &__ThreadTrampoline, 0, stack);
 
     // extract handle if desired; return 0 for success, syscall error otherwise

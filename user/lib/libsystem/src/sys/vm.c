@@ -86,7 +86,7 @@ static uintptr_t ConvertSyscallFlags(const uintptr_t inFlags) {
  */
 int AllocVirtualAnonRegion(const uintptr_t virtualAddr, const uintptr_t size,
         const uintptr_t inFlags, uintptr_t *outHandle) {
-    int err;
+    intptr_t err;
 
     // build flags
     uintptr_t flags = 0;
@@ -108,7 +108,7 @@ int AllocVirtualAnonRegion(const uintptr_t virtualAddr, const uintptr_t size,
  */
 int AllocVirtualRegion(const uint64_t physAddr, const uintptr_t virtualAddr, const uintptr_t size,
         const uintptr_t inFlags, uintptr_t *outHandle) {
-    int err;
+    intptr_t err;
 
     // build flags
     uintptr_t flags = 0;
@@ -203,7 +203,7 @@ int VirtualRegionGetInfo(const uintptr_t regionHandle, uintptr_t *baseAddr, uint
  */
 int VirtualRegionGetInfoFor(const uintptr_t regionHandle, const uintptr_t taskHandle,
         uintptr_t *baseAddr, uintptr_t *length, uintptr_t *flags) {
-    int err;
+    intptr_t err;
 
     // make the call to populate temporary struct
     struct VmInfoStruct info;
@@ -254,7 +254,7 @@ int VirtualGetHandleForAddr(const uintptr_t address, uintptr_t *regionHandle) {
  */
 int VirtualGetHandleForAddrInTask(const uintptr_t taskHandle, const uintptr_t address,
         uintptr_t *regionHandle) {
-    int err;
+    intptr_t err;
 
     // handle the error or non-existent mapping cases of the syscall
     err = __do_syscall2(SYS_VM_ADDR_TO_HANDLE, taskHandle, address);

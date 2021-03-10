@@ -29,7 +29,7 @@ class InfoPage {
         constexpr static const uintptr_t kBaseAddr = 0xBF5FE000;
         constexpr static const size_t kPageLength = 0x1000;
 #elif defined(__amd64__)
-        constexpr static const uintptr_t kBaseAddr = 0x00007FFF00800000;
+        constexpr static const uintptr_t kBaseAddr = 0x7FFF00200000;
         constexpr static const size_t kPageLength = 0x1000;
 #else
 #error Update InfoPage with arch details

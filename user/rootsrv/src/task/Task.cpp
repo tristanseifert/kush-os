@@ -46,7 +46,7 @@ uintptr_t Task::createFromFile(const std::string &elfPath, const std::vector<std
 
     // load the binary into the task's VM map
     auto loader = task->getLoaderFor(elfPath, fp);
-    LOG("Loader for %s: %p (id '%s'); task $%08x'h", elfPath.c_str(), loader.get(),
+    LOG("Loader for %s: %p (id '%s'); task $%p'h", elfPath.c_str(), loader.get(),
             loader->getLoaderId().data(), task->getHandle());
 
     loader->mapInto(task);

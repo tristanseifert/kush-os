@@ -1,0 +1,12 @@
+###############################################################################
+# Default init script
+#
+# Define the servers to execute on boot-up. This is just enough to allow us to
+# discover devices, and read filesystems for additional drivers.
+#
+# SERVER: Specifies the name of a server to launch. They are lauched in the
+#         order specified.
+###############################################################################
+#SERVER dyldosrv -test -flags arg1 arg2 "arg3 is longer with spaces" arg4
+SERVER driverman --expert=pc_amd64
+# SERVER acpisrv -p pc_amd64
