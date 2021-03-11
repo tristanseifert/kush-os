@@ -26,3 +26,19 @@ void PerCpuInfo::BspInit() {
     x86_msr_write(X86_MSR_GSBASE, procAddr, procAddr >> 32);
     x86_msr_write(X86_MSR_KERNEL_GSBASE, procAddr, procAddr >> 32);
 }
+
+/**
+ * Allocates per-processor info for the current processor, which is an application processor that
+ * was started later on.
+ */
+void PerCpuInfo::ApInit() {
+    // allocate the object
+    auto proc = new ProcInfo;
+
+    // TODO: get processor ID
+
+    // store ptr
+    const auto procAddr = reinterpret_cast<uintptr_t>(proc);
+    x86_msr_write(X86_MSR_GSBASE, procAddr, procAddr >> 32);
+    x86_msr_write(X86_MSR_KERNEL_GSBASE, procAddr, procAddr >> 32);
+}

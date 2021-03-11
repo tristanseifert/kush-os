@@ -13,6 +13,7 @@ add_library(kernel_platform_pc64 OBJECT
     src/platform.cpp
     src/physmap.cpp
     src/io/spew.cpp
+    src/irq/Manager.cpp
     src/irq/Irql.cpp
     src/irq/Ipi.cpp
     src/irq/Registry.cpp
@@ -21,6 +22,7 @@ add_library(kernel_platform_pc64 OBJECT
     src/timer/Registry.cpp
     src/timer/pit.cpp
     src/init/LoadRootsrv.cpp
+    src/acpi/Parser.cpp
 )
 
 target_include_directories(kernel_platform_pc64 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../src)

@@ -13,7 +13,7 @@
 #include <new>
 
 // log found physical memory regions
-#define LOG_REGIONS             1
+#define LOG_REGIONS             0
 // log the virtual addresses of bitmap buffers
 #define LOG_BITMAP_MAP          0
 // log allocations and deallocations

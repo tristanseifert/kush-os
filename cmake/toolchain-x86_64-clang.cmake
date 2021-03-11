@@ -5,7 +5,9 @@
 SET(CMAKE_SYSTEM_NAME amd64-kush)
 
 SET(TARGET_TRIPLE "amd64-pc-kush-elf")
-SET(ARCH_FLAGS "")
+
+# minimum requirement becomes Nehalem-ish; at least SSE4.2, CMPXCHG16B, POPCNT
+SET(ARCH_FLAGS "-march=x86-64-v2")
 
 SET(TOOLCHAIN_BASE ~/kush/toolchain/llvm)
 get_filename_component(TOOLCHAIN_BASE ${TOOLCHAIN_BASE} ABSOLUTE)

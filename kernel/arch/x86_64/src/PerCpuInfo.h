@@ -1,7 +1,7 @@
 #ifndef ARCH_x86_64_PERCPUINFO_H
 #define ARCH_x86_64_PERCPUINFO_H
 
-#define PROCI_OFF_SYSCALL_STACK         (16)
+#define PROCI_OFF_SYSCALL_STACK         (24)
 
 #ifndef ASM_FILE
 
@@ -14,6 +14,8 @@ namespace arch {
 struct ProcInfo {
     /// Self pointer
     ProcInfo *selfPtr = nullptr;
+    /// processor ID (local APIC ID)
+    uintptr_t procId;
 
     /// Processor irql
     platform::Irql irql = platform::Irql::Passive;
@@ -35,6 +37,8 @@ class PerCpuInfo {
     public:
         /// Sets up the bootstrap processor per-CPU info struct
         static void BspInit();
+        /// Set up an application processor's info struct
+        static void ApInit();
 
         /// Returns the address of the current processor's info structure.
         static inline ProcInfo *get() {
