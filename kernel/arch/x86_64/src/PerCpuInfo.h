@@ -2,10 +2,15 @@
 #define ARCH_x86_64_PERCPUINFO_H
 
 #define PROCI_OFF_SYSCALL_STACK         (24)
+#define PROCI_OFF_PLATFORM              (32)
 
 #ifndef ASM_FILE
 
 #include <platform.h>
+
+#if __has_include(<platform/CoreLocalInfo.h>)
+#include <platform/CoreLocalInfo.h>
+#endif
 
 namespace arch {
 /**
@@ -15,12 +20,17 @@ struct ProcInfo {
     /// Self pointer
     ProcInfo *selfPtr = nullptr;
     /// processor ID (local APIC ID)
-    uintptr_t procId;
+    uintptr_t procId = 0;
 
     /// Processor irql
     platform::Irql irql = platform::Irql::Passive;
     /// Stack pointer to use when entering syscalls
-    void *syscallStack;
+    void *syscallStack = nullptr;
+
+    // platform specific info
+#if PLATFORM_WANTS_CORE_LOCAL
+    platform::CoreLocalInfo p;
+#endif
 
     /// Initializes the self ptr
     ProcInfo() {
@@ -28,6 +38,9 @@ struct ProcInfo {
     }
 };
 static_assert(offsetof(ProcInfo, syscallStack) == PROCI_OFF_SYSCALL_STACK);
+#if PLATFORM_WANTS_CORE_LOCAL
+static_assert(offsetof(ProcInfo, p) == PROCI_OFF_PLATFORM);
+#endif
 
 /**
  * Handles per-processor information, which is accessible via the %gs segment in kernel space; like

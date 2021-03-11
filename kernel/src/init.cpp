@@ -54,13 +54,6 @@ void kernel_init() {
 
     // notify other components of VM availability
     platform_vm_available();
-
-    // test map the first 4K of VGA memory
-#if 1
-    auto m = vm::Map::kern();
-    int err = m->add(0xb8000, 0x1000, 0xfc000000, vm::MapMode::kKernelRW);
-    REQUIRE(!err, "failed to map vga: %d", err);
-#endif
 }
 
 /**
@@ -69,12 +62,6 @@ void kernel_init() {
  */
 void kernel_main() {
     log("kush (%s) starting", gVERSION_SHORT);
-
-    auto task2 = sched::Task::alloc();
-    auto thread8 = sched::Thread::kernelThread(task2, &ThreadThymeCock, 0);
-    thread8->setName("thyme caulk");
-
-    //sched::Scheduler::get()->scheduleRunnable(task2);
 
     // kernel is initialized. launch the root server
     gRootServer = platform_init_rootsrv();

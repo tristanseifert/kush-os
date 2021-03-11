@@ -1,3 +1,5 @@
+#include "LocalApic.h"
+
 #include <platform.h>
 
 #include <arch/PerCpuInfo.h>
@@ -17,7 +19,9 @@ platform::Irql platform_raise_irql(const platform::Irql irql, const bool enableI
             (int) info->irql, (int) irql);
     __atomic_exchange(&info->irql, &newVal, &prev, __ATOMIC_ACQUIRE);
 
-    // Manager::currentProcessorApic()->updateTpr(irql);
+    if(info->p.lapic) {
+        info->p.lapic->updateTpr(irql);
+    }
 
     if(enableIrq) {
         asm volatile("sti");
@@ -42,7 +46,9 @@ void platform_lower_irql(const platform::Irql irql, const bool enableIrq) {
     Irql _irql = irql;
     __atomic_store(&info->irql, &_irql, __ATOMIC_RELAXED);
 
-    // Manager::currentProcessorApic()->updateTpr(irql);
+    if(info->p.lapic) {
+        info->p.lapic->updateTpr(irql);
+    }
 
     if(enableIrq) {
         asm volatile("sti");

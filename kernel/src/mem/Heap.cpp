@@ -13,6 +13,9 @@ using namespace mem;
 
 DECLARE_SPINLOCK_S(liballoc);
 
+/// Whether allocations are logged
+static bool gLogAlloc = false;
+
 /**
  * Initializes the heap.
  */
@@ -30,24 +33,31 @@ void Heap::init() {
  * Performs an allocation from the heap.
  */
 void *Heap::alloc(const size_t bytes) {
-    return kmalloc(bytes);
+    auto ptr = kmalloc(bytes);
+    if(gLogAlloc) log("kmalloc(%u) = %p", bytes, ptr);
+    return ptr;
 }
 /**
  * Allocates some items and ensures the memory is zeroed.
  */
 void *Heap::calloc(const size_t nItems, const size_t nBytes) {
-    return kcalloc(nItems, nBytes);
+    auto ptr = kcalloc(nItems, nBytes);
+    if(gLogAlloc) log("kcalloc(%u, %u) = %p", nItems, nBytes, ptr);
+    return ptr;
 }
 /**
  * Resizes an existing allocation.
  */
 void *Heap::realloc(void *ptr, const size_t bytes) {
-    return krealloc(ptr, bytes);
+    auto outPtr = krealloc(ptr, bytes);
+    if(gLogAlloc) log("krealloc(%p, %u) = %p", ptr, bytes, outPtr);
+    return outPtr;
 }
 /**
  * Frees a previous heap allocation.
  */
 void Heap::free(void *ptr) {
+    if(gLogAlloc) log("kfree(%p)", ptr);
     kfree(ptr);
 }
 

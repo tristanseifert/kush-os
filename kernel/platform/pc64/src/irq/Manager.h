@@ -2,6 +2,7 @@
 #define PLATFORM_PC64_IRQ_MANAGER_H
 
 #include <bitflags.h>
+#include <stdint.h>
 
 namespace platform {
 /**
@@ -41,11 +42,18 @@ class IrqManager {
     public:
         /// Initialize the global IRQ manager.
         static void Init();
+        /// Initializes all IOAPICs listed in the ACPI tables.
+        static void InitSystemControllers();
+        /// Detects the CPU local APIC and initializes it
+        static void InitCoreLocalController();
 
         /// Return the shared (among all processors) IRQ manager
         static inline IrqManager *the() {
             return gShared;
         }
+
+    private:
+        void initLapic(const uintptr_t lapicPhys, const uintptr_t cpuId, const void *record);
 
     private:
         /// global IRQ manager instance

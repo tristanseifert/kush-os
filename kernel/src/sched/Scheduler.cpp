@@ -24,8 +24,6 @@ Task *gKernelTask = nullptr;
  */
 void Scheduler::init() {
     gShared = new Scheduler();
-
-    log("sizes: scheduler = %u, task = %u, thread = %u", sizeof(Scheduler), sizeof(Task), sizeof(Thread));
 }
 
 /**

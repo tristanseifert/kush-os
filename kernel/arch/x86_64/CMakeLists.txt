@@ -27,6 +27,7 @@ target_include_directories(kernel_arch_amd64 PUBLIC include)
 target_include_directories(kernel_arch_amd64 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../include)
 target_include_directories(kernel_arch_amd64 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../src)
 target_include_directories(kernel_arch_amd64 PRIVATE src)
+target_include_directories(kernel_arch_amd64 PRIVATE ${PLATFORM_INCLUDE_DIR})
 
 set(ARCH_TARGET_NAME "kernel_arch_amd64" CACHE STRING "Architecture target name" FORCE)
 set(ARCH_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include CACHE FILEPATH "Architecture include directory" FORCE)

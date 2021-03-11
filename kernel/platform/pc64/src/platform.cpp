@@ -5,7 +5,6 @@
 #include "acpi/Parser.h"
 #include "io/spew.h"
 #include "irq/Manager.h"
-#include "irq/pic.h"
 #include "timer/pit.h"
 
 #include <bootboot.h>
@@ -28,7 +27,6 @@ void platform_init() {
     Physmap::DetectKernelPhys();
 
     // disable legacy stuff
-    irq::LegacyPic::disable();
     timer::LegacyPIT::disable();
 
     // set up interrupt manager
@@ -41,4 +39,7 @@ void platform_init() {
  */
 void platform_vm_available() {
     AcpiParser::Init();
+
+    IrqManager::InitSystemControllers();
+    IrqManager::InitCoreLocalController();
 }

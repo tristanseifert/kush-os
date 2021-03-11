@@ -57,7 +57,7 @@ AnonPool::AnonPool(const uintptr_t allocBase, const size_t _numPages) : virtBase
 
     // allocate the bitmap
     const auto pageSz = arch_page_size();
-    const auto bitmapBytes = this->totalPages / 32;
+    const auto bitmapBytes = this->totalPages / 8;
     const auto bitmapPages = (bitmapBytes + pageSz - 1) / pageSz;
 
 #if LOG_INIT
@@ -96,7 +96,7 @@ AnonPool::~AnonPool() {
 
     for(size_t i = 0; i < this->totalPages; i++) {
         err = map->get(this->virtBase + (pageSz * i), phys);
-        if(!err) {
+        if(err > 0) {
             mem::PhysicalAllocator::free(phys);
         }
     }
@@ -189,13 +189,13 @@ beach:;
 
     // map each virtual page
     for(size_t i = 0; i < numPages; i++) {
-        const auto idx = allocStart + i;
+        const uintptr_t idx = allocStart + i;
 
         // mark VM space as allocated
         this->freeMap[idx / 32] &= ~(1 << (idx % 32));
 
         // get virtual address and map it
-        const auto virtAddr = this->virtBase + (idx * pageSz);
+        const uintptr_t virtAddr = this->virtBase + (idx * pageSz);
 
         vm::MapMode flags = vm::MapMode::kKernelRW;
         if(gMapGlobal) {
@@ -230,7 +230,7 @@ void AnonPool::free(void *base, const size_t numPages) {
     uint64_t phys;
     int err;
 
-    const auto pageSz = arch_page_size();
+    const uintptr_t pageSz = arch_page_size();
     auto map = vm::Map::current();
 
     // lock the free map and deallocate each page

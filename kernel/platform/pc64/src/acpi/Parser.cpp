@@ -1,5 +1,6 @@
 #include "Parser.h"
 
+#include "irq/pic.h"
 #include "irq/Manager.h"
 
 #include <bootboot.h>
@@ -14,6 +15,9 @@ using namespace platform;
 
 AcpiParser *AcpiParser::gShared = nullptr;
 bool AcpiParser::gLogTables = false;
+bool AcpiParser::gLogLapic = false;
+bool AcpiParser::gLogIoapic = true;
+bool AcpiParser::gLogApicRoutes = true;
 
 /**
  * Allocate the shared ACPI parser.
@@ -114,8 +118,13 @@ void AcpiParser::parse(const HPET *table) {
  * and NMI configuration is applied during interrupt manager per-core setup.
  */
 void AcpiParser::parse(const MADT *table) {
+    this->apicInfo = table;
+
     // disable legacy PIC if needed
     const bool hasPic = ((table->flags & (1 << 0)));
+    if(hasPic) {
+        irq::LegacyPic::disable();
+    }
     log("Has legacy 8259 PIC? %s", hasPic ? "yes" : "no");
 
     // loop over each of the tables
@@ -175,8 +184,10 @@ void AcpiParser::madtRecord(const MADT *table, const MADT::LocalApic *record) {
     const bool online = (record->flags & (1 << 1));
 
     // TODO: implement
-    log("Detected LAPIC: %p id %x cpu id %x enabled %c online %c", table->lapicAddr, record->apicId,
-            record->cpuId, enabled ? 'Y' : 'N', online ? 'Y' : 'N');
+    if(gLogLapic) {
+        log("Detected LAPIC: %p id %x cpu id %x enabled %c online %c", table->lapicAddr,
+                record->apicId, record->cpuId, enabled ? 'Y' : 'N', online ? 'Y' : 'N');
+    }
 }
 
 /**
@@ -184,8 +195,10 @@ void AcpiParser::madtRecord(const MADT *table, const MADT::LocalApic *record) {
  */
 void AcpiParser::madtRecord(const MADT *, const MADT::IoApic *record) {
     // TODO: implement
-    log("Detected IOAPIC: %p id %x IRQ base %3u", record->ioApicPhysAddr, record->apicId,
-            record->irqBase);
+    if(gLogIoapic) {
+        log("Detected IOAPIC: %p id %x IRQ base %3u", record->ioApicPhysAddr, record->apicId,
+                record->irqBase);
+    }
 }
 
 /**
@@ -248,8 +261,10 @@ void AcpiParser::madtRecord(const MADT *, const MADT::IrqSourceOverride *record)
     }
 
     // TODO: implement
-    log("IRQ override: bus %u irq %u system irq %u flags $%04x", record->busSource, record->irqSource,
-            record->systemIrq, flags);
+    if(gLogApicRoutes) {
+        log("IRQ override: bus %u irq %u system irq %u flags $%04x", record->busSource, record->irqSource,
+                record->systemIrq, flags);
+    }
 }
 
 /**
@@ -278,5 +293,7 @@ void AcpiParser::madtRecord(const MADT *, const MADT::Nmi *record) {
             panic("Unhandled NMI polarity: %x", polarity);
     }
 
-    log("APIC NMI: cpu %u, flags $%04x, LINT%d", record->cpuId, record->flags, record->lint);
+    if(gLogApicRoutes) {
+        log("APIC NMI: cpu %u, flags $%04x, LINT%d", record->cpuId, record->flags, record->lint);
+    }
 }

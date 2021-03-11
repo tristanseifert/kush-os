@@ -10,6 +10,9 @@ namespace platform {
  * to discover interrupt configuration.
  */
 class AcpiParser {
+    friend class IrqManager;
+    friend class LocalApic;
+
     public:
         /// Parses tables; should be called on BSP only
         static void Init();
@@ -224,10 +227,19 @@ class AcpiParser {
 
         /// whether discovered tables are logged
         static bool gLogTables;
+        /// whether discovered LAPIC info is logged
+        static bool gLogLapic;
+        /// whether discovered IOAPIC info is logged
+        static bool gLogIoapic;
+        /// whether interrupt routings are logged
+        static bool gLogApicRoutes;
 
     private:
         /// Physical base address
         uintptr_t rsdpPhys = 0;
+
+        /// Location of the MADT
+        const MADT *apicInfo = nullptr;
 };
 };
 

@@ -54,7 +54,7 @@ _osentry:
     xor         %rax, %rax
     mov         $__kern_bss_size_dwords-1, %rcx
     cld
-    rep stosl // XXX: should be STOSL?
+    rep stosl
 
     // perform initializations
     call        arch_init
