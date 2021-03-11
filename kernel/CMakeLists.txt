@@ -30,6 +30,7 @@ add_executable(kernel
     src/c/string.c
     src/mem/AnonPool.cpp
     src/mem/PhysicalAllocator.cpp
+    src/mem/PhysRegion.cpp
     src/mem/StackPool.cpp
     src/mem/Heap.cpp
     src/mem/liballoc/liballoc.cpp

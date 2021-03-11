@@ -41,15 +41,12 @@ uintptr_t Physmap::gBootInfoPhys = 0xBADBADBEEF;
 uintptr_t Physmap::gBootEnvPhys = 0;
 
 /// Maximum number of physical memory regions to allocate space for
-#define MAX_REGIONS             10
-
-/// Minimum length of allocatable regions (anything smaller is ignored)
-constexpr static const size_t kRegionSizeThreshold = (512 * 1024);
+constexpr static const size_t kMaxRegions = 16;
 
 /// Total number of allocatable physical RAM regions
 static size_t gNumPhysRegions = 0;
 /// Info on each of the physical regions
-static physmap_region_t gPhysRegions[MAX_REGIONS] = {
+static physmap_region_t gPhysRegions[kMaxRegions] = {
     {0, 0},
 };
 
@@ -71,7 +68,7 @@ void Physmap::Init() {
 
     // prepare our buffer
     gNumPhysRegions = 0;
-    memclr(&gPhysRegions, sizeof(physmap_region_t) * MAX_REGIONS);
+    memclr(&gPhysRegions, sizeof(physmap_region_t) * kMaxRegions);
 
     // iterate over all entries
     const MMapEnt *mmap = nullptr;
@@ -83,13 +80,6 @@ void Physmap::Init() {
             // ignore regions below the 1M mark
             if(MMapEnt_Ptr(mmap) < 0x100000) {
                 log("Ignoring conventional memory at %016llx (size %016llx)", MMapEnt_Ptr(mmap),
-                        MMapEnt_Size(mmap));
-                continue;
-            }
-
-            // ignore if the region is too small (< 512K)
-            if(MMapEnt_Size(mmap) < kRegionSizeThreshold) {
-                log("Ignoring memory at %016x (size %u bytes): too small", MMapEnt_Ptr(mmap),
                         MMapEnt_Size(mmap));
                 continue;
             }
@@ -116,9 +106,12 @@ void Physmap::Init() {
 /**
  * Creates a hole for the kernel text and data/bss sections, so that we'll never try to allocate
  * over them.
+ *
+ * We don't actually have to do anything here (I think) since it seems that BOOTBOOT excludes the
+ * area where the kernel was loaded from the memory map it returns to us. However, the bootboot
+ * info and environment structures may not have this guarantee.
  */
 static void create_kernel_hole() {
-    // TODO: implement
 }
 
 
@@ -242,6 +235,9 @@ void Physmap::DetectKernelPhys() {
     const uintptr_t envBase = reinterpret_cast<uintptr_t>(&environment);
     err = ResolvePml4Virt(pml4, envBase, gBootEnvPhys);
     REQUIRE(!err, "failed to resolve kernel %s base (%p): %u", "environment", envBase, err);
+
+    log("Phys base: .text $%p .data $%p .bss $%p; info $%p env $%p", gKernelTextPhys,
+            gKernelDataPhys, gKernelBssPhys, gBootInfoPhys, gBootEnvPhys);
 }
 
 /**

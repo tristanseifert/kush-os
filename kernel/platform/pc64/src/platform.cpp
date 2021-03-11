@@ -42,4 +42,6 @@ void platform_vm_available() {
 
     IrqManager::InitSystemControllers();
     IrqManager::InitCoreLocalController();
+
+    // start all APs
 }

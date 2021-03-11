@@ -213,6 +213,10 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t _virt, const bool w
             return Status::NoMemory;
         }
 
+        if(_virt >= kKernelBoundary && gPhysApertureAvailable && !this->parent) {
+            log("VM: added PDPT to kernel space, need to update children! (virt $%p)", _virt);
+        }
+
         // update the PML4 to point at this page directory pointer table
         uint64_t entry = page;
         entry |= 0b11; // present, writable
