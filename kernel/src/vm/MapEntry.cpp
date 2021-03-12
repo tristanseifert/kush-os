@@ -15,7 +15,7 @@ using namespace vm;
 static char gAllocBuf[sizeof(mem::SlabAllocator<MapEntry>)] __attribute__((aligned(64)));
 static mem::SlabAllocator<MapEntry> *gMapEntryAllocator = nullptr;
 
-static vm::MapMode ConvertVmMode(const MappingFlags flags);
+static vm::MapMode ConvertVmMode(const MappingFlags flags, const bool isUser);
 
 /**
  * Initializes the VM mapp entry allocator.
@@ -56,10 +56,11 @@ MapEntry::~MapEntry() {
  * Allocates a VM map entry that refers to a contiguous range of physical memory.
  */
 MapEntry *MapEntry::makePhys(const uint64_t physAddr, const uintptr_t address, const size_t length,
-        const MappingFlags flags) {
+        const MappingFlags flags, const bool kernel) {
     // allocate the bare map
     if(!gMapEntryAllocator) initAllocator();
     auto map = gMapEntryAllocator->alloc(address, length, flags);
+    map->isKernel = kernel;
 
     // set up the phys mapping
     map->physBase = physAddr;
@@ -73,11 +74,12 @@ MapEntry *MapEntry::makePhys(const uint64_t physAddr, const uintptr_t address, c
  * Allocates a new anonymous memory backed VM map entry.
  */
 MapEntry *MapEntry::makeAnon(const uintptr_t address, const size_t length,
-                const MappingFlags flags) {
+                const MappingFlags flags, const bool kernel) {
     // allocate the bare map
     if(!gMapEntryAllocator) initAllocator();
     auto map = gMapEntryAllocator->alloc(address, length, flags);
-
+    map->isKernel = kernel;
+    
     // set it up and fault in all pages if needed
     map->isAnon = true;
 
@@ -222,7 +224,7 @@ beach:;
     for(auto &physPage : this->physOwned) {
         if(physPage.pageOff == pageOff) {
             const auto destAddr = thisBase + (pageOff * pageSz);
-            const auto mode = ConvertVmMode(flg);
+            const auto mode = ConvertVmMode(flg, this->isKernel);
             err = map->add(physPage.physAddr, pageSz, destAddr, mode);
             REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", pageOff, this, this->handle);
 
@@ -249,7 +251,7 @@ beach:;
 
     // map it
     const auto destAddr = thisBase + (pageOff * pageSz);
-    const auto mode = ConvertVmMode(flg);
+    const auto mode = ConvertVmMode(flg, this->isKernel);
     err = map->add(page, pageSz, destAddr, mode);
     REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", info.pageOff, this, this->handle);
 
@@ -346,7 +348,7 @@ void MapEntry::mapAnonPages(Map *map, const uintptr_t base, const MappingFlags m
         flg |= (flg & mask);
     }
 
-    const auto mode = ConvertVmMode(flg);
+    const auto mode = ConvertVmMode(flg, this->isKernel);
 
     // map the pages
     for(const auto &page : this->physOwned) {
@@ -373,7 +375,7 @@ void MapEntry::mapPhysMem(Map *map, const uintptr_t base, const MappingFlags mas
         flg |= (flg & mask);
     }
 
-    const auto mode = ConvertVmMode(flg);
+    const auto mode = ConvertVmMode(flg, this->isKernel);
 
     // insert the mapping
     err = map->add(this->physBase, this->length, base, mode);
@@ -475,8 +477,8 @@ int MapEntry::getInfo(Map *map, uintptr_t &outBase, uintptr_t &outLength, Mappin
 /**
  * Converts map entry flags to those suitable for updating VM maps.
  */
-static vm::MapMode ConvertVmMode(const MappingFlags flags) {
-    vm::MapMode mode = vm::MapMode::ACCESS_USER;
+static vm::MapMode ConvertVmMode(const MappingFlags flags, const bool isUser) {
+    vm::MapMode mode = isUser ? vm::MapMode::ACCESS_USER : vm::MapMode::None;
 
     if(TestFlags(flags & MappingFlags::Read)) {
         mode |= vm::MapMode::READ;

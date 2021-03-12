@@ -1,5 +1,4 @@
 #include "init.h"
-#include "mem/AnonPool.h"
 #include "mem/PhysicalAllocator.h"
 #include "mem/StackPool.h"
 #include "mem/Heap.h"
@@ -39,9 +38,8 @@ void kernel_init() {
     vm::Mapper::loadKernelMap();
     vm::Mapper::lateInit();
 
-    mem::AnonPool::init();
-    mem::StackPool::init();
     mem::Heap::init();
+    mem::StackPool::init();
 
     handle::Manager::init();
     sys::Syscall::init();

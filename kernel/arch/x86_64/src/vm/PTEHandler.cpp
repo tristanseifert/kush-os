@@ -119,6 +119,9 @@ void PTEHandler::initWithParent(PTEHandler *parent) {
         const auto in = readTable(parent->pml4Phys, i);
         writeTable(this->pml4Phys, i, in);
     }
+
+    // add as child
+    this->parent->children.append(this);
 }
 
 
@@ -132,6 +135,14 @@ PTEHandler::~PTEHandler() {
     // deallocate all physical pages we allocated 
     for(const auto physAddr : this->physToDealloc) {
         mem::PhysicalAllocator::free(physAddr);
+    }
+
+    // remove from parent
+    if(this->parent) {
+        const auto rem = this->parent->children.removeMatching([](void *ctx, PTEHandler *child) {
+            return (ctx == reinterpret_cast<void *>(child));
+        }, this);
+        REQUIRE(rem, "failed to remove child map (%p) from parent (%p)", this, this->parent);
     }
 }
 
@@ -205,16 +216,13 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t _virt, const bool w
     }
 
     // read the PML4 entry
-    auto pml4e = readTable(this->pml4Phys, (virt >> 39) & 0x1FF);
+    const auto pml4eIdx = (virt >> 39) & 0x1FF;
+    auto pml4e = readTable(this->pml4Phys, pml4eIdx);
 
     if(!(pml4e & (1 << 0))) { // allocate a PDPT
         auto page = allocPage();
         if(!page) {
             return Status::NoMemory;
-        }
-
-        if(_virt >= kKernelBoundary && gPhysApertureAvailable && !this->parent) {
-            log("VM: added PDPT to kernel space, need to update children! (virt $%p)", _virt);
         }
 
         // update the PML4 to point at this page directory pointer table
@@ -229,6 +237,10 @@ int PTEHandler::mapPage(const uint64_t phys, const uintptr_t _virt, const bool w
 
         if(gLogAlloc) {
             log("Allocated %s: %016llx", "PDPT", entry);
+        }
+
+        if(_virt >= kKernelBoundary && gPhysApertureAvailable && !this->parent) {
+            this->broadcastKernelPml4Update(pml4eIdx, pml4e);
         }
     }
 
@@ -388,6 +400,20 @@ int PTEHandler::getMapping(const uintptr_t virt, uint64_t &outPhys, bool &write,
         return 1;
     } else { // error case
         return ret;
+    }
+}
+
+
+/**
+ * Writes the given PML4 index in all VM maps, except the current one.
+ */
+void PTEHandler::broadcastKernelPml4Update(const size_t idx, const uint64_t entry) {
+    // log("VM: added PDPT to kernel space, need to update children! (virt $%p)", _virt);
+
+    for(auto map : this->children) {
+        if(map->pml4Phys) {
+            writeTable(map->pml4Phys, idx, entry);
+        }
     }
 }
 

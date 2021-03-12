@@ -84,12 +84,40 @@ PhysicalAllocator::PhysicalAllocator() {
  * This should be called immediately after virtual memory becomes available.
  */
 void PhysicalAllocator::mapRegionUsageBitmaps() {
+    // before we begin, acquire a bunch of pages to satisfy allocations for paging structures later
+    for(size_t i = 0; i < kNumVmPagesCached; i++) {
+        auto page = this->allocPage();
+        REQUIRE(page, "VM fixup pre-allocation failed (%u)", i);
+
+        this->vmPageCache[i] = page;
+    }
+
+    this->vmRelocating = true;
+
+    // perform the relocations
     for(size_t i = 0; i < kMaxRegions; i++) {
         if(!this->regions[i]) break;
 
         const auto base = kRegionInfoBase + (i * kRegionInfoEntryLength);
         this->regions[i]->vmAvailable(base, kRegionInfoEntryLength);
     }
+
+    // release any pages we didn't end up using
+    size_t leftover = 0;
+    for(size_t i = 0; i < kNumVmPagesCached; i++) {
+        if(!this->vmPageCache[i]) continue;
+
+        this->freePage(this->vmPageCache[i]);
+        this->vmPageCache[i] = 0;
+
+        leftover++;
+    }
+
+    if(gLogRegions) {
+        log("%u pages of VM init cache unused", leftover);
+    }
+
+    this->vmRelocating = false;
 }
 
 
@@ -102,12 +130,33 @@ void PhysicalAllocator::mapRegionUsageBitmaps() {
  * @return Physical page address, or 0 if no page is available
  */
 uint64_t PhysicalAllocator::alloc(const size_t numPages, const PhysFlags flags) {
-    // XXX: this is stupid
-    for(size_t i = 0; i < this->numRegions; i++) {
-        const auto page = this->regions[i]->alloc(numPages);
-        if(page) {
-            return page;
+    // perform normal allocation flow
+    if(!this->vmRelocating) [[likely]] {
+        // XXX: this is stupid
+        for(size_t i = 0; i < this->numRegions; i++) {
+            // if in VM mode, but this region hasn't been updated yet, bail
+            if(this->vmRelocating) continue;
+
+            // try allocating from this region
+            const auto page = this->regions[i]->alloc(numPages);
+            if(page) {
+                return page;
+            }
         }
+    }
+
+    /*
+     * During the VM fixup stage, we may need to allocate memory for stuff like paging structures,
+     * but the physical allocator is in an inconsistent state. So, because we can't call into any
+     * regions, try to satisfy the request from a small cache we populate before the process
+     * begins.
+     */
+    for(size_t i = 0; i < kNumVmPagesCached; i++) {
+        auto entry = this->vmPageCache[i];
+        if(!entry) continue;
+
+        this->vmPageCache[i] = 0;
+        return entry;
     }
 
     // if we get here, no regions have available memory

@@ -5,6 +5,7 @@
 #include <bitflags.h>
 #include <stdint.h>
 
+#include <runtime/List.h>
 #include <runtime/Vector.h>
 #include <vm/IPTEHandler.h>
 
@@ -136,6 +137,9 @@ class PTEHandler: public ::vm::IPTEHandler {
                 return reinterpret_cast<uint64_t *>(tableBase);
         }
 
+        /// Updates the given PML4 entry of all other tables with the given value.
+        void broadcastKernelPml4Update(const size_t idx, const uint64_t entry);
+
     private:
         /// First address of the kernel memory zone
         constexpr static const uintptr_t kKernelBoundary = 0x8000000000000000;
@@ -157,6 +161,8 @@ class PTEHandler: public ::vm::IPTEHandler {
     private:
         // parent map
         PTEHandler *parent = nullptr;
+        /// child pages
+        rt::List<PTEHandler *> children;
 
         /// physical address of the PML4 table (root level)
         uintptr_t pml4Phys = 0;

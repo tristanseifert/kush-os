@@ -7,7 +7,7 @@
 #include <arch.h>
 #include <arch/spinlock.h>
 #include <log.h>
-#include <mem/AnonPool.h>
+#include <mem/Heap.h>
 
 namespace mem {
 /**
@@ -230,9 +230,8 @@ class SlabAllocator {
          */
         Slab *allocSlab() {
             // get the memory pages
-            const auto pageSz = arch_page_size();
-            const auto slabPages = (slabSz + pageSz - 1) / pageSz;
-            void *base = mem::AnonPool::allocPages(slabPages);
+            void *base = mem::Heap::pvalloc(slabSz);
+            if(!base) return nullptr;
 
             // initialize the slab
             auto slab = reinterpret_cast<Slab *>(base);
@@ -258,9 +257,7 @@ class SlabAllocator {
             slab->~Slab();
 
             // return memory back to the kernel
-            const auto pageSz = arch_page_size();
-            const auto slabPages = (slabSz + pageSz - 1) / pageSz;
-            mem::AnonPool::freePages(slab, slabPages);
+            mem::Heap::free(slab);
         }
 
     private:

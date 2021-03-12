@@ -26,10 +26,7 @@ void *operator new(size_t size) {
 }
 /// Aligned allocation
 void *operator new(size_t size, std::align_val_t al) {
-    void *result = mem::Heap::alloc(size);
-
-    //log("requesting aligned alloc for size %zu (align %zu) %p", size, (size_t) al, result);
-    return result;
+    return mem::Heap::allocAligned(size, static_cast<size_t>(al));
 }
 /// Allocates an array
 void *operator new[](size_t size) {

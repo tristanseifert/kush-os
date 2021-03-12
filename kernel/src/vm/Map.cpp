@@ -157,7 +157,7 @@ int Map::add(const uint64_t physAddr, const uintptr_t _length, const uintptr_t v
         const auto pa = physAddr + off;
         const auto va = vmAddr + off;
 
-        if(this->isActive() || (!this->isActive() && this->table.supportsUnmappedModify(va))) {
+        if(this->isActive() || this->table.supportsUnmappedModify(va)) {
             err = this->table.mapPage(pa, va, write, execute, global, user, nocache);
 
             if(err) {
@@ -246,7 +246,7 @@ int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
  * @return 0 on success
  */
 int Map::add(MapEntry *_entry, sched::Task *task, const uintptr_t _base,
-        const MappingFlags flagsMask) {
+        const MappingFlags flagsMask, const uintptr_t searchStart, const uintptr_t searchEnd) {
     RW_LOCK_WRITE(&this->lock);
 
     // retain entry
@@ -272,9 +272,9 @@ int Map::add(MapEntry *_entry, sched::Task *task, const uintptr_t _base,
         }
     } else {
         // find a VM address for this
-        base = kVmSearchBase;
+        base = searchStart;
 
-        while((base + _entry->length) < kVmMaxAddr) {
+        while((base + _entry->length) < searchEnd) {
             // check whether this address is suitable
             for(auto i : this->entries) {
                 // it's intersected an existing mapping; try again after that mapping

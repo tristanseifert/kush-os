@@ -124,6 +124,11 @@ struct Task {
 
         /// Returns a handle to the currently executing task.
         static Task *current();
+        /// Returns the kernel task handle.
+        inline static Task *kern() {
+            extern Task *gKernelTask;
+            return gKernelTask;
+        }
 
     private:
         static void initAllocator();

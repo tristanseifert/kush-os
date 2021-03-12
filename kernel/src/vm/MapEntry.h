@@ -185,10 +185,10 @@ class MapEntry {
 
         /// Allocates a VM object backed by a region of contiguous physical pages
         static MapEntry *makePhys(const uint64_t physAddr, const uintptr_t address,
-                const size_t length, const MappingFlags flags);
+                const size_t length, const MappingFlags flags, const bool kernel = false);
         /// Allocates an anonymous VM object
         static MapEntry *makeAnon(const uintptr_t address, const size_t length,
-                const MappingFlags flags);
+                const MappingFlags flags, const bool kernel = false);
         /// Releases a VM object
         static void free(MapEntry *entry);
 
@@ -274,6 +274,9 @@ class MapEntry {
         bool isAnon = false;
         /// if not an anonymous map, the physical address base
         uint64_t physBase = 0;
+    
+        /// whether the map entry belongs to the kernel
+        bool isKernel = false;
 };
 }
 

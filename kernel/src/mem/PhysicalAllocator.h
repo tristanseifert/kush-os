@@ -79,11 +79,13 @@ class PhysicalAllocator {
     public:
         /// maximum number of physical regions to store info for
         constexpr static const size_t kMaxRegions = 10;
+        /// total number of pages to cache before mapping physical regions
+        constexpr static const size_t kNumVmPagesCached = 10;
 
         // TODO: this should be retrieved from the arch/platform code
         /// virtual address to map the next physical region allocation bitmap in
 #if defined(__amd64__)
-        constexpr static const uintptr_t kRegionInfoBase = 0xFFFF820000000000;
+        constexpr static const uintptr_t kRegionInfoBase = 0xffff82ff00000000;
         constexpr static const size_t kRegionInfoEntryLength = 0x10000000; // up to 16x
 #endif
 
@@ -102,12 +104,18 @@ class PhysicalAllocator {
         /// regions from which ~ memory ~ can be acquired
         PhysRegion *regions[kMaxRegions];
 
+        /// addresses of pages to be used to satisfy early VM requests
+        uint64_t vmPageCache[kNumVmPagesCached];
+
         /// total number of available pages
         size_t totalPages = 0;
         /// number of allocated a pges
         size_t allocatedPages = 0;
         /// number of reserved pages
         size_t reservedPages = 0;
+
+        /// flag indicating that VM relocation has begun
+        bool vmRelocating = false;
 
         /// lock to protect the alloc bitmaps
         DECLARE_SPINLOCK(bitmapLock);

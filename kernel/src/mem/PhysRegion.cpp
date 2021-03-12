@@ -11,7 +11,7 @@
 
 using namespace mem;
 
-bool PhysRegion::gLogInit = true;
+bool PhysRegion::gLogInit = false;
 bool PhysRegion::gLogAlloc = false;
 bool PhysRegion::gLogFree = false;
 bool PhysRegion::gLogSplits = false;
@@ -228,15 +228,23 @@ uintptr_t PhysRegion::vmAvailable(const uintptr_t base, const size_t len) {
     auto vm = vm::Map::kern();
     const auto pageSz = arch_page_size();
 
+    if(gLogFixups) {
+        log("fixups for %p start (%p %u)", this, base, len);
+    }
+
     // map the bitmap region
     auto bitmapVmBase = base;
     auto bitmapVmSize = this->bitmapSize;
+    auto bitmapPhys = (this->base + this->bitmapOff);
+
     if(bitmapSize % pageSz) {
         bitmapSize = ((bitmapSize + pageSz - 1) / pageSz) * pageSz;
     }
 
-    err = vm->add((this->base + this->bitmapOff), bitmapVmSize, base, vm::MapMode::kKernelRW);
-    REQUIRE(!err, "failed to map phys region %p %s: %u", this, "bitmap", err);
+    if(gLogFixups) log("map bitmap: %p -> %p (len $%x)", bitmapPhys, bitmapVmBase, bitmapSize);
+
+    err = vm->add(bitmapPhys, bitmapVmSize, bitmapVmBase, vm::MapMode::kKernelRW);
+    REQUIRE(!err, "failed to map phys region %p %s: %d", this, "bitmap", err);
 
     used += this->bitmapSize;
 
@@ -249,7 +257,7 @@ uintptr_t PhysRegion::vmAvailable(const uintptr_t base, const size_t len) {
     if(gLogFixups) log("fixup %s %p -> %p", "slab", slabPhys, slabVirt);
 
     err = vm->add(slabPhys, slabTemp->length, slabVirt, vm::MapMode::kKernelRW);
-    REQUIRE(!err, "failed to map phys region %p %s: %u", this, "slab", err);
+    REQUIRE(!err, "failed to map phys region %p %s: %d", this, "slab", err);
 
     // update slab's vm address and ptr
     const auto slabBaseOff = reinterpret_cast<uintptr_t>(this->blockSlab) - slabPhys;

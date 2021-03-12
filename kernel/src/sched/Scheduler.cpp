@@ -17,7 +17,7 @@ using namespace sched;
 
 Scheduler *Scheduler::gShared = nullptr;
 
-Task *gKernelTask = nullptr;
+Task *sched::gKernelTask = nullptr;
 
 /**
  * Initializes the global scheduler.

@@ -28,12 +28,11 @@ add_executable(kernel
     src/c/stack_guard.c
     src/c/printf.c
     src/c/string.c
-    src/mem/AnonPool.cpp
     src/mem/PhysicalAllocator.cpp
     src/mem/PhysRegion.cpp
     src/mem/StackPool.cpp
     src/mem/Heap.cpp
-    src/mem/liballoc/liballoc.cpp
+    src/mem/dlmalloc/dlmalloc.cpp
     src/runtime/CppRuntime.cpp
     src/runtime/log.cpp
     src/runtime/Hash.cpp

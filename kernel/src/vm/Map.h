@@ -19,6 +19,9 @@ class Mapper;
 /// modifier flags for mappings, defining its protection level
 ENUM_FLAGS(MapMode)
 enum class MapMode {
+    /// No flags set
+    None                = 0,
+    
     /// Allow reading from the page
     READ                = (1 << 0),
     /// Allow writing to the page
@@ -72,7 +75,9 @@ class Map {
         void activate();
 
         int add(MapEntry *entry, sched::Task *task, const uintptr_t base = 0,
-                const vm::MappingFlags flagMask = vm::MappingFlags::None);
+                const vm::MappingFlags flagMask = vm::MappingFlags::None,
+                const uintptr_t searchStart = kVmSearchBase,
+                const uintptr_t searchEnd = kVmMaxAddr);
         int remove(MapEntry *entry, sched::Task *);
         const bool contains(MapEntry *entry);
 

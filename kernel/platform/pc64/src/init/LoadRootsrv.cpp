@@ -18,7 +18,7 @@ extern "C" BOOTBOOT bootboot;
 using namespace platform;
 
 // output logs about setting up the root server environment
-#define LOG_SETUP                       0
+#define LOG_SETUP                       1
 
 /// VM address at which the init bundle is mapped in the task
 constexpr static const uintptr_t kInitBundleVmAddr = 0x690000000;

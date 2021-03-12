@@ -47,7 +47,7 @@ class StackPool {
         /// size of a single stack region (in bytes)
         constexpr static const size_t kStackSize = 0x4000;
 #elif defined(__amd64__)
-        constexpr static const uintptr_t kBaseAddr = 0xFFFF820100000000;
+        constexpr static const uintptr_t kBaseAddr = 0xFFFF820000000000;
         //constexpr static const size_t kRegionLength = 0x8000000;
         constexpr static const size_t kStackSize = 0x8000;
         // 1G for now; 32G are reserved
