@@ -119,6 +119,19 @@ uint64_t PhysicalAllocator::alloc(const size_t numPages, const PhysFlags flags) 
  * Frees a previously allocated set of contiguous physical pages.
  */
 void PhysicalAllocator::free(const size_t numPages, const uint64_t physAddr) {
-    // TODO: implement
+    // test which region it came from
+    for(size_t i = 0; i < this->numRegions; i++) {
+        auto region = this->regions[i];
+
+        if(!region->checkAddress(physAddr)) {
+            continue;
+        }
+
+        // found the region, free it
+        return;
+    }
+
+    // failed to free this phys address range
+    panic("failed to free phys range $%p (%u pages)", physAddr, numPages);
 }
 

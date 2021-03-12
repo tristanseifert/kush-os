@@ -52,6 +52,10 @@ sched::Task *platform_init_rootsrv() {
     main->kernelMode = false;
     main->setName("Main");
 
+#if LOG_SETUP
+    log("rootsrv thread: $%p $%p'h", main, main->handle);
+#endif
+
     // schedule it
     sched::Scheduler::get()->scheduleRunnable(task);
 

@@ -165,9 +165,8 @@ void LocalApic::updateTpr(const Irql irql) {
             panic("unhandled irql %d", (int) irql);
     }
 
-    log("%p tpr: %02x", this, priority);
+    //log("%p tpr: %02x", this, priority);
     this->write(kApicRegTaskPriority, priority);
-    log("fuck");
 }
 
 

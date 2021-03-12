@@ -11,8 +11,9 @@
 
 using namespace mem;
 
-bool PhysRegion::gLogInit = false;
+bool PhysRegion::gLogInit = true;
 bool PhysRegion::gLogAlloc = false;
+bool PhysRegion::gLogFree = false;
 bool PhysRegion::gLogSplits = false;
 bool PhysRegion::gLogFixups = false;
 
@@ -166,8 +167,6 @@ PhysRegion::PhysRegion(const uint64_t _base, const uint64_t _length) : base(_bas
      * be represented in the smallest order block.
      */
     size_t toAllocate = usableLength, allocated = 0;
-    if(gLogInit) log("total allocatable: %u bytes (%u bytes overhead)", toAllocate,
-            this->length - toAllocate);
 
     while(toAllocate >= pageSz) {
         const auto blockAddr = this->base + allocated;
@@ -197,13 +196,17 @@ testAlign:;
         entry->setOrder(order);
 
         // add it into the free list
-        this->orders[order].freeBlock(entry);
+        this->orders[order].freeBlock(entry, false, false);
 
         // advance to next
         // log("block %9u to alloc %12u order %2u at $%p", blockSz, toAllocate, order, blockAddr);
         toAllocate -= blockSz;
         allocated += blockSz;
     }
+
+    this->allocatable = allocated;
+    if(gLogInit) log("total allocatable: %u bytes (%u bytes overhead) $%p - $%p", toAllocate,
+            this->length - toAllocate, this->base, this->base + this->allocatable);
 }
 
 /**
@@ -330,7 +333,7 @@ uint64_t PhysRegion::allocOrder(const size_t order) {
         // return its physical address
         const auto addr = (this->base + blockAddr);
         if(gLogAlloc) {
-            log("alloc page order %2u from free list: %p %p", order, addr, blockAddr);
+            log("alloc page order %2u from free list: base $%p (block $%p)", order, addr, blockAddr);
         }
         return addr;
     }
@@ -371,7 +374,7 @@ beach:;
 
     const auto addr = (this->base + blockAddr);
     if(gLogAlloc) {
-        log("alloc page order %2u from split: %p", order, addr);
+        log("alloc page order %2u from split: base $%p", order, addr);
     }
 
     return addr;
@@ -447,7 +450,7 @@ PhysRegion::Block *PhysRegion::Order::split(PhysRegion &region, Block *block, co
     block2->setAddress(base2);
     block2->setOrder(smaller.order);
 
-    smaller.freeBlock(block2, canGrow);
+    smaller.freeBlock(block2, canGrow, false);
 
     // return the lower half of the block
     return block1;
@@ -457,12 +460,21 @@ PhysRegion::Block *PhysRegion::Order::split(PhysRegion &region, Block *block, co
  * Adds a block to the order's free list. For simplicity, this will simply insert it at the head
  * of the list, so we needn't traverse the entire list to the end.
  */
-void PhysRegion::Order::freeBlock(Block *block, const bool coalesce) {
+void PhysRegion::Order::freeBlock(Block *block, const bool coalesce, const bool paranoid) {
     // insert into free map
     block->next = this->free;
     this->free = block;
 
+    if(PhysRegion::gLogFree) {
+        log("freeing: order %2u base $%p", block->getOrder(), block->getAddress());
+    }
+
     // update bitmap
+    if(paranoid) {
+        // during initialization, we do some stuff that will trigger this check
+        REQUIRE(this->testBit(block), "attempt to free block %p (order %2u base $%p) but is not alloc",
+                block, block->getOrder(), block->getAddress());
+    }
     this->clearBit(block);
 
     // TODO: test if it can be coalesced

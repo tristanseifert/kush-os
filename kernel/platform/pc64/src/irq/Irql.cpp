@@ -7,6 +7,8 @@
 
 using namespace platform;
 
+static bool gLogIrql = false;
+
 /**
  * Raises the interrupt priority level of the current processor. The previous irql is returned.
  */
@@ -19,6 +21,7 @@ platform::Irql platform_raise_irql(const platform::Irql irql, const bool enableI
             (int) info->irql, (int) irql);
     __atomic_exchange(&info->irql, &newVal, &prev, __ATOMIC_ACQUIRE);
 
+    if(gLogIrql) log("raise irql: %u (%p)", (uintptr_t) irql, info->p.lapic);
     if(info->p.lapic) {
         info->p.lapic->updateTpr(irql);
     }
@@ -46,6 +49,7 @@ void platform_lower_irql(const platform::Irql irql, const bool enableIrq) {
     Irql _irql = irql;
     __atomic_store(&info->irql, &_irql, __ATOMIC_RELAXED);
 
+   if(gLogIrql) log("lower irql: %u (%p)", (uintptr_t) irql, info->p.lapic);
     if(info->p.lapic) {
         info->p.lapic->updateTpr(irql);
     }

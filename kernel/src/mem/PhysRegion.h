@@ -38,6 +38,14 @@ class PhysRegion {
         /// Allocates a region of physical pages in the given order
         uint64_t allocOrder(const size_t order);
 
+        /// Releases the block of pages with the specified base address and order.
+        void freeOrder(const size_t order, const uintptr_t address);
+
+        /// Check if the given physical address was allocated from this region.
+        inline bool checkAddress(const uintptr_t addr) const {
+            return (addr >= this->base) && (addr < (this->base + this->allocatable));
+        }
+
     private:
         /// Base address of physical memory identity mapping zone during early boot
         constexpr static uintptr_t kEarlyPhysIdentityMap = 0x0000000000000000;
@@ -120,7 +128,7 @@ class PhysRegion {
             /// Allocates the first free block, and returns its address.
             Block * _Nullable allocBlock();
             /// Adds a block to the free list.
-            void freeBlock(Block * _Nonnull block, const bool coalesce = false);
+            void freeBlock(Block * _Nonnull block, const bool coalesce = false, const bool paranoid = true);
 
             /// Allocate and split a block. Return one half, the other is inserted into free list.
             Block * _Nullable split(PhysRegion &region, Block * _Nonnull,
@@ -204,6 +212,8 @@ class PhysRegion {
         static bool gLogInit;
         /// When set, all page allocations are logged
         static bool gLogAlloc;
+        /// whether page frees are logged
+        static bool gLogFree;
         /// whether block splits are logged
         static bool gLogSplits;
         /// whether VM pointer fixups are logged

@@ -34,7 +34,7 @@ class LocalApic {
     private:
         /// Writes the given APIC register.
         inline void write(const size_t reg, const uint32_t value) {
-            log("write %04x -> %08x (%p %p %p)", reg, value, this, this->base, &this->base);
+            //log("write %04x -> %08x (%p %p %p)", reg, value, this, this->base, &this->base);
             this->base[reg / 4] = value;
         }
         /// Reads the given APIC register.
