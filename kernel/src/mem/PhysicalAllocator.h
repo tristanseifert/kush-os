@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <bitflags.h>
 
 #include <log.h>
 #include <arch/spinlock.h>
@@ -10,7 +11,18 @@
 #include "PhysRegion.h"
 
 namespace mem {
+/**
+ * Flags for allocations
+ */
+ENUM_FLAGS(PhysFlags)
+enum class PhysFlags {
+    None                                = 0,
+};
 
+
+/**
+ * Provides an interface for allocating contiguous chunks of physical memory.
+ */
 class PhysicalAllocator {
     public:
         static void init();
@@ -53,12 +65,27 @@ class PhysicalAllocator {
 
         void mapRegionUsageBitmaps();
 
-        uint64_t allocPage();
-        void freePage(const uint64_t physicalAddr);
+        uint64_t allocPage(const PhysFlags flags = PhysFlags::None) {
+            return this->alloc(1, flags);
+        }
+        uint64_t alloc(const size_t numPages, const PhysFlags flags = PhysFlags::None);
+
+
+        void freePage(const uint64_t physicalAddr) {
+            this->free(1, physicalAddr);
+        }
+        void free(const size_t numPages, const uint64_t physicalAddr);
 
     public:
         /// maximum number of physical regions to store info for
         constexpr static const size_t kMaxRegions = 10;
+
+        // TODO: this should be retrieved from the arch/platform code
+        /// virtual address to map the next physical region allocation bitmap in
+#if defined(__amd64__)
+        constexpr static const uintptr_t kRegionInfoBase = 0xFFFF820000000000;
+        constexpr static const size_t kRegionInfoEntryLength = 0x10000000; // up to 16x
+#endif
 
     private:
         static PhysicalAllocator *gShared;
@@ -74,14 +101,6 @@ class PhysicalAllocator {
         size_t numRegions = 0;
         /// regions from which ~ memory ~ can be acquired
         PhysRegion *regions[kMaxRegions];
-
-        // TODO: this should be retrieved from the arch/platform code
-        /// virtual address to map the next physical region allocation bitmap in
-#if defined(__i386__)
-        uintptr_t nextBitmapVmAddr = 0xC0400000;
-#elif defined(__amd64__)
-        uintptr_t nextBitmapVmAddr = 0xFFFF820000000000;
-#endif
 
         /// total number of available pages
         size_t totalPages = 0;

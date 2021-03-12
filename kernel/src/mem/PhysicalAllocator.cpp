@@ -87,20 +87,28 @@ void PhysicalAllocator::mapRegionUsageBitmaps() {
     for(size_t i = 0; i < kMaxRegions; i++) {
         if(!this->regions[i]) break;
 
-        auto used = this->regions[i]->vmAvailable(this->nextBitmapVmAddr);
-
-        // XXX: should/can we bounds check?
-        this->nextBitmapVmAddr += used;
+        const auto base = kRegionInfoBase + (i * kRegionInfoEntryLength);
+        this->regions[i]->vmAvailable(base, kRegionInfoEntryLength);
     }
 }
 
 
 
 /**
- * Checks each physical region in turn to see if it's got free pages.
+ * Attempts to satisfy an allocation request for contiguous physical memory.
+ *
+ * @param numPages Total number of contiguous pages to allocate
+ * @param flags Flags to change the allocator behavior
+ * @return Physical page address, or 0 if no page is available
  */
-uint64_t PhysicalAllocator::allocPage() {
-    // TODO: implement
+uint64_t PhysicalAllocator::alloc(const size_t numPages, const PhysFlags flags) {
+    // XXX: this is stupid
+    for(size_t i = 0; i < this->numRegions; i++) {
+        const auto page = this->regions[i]->alloc(numPages);
+        if(page) {
+            return page;
+        }
+    }
 
     // if we get here, no regions have available memory
     return 0;
@@ -108,9 +116,9 @@ uint64_t PhysicalAllocator::allocPage() {
 
 
 /**
- * Frees a previously allocated physical page.
+ * Frees a previously allocated set of contiguous physical pages.
  */
-void PhysicalAllocator::freePage(const uint64_t physAddr) {
+void PhysicalAllocator::free(const size_t numPages, const uint64_t physAddr) {
     // TODO: implement
 }
 
