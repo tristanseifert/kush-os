@@ -105,6 +105,11 @@ int thrd_create(thrd_t *outThread, thrd_start_t entry, void *arg) {
     // create the thread, but paused
     uintptr_t stackBot = ((uintptr_t) stack) + stackBytes;
 
+#if defined(__amd64__)
+    // compensate for red zone
+    stackBot += 128;
+#endif
+
     err = ThreadCreateFlags(__ThreadEntry, (uintptr_t) info, stackBot, &handle, THREAD_PAUSED);
     if(err) {
         free(info);

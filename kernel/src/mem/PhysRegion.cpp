@@ -588,7 +588,8 @@ PhysRegion::SlabHeader::SlabHeader(const uintptr_t base, const size_t len) : vmB
         }
     }
 
-    log("slab %p: base %p (len %u) bitmap %u bytes, %u blocks", this, base, len, bitmapSize, numBlocks);
+    if(PhysRegion::gLogInit) log("slab %p: base %p (len %u) bitmap %u bytes, %u blocks", this,
+            base, len, bitmapSize, numBlocks);
 }
 
 /**

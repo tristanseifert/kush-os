@@ -193,7 +193,7 @@ void MapEntry::faultInPage(const uintptr_t address, Map *map) {
 
     int err;
     const auto pageSz = arch_page_size();
-  
+
     // get map specific base
     uintptr_t thisBase = 0;
     bool foundBase = false;
@@ -224,7 +224,7 @@ beach:;
     for(auto &physPage : this->physOwned) {
         if(physPage.pageOff == pageOff) {
             const auto destAddr = thisBase + (pageOff * pageSz);
-            const auto mode = ConvertVmMode(flg, this->isKernel);
+            const auto mode = ConvertVmMode(flg, !this->isKernel);
             err = map->add(physPage.physAddr, pageSz, destAddr, mode);
             REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", pageOff, this, this->handle);
 
@@ -251,12 +251,13 @@ beach:;
 
     // map it
     const auto destAddr = thisBase + (pageOff * pageSz);
-    const auto mode = ConvertVmMode(flg, this->isKernel);
+    const auto mode = ConvertVmMode(flg, !this->isKernel);
+
     err = map->add(page, pageSz, destAddr, mode);
     REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", info.pageOff, this, this->handle);
 
-    // invalidate the address
-    asm volatile ( "invlpg (%0)" : : "b"(destAddr) : "memory" );
+    // invalidate TLB entry
+    arch::InvalidateTlb(destAddr);
 
     // zero it
     memset(reinterpret_cast<void *>(destAddr), 0, pageSz);
@@ -348,7 +349,7 @@ void MapEntry::mapAnonPages(Map *map, const uintptr_t base, const MappingFlags m
         flg |= (flg & mask);
     }
 
-    const auto mode = ConvertVmMode(flg, this->isKernel);
+    const auto mode = ConvertVmMode(flg, !this->isKernel);
 
     // map the pages
     for(const auto &page : this->physOwned) {
@@ -375,7 +376,7 @@ void MapEntry::mapPhysMem(Map *map, const uintptr_t base, const MappingFlags mas
         flg |= (flg & mask);
     }
 
-    const auto mode = ConvertVmMode(flg, this->isKernel);
+    const auto mode = ConvertVmMode(flg, !this->isKernel);
 
     // insert the mapping
     err = map->add(this->physBase, this->length, base, mode);

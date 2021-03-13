@@ -114,6 +114,17 @@ intptr_t HandleSyscall(const sys::Syscall::Args *args, const uintptr_t number);
  * Tick callback
  */
 void Tick();
+
+
+
+/**
+ * Flushes the given address from the TLB of the current processor, if supported. This will not
+ * notify other running processors.
+ */
+void InvalidateTlb(const uintptr_t addr);
+static inline void InvalidateTlb(void *addr) {
+    InvalidateTlb(reinterpret_cast<const uintptr_t>(addr));
+}
 }
 #endif
 #endif
