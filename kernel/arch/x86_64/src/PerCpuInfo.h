@@ -2,7 +2,7 @@
 #define ARCH_x86_64_PERCPUINFO_H
 
 #define PROCI_OFF_SYSCALL_STACK         (24)
-#define PROCI_OFF_PLATFORM              (32)
+#define PROCI_OFF_PLATFORM              (48)
 
 #ifndef ASM_FILE
 
@@ -13,6 +13,9 @@
 #endif
 
 namespace arch {
+class Idt;
+class IrqRegistry;
+
 /**
  * Per processor information structure
  */
@@ -26,6 +29,11 @@ struct ProcInfo {
     platform::Irql irql = platform::Irql::Passive;
     /// Stack pointer to use when entering syscalls
     void *syscallStack = nullptr;
+
+    /// IDT pointer
+    arch::Idt *idt = nullptr;
+    /// interrupt registration (core specific)
+    arch::IrqRegistry *irqRegistry = nullptr;
 
     // platform specific info
 #if PLATFORM_WANTS_CORE_LOCAL

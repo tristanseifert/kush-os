@@ -87,26 +87,26 @@ extern "C" void amd64_exception_virtualization();
 /**
  * Installs the default set of exception handlers.
  */
-void exception_install_handlers() {
-    Idt::Set(X86_EXC_DIVIDE, (uintptr_t) amd64_exception_div0, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
-    Idt::Set(X86_EXC_DEBUG, (uintptr_t) amd64_exception_debug, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack4);
-    Idt::Set(X86_EXC_NMI, (uintptr_t) amd64_exception_nmi, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR, Idt::Stack::Stack3);
-    Idt::Set(X86_EXC_BREAKPOINT, (uintptr_t) amd64_exception_breakpoint, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack4);
-    Idt::Set(X86_EXC_OVERFLOW, (uintptr_t) amd64_exception_overflow, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
-    Idt::Set(X86_EXC_BOUNDS, (uintptr_t) amd64_exception_bounds, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
-    Idt::Set(X86_EXC_ILLEGAL_OPCODE, (uintptr_t) amd64_exception_invalid_instruction, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
-    Idt::Set(X86_EXC_DEVICE_UNAVAIL, (uintptr_t) amd64_exception_device_unavailable, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
-    Idt::Set(X86_EXC_DOUBLE_FAULT, (uintptr_t) amd64_exception_double_fault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
-    Idt::Set(X86_EXC_INVALID_TSS, (uintptr_t) amd64_exception_tss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
-    Idt::Set(X86_EXC_SEGMENT_NP, (uintptr_t) amd64_exception_segment_missing, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
-    Idt::Set(X86_EXC_SS, (uintptr_t) amd64_exception_ss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
-    Idt::Set(X86_EXC_GPF, (uintptr_t) amd64_exception_gpf, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
-    Idt::Set(X86_EXC_PAGING, (uintptr_t) amd64_exception_pagefault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
-    Idt::Set(X86_EXC_FP, (uintptr_t) amd64_exception_float, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
-    Idt::Set(X86_EXC_ALIGNMENT, (uintptr_t) amd64_exception_alignment_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
-    Idt::Set(X86_EXC_MCE, (uintptr_t) amd64_exception_machine_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack4);
-    Idt::Set(X86_EXC_SIMD_FP, (uintptr_t) amd64_exception_simd, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
-    Idt::Set(X86_EXC_VIRT, (uintptr_t) amd64_exception_virtualization, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+void arch::InstallExceptionHandlers(Idt *idt) {
+    idt->set(X86_EXC_DIVIDE, (uintptr_t) amd64_exception_div0, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    idt->set(X86_EXC_DEBUG, (uintptr_t) amd64_exception_debug, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack4);
+    idt->set(X86_EXC_NMI, (uintptr_t) amd64_exception_nmi, GDT_KERN_CODE_SEG, IDT_FLAGS_ISR, Idt::Stack::Stack3);
+    idt->set(X86_EXC_BREAKPOINT, (uintptr_t) amd64_exception_breakpoint, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack4);
+    idt->set(X86_EXC_OVERFLOW, (uintptr_t) amd64_exception_overflow, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    idt->set(X86_EXC_BOUNDS, (uintptr_t) amd64_exception_bounds, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    idt->set(X86_EXC_ILLEGAL_OPCODE, (uintptr_t) amd64_exception_invalid_instruction, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    idt->set(X86_EXC_DEVICE_UNAVAIL, (uintptr_t) amd64_exception_device_unavailable, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    idt->set(X86_EXC_DOUBLE_FAULT, (uintptr_t) amd64_exception_double_fault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    idt->set(X86_EXC_INVALID_TSS, (uintptr_t) amd64_exception_tss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    idt->set(X86_EXC_SEGMENT_NP, (uintptr_t) amd64_exception_segment_missing, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    idt->set(X86_EXC_SS, (uintptr_t) amd64_exception_ss_invalid, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    idt->set(X86_EXC_GPF, (uintptr_t) amd64_exception_gpf, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    idt->set(X86_EXC_PAGING, (uintptr_t) amd64_exception_pagefault, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    idt->set(X86_EXC_FP, (uintptr_t) amd64_exception_float, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    idt->set(X86_EXC_ALIGNMENT, (uintptr_t) amd64_exception_alignment_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack2);
+    idt->set(X86_EXC_MCE, (uintptr_t) amd64_exception_machine_check, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack4);
+    idt->set(X86_EXC_SIMD_FP, (uintptr_t) amd64_exception_simd, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
+    idt->set(X86_EXC_VIRT, (uintptr_t) amd64_exception_virtualization, GDT_KERN_CODE_SEG, IDT_FLAGS_TRAP, Idt::Stack::Stack1);
 }
 
 /**

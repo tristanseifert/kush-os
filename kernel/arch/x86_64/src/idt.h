@@ -61,12 +61,16 @@ class Idt {
         };
 
     public:
-        /// Initialize the IDT memory and load it into the processor register.
+        /// Initialize the BSP IDT and activates it.
         static void Init();
-        /// Sets an IDT entry
-        static void Set(const size_t entry, const uintptr_t addr, const uintptr_t seg, const uintptr_t flags, const Stack stack = Stack::None);
+        /// Initializes a new IDT, sets it up with the exception handler entries, and loads it.
+        Idt();
 
-        static void Load();
+        /// Sets an IDT entry
+        void set(const size_t entry, const uintptr_t addr, const uintptr_t seg, const uintptr_t flags, const Stack stack = Stack::None);
+
+        /// Activates the IDT.
+        void load();
 
     private:
         static idt_entry64_t gIdts[kNumIdt];
@@ -75,7 +79,13 @@ class Idt {
         static bool gLogLoad;
         /// whether inserting an entry in the IDT is logged
         static bool gLogSet;
+
+    private:
+        /// IDT storage
+        idt_entry64_t storage[kNumIdt] __attribute__((aligned((64))));
 };
+
+extern Idt *gBspIdt;
 }
 
 #endif

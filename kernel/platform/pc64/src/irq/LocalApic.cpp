@@ -1,9 +1,14 @@
 #include "LocalApic.h"
 #include "ApicRegs.h"
 
+#include "../memmap.h"
 #include "acpi/Parser.h"
 
 #include <stdint.h>
+
+#include <sched/Task.h>
+#include <vm/Map.h>
+#include <vm/MapEntry.h>
 
 #include <arch/PerCpuInfo.h>
 #include <arch/x86_msr.h>
@@ -11,6 +16,9 @@
 #include <log.h>
 
 using namespace platform;
+
+bool LocalApic::gLogInit = true;
+bool LocalApic::gLogRegIo = false;
 
 /**
  * Reads out the APIC base MSR.
@@ -32,15 +40,38 @@ static void SetApicBase(const uint32_t base) {
  * Initializes a local APIC.
  */
 LocalApic::LocalApic(const uintptr_t _id, const uintptr_t cpuId, const uintptr_t phys) : id(_id) {
-    this->base = reinterpret_cast<uint32_t *>(phys + kPhysIdentityMap);
+    int err;
+
+    // map it somewhere in the architecture VM space
+    this->vmEnt = vm::MapEntry::makePhys(phys, 0, arch_page_size(),
+            vm::MappingFlags::Read | vm::MappingFlags::Write | vm::MappingFlags::MMIO, true);
+    REQUIRE(this->vmEnt, "failed to create %s phys map", "LAPIC");
+
+    auto vm = vm::Map::kern();
+    err = vm->add(this->vmEnt, sched::Task::kern(), 0, vm::MappingFlags::None, kPlatformRegionMmio,
+            (kPlatformRegionMmio + kPlatformRegionMmioLen - 1));
+    REQUIRE(!err, "failed to map %s: %d", "LAPIC", err);
+
+    auto base = this->vmEnt->getBaseAddressIn(vm);
+    REQUIRE(base, "failed to get %s base address", "LAPIC");
+
+    this->base = reinterpret_cast<uint32_t *>(base);
+    if(gLogInit) {
+        log("LAPIC id %u cpu %u is at $%p (phys %p)", _id, cpuId, base, phys);
+    }
 
     // get APIC version
     const auto version = this->read(kApicRegVersion);
 
-    log("allocated LAPIC %u for cpu %u ($%p) version $%08x base $%p", _id, cpuId, this, version,
-            this->base);
+    if(gLogInit) {
+        log("allocated LAPIC %u for cpu %u ($%p) version $%08x base $%p", _id, cpuId, this,
+                version, this->base);
+    }
 
     this->configNmi(cpuId);
+
+    // install amd64 irq handlers and enable APIC
+
     this->enable();
 }
 
@@ -65,7 +96,7 @@ void LocalApic::configNmi(const uintptr_t cpuId) {
                     break;
                 }
 
-                // ID matches, so configure it
+                // ID matches, so configure it (vector number ignored)
                 uint32_t value = kVectorNMI;
                 REQUIRE((nmi->lint == 0) || (nmi->lint == 1), "Invalid APIC local interrupt %u",
                         nmi->lint);
@@ -126,10 +157,17 @@ void LocalApic::enable() {
  * Clear the APIC enable bit and uninstall all interrupts.
  */
 LocalApic::~LocalApic() {
+    int err;
+
     // clear enable bit
     auto reg = this->read(kApicRegSpurious);
     reg &= ~(1 << 8);
     this->write(kApicRegSpurious, reg);
+
+    // remove mapping
+    auto vm = vm::Map::kern();
+    err = vm->remove(this->vmEnt, sched::Task::kern());
+    REQUIRE(!err, "failed to unmap %s phys map", "LAPIC");
 }
 
 

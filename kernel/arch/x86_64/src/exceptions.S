@@ -260,6 +260,7 @@ amd64_exception_pagefault:
     add         $0x10, %rsp
 
     // return; this will restore the interrupt flag too
+    MaybeSwapGs 16
     iretq
 
 .extern amd64_handle_exception
@@ -328,6 +329,8 @@ error_common_stub:
     // clear the error code and interrupt number
     add         $0x10, %rsp
 
+    // XXX: is this right?
+    MaybeSwapGs 8
     // return; this will restore the interrupt flag too
     iretq
 

@@ -1,5 +1,8 @@
 #include "PerCpuInfo.h"
 
+#include "idt.h"
+#include "IrqRegistry.h"
+
 #include <arch/x86_msr.h>
 #include <log.h>
 
@@ -25,6 +28,10 @@ void PerCpuInfo::BspInit() {
     const auto procAddr = reinterpret_cast<uintptr_t>(proc);
     x86_msr_write(X86_MSR_GSBASE, procAddr, procAddr >> 32);
     x86_msr_write(X86_MSR_KERNEL_GSBASE, procAddr, procAddr >> 32);
+
+    // install IDT
+    proc->idt = gBspIdt;
+    proc->irqRegistry = gBspIrqRegistry;
 }
 
 /**
@@ -36,6 +43,10 @@ void PerCpuInfo::ApInit() {
     auto proc = new ProcInfo;
 
     // TODO: get processor ID
+
+    // set up some per-processor structures
+    proc->idt = new Idt;
+    proc->irqRegistry = new IrqRegistry(proc->idt);
 
     // store ptr
     const auto procAddr = reinterpret_cast<uintptr_t>(proc);
