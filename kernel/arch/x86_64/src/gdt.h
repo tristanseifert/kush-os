@@ -112,6 +112,8 @@ class Gdt {
 
         /// whehter GDT loads are logged
         static bool gLogLoad;
+        /// whether writes to GDT are logged
+        static bool gLogSet;
 };
 }
 

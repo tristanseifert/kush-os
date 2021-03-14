@@ -79,8 +79,8 @@ void Physmap::Init() {
         if(type == MMAP_FREE) {
             // ignore regions below the 1M mark
             if(MMapEnt_Ptr(mmap) < 0x100000) {
-                log("Ignoring conventional memory at %016llx (size %016llx)", MMapEnt_Ptr(mmap),
-                        MMapEnt_Size(mmap));
+                if(gLogPhysRegions) log("Ignoring conventional memory at $%016lx (size %016lx)",
+                        MMapEnt_Ptr(mmap), MMapEnt_Size(mmap));
                 continue;
             }
 
@@ -88,13 +88,13 @@ void Physmap::Init() {
             gPhysRegions[gNumPhysRegions].start = MMapEnt_Ptr(mmap);
             gPhysRegions[gNumPhysRegions].length = MMapEnt_Size(mmap);
 
-            if(gLogPhysRegions) log("phys region %2u: start %016x len %016x", gNumPhysRegions,
+            if(gLogPhysRegions) log("phys region %2u: start $%016lx len %016lx", gNumPhysRegions,
                     gPhysRegions[gNumPhysRegions].start, gPhysRegions[gNumPhysRegions].length);
 
             gNumPhysRegions++;
         } else {
-            /*log("Unused Entry: addr %016llx size %016llx flags %08x", MMapEnt_Ptr(mmap),
-                    MMapEnt_Size(mmap), MMapEnt_Type(mmap));*/
+            if(gLogPhysRegions) log("Unused Entry: addr $%016lx size %016lx flags %08x",
+                    MMapEnt_Ptr(mmap), MMapEnt_Size(mmap), MMapEnt_Type(mmap));
         }
     }
 
@@ -236,8 +236,8 @@ void Physmap::DetectKernelPhys() {
     err = ResolvePml4Virt(pml4, envBase, gBootEnvPhys);
     REQUIRE(!err, "failed to resolve kernel %s base (%p): %u", "environment", envBase, err);
 
-    log("Phys base: .text $%p .data $%p .bss $%p; info $%p env $%p", gKernelTextPhys,
-            gKernelDataPhys, gKernelBssPhys, gBootInfoPhys, gBootEnvPhys);
+    if(gLogPhysRegions) log("Phys base: .text $%p .data $%p .bss $%p; info $%p env $%p",
+            gKernelTextPhys, gKernelDataPhys, gKernelBssPhys, gBootInfoPhys, gBootEnvPhys);
 }
 
 /**

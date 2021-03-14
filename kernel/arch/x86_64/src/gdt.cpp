@@ -6,6 +6,8 @@
 #include <string.h>
 #include <arch/spinlock.h>
 
+extern "C" void amd64_gdt_flush();
+
 using namespace arch;
 
 /// static GDT allocation
@@ -20,6 +22,7 @@ constexpr static const size_t kIrqStackSz = 256;
 static __attribute__((aligned(64))) uintptr_t gBspIrqStacks[7][kIrqStackSz];
 
 bool Gdt::gLogLoad = false;
+bool Gdt::gLogSet = false;
 
 /**
  * Loads the task register with the TSS in the given descriptor.
@@ -97,6 +100,8 @@ void Gdt::Set32(const size_t num, const uint32_t base, const uint32_t limit, con
 
     gGdt[num].granularity |= gran & 0xF0;
     gGdt[num].access = flags;
+
+    if(gLogSet) log("GDT %4x: %08x", num, *(uint32_t *) &gGdt[num]);
 }
 
 /**
@@ -125,6 +130,8 @@ void Gdt::Set64(const size_t num, const uintptr_t base, const uint32_t limit, co
 
     // copy it in
     memcpy(&gGdt[num], &desc, sizeof(desc));
+
+    if(gLogSet) log("GDT %4x: %016llx", num, *(uint64_t *) &desc);
 }
 
 /**
@@ -142,6 +149,8 @@ void Gdt::Load(const size_t numTss) {
     asm volatile("lgdt (%0)" : : "r"(&GDTR) : "memory");
 
     if(gLogLoad) log("Load GDT %p len %u", GDTR.base, GDTR.length);
+
+    amd64_gdt_flush();
 }
 
 /**

@@ -10,6 +10,7 @@
 #include <vm/Map.h>
 #include <vm/MapEntry.h>
 
+#include <arch/IrqRegistry.h>
 #include <arch/PerCpuInfo.h>
 #include <arch/x86_msr.h>
 #include <arch/spinlock.h>
@@ -19,6 +20,7 @@ using namespace platform;
 
 bool LocalApic::gLogInit = true;
 bool LocalApic::gLogRegIo = false;
+bool LocalApic::gLogSpurious = true;
 
 /**
  * Reads out the APIC base MSR.
@@ -34,6 +36,11 @@ static uint32_t GetApicBase() {
  */
 static void SetApicBase(const uint32_t base) {
     x86_msr_write(IA32_APIC_BASE_MSR, base, 0);
+}
+
+/// Spurious IRQ trampoline
+void platform::ApicSpuriousIrq(const uintptr_t vector, void *ctx) {
+    reinterpret_cast<LocalApic *>(ctx)->irqSpurious();
 }
 
 /**
@@ -56,23 +63,25 @@ LocalApic::LocalApic(const uintptr_t _id, const uintptr_t cpuId, const uintptr_t
     REQUIRE(base, "failed to get %s base address", "LAPIC");
 
     this->base = reinterpret_cast<uint32_t *>(base);
-    if(gLogInit) {
-        log("LAPIC id %u cpu %u is at $%p (phys %p)", _id, cpuId, base, phys);
-    }
 
     // get APIC version
     const auto version = this->read(kApicRegVersion);
 
     if(gLogInit) {
-        log("allocated LAPIC %u for cpu %u ($%p) version $%08x base $%p", _id, cpuId, this,
-                version, this->base);
+        log("allocated LAPIC %u for cpu %u ($%p) version $%08x base $%p (phys $%p)", _id, cpuId,
+                this, version, this->base, phys);
     }
 
     this->configNmi(cpuId);
 
     // install amd64 irq handlers and enable APIC
+    auto irq = arch::PerCpuInfo::get()->irqRegistry;
+    irq->install(kVectorSpurious, ApicSpuriousIrq, this);
 
     this->enable();
+
+    // once the APIC is enabled, we can set up the timer
+    this->timer = new ApicTimer(this);
 }
 
 /**
@@ -159,6 +168,9 @@ void LocalApic::enable() {
 LocalApic::~LocalApic() {
     int err;
 
+    // turn off timer
+    delete this->timer;
+
     // clear enable bit
     auto reg = this->read(kApicRegSpurious);
     reg &= ~(1 << 8);
@@ -168,6 +180,10 @@ LocalApic::~LocalApic() {
     auto vm = vm::Map::kern();
     err = vm->remove(this->vmEnt, sched::Task::kern());
     REQUIRE(!err, "failed to unmap %s phys map", "LAPIC");
+
+    // remove irq handlers
+    auto irq = arch::PerCpuInfo::get()->irqRegistry;
+    irq->remove(kVectorSpurious);
 }
 
 
@@ -205,6 +221,24 @@ void LocalApic::updateTpr(const Irql irql) {
 
     //log("%p tpr: %02x", this, priority);
     this->write(kApicRegTaskPriority, priority);
+}
+
+/**
+ * Handle a received spurious IRQ. This just increments a counter.
+ */
+void LocalApic::irqSpurious() {
+    this->numSpurious++;
+
+    if(gLogSpurious) {
+        log("APIC %3u: spurious irq", this->id);
+    }
+}
+
+/**
+ * Acknowledges an interrupt.
+ */
+void LocalApic::eoi() {
+    this->write(kApicRegEndOfInt, 0);
 }
 
 

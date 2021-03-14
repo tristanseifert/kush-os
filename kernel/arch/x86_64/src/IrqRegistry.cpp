@@ -34,8 +34,6 @@ IrqRegistry::IrqRegistry(Idt *_idt) : idt(_idt) {
     memset(this->registrations, 0, sizeof(HandlerRegistration) * kNumVectors);
 
     // set up IDT entries
-    auto idt = arch::PerCpuInfo::get()->idt;
-
     for(size_t i = 0; i < kNumVectors; i++) {
         const auto vec = i + kVectorMin;
         idt->set(vec, (uintptr_t) kIrqStubTable[i], GDT_KERN_CODE_SEG, IDT_FLAGS_ISR,
@@ -48,7 +46,7 @@ IrqRegistry::IrqRegistry(Idt *_idt) : idt(_idt) {
  */
 void IrqRegistry::handle(const uintptr_t vector) {
     // ensure it's in bounds
-    REQUIRE(vector >= kVectorMin && vector <= kVectorMax, "invalid vector number: %u", vector);
+    REQUIRE(vector >= kVectorMin && vector <= kVectorMax, "invalid vector number: %3u", vector);
 
     // find and execute handler if installed
     const auto &handler = this->registrations[vector - kVectorMin];
@@ -59,6 +57,43 @@ void IrqRegistry::handle(const uintptr_t vector) {
     else {
         log("got irq %3u, but no handlers installed!", vector);
     }
+}
+
+/**
+ * Installs an irq handler.
+ */
+void IrqRegistry::install(const uintptr_t vector, Handler func, void *funcCtx, const bool replace) {
+    // validate vector number
+    REQUIRE(vector >= kVectorMin && vector <= kVectorMax, "invalid vector number: %3u", vector);
+    const auto idx = vector - kVectorMin;
+    auto &reg = this->registrations[idx];
+
+    if(!replace) {
+        REQUIRE(!reg.function, "refusing to replace vector %3u", vector);
+    }
+
+    // store it
+    __atomic_store(&reg.context, &funcCtx, __ATOMIC_RELAXED);
+    __atomic_store(&reg.function, &func, __ATOMIC_SEQ_CST);
+}
+
+/**
+ * Removes a previously installed irq handler.
+ */
+void IrqRegistry::remove(const uintptr_t vector) {
+    // validate vector number
+    REQUIRE(vector >= kVectorMin && vector <= kVectorMax, "invalid vector number: %3u", vector);
+    const auto idx = vector - kVectorMin;
+    auto &reg = this->registrations[idx];
+
+    REQUIRE(reg.function, "no handler for vector %3u, but removal requested", vector);
+
+    // zero it out
+    Handler nullHandler = reinterpret_cast<Handler>(NULL);
+    void *nullPtr = nullptr;
+
+    __atomic_store(&reg.function, &nullHandler, __ATOMIC_SEQ_CST);
+    __atomic_store(&reg.context, &nullPtr, __ATOMIC_RELAXED);
 }
 
 

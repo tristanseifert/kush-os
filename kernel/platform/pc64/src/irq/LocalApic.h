@@ -1,6 +1,8 @@
 #ifndef PLATFORM_PC64_IRQ_LOCALAPIC_H
 #define PLATFORM_PC64_IRQ_LOCALAPIC_H
 
+#include "../timer/ApicTimer.h"
+
 #include <platform.h>
 
 #include <stddef.h>
@@ -20,6 +22,9 @@ namespace platform {
  * necessary interfaces for the core-local timers.
  */
 class LocalApic {
+    friend void ApicSpuriousIrq(const uintptr_t, void *);
+    friend class ApicTimer;
+
     public:
         /// NMI interrupt vector
         constexpr static const uint8_t kVectorNMI = 0xDF;
@@ -30,10 +35,22 @@ class LocalApic {
         LocalApic(const uintptr_t lapicId, const uintptr_t cpuId, const uintptr_t phys);
         ~LocalApic();
 
+        /// Return the core-local timer
+        inline ApicTimer *getTimer() {
+            return this->timer;
+        }
+        /// Sets the task priority register
         void updateTpr(const Irql irql);
 
         /// Return the current core's LAPIC
         static LocalApic *the();
+        /// Return the current core's LAPIC timer
+        static ApicTimer *theTimer() {
+            return the()->getTimer();
+        }
+
+        /// Signals the end of interrupt to the APIC. This should be called at the end of all ISRs.
+        void eoi();
 
     private:
         /// Writes the given APIC register.
@@ -57,6 +74,9 @@ class LocalApic {
         /// Enable the APIC
         void enable();
 
+        /// Handles a received spurious irq.
+        void irqSpurious();
+
     private:
         // XXX: this should go somewhere better than being duplicated everywhere...
         /// Base address of the physical memory identity mapping zone
@@ -66,6 +86,8 @@ class LocalApic {
         static bool gLogInit;
         /// whether reads/writes to LAPIC registers are logged
         static bool gLogRegIo;
+        /// whether spurious IRQs are logged
+        static bool gLogSpurious;
 
     private:
         /// ID of this local APIC
@@ -75,6 +97,11 @@ class LocalApic {
 
         /// VM mapping of the phys base
         vm::MapEntry *vmEnt = nullptr;
+        /// APIC timer
+        ApicTimer *timer = nullptr;
+
+        /// number of received spurious IRQs
+        uintptr_t numSpurious = 0;
 };
 }
 

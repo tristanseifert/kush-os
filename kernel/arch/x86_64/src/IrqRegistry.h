@@ -31,7 +31,7 @@ class IrqRegistry {
         /// Creates an IRQ registry for the processor with the given IDT.
         IrqRegistry(Idt *idt);
         /// Installs a handler for the given vector number.
-        void install(const uintptr_t vector, Handler h, void *handlerCtx);
+        void install(const uintptr_t vector, Handler h, void *handlerCtx, const bool replace = false);
         /// Removes a previously installed handler for the given vector number.
         void remove(const uintptr_t vector);
 

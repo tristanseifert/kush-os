@@ -55,7 +55,7 @@ Idt::Idt() {
 void Idt::set(const size_t entry, const uintptr_t function, const uintptr_t segment, const uintptr_t flags, const Stack stack) {
     REQUIRE(entry < kNumIdt, "IDT index out of bounds: %u", entry);
 
-    if(gLogSet) log("IDT %p index %2u: addr %016llx segment %04x flags %08x stack %u", this, entry,
+    if(gLogSet) log("IDT %p index %3u: addr $%016llx segment %04x flags %02x stack %u", this, entry,
             function, segment, flags, (uint8_t) stack);
 
     this->storage[entry].offset1 = function & 0xFFFF;

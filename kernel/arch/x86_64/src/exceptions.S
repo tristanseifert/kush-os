@@ -18,10 +18,10 @@
  * TODO: fix this
  */
 .macro MaybeSwapGs off
-/*    cmpq        $GDT_KERN_CODE_SEG, \off(%rsp)
+    cmpq        $GDT_KERN_CODE_SEG, \off(%rsp)
     je          1f
     swapgs
-1:*/
+1:
 .endm
 
 /// divide-by-zero

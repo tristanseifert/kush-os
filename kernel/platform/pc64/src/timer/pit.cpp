@@ -6,6 +6,8 @@
 
 using namespace platform::timer;
 
+bool LegacyPIT::gLogConfig = false;
+
 /**
  * Disables the legacy 8254 programmable timer. Most BIOSes will configure this on bootup to be
  * enabled on channel 0.
@@ -32,21 +34,19 @@ void LegacyPIT::disable() {
  *
  * @return Number of picoseconds that we actually slept for
  */
-uint64_t LegacyPIT::configBusyWait(const uint32_t micros) {
+uint64_t LegacyPIT::configBusyWait(const uint64_t micros) {
     uint16_t reload = 0xFFFF;
 
     // calculate the reload value
-    static const double nsPerCount = 838.0953445668707;
-    const double desiredNs = ((double) micros) * 1000.;
+    static const uint64_t psPerCount = 838.0953445668707 * 1000;
+    const uint64_t desiredPs = micros * 1000 * 1000;
 
-    const auto count = desiredNs / nsPerCount;
-    const auto intCount = (uint32_t) (count);
+    const auto count = desiredPs / psPerCount;
+    const auto actualPicos = (psPerCount * count);
 
-    const auto actualMicros = (nsPerCount * intCount) / 1000.;
-
-    //log("count %g int %lu actual time %g", count, intCount, actualMicros);
-    REQUIRE(intCount <= 0xFFFF, "frequency too high");
-    reload = intCount;
+    if(gLogConfig) log("count %lu actual time %lu ps", count, actualPicos);
+    REQUIRE(count <= 0xFFFF, "frequency too high");
+    reload = count;
 
     // set gate input low
     const auto temp = io_inb(kTimerIoPort);
@@ -60,14 +60,14 @@ uint64_t LegacyPIT::configBusyWait(const uint32_t micros) {
     io_outb(kCh2DataPort, (reload & 0xFF00) >> 8);
 
     // return the actual number of microseconds we'll sleep
-    return static_cast<uint64_t>(actualMicros * 1000. * 1000.);
+    return actualPicos;
 }
 
 
 /**
  * Performs the previously configured busy wait.
  */
-void LegacyPIT::busyWait() {
+bool LegacyPIT::busyWait() {
     uint16_t count = 0, lastCount = 0;
     size_t iterations = 0;
 
@@ -89,14 +89,17 @@ void LegacyPIT::busyWait() {
             iterations++;
             if(iterations >= 2) {
                 log("PIT timing missed loop!");
+                return false;
             }
         }
         lastCount = count;
 
         // exit if the count is 0 or 0xFFFF
-        if(!count || count == 0xFFFF) return;
+        if(!count || count == 0xFFFF) goto beach;
     }
 
+beach:;
     // disable the channel
     io_outb(kCommandPort, 0b10111000);
+    return true;
 }
