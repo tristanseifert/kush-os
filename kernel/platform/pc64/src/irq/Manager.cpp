@@ -1,5 +1,6 @@
 #include "Manager.h"
 #include "LocalApic.h"
+#include "IoApic.h"
 
 #include "acpi/Parser.h"
 
@@ -32,6 +33,25 @@ void IrqManager::Init() {
 void IrqManager::InitSystemControllers() {
     REQUIRE(gShared, "IrqManager not initialized");
 
+    // find all IOAPIC entries
+    auto madt = AcpiParser::the()->apicInfo;
+
+    for(const AcpiParser::MADT::RecordHdr *record = madt->records;
+            ((uintptr_t) record) < ((uintptr_t) madt + madt->head.length);
+            record = (AcpiParser::MADT::RecordHdr *) ((uintptr_t) record + record->length)) {
+        // per ACPI spec, ignore all > 8
+        if(record->type > 8) continue;
+
+        switch(record->type) {
+            // Global IOAPIC
+            case 1:
+                gShared->initIoApic(reinterpret_cast<const AcpiParser::MADT::IoApic *>(record));
+                break;
+
+            default:
+                break;
+        }
+    }
 }
 
 /**
@@ -59,12 +79,14 @@ void IrqManager::InitCoreLocalController() {
 
         switch(record->type) {
             // processor local APIC
-            case 0:
+            case 0: {
                 // check ID
-                if(reinterpret_cast<const AcpiParser::MADT::LocalApic *>(record)->apicId != id)
+                auto info = reinterpret_cast<const AcpiParser::MADT::LocalApic *>(record);
+                if(info->apicId != id)
                     break;
                 // ID matches, so configure it
-                return gShared->initLapic(lapicPhys, id, record);
+                return gShared->initLapic(lapicPhys, id, info);
+            }
 
             default:
                 break;
@@ -77,6 +99,16 @@ void IrqManager::InitCoreLocalController() {
 }
 
 /**
+ * Initializes an IOAPIC shared among all processors in the system.
+ *
+ * @param record Pointer to the IOAPIC ACPI record
+ */
+void IrqManager::initIoApic(const AcpiParser::MADT::IoApic *info) {
+    auto ioapic = new IoApic(info->ioApicPhysAddr, info->irqBase, info->apicId);
+    this->ioapics.push_back(ioapic);
+}
+
+/**
  * Sets up a local APIC for the processor, given a MADT LAPIC record.
  *
  * @note You must be executing on the core whose APIC ID you specify.
@@ -85,9 +117,8 @@ void IrqManager::InitCoreLocalController() {
  * @param cpu Local APIC ID of the processor
  * @param record Pointer to an ACPI MADT record, which is the LocalApic type
  */
-void IrqManager::initLapic(const uintptr_t lapicPhys, const uintptr_t cpu, const void *record) {
-    auto info = reinterpret_cast<const AcpiParser::MADT::LocalApic *>(record);
-
+void IrqManager::initLapic(const uintptr_t lapicPhys, const uintptr_t cpu,
+        const AcpiParser::MADT::LocalApic *info) {
     // create the local APIC
     auto lapic = new LocalApic(info->apicId, info->cpuId, lapicPhys);
 

@@ -16,8 +16,8 @@ using namespace platform;
 AcpiParser *AcpiParser::gShared = nullptr;
 bool AcpiParser::gLogTables = false;
 bool AcpiParser::gLogLapic = false;
-bool AcpiParser::gLogIoapic = true;
-bool AcpiParser::gLogApicRoutes = true;
+bool AcpiParser::gLogIoapic = false;
+bool AcpiParser::gLogApicRoutes = false;
 
 /**
  * Allocate the shared ACPI parser.

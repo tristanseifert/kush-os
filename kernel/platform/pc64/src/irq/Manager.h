@@ -4,7 +4,13 @@
 #include <bitflags.h>
 #include <stdint.h>
 
+#include <runtime/Vector.h>
+
+#include "../acpi/Parser.h"
+
 namespace platform {
+class IoApic;
+
 /**
  * Flags for interrupts
  */
@@ -53,11 +59,17 @@ class IrqManager {
         }
 
     private:
-        void initLapic(const uintptr_t lapicPhys, const uintptr_t cpuId, const void *record);
+        void initIoApic(const AcpiParser::MADT::IoApic *record);
+        void initLapic(const uintptr_t lapicPhys, const uintptr_t cpuId,
+                const AcpiParser::MADT::LocalApic *record);
 
     private:
         /// global IRQ manager instance
         static IrqManager *gShared;
+
+    private:
+        /// IOAPICs in the system
+        rt::Vector<IoApic *> ioapics;
 };
 };
 

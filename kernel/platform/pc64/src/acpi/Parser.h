@@ -12,6 +12,7 @@ namespace platform {
 class AcpiParser {
     friend class IrqManager;
     friend class LocalApic;
+    friend class IoApic;
 
     public:
         /// Parses tables; should be called on BSP only
