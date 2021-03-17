@@ -126,3 +126,26 @@ void IrqManager::initLapic(const uintptr_t lapicPhys, const uintptr_t cpu,
     auto gs = arch::PerCpuInfo::get();
     gs->p.lapic = lapic;
 }
+
+
+/**
+ * Sets the mask state of the given system interrupt.
+ *
+ * @param vector System interrupt number to mask/unmask
+ * @param isMasked Whether the interrupt is to be masked or not.
+ */
+void IrqManager::setMasked(const uintptr_t vector, const bool isMasked) {
+    // vectors less than 256 correspond to a physical interrupt
+    if(vector < 0x100) {
+        // see if an IOAPIC handles it
+        for(auto ioapic : this->ioapics) {
+            if(!ioapic->handlesIrq(vector)) continue;
+
+            ioapic->setIrqMasked(vector, isMasked);
+            return;
+        }
+    }
+
+    // nobody handled this vector
+    panic("don't know how to %s irq %x", "mask", vector);
+}

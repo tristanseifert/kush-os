@@ -63,6 +63,9 @@ class IrqManager {
         void initLapic(const uintptr_t lapicPhys, const uintptr_t cpuId,
                 const AcpiParser::MADT::LocalApic *record);
 
+        // Masks or unmasks a system interrupt
+        void setMasked(const uintptr_t vector, const bool isMasked);
+
     private:
         /// global IRQ manager instance
         static IrqManager *gShared;

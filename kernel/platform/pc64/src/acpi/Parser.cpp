@@ -183,7 +183,6 @@ void AcpiParser::madtRecord(const MADT *table, const MADT::LocalApic *record) {
     const bool enabled = (record->flags & (1 << 0));
     const bool online = (record->flags & (1 << 1));
 
-    // TODO: implement
     if(gLogLapic) {
         log("Detected LAPIC: %p id %x cpu id %x enabled %c online %c", table->lapicAddr,
                 record->apicId, record->cpuId, enabled ? 'Y' : 'N', online ? 'Y' : 'N');
@@ -194,7 +193,6 @@ void AcpiParser::madtRecord(const MADT *table, const MADT::LocalApic *record) {
  * A system-wide IOAPIC (for handling external interrupts) is described in the record.
  */
 void AcpiParser::madtRecord(const MADT *, const MADT::IoApic *record) {
-    // TODO: implement
     if(gLogIoapic) {
         log("Detected IOAPIC: %p id %x IRQ base %3u", record->ioApicPhysAddr, record->apicId,
                 record->irqBase);
@@ -260,7 +258,6 @@ void AcpiParser::madtRecord(const MADT *, const MADT::IrqSourceOverride *record)
             panic("Unknown irq trigger mode: %x", trigger);
     }
 
-    // TODO: implement
     if(gLogApicRoutes) {
         log("IRQ override: bus %u irq %u system irq %u flags $%04x", record->busSource, record->irqSource,
                 record->systemIrq, flags);
