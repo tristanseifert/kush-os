@@ -256,6 +256,8 @@ static void CreateThreadEntryStub(uintptr_t _ctx) {
     const auto [pc, arg, sp] = *info;
     delete info;
 
+    log("entry stub %p: pc %p sp %p arg %p", _ctx, pc, sp, arg);
+
     // perform return to userspace
     thread->returnToUser(pc, sp, arg);
 }

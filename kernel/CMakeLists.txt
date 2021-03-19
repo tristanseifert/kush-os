@@ -39,6 +39,7 @@ add_executable(kernel
     src/vm/Mapper.cpp
     src/vm/Map.cpp
     src/vm/MapEntry.cpp
+    src/sched/GlobalState.cpp
     src/sched/Scheduler.cpp
     src/sched/Task.cpp
     src/sched/Thread.cpp

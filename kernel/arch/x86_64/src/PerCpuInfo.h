@@ -2,7 +2,7 @@
 #define ARCH_x86_64_PERCPUINFO_H
 
 #define PROCI_OFF_SYSCALL_STACK         (24)
-#define PROCI_OFF_PLATFORM              (48)
+#define PROCI_OFF_PLATFORM              (56)
 
 #ifndef ASM_FILE
 
@@ -11,6 +11,11 @@
 #if __has_include(<platform/CoreLocalInfo.h>)
 #include <platform/CoreLocalInfo.h>
 #endif
+
+namespace sched {
+class Scheduler;
+struct Thread;
+}
 
 namespace arch {
 class Idt;
@@ -34,6 +39,9 @@ struct ProcInfo {
     arch::Idt *idt = nullptr;
     /// interrupt registration (core specific)
     arch::IrqRegistry *irqRegistry = nullptr;
+
+    /// core local scheduler
+    sched::Scheduler *sched = nullptr;
 
     // platform specific info
 #if PLATFORM_WANTS_CORE_LOCAL
@@ -69,6 +77,13 @@ class PerCpuInfo {
         }
 
 };
+
+/**
+ * Returns a reference to the architecture per-processor info structure.
+ */
+static inline ProcInfo *GetProcLocal() {
+    return PerCpuInfo::get();
+}
 }
 
 #endif

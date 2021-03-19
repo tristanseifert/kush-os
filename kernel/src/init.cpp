@@ -48,7 +48,7 @@ void kernel_init() {
     arch_vm_available();
 
     // set up scheduler (platform code may set up threads)
-    sched::Scheduler::init();
+    sched::Scheduler::Init();
 
     // notify other components of VM availability
     platform_vm_available();

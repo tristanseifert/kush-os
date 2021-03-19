@@ -16,19 +16,19 @@ class IdleWorker;
 struct Task;
 
 /**
- * Scheduler is responsible for ensuring all runnable threads get CPU time. It does this by taking
- * threads from the head of each priority level's ready queue and running them until that queue is
- * empty, then continuing on to the queue of the next lowest priority, and so on.
+ * Provides multitasking abilities for multiple cores. Each scheduler handles the workload for a
+ * particular core, optionally stealing work from other cores if it becomes idle.
  *
- * In essence, the scheduler implements a round-robin scheduling scheme inside priority bands, but
- * ensures that a higher priority task will ALWAYS receive CPU time before a lower priority one.
+ * Internally, the scheduler can be described as a basic multi-level feedback queue. Each level of
+ * the queue has its own scheduling properties (quantum length and quantum expiration or sleep
+ * return levels) that are applied.
  *
- * Pre-emption works by having a tick handler that queues scheduler invocations and increments a
- * flag to indicate the number of ticks that took place. Likewise, unblocking threads will simply
- * add them to a queue and request a scheduler update.
+ * Additionally, there are global variables, such as the interval of periodic priority boosts, and
+ * the default priority of new threads.
  *
- * XXX: This will require a fair bit of re-architecting when we want to support multiprocessor
- *      machines. Probably making data structures shared is sufficient.
+ * Threads will always be preempted at the latest when the time quantum finishes up. Before we
+ * switch to a new thread, the timer is configured to fire either at the end of the time quantum,
+ * or when a registered timer expires.
  */
 class Scheduler {
     friend void ::kernel_init();
@@ -37,22 +37,8 @@ class Scheduler {
     friend struct Thread;
 
     public:
-        /// Defines the priority groups tasks can fall into
-        enum PriorityGroup: uint8_t {
-            Highest                         = 0,
-            AboveNormal                     = 1,
-            Normal                          = 2,
-            BelowNormal                     = 3,
-            Idle                            = 4,
-
-            kPriorityGroupMax
-        };
-
-    public:
         // return the shared scheduler instance
-        static Scheduler *get() {
-            return gShared;
-        }
+        static Scheduler *get();
 
         // return the thread running on the current processor
         Thread *runningThread() const {
@@ -62,49 +48,27 @@ class Scheduler {
         /// schedules all runnable threads in the given task
         void scheduleRunnable(Task *task);
         /// adds the given thread to the runnable queue
-        void markThreadAsRunnable(Thread *thread) {
-            this->markThreadAsRunnable(thread, false);
-        }
+        bool markThreadAsRunnable(Thread *thread, const bool shouldSwitch = true);
 
         /// Runs the scheduler.
         void run() __attribute__((noreturn));
         /// Yields the remainder of the current thread's CPU time.
-        void yield(const Thread::State state = Thread::State::Runnable) {
-            yield(nullptr, nullptr);
-        }
+        void yield(const Thread::State state = Thread::State::Runnable);
 
-        void registerTask(Task *task);
-        void unregisterTask(Task *task);
-        void iterateTasks(void (*callback)(Task *));
+        /// If the run queue has been dirtied, send a scheduler IPI
+        void lazyDispatch();
 
     private:
-        static void init();
-
-        // marks a thread as runnable, possibly by inserting it at the head of the run queue
-        void markThreadAsRunnable(Thread *thread, const bool atHead, const bool immediate = false);
+        static void Init();
+        static void InitAp();
 
         /// updates the current CPU's running thread
         void setRunningThread(Thread *t) {
             this->running = t;
         }
 
-        const PriorityGroup groupForThread(Thread *t, const bool withBoost = false) const;
-
-        void tickCallback();
-
         Scheduler();
         ~Scheduler();
-
-        void yield(const platform::Irql restoreIrql);
-        void yield(void (*willSwitch)(void*), void *willSwitchCtx = nullptr);
-
-        bool switchToRunnable(Thread *ignore = nullptr, bool requeueRunning = false,
-                void (*willSwitch)(void*) = nullptr, void *willSwitchCtx = nullptr);
-
-        bool handleDeferredUpdates();
-        void receivedDispatchIpi(const uintptr_t);
-
-        void removeThreadFromRunQueue(Thread *);
 
     private:
         /// Info on a thread that is runnable
@@ -121,22 +85,22 @@ class Scheduler {
         };
 
     private:
-        static Scheduler *gShared;
-
-    private:
         /// the thread that is currently being executed
         Thread *running = nullptr;
 
-        /// number of time ticks we have to handle for the next deferred update cycle
-        uintptr_t ticksToHandle = 0;
-
-        /// runnable threads (per priority band)
-        rt::Queue<Thread *> runnable[kPriorityGroupMax];
-        /// queue of threads that have become runnable
-        rt::Queue<RunnableInfo> newlyRunnable;
-
-        /// all active tasks
-        rt::List<Task *> tasks;
+        /**
+         * Whether the run queue has been modified. This is set whenever a new thread is made
+         * runnable. 
+         *
+         * This is used to perform a scheduler dispatch as needded at the end of interrupt
+         * routines. That way, the ISRs can just unconditionally call the `LazyDispatch()` method
+         * and we'll send a dispatch IPI if the run queue has changed.
+         *
+         * We'll clear this flag when we send an IPI, and when we otherwise take a trip into the
+         * dispatch machinery. (This covers the case where a thread is unblocked, but the caller's
+         * time quantum expires before a dispatch IPI can be generated.)
+         */
+        bool isDirty = false;
 
     public:
         /// idle worker

@@ -1,6 +1,7 @@
 #include "Task.h"
 #include "Thread.h"
 #include "Scheduler.h"
+#include "GlobalState.h"
 #include "IdleWorker.h"
 
 #include "ipc/Port.h"
@@ -76,10 +77,7 @@ Task::~Task() {
     RW_LOCK_WRITE_GUARD(this->lock);
 
     // remove from scheduler
-    Scheduler::get()->unregisterTask(this);
-
-    // invalidate the handle
-    handle::Manager::releaseTaskHandle(this->handle);
+    GlobalState::the()->unregisterTask(this);
 
     // terminate all remaining threads
     for(auto thread : this->threads) {
@@ -95,6 +93,9 @@ Task::~Task() {
     for(auto region : this->ownedRegions) {
         region->release();
     }
+
+    // invalidate the handle
+    handle::Manager::releaseTaskHandle(this->handle);
 
     if(this->ownsVm) {
         vm::Map::free(this->vm);

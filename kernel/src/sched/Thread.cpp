@@ -64,6 +64,8 @@ Thread::Thread(Task *_parent, const uintptr_t pc, const uintptr_t param, const b
     this->stack = mem::StackPool::get();
     REQUIRE(this->stack, "failed to get stack for thread %p", this);
 
+    log("new thread %p (%u) stack %p parent %p", this, this->tid, this->stack, this->task);
+
     // then initialize thread state
     arch::InitThreadState(this, pc, param);
 
@@ -222,8 +224,8 @@ void Thread::terminate(bool release) {
 
     CRITICAL_EXIT();
 
-    // ensure it's removed from run queues
-    Scheduler::get()->removeThreadFromRunQueue(this);
+    // TODO: ensure it's removed from run queues
+    // Scheduler::get()->removeThreadFromRunQueue(this);
 
     // if running, context switch away
     if(isRunning) {
@@ -342,8 +344,8 @@ void Thread::unblock(Blockable *b) {
     RW_UNLOCK_WRITE(&this->lock);
     CRITICAL_EXIT();
 
-    // queue in scheduler
-    Scheduler::get()->markThreadAsRunnable(this, true);
+    // TODO: queue in scheduler
+    // Scheduler::get()->markThreadAsRunnable(this, true);
 }
 
 
