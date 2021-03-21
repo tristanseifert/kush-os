@@ -103,5 +103,6 @@ void IrqRegistry::remove(const uintptr_t vector) {
  * turn invoke the appropriate handler, if one is installed.
  */
 void pc64_irq_entry(struct amd64_exception_info *info) {
+    log("irq %3u %p", info->errCode, info);
     arch::PerCpuInfo::get()->irqRegistry->handle(info->errCode);
 }

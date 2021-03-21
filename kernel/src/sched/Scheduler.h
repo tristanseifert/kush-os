@@ -37,6 +37,15 @@ class Scheduler {
     friend struct Thread;
 
     public:
+        /**
+         * Total number of levels the scheduler is configured for.
+         *
+         * Each level has its own run queue, which can be individually locked (to optimize the
+         * case where other cores steal work from us) as we try to find work.
+         */
+        constexpr static const size_t kNumLevels = 32;
+
+    public:
         // return the shared scheduler instance
         static Scheduler *get();
 
@@ -71,17 +80,19 @@ class Scheduler {
         ~Scheduler();
 
     private:
-        /// Info on a thread that is runnable
-        struct RunnableInfo {
-            /// When set, the thread should be inserted at the head of the runnable queue
-            bool atFront = false;
-            /// Pointer to thread
-            Thread *thread = nullptr;
+        /**
+         * Each level is made up of a queue (implemented as a doubly-linked list) and a lock that
+         * protects access to that queue.
+         *
+         * In most cases, this queue is accessed only by the core that owns this scheduler, so the
+         * locking should be a negligible overhead.
+         */
+        struct Level {
+            /// Lock for the queue
+            DECLARE_SPINLOCK(lock);
 
-            RunnableInfo() = default;
-            RunnableInfo(Thread *_thread) : atFront(false), thread(_thread) {}
-            RunnableInfo(Thread *_thread, const bool _atFront) : atFront(_atFront), 
-                thread(_thread) {}
+            /// List (treated as a queue) of runnable threads
+            rt::List<Thread *> storage;
         };
 
     private:
@@ -101,6 +112,9 @@ class Scheduler {
          * time quantum expires before a dispatch IPI can be generated.)
          */
         bool isDirty = false;
+
+        /// Each of the levels that may contain a thread to run
+        Level levels[kNumLevels];
 
     public:
         /// idle worker

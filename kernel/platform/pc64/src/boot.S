@@ -33,12 +33,6 @@ _osentry:
     cpuid
     shr         $24, %ebx
 
-    // clear segments
-    xor         %rax, %rax
-    //mov         %ax, %ds
-    //mov         %ax, %es
-    //mov         %ax, %ss
-
     // jump if not the boostrap processor
     cmpw        %bx, bootboot + 0xC
     jne         ap_start

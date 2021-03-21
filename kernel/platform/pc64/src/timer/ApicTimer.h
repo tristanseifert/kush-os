@@ -1,6 +1,7 @@
 #ifndef PLATFORM_PC64_TIMER_APICTIMER_H
 #define PLATFORM_PC64_TIMER_APICTIMER_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 namespace platform {
@@ -33,6 +34,9 @@ class ApicTimer {
         void measureTimerFreq();
 
     private:
+        /// Number of times we'll measure the APIC timer and average it
+        constexpr static const size_t kTimeAverages = 5;
+
         /// are the initializations of the timer logged?
         static bool gLogInit;
         /// are timer interval changes logged?

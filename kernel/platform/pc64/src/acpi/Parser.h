@@ -13,6 +13,7 @@ class AcpiParser {
     friend class IrqManager;
     friend class LocalApic;
     friend class IoApic;
+    friend class Hpet;
 
     public:
         /// Parses tables; should be called on BSP only
@@ -234,6 +235,8 @@ class AcpiParser {
         static bool gLogIoapic;
         /// whether interrupt routings are logged
         static bool gLogApicRoutes;
+        /// whether found HPET tables are logged
+        static bool gLogHpet;
 
     private:
         /// Physical base address
@@ -241,6 +244,8 @@ class AcpiParser {
 
         /// Location of the MADT
         const MADT *apicInfo = nullptr;
+        /// Location of the first HPET table
+        const HPET *hpetInfo = nullptr;
 };
 };
 

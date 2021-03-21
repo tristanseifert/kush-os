@@ -140,6 +140,10 @@ void Scheduler::yield(const Thread::State state) {
 
 /**
  * Sends a dispatch IPI on the current core if the run queue has been dirtied.
+ *
+ * Since the scheduler structures can't be updated above the scheduler IRQL (such as from an
+ * interrupt context) any pending run queue insertions (which are stored in a separate queue) are
+ * processed by the scheduler in an IPI.
  */
 void Scheduler::lazyDispatch() {
     // exit if run queue is not dirty

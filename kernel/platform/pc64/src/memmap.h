@@ -1,6 +1,7 @@
 #ifndef PLATFORM_PC_MEMMAP_H
 #define PLATFORM_PC_MEMMAP_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 using namespace platform;

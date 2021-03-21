@@ -1,5 +1,5 @@
 #include "ApicTimer.h"
-#include "pit.h"
+#include "Hpet.h"
 #include "../irq/LocalApic.h"
 #include "../irq/ApicRegs.h"
 
@@ -11,14 +11,8 @@
 
 using namespace platform;
 
-bool ApicTimer::gLogInit = false;
-bool ApicTimer::gLogSet = false;
-
-/**
- * Since we have only one PIT, but multiple APICs (if there's many cores) we need to be sure that
- * only one core is using it to calculate the APIC tick frequency at a time.
- */
-DECLARE_SPINLOCK_S(gPitLock);
+bool ApicTimer::gLogInit        = true;
+bool ApicTimer::gLogSet         = false;
 
 
 /**
@@ -77,47 +71,45 @@ void ApicTimer::fired() {
 }
 
 /**
- * Measure the timer frequency against the legacy PIT.
- *
- * XXX: We should ensure the PIT actually exists before doing this. Alternatively, it may be better
- * to use the HPET.
- *
- * XXX: This code uses floating-point math; you probably shouldn't call this once the kernel is
- * running unless you take responsibility for saving and restoring all of the floating point state
- * around this method call.
+ * Measure the timer frequency against the system HPET. This is done a configurable number of times
+ * then averaged.
  */
 void ApicTimer::measureTimerFreq() {
-    // prepare the timer to use a 16x divider
+    // prepare the timer to use a 16x divider and set up our averages
     this->parent->write(kApicRegTimerDivide, 0b0011);
 
-    // configure PIT
-    SPIN_LOCK_GUARD(gPitLock);
+    uint64_t ps[kTimeAverages] {0};
 
-again:;
-    const auto actualPicos = timer::LegacyPIT::configBusyWait(10000);
+    // measure the timer N number of tim es (for 10ms each time)
+    for(size_t i = 0; i < kTimeAverages; i++) {
+        // start APIC timer and wait
+        this->parent->write(kApicRegTimerInitial, 0xFFFFFFFF); // initial counter is -1
+        const auto actualPicos = Hpet::the()->busyWait(1000ULL * 1000ULL * 10) * 1000ULL;
 
-    // start APIC timer, wait on PIT to elapse 10ms
-    this->parent->write(kApicRegTimerInitial, 0xFFFFFFFF); // initial counter is -1
-    const bool yes = timer::LegacyPIT::busyWait(); // TODO: ensure this did not fail
+        // stop APIC timer and read out its tick value
+        const auto currentTimer = this->parent->read(kApicRegTimerCurrent);
+        this->parent->write(kApicRegTimerInitial, 0);
 
-    // stop APIC timer and read out its tick value
-    const auto currentTimer = this->parent->read(kApicRegTimerCurrent);
-    this->parent->write(kApicRegTimerInitial, 0);
+        const auto ticksPerTime = 0xFFFFFFFF - currentTimer;
 
-    if(!yes) goto again;
+        // store the iteration's picosecond value
+        ps[i] = actualPicos / ticksPerTime;
+    }
 
-    const auto ticksPerTime = 0xFFFFFFFF - currentTimer;
+    // calculate average picosecond value (and frequency)
+    uint64_t psAvg = 0;
+    for(size_t i = 0; i < kTimeAverages; i++) {
+        psAvg += ps[i];
+    }
 
-    // calculate the time a tick takes
-    const uint64_t psPerTick = actualPicos / ticksPerTime;
-    const uint64_t psPerClock = psPerTick / 16;
+    this->psPerTick = psAvg / kTimeAverages;
 
-    this->psPerTick = psPerTick;
+    const uint64_t psPerClock = this->psPerTick / 16;
     this->freq = (1000000000000 / psPerClock);
 
     if(gLogInit) {
-        log("APIC timer %3u: %lu ticks, %lu ps per tick freq %lu Hz", this->parent->id,
-                ticksPerTime, psPerTick, this->freq);
+        log("APIC timer %3u: %lu ps per tick (avg) freq %lu Hz", this->parent->id,
+                psPerTick, this->freq);
     }
 }
 

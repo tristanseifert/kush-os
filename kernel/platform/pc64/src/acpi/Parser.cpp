@@ -14,10 +14,11 @@ extern "C" BOOTBOOT bootboot;
 using namespace platform;
 
 AcpiParser *AcpiParser::gShared = nullptr;
-bool AcpiParser::gLogTables = false;
-bool AcpiParser::gLogLapic = false;
-bool AcpiParser::gLogIoapic = false;
+bool AcpiParser::gLogTables     = false;
+bool AcpiParser::gLogLapic      = false;
+bool AcpiParser::gLogIoapic     = false;
 bool AcpiParser::gLogApicRoutes = false;
+bool AcpiParser::gLogHpet       = false;
 
 /**
  * Allocate the shared ACPI parser.
@@ -101,8 +102,17 @@ void AcpiParser::foundTable(const uintptr_t physAddr) {
  * contained in the table.
  */
 void AcpiParser::parse(const HPET *table) {
-    log("HPET rev %d; have %d %d-bit comparators (HPET num %u) min tick %u protection %02x "
-            "address %p (addr space %d, reg width %d, offset %d)",
+    // store it if this is the first HPET
+    if(!this->hpetInfo) {
+        this->hpetInfo = table;
+    } 
+    // XXX: can systems have multiple HPETs? we'll ignore the later ones
+    else {
+        log("Ignoring HPET (rev %d) at %p", table->hwRev, table->address.physAddr);
+    }
+
+    if(gLogHpet) log("HPET rev %d; have %d %d-bit comparators (HPET num %u) min tick %u "
+            "protection %02x address %p (addr space %d, reg width %d, offset %d)",
             table->hwRev, table->numComparators, table->counter64 ? 64 : 32, table->hpetNo,
             table->minTick, table->pageProtection,
             table->address.physAddr, (int) table->address.spaceId, table->address.regWidth,

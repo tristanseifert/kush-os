@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-namespace platform { namespace timer {
+namespace platform {
 /**
  * Provides a very basic intercace to the legacy PIT on the PC platform.
  *
@@ -32,11 +32,7 @@ class LegacyPIT {
 
     public:
         static void disable();
-
-        /// Returns the number of picoseconds the actual wait was for
-        static uint64_t configBusyWait(const uint64_t micros);
-        static bool busyWait();
 };
-}}
+}
 
 #endif

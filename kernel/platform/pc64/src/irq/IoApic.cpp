@@ -21,8 +21,8 @@ using namespace platform;
 // low 32 bits of a redirection entry register
 #define IOAPICREDTBL(n)                 (0x10 + (2 * n))
 
-bool IoApic::gLogInit = true;
-bool IoApic::gLogSet = true;
+bool IoApic::gLogInit   = false;
+bool IoApic::gLogSet    = false;
 
 /**
  * Creates and initializes a new IOAPIC controller.
