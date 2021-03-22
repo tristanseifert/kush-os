@@ -3,16 +3,6 @@
 #include <log.h>
 
 /**
- * Gets the current system timestamp.
- *
- * System time is kept as the number of nanoseconds since boot-up.
- */
-uint64_t platform_timer_now() {
-    // TODO: implement
-    return 0;
-}
-
-/**
  * Registers a new timer callback.
  *
  * The given function is invoked at (or after -- there is no guarantee made as to the resolution of

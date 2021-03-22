@@ -4,6 +4,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "Timer.h"
+
+#include <platform.h>
 #include <log.h>
 
 namespace vm {
@@ -14,7 +17,7 @@ namespace platform {
 /**
  * Implements the high-performance event timer, which is used as the global system timebase.
  */
-class Hpet {
+class Hpet: public Timer {
     public:
         /// Reads ACPI tables and initialize the system HPET.
         static void Init();
@@ -24,12 +27,22 @@ class Hpet {
         }
 
         /// Converts timer ticks into nanoseconds
-        uint64_t ticksToNs(const uint64_t ticks);
+        uint64_t ticksToNs(const uint64_t ticks) const;
         /// Converts nanoseconds to timer ticks
-        uint64_t nsToTicks(const uint64_t nsec, uint64_t &actualNsec);
+        uint64_t nsToTicks(const uint64_t nsec, uint64_t &actualNsec) const;
 
         /// Performs a busy wait for the given time using the HPET as a reference.
         uint64_t busyWait(const uint64_t nsec);
+
+        /// Returns the current timer value.
+        inline uint64_t getCount() const {
+            return *reinterpret_cast<volatile uint64_t *>(
+                    reinterpret_cast<uintptr_t>(base) + kRegCount);
+        }
+        /// Returns ticks since the HPET was initialized.
+        inline uint64_t ticksSinceInit() const {
+            return this->getCount() - this->countOffset;
+        }
 
     private:
         Hpet(const uintptr_t physBase, const void *table);
@@ -51,12 +64,6 @@ class Hpet {
             auto ptr = reinterpret_cast<volatile uint64_t *>(
                     reinterpret_cast<uintptr_t>(base) + off);
             return *ptr;
-        }
-
-        /// Returns the current timer value.
-        inline uint64_t getCount() const {
-            return *reinterpret_cast<volatile uint64_t *>(
-                    reinterpret_cast<uintptr_t>(base) + kRegCount);
         }
 
     private:
@@ -86,7 +93,10 @@ class Hpet {
         size_t numTimers = 0;
         /// period of a single clock tick, in femtoseconds
         uint64_t period = 0;
+
+        /// HPET value at initialization
+        uint64_t countOffset = 0;
 };
-};
+}
 
 #endif

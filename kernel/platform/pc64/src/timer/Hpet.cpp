@@ -87,6 +87,8 @@ Hpet::Hpet(const uintptr_t phys, const void *table) {
 
     const auto time2 = this->getCount();
     REQUIRE(time2 > time1, "HPET is broken: %u %u", time1, time2);
+
+    this->countOffset = this->getCount();
 }
 
 /**
@@ -135,7 +137,7 @@ uint64_t Hpet::busyWait(const uint64_t nsec) {
  * femtoseconds that fit in a 64-bit quantity. In the future, it may be worth doing 128-bit math,
  * though that depends on the compiler built-in libraries.
  */
-uint64_t Hpet::ticksToNs(const uint64_t ticks) {
+uint64_t Hpet::ticksToNs(const uint64_t ticks) const {
     uint64_t fs = ticks;
     fs *= static_cast<uint64_t>(this->period);
 
@@ -148,7 +150,7 @@ uint64_t Hpet::ticksToNs(const uint64_t ticks) {
  *
  * As with `ticksToNs()`, this is only good for up to about five hour waits.
  */
-uint64_t Hpet::nsToTicks(const uint64_t desiredNs, uint64_t &actualNs) {
+uint64_t Hpet::nsToTicks(const uint64_t desiredNs, uint64_t &actualNs) const {
     const uint64_t desiredFs = (desiredNs * 1000ULL * 1000ULL);
     const auto desiredTicks = desiredFs / static_cast<uint64_t>(this->period);
 
@@ -156,3 +158,19 @@ uint64_t Hpet::nsToTicks(const uint64_t desiredNs, uint64_t &actualNs) {
 
     return desiredTicks;
 }
+
+
+/**
+ * Uses the HPET to get the nanoseconds since boot.
+ *
+ * XXX: This is pretty slow; we should be using the TSC if at all possible instead.
+ */
+uint64_t platform_timer_now() {
+    auto hpet = Hpet::the();
+    if(hpet) [[likely]] {
+        return hpet->ticksToNs(hpet->ticksSinceInit());
+    }
+
+    return 0;
+}
+

@@ -23,6 +23,7 @@ add_library(kernel_platform_pc64 OBJECT
     src/irq/Idle.cpp
     src/timer/ApicTimer.cpp
     src/timer/Hpet.cpp
+    src/timer/Tsc.cpp
     src/timer/Registry.cpp
     src/timer/pit.cpp
     src/init/LoadRootsrv.cpp

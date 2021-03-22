@@ -7,6 +7,7 @@
 #include "irq/Manager.h"
 #include "timer/Hpet.h"
 #include "timer/pit.h"
+#include "timer/Tsc.h"
 
 #include <bootboot.h>
 #include <stdint.h>
@@ -41,10 +42,15 @@ void platform_init() {
 void platform_vm_available() {
     AcpiParser::Init();
 
+    // set up the system timer and BSP TSC
     Hpet::Init();
+    Tsc::InitCoreLocal();
 
+    // then, set up the interrupt controllers (both system and BSP local)
     IrqManager::InitSystemControllers();
     IrqManager::InitCoreLocalController();
 
-    // start all APs
+    // prepare stacks, per core info, etc. for all APs
+
+    // signal APs to start and wait
 }
