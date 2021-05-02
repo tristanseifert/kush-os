@@ -1,6 +1,8 @@
 #include "Heap.h"
 
 #include <arch.h>
+#include <arch/spinlock.h>
+
 #include <log.h>
 
 #include "mem/PhysicalAllocator.h"
@@ -17,6 +19,9 @@ bool Heap::gLogMmap = true;
 
 /// base address at which heap allocations begin
 uintptr_t Heap::gVmBase = Heap::kHeapStart;
+
+/// Heap lock (to protect access to mem map)
+DECLARE_SPINLOCK_S(gHeapLock);
 
 /**
  * Initializes the heap.
@@ -105,6 +110,12 @@ void Heap::freeBulk(void **ptrs, const size_t numPtr) {
  * We cannot allocate any memory here, so we have to manually acquire the required pages of
  * physical memory and yeet them directly into the page tables. In the future, this should be
  * optimized to fault pages in later.
+ *
+ * TODO: We really need some sort of scratch space to store physical pages we allocate into; the
+ * stack worked for small allocations but this can quickly get out of control. We can't use the
+ * heap to allocate memory - do we maybe allocate a page to store this temporary array and fail any
+ * allocations that require more than the number of page addresses we can fit? Are there any legit
+ * use cases for such large kernel heap allocations?
  */
 void *Heap::fakeMmap(const size_t len) {
     using namespace vm;
@@ -121,14 +132,17 @@ void *Heap::fakeMmap(const size_t len) {
         numPages++;
     }
 
+    SPIN_LOCK_GUARD(gHeapLock);
+
     // ensure we've sufficient VM space
     if((gVmBase + (numPages * pageSz)) >= kHeapEnd) {
+        // TODO: wrap back around and find a page?
         return nullptr;
     }
 
     // then perform the allocation
-    uint64_t pages[numPages];
-    memset(pages, 0, sizeof(uint64_t) * numPages);
+    //uint64_t pages[numPages];
+    //memset(pages, 0, sizeof(uint64_t) * numPages);
 
     for(size_t i = 0; i < numPages; i++) {
         // get the physical page
@@ -137,7 +151,7 @@ void *Heap::fakeMmap(const size_t len) {
             if(gLogMmap) log("failed to allocate phys page for heap");
             goto fail;
         }
-        pages[i] = page;
+        //pages[i] = page;
 
         // map it
         const auto virt = gVmBase + (i * pageSz);
@@ -160,9 +174,10 @@ void *Heap::fakeMmap(const size_t len) {
 
 fail:;
     // failure case: release all physical pages
+    // TODO: This is currently broken as it has too large a stack space demand
     for(size_t i = 0; i < numPages; i++) {
-        if(!pages[i]) continue;
-        mem::PhysicalAllocator::free(pages[i]);
+        //if(!pages[i]) continue;
+        //mem::PhysicalAllocator::free(pages[i]);
     }
 
     // XXX: remove any VM mappings that were added too
@@ -177,8 +192,49 @@ fail:;
  */
 int Heap::fakeMunmap(const void *base, const size_t len) {
     int err = -1;
+    auto vm = vm::Map::kern();
+    size_t freed = 0;
 
+    // basic error checking
+    uintptr_t addr = reinterpret_cast<uintptr_t>(base);
+    if((addr + len) >= kHeapEnd || addr < kHeapStart) {
+        return -1;
+    }
+
+    // determine the number of pages to unmap
+    const size_t pageSz = arch_page_size();
+    size_t numPages = len / pageSz;
+    if(len % pageSz) {
+        numPages++;
+    }
+    addr &= ~pageSz;
+
+    // unmap the physical pages and release them
+    SPIN_LOCK_GUARD(gHeapLock);
+
+    for(size_t i = 0; i < numPages; i++) {
+        uint64_t phys;
+        const uintptr_t virt = (addr + (i * pageSz));
+
+        // read the page table entry
+        err = vm->get(virt, phys);
+        if(err == 1) continue; // no mapping
+        else if(err < 0) goto beach; // error
+
+        // there exists a mapping, so unmap and remove it
+        err = vm->remove(virt, pageSz);
+        if(err) goto beach;
+
+        phys &= ~pageSz; // XXX: is this needed?
+        mem::PhysicalAllocator::free(phys);
+        freed++;
+    }
+
+    // if we get here, all pages were cleaned up
+    err = 0;
+
+beach:;
     // done
-    if(gLogMmap) log("munmap(%p, %u) = %d", base, len, err);
+    if(gLogMmap) log("munmap(%p, %u) = %d (freed %llu)", base, len, err, freed);
     return err;
 }

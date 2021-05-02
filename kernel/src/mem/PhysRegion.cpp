@@ -16,6 +16,7 @@ bool PhysRegion::gLogAlloc = false;
 bool PhysRegion::gLogFree = false;
 bool PhysRegion::gLogSplits = false;
 bool PhysRegion::gLogFixups = false;
+bool PhysRegion::gLogSlabHeaderFree = false;
 
 /**
  * Return index of the most significant bit set in the given value.
@@ -680,7 +681,7 @@ bool PhysRegion::SlabHeader::free(Block *block) {
 
     // validate the address
     auto blockBase = reinterpret_cast<uintptr_t>(block);
-    const auto storageBase = reinterpret_cast<uintptr_t>(this->getStorage());
+    const uintptr_t storageBase = reinterpret_cast<uintptr_t>(this->getStorage());
     const uint64_t blockIdx = (blockBase - storageBase) / sizeof(Block);
     REQUIRE(!((blockBase - storageBase) % sizeof(Block)), "unaligned ptr: $%p", block);
 
@@ -689,11 +690,16 @@ bool PhysRegion::SlabHeader::free(Block *block) {
     }
 
     // test whether it's allocated
-    const auto entry = bitmap[blockIdx / 64];
-    const auto bit = (1ULL << (blockIdx % 64));
+    const size_t bitmapIdx = (blockIdx / 64);
+    const size_t bitmapBit = (blockIdx % 64);
 
-    /*log("free block %p idx %u bitmap %016llx %016llx %016llx", block, blockIdx, entry, bit,
-            entry & bit);*/
+    const uint64_t entry = bitmap[bitmapIdx];
+    const uint64_t bit = (1ULL << bitmapBit);
+
+    if(gLogSlabHeaderFree) {
+        log("free block %p idx %4u bitmap %016llx %016llx %016llx %4lu %4lu", block, blockIdx, 
+            entry, bit, entry & bit, bitmapIdx, bitmapBit);
+    }
 
     if(entry & bit) {
         panic("attempt to free $%p (idx %u) but is not marked as allocated", block, blockIdx);
@@ -701,7 +707,7 @@ bool PhysRegion::SlabHeader::free(Block *block) {
     }
 
     // it's allocated; release its memory and clear in bitmap
-    bitmap[blockIdx / 64] |= (1 << (blockIdx % 64));
+    bitmap[bitmapIdx] |= bit;
 
     block->~Block();
     memset(block, 0, sizeof(Block));

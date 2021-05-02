@@ -218,6 +218,8 @@ class PhysRegion {
         static bool gLogSplits;
         /// whether VM pointer fixups are logged
         static bool gLogFixups;
+        /// whether slab header free operations are logged
+        static bool gLogSlabHeaderFree;
 
     private:
         /// base address (physical) of this memory allocation region
