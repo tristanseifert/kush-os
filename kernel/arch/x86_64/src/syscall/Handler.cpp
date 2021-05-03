@@ -18,9 +18,6 @@ using namespace arch::syscall;
 char gSharedBuf[sizeof(Handler)] __attribute__((aligned(64)));
 Handler *Handler::gShared = nullptr;
 
-extern "C" char _binary_syscall_stub_start[], _binary_syscall_stub_end[];
-#define SIZE_OF_STUB (_binary_syscall_stub_end - _binary_syscall_stub_start)
-
 extern "C" void arch_syscall_entry();
 
 /// Total number of architecture-specific syscalls

@@ -177,6 +177,8 @@ struct Thread {
         /// When set, there are DPCs pending.
         bool dpcsPending = false;
 
+        /// size of the thread's kernel stack (in bytes)
+        size_t stackSize = 0;
         /// bottom of the kernel stack of this thread
         void *stack = nullptr;
 

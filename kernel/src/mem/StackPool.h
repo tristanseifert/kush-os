@@ -20,8 +20,13 @@ class StackPool {
 
     public:
         /// Allocates a new kernel stack, returning its bottom (base) address
+        static void *get(size_t &stackSize) {
+            return gShared->alloc(stackSize);
+        }
+        /// Allocates a new kernel stack, returning its bottom (base) address
         static void *get() {
-            return gShared->alloc();
+            size_t unused;
+            return gShared->alloc(unused);
         }
         /// Releases a previously allocated stack, given its base (bottom) address
         static void release(void *base) {
@@ -34,7 +39,7 @@ class StackPool {
         static void init();
 
         /// returns an available stack
-        void *alloc();
+        void *alloc(size_t &size);
         /// releases the given stack
         void free(void *base);
 

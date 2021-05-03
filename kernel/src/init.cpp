@@ -59,7 +59,7 @@ void kernel_init() {
  * takes place and we go into the scheduler.
  */
 void kernel_main() {
-    log("kush (%s) starting", gVERSION_SHORT);
+    log("kush (%s) starting", gVERSION_HASH);
 
     // kernel is initialized. launch the root server
     gRootServer = platform_init_rootsrv();

@@ -61,7 +61,7 @@ Thread::Thread(Task *_parent, const uintptr_t pc, const uintptr_t param, const b
     this->tid = nextTid++;
 
     // get a kernel stack
-    this->stack = mem::StackPool::get();
+    this->stack = mem::StackPool::get(this->stackSize);
     REQUIRE(this->stack, "failed to get stack for thread %p", this);
 
     log("new thread %p (%u) stack %p parent %p", this, this->tid, this->stack, this->task);

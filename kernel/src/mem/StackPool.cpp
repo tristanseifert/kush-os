@@ -43,7 +43,7 @@ StackPool::StackPool() {
  *
  * The topmost page of the kStackSize region is not mapped; it's a guard page between stacks.
  */
-void *StackPool::alloc() {
+void *StackPool::alloc(size_t &outSize) {
     int err;
     const auto pageSz = arch_page_size();
 
@@ -99,6 +99,7 @@ void *StackPool::alloc() {
 
         // clear the entire allocated stack region and return it
         memset((void *) (start + pageSz), 0, (kStackSize - pageSz));
+        outSize = (kStackSize - pageSz); // one page used for guard page
         return (void *) (start + kStackSize);
 
 failure:;

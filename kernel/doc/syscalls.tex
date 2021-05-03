@@ -35,7 +35,7 @@ This document describes the syscalls exported by the kernel. Each syscall is ide
 
 %%%%%%%%%%%%%%%
 \section{Calling Conventions}
-Each architecture may define a different calling convention for syscalls.
+Each architecture may define a different calling convention for syscalls. A commonality between all architectures, however, is the fact that system calls may receive up to six arguments. Not all arguments may be used for all system calls. Additionally, each system call can return an integer value, the width of which is at least equal to the machine's native width.
 
 \subsection{x86 (32-bit)}
 For kernel entry, the IA32 specific \texttt{SYSENTER} instruction should be used; specifically, the kernel syscall trampoline, mapped into all processes, should be used to perform the syscall. It performs some special handling to ensure the stack pointer can be restored as required (it copies the stack pointer to restore to the \texttt{\%esi} register, which the kernel will in turn restore that register to \texttt{\%ecx} before exiting from the syscall with \texttt{SYSEXIT}.
@@ -50,6 +50,11 @@ The entire memory range of \texttt{0xBF5F0000} to \texttt{0xBF5FFFFF}, inclusive
 	\memsection{bf5f dfff}{bf5f 2000}{4}{-- reseved --} \\
 	\memsection{bf5f 1fff}{bf5f 0000}{2}{System call \texttt{SYSENTER} stub}
 \end{bytefield}
+
+\subsection{\textsc{amd64} (x86 64-bit)}
+The \texttt{SYSCALL} instruction should be used inline to make a kernel call. Up to six arguments may be passed to the system call, in registers \texttt{\%rdi, \%rsi, \%rdx, \%r10, \%r8, \%r9}, in that order. This is similar to the standard System V ABI that is used for function calls on the system -- with the exception that the fourth argument goes in \texttt{\%r10} rather than \texttt{\%rcx}, which is clobbered by \texttt{SYSCALL}) allowing for minimum overhead. The system call number should be placed in \texttt{\%rax}.
+
+On return from the system call, \texttt{\%rax} contains the system call specific return value.
 
 %%%%%%%%%%%%%%%
 \section{Handles}
@@ -78,6 +83,20 @@ Encoded in each handle is an "object type," which identifies in which table the 
 \end{itemize}
 
 The epoch value is a monotonically increasing value; it starts off at zero the first time a handle is assigned, and is decremented every time a given handle index (for that particular object type) is re-assigned. This allows the kernel to detect stale handles.
+
+\subsection{64-bit Handles}
+Type values are identical to the 32-bit counterparts. Fields are simply extended to take up the whole 64 bit width:
+
+\begin{bytefield}[bitheight=\widthof{~Sign~},bitwidth=0.67em]{64} \\
+\bitheader[endianness=big]{0,31,32,51,52,55,56,62,63} \\
+\bitbox{1}{\rotatebox{90}{Sign}}
+\bitbox{7}{Reserved}
+\bitbox{4}{Type}
+\bitbox{20}{Epoch}
+\bitbox{32}{Object Table Index}
+\end{bytefield}
+
+It's guaranteed that the sign bit is always clear, and that at least one reserved bit continues to be zero so attempting to dereference a handle as a pointer will take a non-cannonical address fault on at least \textsc{amd64}.
 
 %%%%%%%%%%%%%%%
 \section{Syscalls}
@@ -265,7 +284,7 @@ Only the task that created a VM object can change its permissions. (More concret
 
 Resizes a previously allocated virtual memory region. The new size may be larger or smaller than the current size, but it must be a multiple of the platform's page size.
 
-Only the task that created a VM object can resize it.
+Only the task that created a VM object can resize it. Additionally, once a VM region has been mapped by more than one process, it cannot be resized.
 
 \begin{itemize}
 \item \texttt{1 << 0}: If the object represents an anonymous mapping, and the resize operation requires the allocation of additional physical memory, force that memory to be allocated eagerly. This call will fail if the system has insufficient physical memory available to satisfy the request.
@@ -277,9 +296,7 @@ Only the task that created a VM object can resize it.
 \textbf{Flags:} See below \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
-Maps the specified virtual memory object into the address space of the specified task, if possible; possible failure reasons include a conflicting mapping in the destination address space.
-
-If desired, a different base address can be specified where the region should be mapped in the destination task. Specify a value of \texttt{0} to map it at the base address specified when the mapping was created.
+Maps the specified virtual memory object into the address space of the specified task, if possible; possible failure reasons include a conflicting mapping in the destination address space. A page aligned base address must be specified.
 
 If any flags are specified at all, they are interpreted as a mask to be applied against the map's flags. For example, this can be used to map a page read-only into another task. The supported flags are:
 

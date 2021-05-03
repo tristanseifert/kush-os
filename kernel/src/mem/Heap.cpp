@@ -141,9 +141,6 @@ void *Heap::fakeMmap(const size_t len) {
     }
 
     // then perform the allocation
-    //uint64_t pages[numPages];
-    //memset(pages, 0, sizeof(uint64_t) * numPages);
-
     for(size_t i = 0; i < numPages; i++) {
         // get the physical page
         auto page = mem::PhysicalAllocator::alloc();
@@ -173,14 +170,25 @@ void *Heap::fakeMmap(const size_t len) {
     return ret;
 
 fail:;
-    // failure case: release all physical pages
-    // TODO: This is currently broken as it has too large a stack space demand
+    // failure case: release all physical pages and remove VM mapping
     for(size_t i = 0; i < numPages; i++) {
-        //if(!pages[i]) continue;
-        //mem::PhysicalAllocator::free(pages[i]);
+        uint64_t phys;
+        const uintptr_t virt = (gVmBase + (i * pageSz));
+
+        // read the page table entry
+        err = vm->get(virt, phys);
+        if(err == 1) continue; // no mapping
+        REQUIRE(err >= 0, "failed to %s (%d)", "read page table", err);
+
+        // there exists a mapping, so unmap and remove it
+        err = vm->remove(virt, pageSz);
+        REQUIRE(!err, "failed to %s (%d)", "unmap page", err);
+
+        phys &= ~pageSz; // XXX: is this needed?
+        mem::PhysicalAllocator::free(phys);
     }
 
-    // XXX: remove any VM mappings that were added too
+    if(gLogMmap) log("fakeMmap(%u) failed", len);
     return nullptr;
 }
 
