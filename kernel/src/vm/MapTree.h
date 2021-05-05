@@ -154,6 +154,23 @@ class MapTree {
         }
 
         /**
+         * Determines if the given region of [start, start+length) conflicts with any existing
+         * mappings in the tree.
+         *
+         * @param start Base virtual address of the region to test
+         * @param length Number of bytes in the virtual address region to check
+         * @param outNext Address of the end of the conflicting region
+         *
+         * @return Whether there were any mappings found that overlap the given range.
+         */
+        bool isRegionFree(const uintptr_t base, const size_t length, uintptr_t &outNext) {
+            auto leaf = this->findOverlapping(base, length, this->root);
+
+            outNext = leaf ? (leaf->address + leaf->size) : 0;
+            return leaf == nullptr;
+        }
+
+        /**
          * Inserts into the tree a new virtual memory object.
          *
          * @param address Virtual address for the base of the mapping
@@ -278,6 +295,28 @@ class MapTree {
                 // beyond the end of the node, so check the right subtree
                 return this->find(address, node->right);
             }
+        }
+
+        /**
+         * Finds the first mapping that overlaps the given range, if any.
+         * TODO: optimize to avoid visiting every node in the tree...
+         *
+         * @return Node corresponding to the first overlapping map, or `nullptr`
+         */
+        Leaf *findOverlapping(const uintptr_t base, const size_t length, Leaf *node) {
+            // bail if end of subtree
+            if(!node) return nullptr;
+
+            // does this node overlap the range?
+            else if(node->contains(base, length)) {
+                return node;
+            }
+
+            // recurse down the remainder of the tree
+            auto left = this->findOverlapping(base, length, node->left);
+            if(left) return left;
+
+            return this->findOverlapping(base, length, node->right);
         }
 
         /**

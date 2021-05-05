@@ -101,8 +101,9 @@ void MapEntry::free(MapEntry *ptr) {
 /**
  * Resize the VM object.
  *
- * TODO: most of this needs to be implemented. should we support resizing shared mappings? this
- * adds a whole lot of complexity...
+ * @note This does NOT update the size of the mapping windows in any dependant maps; if the entry
+ * is shrunk, however, any mapped pages beyond the cutoff will immediately be unmapped from all
+ * memory maps the entry occurs in.
  */
 int MapEntry::resize(const size_t newSize) {
     const auto pageSz = arch_page_size();
@@ -119,7 +120,7 @@ int MapEntry::resize(const size_t newSize) {
 
     // are we shrinking the region?
     if(this->length > newSize) {
-        // TODO: update mappings in all maps
+        // TODO: Remove mapped pages above cutoff from all tasks that map us
 
         // release all physical memory for pages above the cutoff
         this->length = newSize;
@@ -149,14 +150,6 @@ int MapEntry::resize(const size_t newSize) {
     }
     // no, it should be embiggened
     else {
-        // check that the new size doesn't cause conflicts in maps we belong to
-        for(auto &info : this->maps) {
-            if(!info.mapPtr->canResize(this, info.base, this->length, newSize)) {
-                return -1;
-            }
-        }
-
-        // if no conflicts, we're good to perform resize
         this->length = newSize;
         return 0;
     }

@@ -211,7 +211,10 @@ int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
  */
 int Map::add(MapEntry *entry, sched::Task *task, const uintptr_t requestedBase,
         const MappingFlags flagsMask, const uintptr_t searchStart, const uintptr_t searchEnd) {
+    uintptr_t nextFree;
+
     uintptr_t base = requestedBase;
+    const auto size = entry->length;
 
     // retain entry
     entry = entry->retain();
@@ -221,51 +224,44 @@ int Map::add(MapEntry *entry, sched::Task *task, const uintptr_t requestedBase,
 
     // test that the range of [base, base+length) does not overlap any existing mappings
     if(base) {
-        // TODO
+        if(this->entries.isRegionFree(base, size, nextFree)) {
+            goto success;
+        }
+
         goto fail;
     } 
     // find a large enough free space in the provided VM range
     else {
-        // TODO
+        base = searchStart;
+
+        while(base < (searchEnd - size)) {
+            // test for overlapping
+            if(this->entries.isRegionFree(base, size, nextFree)) {
+                goto success;
+            }
+
+            // not free so increase past end of region
+            base = nextFree;
+        }
+
+        // failed to find a large enough space
         goto fail;
     }
 
+success:;
     // the mapping doesn't overlap, so add it
-    this->entries.insert(base, entry->length, entry);
+    this->entries.insert(base, size, entry);
     RW_UNLOCK_WRITE(&this->lock);
 
     entry->addedToMap(this, task, base, flagsMask);
     return 0;
 
 fail:;
-    // ensure we release the lock on failure
+    // release lock and decrement entry retain count
     RW_UNLOCK_WRITE(&this->lock);
 
-    // we don't wnat to add the map
     entry->release();
     return -1;
-}
-
-/**
- * Tests if the new size for the given map entry will cause any conflicts with existing mappings.
- *
- * In effect, this takes the region of [base+length, base+newlength] and checks if there exist any
- * mappings in thatspace.
- */
-bool Map::canResize(MapEntry *entry, const uintptr_t base, const size_t oldSize, const size_t newSize) {
-    // we can always support shrinking
-    if(newSize <= oldSize) return true;
-
-    // get the new range to check
-    // const auto newBase = base + oldSize;
-    // const auto sizeDiff = newSize - oldSize;
-
-    // log("Old region: %08x -> %08x; new region to test %08x - %08x", base, base+oldSize, base+oldSize, base+newSize);
-
-    RW_LOCK_READ_GUARD(this->lock);
-
-    // TODO: implement
-    return false;
 }
 
 /**

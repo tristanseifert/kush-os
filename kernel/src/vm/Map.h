@@ -97,10 +97,6 @@ class Map {
         /// Page fault handler
         bool handlePagefault(const uintptr_t virtAddr, const bool present, const bool write);
 
-        /// Tests whether the given map entry can be expanded in this map without causing conflicts
-        bool canResize(MapEntry *entry, const uintptr_t base, const size_t oldSize,
-                const size_t newSize);
-
         /// Searches mappings to find one containing the given address.
         bool findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &outOffset);
 
