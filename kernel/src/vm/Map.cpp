@@ -45,9 +45,9 @@ Map::Map(const bool copyKernel) :
  */
 Map::~Map() {
     // release all map entries
-    for(auto entry : this->entries) {
-        entry->release();
-    }
+    this->entries.iterate([](auto node) {
+        node.entry->release();
+    });
 
     // TODO: implement
 }
@@ -74,44 +74,6 @@ void Map::free(Map *ptr) {
 void Map::activate() {
     this->table.activate();
     gCurrentMap = this;
-
-    // handle deferred maps
-    size_t numDeferred = 0;
-    __atomic_load(&this->numDeferredMaps, &numDeferred, __ATOMIC_ACQUIRE);
-
-    if(numDeferred) {
-        RW_LOCK_WRITE_GUARD(this->lock);
-        int err;
-
-#if LOG_DEFERRED_MAP
-        log("Performing %u deferred mappings", numDeferred);
-#endif
-        while(!this->deferredMaps.empty()) {
-            const auto toMap = this->deferredMaps.pop();
-
-            const bool write = TestFlags(toMap.mode & MapMode::WRITE);
-            const bool execute = TestFlags(toMap.mode & MapMode::EXECUTE);
-            const bool global = TestFlags(toMap.mode & MapMode::GLOBAL);
-            const bool user = TestFlags(toMap.mode & MapMode::ACCESS_USER);
-            const bool nocache = TestFlags(toMap.mode & MapMode::CACHE_DISABLE);
-
-#if LOG_DEFERRED_MAP
-            log("Mapping %016llx -> %08x w %d x %d g %d u %d c %d", toMap.physAddr, toMap.vmAddr,
-                    write, execute, global, user, !nocache);
-#endif
-
-            err = this->table.mapPage(toMap.physAddr, toMap.vmAddr, write, execute, global, user,
-                    nocache);
-            if(err) {
-                log("Failed to add mapping in %p: %d (phys %016llx, virt %08x, mode %08x)",
-                        this, err, toMap.physAddr, toMap.vmAddr, toMap.mode);
-            }
-        }
-
-        // clear the counter
-        size_t zero = 0;
-        __atomic_store(&this->numDeferredMaps, &zero, __ATOMIC_RELEASE);
-    }
 }
 
 /**
@@ -157,22 +119,10 @@ int Map::add(const uint64_t physAddr, const uintptr_t _length, const uintptr_t v
         const auto pa = physAddr + off;
         const auto va = vmAddr + off;
 
-        if(this->isActive() || this->table.supportsUnmappedModify(va)) {
-            err = this->table.mapPage(pa, va, write, execute, global, user, nocache);
+        err = this->table.mapPage(pa, va, write, execute, global, user, nocache);
 
-            if(err) {
-                return err;
-            }
-        } 
-        // otherwise, defer the mapping to the next time this map is activated
-        else {
-            // TODO: it would be nice to coalesce adjacent mappings
-
-            // build the mapping info
-            DeferredMapping def(pa, va, mode);
-            this->deferredMaps.push_back(DeferredMapping(def));
-
-            __atomic_add_fetch(&this->numDeferredMaps, 1, __ATOMIC_RELAXED);
+        if(err) {
+            return err;
         }
     }
 
@@ -241,62 +191,47 @@ int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
 
 
 /**
- * Maps the given virtual memory object.
+ * Maps the given virtual memory object into this virtual memory map.
+ *
+ * If the base address is non-zero, the call will fail if placing it at that address would cause
+ * it to overlap an already existing mapping.
+ *
+ * If the base address is zero, we'll place it at the first address in the range [searchStart,
+ * searchEnd) where it will not overlap an existing allocation. The search always starts at the
+ * start of the range, regardless of where the last allocation was placed.
+ *
+ * @param entry VM object to add to this VM map
+ * @param task The task to which this VM map belongs
+ * @param requestedBase Page aligned base address for the mapping, or 0 to find a suitable base
+ * @param flags If specified, overrides some of the flags of the VM object (access permissions)
+ * @param searchStart Lower bound for an automatically selected base address
+ * @param searchEnd Upper bound (minus VM object size) for an automatically selected base address
  *
  * @return 0 on success
  */
-int Map::add(MapEntry *_entry, sched::Task *task, const uintptr_t _base,
+int Map::add(MapEntry *entry, sched::Task *task, const uintptr_t requestedBase,
         const MappingFlags flagsMask, const uintptr_t searchStart, const uintptr_t searchEnd) {
-    RW_LOCK_WRITE(&this->lock);
+    uintptr_t base = requestedBase;
 
     // retain entry
-    auto entry = _entry->retain();
-    uintptr_t base = _base;
+    entry = entry->retain();
 
-    if(entry->base || base) {
-        if(!base) {
-            // check that it doesn't overlap with anything else
-            for(auto i : this->entries) {
-                if(i->intersects(this, entry)) {
-                    goto fail;
-                }
-            }
-        }
-        // check the desired new base address
-        else {
-            for(auto i : this->entries) {
-                if(i->contains(this, base, entry->length)) {
-                    goto fail;
-                }
-            }
-        }
-    } else {
-        // find a VM address for this
-        base = searchStart;
+    // either test whether the provided base address is valid, or select one
+    RW_LOCK_WRITE(&this->lock);
 
-        while((base + _entry->length) < searchEnd) {
-            // check whether this address is suitable
-            for(auto i : this->entries) {
-                // it's intersected an existing mapping; try again after that mapping
-                if(i->contains(this, base, entry->length)) {
-                    base = (i->getBaseAddressIn(this) + i->length);
-                    continue;
-                }
-            }
-
-            // if we get here, it didn't collide with any other mappings
-            goto beach;
-        }
-
-        // if we're here, we cannot find a suitable base address
+    // test that the range of [base, base+length) does not overlap any existing mappings
+    if(base) {
+        // TODO
+        goto fail;
+    } 
+    // find a large enough free space in the provided VM range
+    else {
+        // TODO
         goto fail;
     }
 
-beach:;
     // the mapping doesn't overlap, so add it
-    this->entries.push_back(entry);
-
-    // allow the performing of mapping modifications by the entry
+    this->entries.insert(base, entry->length, entry);
     RW_UNLOCK_WRITE(&this->lock);
 
     entry->addedToMap(this, task, base, flagsMask);
@@ -322,21 +257,15 @@ bool Map::canResize(MapEntry *entry, const uintptr_t base, const size_t oldSize,
     if(newSize <= oldSize) return true;
 
     // get the new range to check
-    const auto newBase = base + oldSize;
-    const auto sizeDiff = newSize - oldSize;
+    // const auto newBase = base + oldSize;
+    // const auto sizeDiff = newSize - oldSize;
 
     // log("Old region: %08x -> %08x; new region to test %08x - %08x", base, base+oldSize, base+oldSize, base+newSize);
 
     RW_LOCK_READ_GUARD(this->lock);
 
-    for(auto i : this->entries) {
-        if(i->contains(this, newBase, sizeDiff)) {
-            return false;
-        }
-    }
-
-    // if we get down here, there's no conflicts
-    return true;
+    // TODO: implement
+    return false;
 }
 
 /**
@@ -349,12 +278,10 @@ bool Map::canResize(MapEntry *entry, const uintptr_t base, const size_t oldSize,
 bool Map::findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &outOffset) {
     RW_LOCK_READ_GUARD(this->lock);
 
-    for(auto i : this->entries) {
-        if(i->contains(this, virtAddr, 1)) {
-            outHandle = i->getHandle();
-            outOffset = virtAddr - i->getBaseAddressIn(this);
-            return true;
-        }
+    auto vobj = this->entries.find(virtAddr, outOffset);
+    if(vobj) {
+        outHandle = vobj->getHandle();
+        return true;
     }
 
     // if we get here, no region contains this address
@@ -364,35 +291,27 @@ bool Map::findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &out
 /**
  * Removes the given entry from this map.
  */
-int Map::remove(MapEntry *_entry, sched::Task *task) {
-    MapEntry *removed = nullptr;
+int Map::remove(MapEntry *entry, sched::Task *task) {
+    REQUIRE(entry, "invalid %s", "vm object");
+    REQUIRE(task, "invalid %s", "task");
 
     RW_LOCK_WRITE(&this->lock);
 
-    // iterate over all entries...
-    for(size_t i = 0; i < this->entries.size(); i++) {
-        auto entry = this->entries[i];
+    // find its base address in the tree
+    auto base = this->entries.baseAddressFor(entry);
 
-        // we've found it! so invoke its removal callback
-        if(entry == _entry) {
-            // then remove it
-            this->entries.remove(i);
-            removed = entry;
-            goto beach;
-        }
+    if(!base) {
+        RW_UNLOCK_WRITE(&this->lock);
+        return -1;
     }
 
-    // if we get here, the entry wasn't found
-    RW_UNLOCK_WRITE(&this->lock);
-    return -1;
+    this->entries.remove(base);
 
-beach:;
     // finish the removal
     RW_UNLOCK_WRITE(&this->lock);
-    REQUIRE(removed, "wtf");
 
-    removed->removedFromMap(this, task);
-    removed->release();
+    entry->removedFromMap(this, task);
+    entry->release();
 
     return 0;
 }
@@ -402,13 +321,7 @@ beach:;
  */
 const bool Map::contains(MapEntry *entry) {
     RW_LOCK_READ_GUARD(this->lock);
-    for(auto map : this->entries) {
-        if(map == entry) {
-            return true;
-        }
-    }
-
-    return false;
+    return (this->entries.baseAddressFor(entry) != 0);
 }
 
 
@@ -423,26 +336,18 @@ const bool Map::contains(MapEntry *entry) {
  * Any other type of fault will cause a signal to be sent to the process.
  */
 bool Map::handlePagefault(const uintptr_t virtAddr, const bool present, const bool write) {
-    MapEntry *region = nullptr;
+    uintptr_t offset;
 
+    // is there a VM mapping to handle this pagefault?
     RW_LOCK_READ(&this->lock);
+    auto region = this->entries.find(virtAddr, offset);
+    RW_UNLOCK_READ(&this->lock);
 
-    // test all our regions
-    for(auto entry : this->entries) {
-        // this one contains it :D
-        if(entry->contains(this, virtAddr)) {
-            region = entry;
-            goto beach;
-        }
+    if(!region) {
+        return false;
     }
-    RW_UNLOCK_READ(&this->lock);
 
-    // if we get here, no region contains the address
-    return false;
-
-beach:;
-    RW_UNLOCK_READ(&this->lock);
-    // we found a region to handle it
-    return region->handlePagefault(this, virtAddr, present, write);
+    // if so, handle it
+    return region->handlePagefault(this, virtAddr, offset, present, write);
 }
 

@@ -225,8 +225,8 @@ class MapEntry {
 
     private:
         /// Attempt to handle a page fault for the virtual address
-        bool handlePagefault(Map *map, const uintptr_t address, const bool present,
-                const bool write);
+        bool handlePagefault(Map *map, const uintptr_t base, const uintptr_t offset, 
+                const bool present, const bool write);
 
     private:
         static void initAllocator();
@@ -243,7 +243,7 @@ class MapEntry {
         void removedFromMap(Map *, sched::Task *);
 
         /// Faults in an anonymous memory page.
-        void faultInPage(const uintptr_t address, Map *map);
+        void faultInPage(const uintptr_t base, const uintptr_t offset, Map *map);
         /// Frees a physical page and updates the caller's "pages owned" counter
         void freePage(const uintptr_t page);
 

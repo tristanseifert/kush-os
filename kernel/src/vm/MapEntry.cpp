@@ -165,10 +165,14 @@ int MapEntry::resize(const size_t newSize) {
 /**
  * Handles a page fault for the given virtual address.
  *
+ * @param map Memory map of the faulting task
+ * @param base Virtual base address of this VM object in the given map
+ * @param offset Offset into this VM object, in bytes
+ *
  * @note As a precondition, the virtual address provided must fall in the range of this map.
  */
-bool MapEntry::handlePagefault(Map *map, const uintptr_t address, const bool present,
-        const bool write) {
+bool MapEntry::handlePagefault(Map *map, const uintptr_t base, const uintptr_t offset,
+        const bool present, const bool write) {
     // only anonymous memory can be faulted in
     if(!this->isAnon) {
         return false;
@@ -180,7 +184,7 @@ bool MapEntry::handlePagefault(Map *map, const uintptr_t address, const bool pre
     }
 
     // fault it in
-    this->faultInPage(address & ~0xFFF, map);
+    this->faultInPage(base, offset, map);
 
     return true;
 }
@@ -188,42 +192,24 @@ bool MapEntry::handlePagefault(Map *map, const uintptr_t address, const bool pre
 /**
  * Faults in a page.
  */
-void MapEntry::faultInPage(const uintptr_t address, Map *map) {
+void MapEntry::faultInPage(const uintptr_t base, const uintptr_t offset, Map *map) {
     RW_LOCK_WRITE_GUARD(this->lock);
 
     int err;
     const auto pageSz = arch_page_size();
+    const auto pageOff = offset / pageSz; 
 
-    // get map specific base
-    uintptr_t thisBase = 0;
-    bool foundBase = false;
-    auto mask = MappingFlags::None;
-
-    for(auto &info : this->maps) {
-        if(info.mapPtr == map) {
-            thisBase = (info.base ? info.base : this->base);
-            mask = info.flagsMask;
-            foundBase = true;
-            goto beach;
-        }
-    }
-
-beach:;
-    REQUIRE(foundBase, "failed to find base address");
-
-    const auto pageOff = (address - thisBase) / pageSz; 
-
-    // figure out the proper flags
+    // TODO: figure out the proper flags
     auto flg = this->flags;
-    if(mask != MappingFlags::None) {
+    /*if(mask != MappingFlags::None) {
         flg &= ~MappingFlags::PermissionsMask;
         flg |= (flg & mask);
-    }
+    }*/
 
     // check if we already own such a physical page (shared memory case)
     for(auto &physPage : this->physOwned) {
         if(physPage.pageOff == pageOff) {
-            const auto destAddr = thisBase + (pageOff * pageSz);
+            const auto destAddr = base + (pageOff * pageSz);
             const auto mode = ConvertVmMode(flg, !this->isKernel);
             err = map->add(physPage.physAddr, pageSz, destAddr, mode);
             REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", pageOff, this, this->handle);
@@ -234,7 +220,7 @@ beach:;
 
     // allocate physical memory and map it in
     const auto page = mem::PhysicalAllocator::alloc();
-    REQUIRE(page, "failed to allocage physical page for %08x", address);
+    REQUIRE(page, "failed to allocage physical page for %p+%x", base, offset);
 
     auto task = sched::Task::current();
     if(task) {
@@ -250,7 +236,7 @@ beach:;
     this->physOwned.push_back(info);
 
     // map it
-    const auto destAddr = thisBase + (pageOff * pageSz);
+    const auto destAddr = base + (pageOff * pageSz);
     const auto mode = ConvertVmMode(flg, !this->isKernel);
 
     err = map->add(page, pageSz, destAddr, mode);
@@ -259,7 +245,7 @@ beach:;
     // invalidate TLB entry
     arch::InvalidateTlb(destAddr);
 
-    // zero it
+    // zero it (XXX: this should be done BEFORE it's mapped!)
     memset(reinterpret_cast<void *>(destAddr), 0, pageSz);
 }
 
