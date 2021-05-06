@@ -44,7 +44,7 @@ Hpet::Hpet(const uintptr_t phys, const void *table) {
     REQUIRE(!(phys % arch_page_size()), "HPET phys base $%p not page aligned", phys);
 
     // map the controller
-    this->vm = vm::MapEntry::makePhys(phys, 0, arch_page_size(),
+    this->vm = vm::MapEntry::makePhys(phys, arch_page_size(),
             vm::MappingFlags::Read | vm::MappingFlags::Write | vm::MappingFlags::MMIO, true);
     REQUIRE(this->vm, "failed to create %s phys map", "HPET");
 
@@ -53,7 +53,7 @@ Hpet::Hpet(const uintptr_t phys, const void *table) {
             (kPlatformRegionMmio + kPlatformRegionMmioLen - 1));
     REQUIRE(!err, "failed to map %s: %d", "HPET", err);
 
-    auto vmBase = this->vm->getBaseAddressIn(map);
+    auto vmBase = map->getRegionBase(this->vm);
     REQUIRE(vmBase, "failed to get %s base address", "HPET");
 
     this->base = reinterpret_cast<void *>(vmBase);

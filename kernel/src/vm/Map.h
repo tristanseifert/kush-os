@@ -9,6 +9,7 @@
 #include <bitflags.h>
 #include <arch/rwlock.h>
 #include <arch/PTEHandler.h>
+#include <arch/PerCpuInfo.h>
 
 #include <handle/Manager.h>
 #include <runtime/Vector.h>
@@ -99,6 +100,11 @@ class Map {
 
         /// Searches mappings to find one containing the given address.
         bool findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &outOffset);
+        /// Determines the base address of a particular mapping
+        const uintptr_t getRegionBase(const MapEntry *entry);
+        /// Gets information about a VM region.
+        int getRegionInfo(MapEntry *region, uintptr_t &outBase, size_t &outSize,
+                MappingFlags &outFlags);
 
         /// Returns the number of installed mappings.
         const size_t numMappings() const {
@@ -108,8 +114,8 @@ class Map {
         /// Returns the global kernel map
         static Map *kern();
         /// Returns the currently activated map
-        static Map *current() {
-            return gCurrentMap;
+        static inline Map *current() {
+            return arch::PerCpuInfo::get()->activeMap;
         }
 
     private:
@@ -126,6 +132,10 @@ class Map {
         constexpr static const uintptr_t kVmSearchBase = 0x400000000000;
         constexpr static const uintptr_t kVmMaxAddr =    0x7E0000000000;
 #endif
+
+    private:
+        /// whether additions to the page table are logged
+        static bool gLogAdd;
 
     private:
         friend class arch::vm::PTEHandler;

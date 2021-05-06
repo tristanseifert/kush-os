@@ -30,8 +30,8 @@ void MapEntry::initAllocator() {
 /**
  * Creates a new VM mapping that encompasses the given address range.
  */
-MapEntry::MapEntry(const uintptr_t _base, const size_t _length, const MappingFlags _flags) :
-    base(_base), length(_length), flags(_flags) {
+MapEntry::MapEntry(const size_t _length, const MappingFlags _flags) : length(_length),
+    flags(_flags) {
     // allocate a handle for it
     this->handle = handle::Manager::makeVmObjectHandle(this);
 }
@@ -55,11 +55,11 @@ MapEntry::~MapEntry() {
 /**
  * Allocates a VM map entry that refers to a contiguous range of physical memory.
  */
-MapEntry *MapEntry::makePhys(const uint64_t physAddr, const uintptr_t address, const size_t length,
-        const MappingFlags flags, const bool kernel) {
+MapEntry *MapEntry::makePhys(const uint64_t physAddr, const size_t length, const MappingFlags flags,
+        const bool kernel) {
     // allocate the bare map
     if(!gMapEntryAllocator) initAllocator();
-    auto map = gMapEntryAllocator->alloc(address, length, flags);
+    auto map = gMapEntryAllocator->alloc(length, flags);
     map->isKernel = kernel;
 
     // set up the phys mapping
@@ -73,13 +73,12 @@ MapEntry *MapEntry::makePhys(const uint64_t physAddr, const uintptr_t address, c
 /**
  * Allocates a new anonymous memory backed VM map entry.
  */
-MapEntry *MapEntry::makeAnon(const uintptr_t address, const size_t length,
-                const MappingFlags flags, const bool kernel) {
+MapEntry *MapEntry::makeAnon(const size_t length, const MappingFlags flags, const bool kernel) {
     // allocate the bare map
     if(!gMapEntryAllocator) initAllocator();
-    auto map = gMapEntryAllocator->alloc(address, length, flags);
+    auto map = gMapEntryAllocator->alloc(length, flags);
     map->isKernel = kernel;
-    
+
     // set it up and fault in all pages if needed
     map->isAnon = true;
 
@@ -170,9 +169,12 @@ bool MapEntry::handlePagefault(Map *map, const uintptr_t base, const uintptr_t o
     if(!this->isAnon) {
         return false;
     }
-
     // the page must be _not_ present
-    if(present) {
+    else if(present) {
+        return false;
+    }
+    // offset musn't be past the end of the region (it was shrunk, but someone is mapping us still)
+    else if(offset >= this->length) {
         return false;
     }
 
@@ -285,16 +287,21 @@ int MapEntry::updateFlags(const MappingFlags newFlags) {
 }
 
 
+
 /**
- * Maps the address range of this entry.
+ * Callback invoked when this entry is added to a VM map.
  *
  * If it is backed by anonymous memory, we map all pages that have been faulted in so far;
  * otherwise, we map the entire region.
+ *
+ * @param map Address space into which this VM object was inserted
+ * @param task Task that owns the address space into which we've been inserted
+ * @param baseAddress Virtual address for the mapping in this address space
+ * @param flagsMask Flags to overwrite from the original mapping
  */
-void MapEntry::addedToMap(Map *map, sched::Task *task, const uintptr_t _base, const MappingFlags flagsMask) {
+void MapEntry::addedToMap(Map *map, sched::Task *task, const uintptr_t baseAddr,
+        const MappingFlags flagsMask) {
     RW_LOCK_READ(&this->lock);
-
-    const auto baseAddr = (_base ? _base : this->base);
     REQUIRE(baseAddr, "failed to get base address for map entry %p", this);
 
     // map all allocated physical anon pages
@@ -306,11 +313,6 @@ void MapEntry::addedToMap(Map *map, sched::Task *task, const uintptr_t _base, co
         this->mapPhysMem(map, baseAddr, flagsMask);
     }
     RW_UNLOCK_READ(&this->lock);
-
-    // insert owner info
-    RW_LOCK_WRITE(&this->lock);
-    this->maps.push_back(MapInfo(map, task, baseAddr, flagsMask));
-    RW_UNLOCK_WRITE(&this->lock);
 }
 
 /**
@@ -360,8 +362,7 @@ void MapEntry::mapPhysMem(Map *map, const uintptr_t base, const MappingFlags mas
     // insert the mapping
     err = map->add(this->physBase, this->length, base, mode);
 
-    REQUIRE(!err, "failed to map vm object %p ($%08x'h) addr $%08x %d", this, this->handle,
-            this->base, err);
+    REQUIRE(!err, "failed to map vm object %p ($%p'h) %d", this, this->handle, err);
 }
 
 struct RemoveCtxInfo {
@@ -371,10 +372,20 @@ struct RemoveCtxInfo {
     RemoveCtxInfo(MapEntry *_entry, Map *_map) : entry(_entry), map(_map) {};
 };
 
+
+
 /**
- * Unmaps the address range of this map entry.
+ * Callback invoked after the VM object is removed from a memory map.
+ *
+ * Any mappings this object owns in the provided memory map are removed.
+ *
+ * @param map Memory map to which this VM object was added
+ * @param task Task to which the memory map belongs
+ * @param base Virtual base address of this VM object in the given task
+ * @param length Total length of the mapped region in the memory map
  */
-void MapEntry::removedFromMap(Map *map, sched::Task *task) {
+void MapEntry::removedFromMap(Map *map, sched::Task *task, const uintptr_t base,
+        const size_t length) {
     RemoveCtxInfo info(this, map);
 
     // iterate the maps info dict to get our true base address
@@ -382,25 +393,21 @@ void MapEntry::removedFromMap(Map *map, sched::Task *task) {
     size_t i = 0;
     while(i < this->maps.size()) {
         // ensure it's the map we're after
-        if(this->maps[i].mapPtr != map) {
+        if(this->maps[i] != map) {
             i++;
             continue;
         }
 
         // unmap the range
-        int err = map->remove(this->maps[i].base, this->length);
+        int err = map->remove(base, length);
         REQUIRE(!err, "failed to unmap vm object: %d", err);
 
         // remove it
         this->maps.remove(i);
 
-        // find the next first task that's mapped us still
+        // TODO: find new task to transfer ownership of pages to
         sched::Task *newOwner = nullptr;
-        if(!this->maps.empty()) {
-            newOwner = this->maps[0].task;
-        }
 
-        // transfer ownership of physical pages to the next task that maps us
         uintptr_t owned = 0;
         for(auto &physPage : this->physOwned) {
             if(physPage.task == task) {
@@ -417,40 +424,6 @@ void MapEntry::removedFromMap(Map *map, sched::Task *task) {
 
     RW_UNLOCK_WRITE(&this->lock);
 }
-
-/**
- * Gets info about this map entry from the perspective of a map.
- */
-int MapEntry::getInfo(Map *map, uintptr_t &outBase, uintptr_t &outLength, MappingFlags &outFlags) {
-    RW_LOCK_READ_GUARD(this->lock);
-
-    // iterate the map infos
-    for(const auto &info : this->maps) {
-        if(info.mapPtr == map) {
-            outBase = info.base;
-            outLength = this->length;
-
-            auto flg = this->flags;
-            if(info.flagsMask != MappingFlags::None) {
-                //log("Maskule %08x", (uintptr_t) info.flagsMask);
-
-                flg &= ~MappingFlags::PermissionsMask;
-                flg |= (flg & info.flagsMask);
-            }
-
-            //log("fuck %08x %08x %08x %08x %08x", info.base, (uintptr_t) this->flags, (uintptr_t) info.flagsMask, (uintptr_t) flg,
-            //        info.base);
-
-            outFlags = flg;
-
-            return 0;
-        }
-    }
-
-    // if we get here, we're not mapped by this map
-    return -1;
-}
-
 
 
 

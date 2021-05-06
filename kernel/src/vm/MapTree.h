@@ -6,7 +6,7 @@
 namespace vm {
 /**
  * An AVL tree implementation specifically geared towards use by the virtual memory subsystem to
- * store a process' VM map.
+ * store a process' VM map. (TODO: this is currently just a BST, not an AVL tree. fix this lol)
  *
  * Each node in the tree stores not only the per-process virtual base address and a pointer to the
  * VM object it maps, but also the size of a "window" allocated in the address space for that
@@ -120,6 +120,25 @@ class MapTree {
          */
         const uintptr_t baseAddressFor(const MapEntry *entry) const {
             auto leaf = this->leafFor(entry, this->root);
+            return leaf ? leaf->address : 0;
+        }
+        /**
+         * Locates the base address and mapping window length of a particular VM object.
+         */
+        const uintptr_t baseAddressFor(const MapEntry *entry, size_t &outLength) const {
+            auto leaf = this->leafFor(entry, this->root);
+            outLength = leaf ? leaf->size : 0;
+            return leaf ? leaf->address : 0;
+        }
+        /**
+         * Locates the base address, mapping window length and mapping flags of a particular VM
+         * object.
+         */
+        const uintptr_t baseAddressFor(const MapEntry *entry, size_t &outLength,
+                MappingFlags &outFlags) const {
+            auto leaf = this->leafFor(entry, this->root);
+            outLength = leaf ? leaf->size : 0;
+            outFlags = leaf ? leaf->flags : MappingFlags::None;
             return leaf ? leaf->address : 0;
         }
 

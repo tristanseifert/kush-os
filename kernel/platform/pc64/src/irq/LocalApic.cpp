@@ -50,16 +50,16 @@ LocalApic::LocalApic(const uintptr_t _id, const uintptr_t cpuId, const uintptr_t
     int err;
 
     // map it somewhere in the architecture VM space
-    this->vmEnt = vm::MapEntry::makePhys(phys, 0, arch_page_size(),
+    this->vmEnt = vm::MapEntry::makePhys(phys, arch_page_size(),
             vm::MappingFlags::Read | vm::MappingFlags::Write | vm::MappingFlags::MMIO, true);
     REQUIRE(this->vmEnt, "failed to create %s phys map", "LAPIC");
 
-    auto vm = vm::Map::kern();
-    err = vm->add(this->vmEnt, sched::Task::kern(), 0, vm::MappingFlags::None, kPlatformRegionMmio,
+    auto map = vm::Map::kern();
+    err = map->add(this->vmEnt, sched::Task::kern(), 0, vm::MappingFlags::None, kPlatformRegionMmio,
             (kPlatformRegionMmio + kPlatformRegionMmioLen - 1));
     REQUIRE(!err, "failed to map %s: %d", "LAPIC", err);
 
-    auto base = this->vmEnt->getBaseAddressIn(vm);
+    auto base = map->getRegionBase(this->vmEnt);
     REQUIRE(base, "failed to get %s base address", "LAPIC");
 
     this->base = reinterpret_cast<uint32_t *>(base);

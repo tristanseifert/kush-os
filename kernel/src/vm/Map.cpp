@@ -3,6 +3,8 @@
 
 #include <new>
 #include <arch.h>
+#include <arch/PerCpuInfo.h>
+
 #include <log.h>
 
 #include "mem/SlabAllocator.h"
@@ -12,13 +14,7 @@ using namespace vm;
 static char gAllocBuf[sizeof(mem::SlabAllocator<Map>)] __attribute__((aligned(64)));
 static mem::SlabAllocator<Map> *gMapAllocator = nullptr;
 
-/// pointer to the currently active map
-Map *Map::gCurrentMap = nullptr;
-
-/// Set to 1 to log adding mappings
-#define LOG_MAP_ADD                     0
-/// Set to log deferred mappings
-#define LOG_DEFERRED_MAP                0
+bool Map::gLogAdd = false;
 
 /**
  * Initializes the VM mapping allocator.
@@ -46,6 +42,7 @@ Map::Map(const bool copyKernel) :
 Map::~Map() {
     // release all map entries
     this->entries.iterate([](auto node) {
+        // TODO: do we need to invoke the removal callbacks too?
         node.entry->release();
     });
 
@@ -73,7 +70,7 @@ void Map::free(Map *ptr) {
  */
 void Map::activate() {
     this->table.activate();
-    gCurrentMap = this;
+    arch::PerCpuInfo::get()->activeMap = this;
 }
 
 /**
@@ -102,10 +99,10 @@ int Map::add(const uint64_t physAddr, const uintptr_t _length, const uintptr_t v
         length += pageSz - (length % pageSz);
     }
 
-#if LOG_MAP_ADD
-    log("Adding mapping to %p: $%lx -> $%llx (length $%lx, mode $%04lx)", this, vmAddr, physAddr, length,
-            (uint32_t) mode);
-#endif
+    if(gLogAdd) {
+        log("Adding mapping to %p: $%lx -> $%llx (length $%lx, mode $%04lx)", this, vmAddr, physAddr, length,
+                (uint32_t) mode);
+    }
 
     // decompose the flags
     const bool write = TestFlags(mode & MapMode::WRITE);
@@ -211,6 +208,9 @@ int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
  */
 int Map::add(MapEntry *entry, sched::Task *task, const uintptr_t requestedBase,
         const MappingFlags flagsMask, const uintptr_t searchStart, const uintptr_t searchEnd) {
+    REQUIRE(entry, "invalid %s", "vm object");
+    REQUIRE(task, "invalid %s", "task");
+
     uintptr_t nextFree;
 
     uintptr_t base = requestedBase;
@@ -285,6 +285,55 @@ bool Map::findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &out
 }
 
 /**
+ * Returns the base address of a particular VM object in this memory map.
+ *
+ * @note This method uses an address of 0 to indicate the region was not found; this means that we
+ * don't really support mappings at address zero.
+ *
+ * @return Virtual base address of the region, or 0 if not found
+ */
+const uintptr_t Map::getRegionBase(const MapEntry *entry) {
+    RW_LOCK_READ_GUARD(this->lock);
+    return this->entries.baseAddressFor(entry);
+}
+
+/**
+ * Gets information about a particular VM object mapped into this address space.
+ *
+ * @param region VM object to get info for
+ * @param outBase Base address of the object
+ * @param outSize Mapped size of the object (may differ from object size!)
+ * @param outFlags Actual flags that the object is mapped with
+ *
+ * @return 0 on success, negative error code otherwise
+ */
+int Map::getRegionInfo(MapEntry *region, uintptr_t &outBase, size_t &outSize,
+        MappingFlags &outFlags) {
+    size_t length;
+    MappingFlags flags = MappingFlags::None;
+
+    // get info on the region
+    RW_LOCK_READ_GUARD(this->lock);
+    const auto base = this->entries.baseAddressFor(region, length, flags);
+    if(!base) {
+        return -1;
+    }
+
+    // region was found, return info
+    outBase = base;
+    outSize = length;
+
+    if(flags != MappingFlags::None) {
+        outFlags = flags;
+    } else {
+        outFlags = region->getFlags();
+    }
+
+    return 0;
+}
+
+
+/**
  * Removes the given entry from this map.
  */
 int Map::remove(MapEntry *entry, sched::Task *task) {
@@ -294,7 +343,8 @@ int Map::remove(MapEntry *entry, sched::Task *task) {
     RW_LOCK_WRITE(&this->lock);
 
     // find its base address in the tree
-    auto base = this->entries.baseAddressFor(entry);
+    size_t length;
+    auto base = this->entries.baseAddressFor(entry, length);
 
     if(!base) {
         RW_UNLOCK_WRITE(&this->lock);
@@ -306,7 +356,7 @@ int Map::remove(MapEntry *entry, sched::Task *task) {
     // finish the removal
     RW_UNLOCK_WRITE(&this->lock);
 
-    entry->removedFromMap(this, task);
+    entry->removedFromMap(this, task, base, length);
     entry->release();
 
     return 0;

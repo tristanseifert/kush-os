@@ -2,7 +2,7 @@
 #define ARCH_x86_64_PERCPUINFO_H
 
 #define PROCI_OFF_SYSCALL_STACK         (24)
-#define PROCI_OFF_PLATFORM              (56)
+#define PROCI_OFF_PLATFORM              (64)
 
 #ifndef ASM_FILE
 
@@ -15,6 +15,10 @@
 namespace sched {
 class Scheduler;
 struct Thread;
+}
+
+namespace vm {
+class Map;
 }
 
 namespace arch {
@@ -42,6 +46,8 @@ struct ProcInfo {
 
     /// core local scheduler
     sched::Scheduler *sched = nullptr;
+    /// currently active VM map
+    ::vm::Map *activeMap = nullptr;
 
     // platform specific info
 #if PLATFORM_WANTS_CORE_LOCAL

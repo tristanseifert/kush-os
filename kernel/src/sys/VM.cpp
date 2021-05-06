@@ -99,7 +99,7 @@ intptr_t sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
     // set up the mapping
     const auto mapFlags = ConvertFlags(flags);
 
-    region = vm::MapEntry::makePhys(physAddr, vmAddr, length, mapFlags);
+    region = vm::MapEntry::makePhys(physAddr, length, mapFlags);
     if(!region) {
         return Errors::GeneralError;
     }
@@ -107,7 +107,7 @@ intptr_t sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
     // add it to the calling task's mapping if desired
     if(!(flags & kDoNotMap)) {
         auto vm = task->vm;
-        err = vm->add(region, task);
+        err = vm->add(region, task, vmAddr);
 
         if(err) {
             vm::MapEntry::free(region);
@@ -147,7 +147,7 @@ intptr_t sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
     // set up the mapping
     const auto mapFlags = ConvertFlags(flags);
 
-    region = vm::MapEntry::makeAnon(vmAddr, length, mapFlags);
+    region = vm::MapEntry::makeAnon(length, mapFlags);
     if(!region) {
         return Errors::GeneralError;
     }
@@ -155,7 +155,7 @@ intptr_t sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
     // add it to the calling task's mapping if desired
     if(!(flags & kDoNotMap)) {
         auto vm = task->vm;
-        err = vm->add(region, task);
+        err = vm->add(region, task, vmAddr);
 
         if(err) {
             vm::MapEntry::free(region);
@@ -338,7 +338,7 @@ intptr_t sys::VmRegionGetInfo(const Syscall::Args *args, const uintptr_t number)
     uintptr_t base, len;
     vm::MappingFlags flags;
 
-    err = region->getInfo(vm, base, len, flags);
+    err = vm->getRegionInfo(region, base, len, flags);
     if(err) {
         return Errors::GeneralError;
     }

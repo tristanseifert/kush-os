@@ -32,7 +32,7 @@ IoApic::IoApic(const uintptr_t base, const uint32_t _irqBase, const uint8_t _id)
     int err;
 
     // map the controller
-    this->vm = vm::MapEntry::makePhys(this->physBase, 0, arch_page_size(),
+    this->vm = vm::MapEntry::makePhys(this->physBase, arch_page_size(),
             vm::MappingFlags::Read | vm::MappingFlags::Write | vm::MappingFlags::MMIO, true);
     REQUIRE(this->vm, "failed to create %s phys map", "IOAPIC");
 
@@ -41,7 +41,7 @@ IoApic::IoApic(const uintptr_t base, const uint32_t _irqBase, const uint8_t _id)
             (kPlatformRegionMmio + kPlatformRegionMmioLen - 1));
     REQUIRE(!err, "failed to map %s: %d", "IOAPIC", err);
 
-    auto vmBase = this->vm->getBaseAddressIn(map);
+    auto vmBase = map->getRegionBase(this->vm);
     REQUIRE(vmBase, "failed to get %s base address", "IOAPIC");
 
     this->base = reinterpret_cast<void *>(vmBase);

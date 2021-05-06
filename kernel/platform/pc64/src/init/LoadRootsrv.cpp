@@ -278,15 +278,15 @@ static void MapInitBundle() {
     // create an allocation
     auto task = sched::Task::current();
     auto vm = task->vm;
-    auto entry = vm::MapEntry::makePhys(bootboot.initrd_ptr, kInitBundleVmAddr,
-            numPages * pageSz, vm::MappingFlags::Read);
+    auto entry = vm::MapEntry::makePhys(bootboot.initrd_ptr, numPages * pageSz,
+            vm::MappingFlags::Read);
 
 #if LOG_SETUP
     log("Mapped init bundle: phys %p len %u bytes to %p", bootboot.initrd_ptr,
             bootboot.initrd_size, kInitBundleVmAddr);
 #endif
 
-    err = vm->add(entry, task);
+    err = vm->add(entry, task, kInitBundleVmAddr);
     REQUIRE(!err, "failed to map root server init bundle: %d", err);
 }
 
