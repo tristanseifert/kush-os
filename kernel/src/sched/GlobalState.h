@@ -8,7 +8,7 @@
 namespace sched {
 struct Task;
 
-    /**
+/**
  * Some scheduler state is shared between all cores; this is stored inside the global state
  * structure.
  */

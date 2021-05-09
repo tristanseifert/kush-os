@@ -168,6 +168,12 @@ static const struct {
         .ecx    = (1 << 19) | (1 << 20),
         .name   = "SSE 4.1 and SSE 4.2"
     },
+    // supervisor mode access protection
+    /*{
+        .leaf   = 0x07,
+        .ebx    = (1 << 20),
+        .name   = "SMAP"
+    },*/
     // terminator
     {}
 };

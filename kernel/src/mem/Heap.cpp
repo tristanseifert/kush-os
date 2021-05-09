@@ -46,8 +46,8 @@ void *Heap::alloc(const size_t bytes) {
  * Performs an aligned allocation from the heap.
  */
 void *Heap::allocAligned(const size_t bytes, const size_t alignment) {
-    auto ptr = dlmemalign(bytes, alignment);
-    if(gLogAlloc) log("%s(%u, %u) = %p", "dlmemalign", bytes, alignment, ptr);
+    auto ptr = dlmemalign(alignment, bytes);
+    if(gLogAlloc) log("%s(%u, %u) = %p", "dlmemalign", alignment, bytes, ptr);
     return ptr;
 }
 /**

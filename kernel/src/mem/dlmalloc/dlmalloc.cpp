@@ -1365,7 +1365,7 @@ private:
 #else 
     //Set foot of inuse chunk to be xor of mstate and seed 
     void  mark_inuse_foot(malloc_chunk_header *p, size_t s) {
-        (((mchunkptr)((char*)p + s))->prev_foot = (size_t)this ^ mparams._magic); }
+        (((mchunkptr)((char*)p + s))->_prev_foot = (size_t)this ^ mparams._magic); }
 #endif
 
     void set_inuse(malloc_chunk_header *p, size_t s) {
@@ -1473,7 +1473,7 @@ typedef malloc_state*    mstate;
 #if FOOTERS
     malloc_state* get_mstate_for(malloc_chunk_header *p) {
         return (malloc_state*)(((mchunkptr)((char*)(p) +
-                                     (p->chunksize())))->prev_foot ^ mparams._magic);
+                                     (p->chunksize())))->_prev_foot ^ mparams._magic);
     }
 #endif
 
@@ -3599,7 +3599,7 @@ size_t malloc_state::internal_bulk_free(void* array[], size_t nelem) {
             if (mem != 0) {
                 mchunkptr p = mem2chunk(mem);
                 size_t psize = p->chunksize();
-#if FOOTERS
+#if FOOTERS && 0 // TODO: figure out this
                 if (get_mstate_for(p) != m) {
                     ++unfreed;
                     continue;
