@@ -6,6 +6,7 @@
 #include <platform.h>
 #include <arch/spinlock.h>
 #include <runtime/Queue.h>
+#include <runtime/LockFreeQueue.h>
 
 #include "Thread.h"
 
@@ -46,10 +47,10 @@ class Scheduler {
         constexpr static const size_t kNumLevels = 32;
 
     public:
-        // return the shared scheduler instance
+        // return the scheduler for the current core
         static Scheduler *get();
 
-        // return the thread running on the current processor
+        // return the thread running on the calling processor
         Thread *runningThread() const {
             return this->running;
         }
@@ -92,7 +93,7 @@ class Scheduler {
             DECLARE_SPINLOCK(lock);
 
             /// List (treated as a queue) of runnable threads
-            rt::List<Thread *> storage;
+            rt::LockFreeQueue<Thread *> storage;
         };
 
     private:

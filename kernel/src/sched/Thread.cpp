@@ -9,8 +9,8 @@
 
 #include "ipc/Interrupts.h"
 #include "mem/StackPool.h"
-#include "mem/SlabAllocator.h"
 
+#include <arch.h>
 #include <arch/critical.h>
 
 #include <platform.h>
@@ -18,28 +18,14 @@
 
 using namespace sched;
 
-static char gAllocBuf[sizeof(mem::SlabAllocator<Thread>)] __attribute__((aligned(64)));
-static mem::SlabAllocator<Thread> *gThreadAllocator = nullptr;
-
 /// Thread id for the next thread
 uint32_t Thread::nextTid = 1;
-
-/**
- * Initializes the task struct allocator.
- */
-void Thread::initAllocator() {
-    gThreadAllocator = reinterpret_cast<mem::SlabAllocator<Thread> *>(&gAllocBuf);
-    new(gThreadAllocator) mem::SlabAllocator<Thread>();
-}
 
 /**
  * Allocates a new thread.
  */
 Thread *Thread::kernelThread(Task *parent, void (*entry)(uintptr_t), const uintptr_t param) {
-    if(!gThreadAllocator) initAllocator();
-    auto thread = gThreadAllocator->alloc(parent, (uintptr_t) entry, param, true);
-
-    return thread;
+    return new Thread(parent, (uintptr_t) entry, param, true);
 }
 
 /**
@@ -48,7 +34,7 @@ Thread *Thread::kernelThread(Task *parent, void (*entry)(uintptr_t), const uintp
  * @note The thread MUST NOT be scheduled or running.
  */
 void Thread::free(Thread *ptr) {
-    gThreadAllocator->free(ptr);
+    delete ptr;
 }
 
 

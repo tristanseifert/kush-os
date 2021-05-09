@@ -131,8 +131,6 @@ struct Task {
         }
 
     private:
-        static void initAllocator();
-
         void notifyExit(int);
 
         static uint32_t nextPid;

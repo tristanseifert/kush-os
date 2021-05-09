@@ -261,9 +261,6 @@ struct Thread {
         static uint32_t nextTid;
 
     private:
-        static void initAllocator();
-
-    private:
         void unblock(Blockable *b);
         /// Called when this thread is switching out
         void switchFrom();

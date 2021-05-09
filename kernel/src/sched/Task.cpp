@@ -7,40 +7,27 @@
 #include "ipc/Port.h"
 #include "vm/Map.h"
 #include "vm/MapEntry.h"
-#include "mem/SlabAllocator.h"
 
 #include <string.h>
 #include <new>
 
 using namespace sched;
 
-static char gAllocBuf[sizeof(mem::SlabAllocator<Task>)] __attribute__((aligned(64)));
-static mem::SlabAllocator<Task> *gTaskAllocator = nullptr;
-
 /// pid for the next task
 uint32_t Task::nextPid = 0;
-
-/**
- * Initializes the task struct allocator.
- */
-void Task::initAllocator() {
-    gTaskAllocator = reinterpret_cast<mem::SlabAllocator<Task> *>(&gAllocBuf);
-    new(gTaskAllocator) mem::SlabAllocator<Task>();
-}
 
 /**
  * Allocates a new task.
  */
 Task *Task::alloc(vm::Map *map) {
-    if(!gTaskAllocator) initAllocator();
-    return gTaskAllocator->alloc(map);
+    return new Task(map);
 }
 
 /**
  * Frees a previously allocated task.
  */
 void Task::free(Task *ptr) {
-    gTaskAllocator->free(ptr);
+    delete ptr;
 }
 
 
