@@ -59,10 +59,10 @@ typedef struct arch_gdt_descriptor_64 {
 typedef struct amd64_tss {
     uint32_t reserved1;
 
-    // stack pointers
-    uint32_t rsp0Low, rsp0High;
-    uint32_t rsp1Low, rsp1High;
-    uint32_t rsp2Low, rsp2High;
+    // stack pointers (RSP0 - RSP2)
+    struct {
+        uint32_t low, high;
+    } __attribute__((packed)) rsp[3];
 
     uint32_t reserved2[2];
 
@@ -87,6 +87,8 @@ class Gdt {
         /// Initializes the global GDT and loads it.
         static void Init();
 
+        /// Allocates a TSS and interrupt stacks.
+        static void AllocTss(amd64_tss_t* &outTss, size_t &outTssIdx, const bool load = false);
         /// Initializes a TSS.
         static void InitTss(amd64_tss_t *tss);
         /// Installs the given TSS at the specified index.
@@ -107,8 +109,14 @@ class Gdt {
     private:
         /// Total number of GDT entries to allocate
         constexpr static const size_t kGdtSize = 128;
+        /// Total number of TSS slots available
+        constexpr static const size_t kNumTssSlots = (kGdtSize - (GDT_FIRST_TSS / 8));
+
         /// Storage for the system's GDT
         static gdt_descriptor_t gGdt[kGdtSize];
+
+        /// next TSS index to allocate
+        static size_t gTssIndex;
 
         /// whehter GDT loads are logged
         static bool gLogLoad;

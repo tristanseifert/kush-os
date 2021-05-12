@@ -1,5 +1,6 @@
 #include "PerCpuInfo.h"
 
+#include "gdt.h"
 #include "idt.h"
 #include "IrqRegistry.h"
 
@@ -24,14 +25,12 @@ void PerCpuInfo::BspInit() {
     auto ptr = reinterpret_cast<ProcInfo *>(&gBspInfoStruct);
     auto proc = new(ptr) ProcInfo();
 
-    // write the MSRs
-    const auto procAddr = reinterpret_cast<uintptr_t>(proc);
-    x86_msr_write(X86_MSR_GSBASE, procAddr, procAddr >> 32);
-    x86_msr_write(X86_MSR_KERNEL_GSBASE, procAddr, procAddr >> 32);
-
     // install IDT
     proc->idt = gBspIdt;
     proc->irqRegistry = gBspIrqRegistry;
+
+    // once configured, install the structure
+    set(proc);
 }
 
 /**
@@ -48,7 +47,17 @@ void PerCpuInfo::ApInit() {
     proc->idt = new Idt;
     proc->irqRegistry = new IrqRegistry(proc->idt);
 
-    // store ptr
+    Gdt::AllocTss(proc->tss, proc->tssIndex, true);
+
+    // once configured, install the structure
+    set(proc);
+}
+
+/**
+ * Writes the MSRs for storing the base of the GS register, to point at the specified per processor
+ * info struct.
+ */
+void PerCpuInfo::set(ProcInfo *proc) {
     const auto procAddr = reinterpret_cast<uintptr_t>(proc);
     x86_msr_write(X86_MSR_GSBASE, procAddr, procAddr >> 32);
     x86_msr_write(X86_MSR_KERNEL_GSBASE, procAddr, procAddr >> 32);

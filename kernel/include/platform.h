@@ -180,6 +180,16 @@ void platform_request_dispatch();
 uint64_t platform_timer_now();
 
 /**
+ * Returns a core local timestamp.
+ *
+ * There is no guarantee that the values returned by this function on separate core have any sort
+ * of correlation, or that they start at a particular value at reset. It is only guaranteed that
+ * the values returned will be increasing, e.g. that two successive invocations on the same core
+ * will ALWAYS result in the second call's result being greater than the first.
+ */
+uint64_t platform_local_timer_now();
+
+/**
  * Registers a new timer callback.
  *
  * The given function is invoked at (or after -- there is no guarantee made as to the resolution of

@@ -32,7 +32,6 @@ using namespace arch;
  */
 void arch::InitThreadState(sched::Thread *thread, const uintptr_t pc, const uintptr_t arg) {
     // make space for the exception frame and initialize it
-    /// XXX: the +8 allows us to build a stack frame to enter the main function
     const auto frameSz = sizeof(CpuRegs);
     uintptr_t *params = reinterpret_cast<uintptr_t *>((uintptr_t) thread->stack - 20);
     auto frame = reinterpret_cast<CpuRegs *>((uintptr_t) thread->stack - frameSz - 20);
@@ -93,22 +92,24 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
 
     // update thread-local
 
-    // update syscall handler state
+    // update syscall handler and kernel stack in TSS
     syscall::Handler::handleCtxSwitch(to);
 
     // save state into current thread and switch to next
     if(from) {
         //log("old task %%esp = %p, new task %%esp = %p (stack %p)", from->regs.stackTop, to->regs.stackTop, to->stack);
         // set the running flags
-        __atomic_store(&from->isActive, &no, __ATOMIC_RELEASE);
-        __atomic_store(&to->isActive, &yes, __ATOMIC_RELEASE);
+        __atomic_store(&from->isActive, &no, __ATOMIC_RELAXED);
+        __atomic_store(&to->isActive, &yes, __ATOMIC_RELAXED);
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
 
         amd64_switchto_save(&from->regs, &to->regs);
     }
     // no thread context to save; just switch
     else {
         // log("new task %%esp = %p (stack %p)", to->regs.stackTop, to->stack);
-        __atomic_store(&to->isActive, &yes, __ATOMIC_RELEASE);
+        __atomic_store(&to->isActive, &yes, __ATOMIC_RELAXED);
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
 
         amd64_switchto(&to->regs);
     }

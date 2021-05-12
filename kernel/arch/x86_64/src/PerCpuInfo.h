@@ -1,8 +1,12 @@
 #ifndef ARCH_x86_64_PERCPUINFO_H
 #define ARCH_x86_64_PERCPUINFO_H
 
+// ProcInfo.syscallStack
 #define PROCI_OFF_SYSCALL_STACK         (24)
-#define PROCI_OFF_PLATFORM              (64)
+// ProcInfo.sched
+#define PROCI_OFF_SCHED                 (64)
+// ProcInfo.p
+#define PROCI_OFF_PLATFORM              (80)
 
 #ifndef ASM_FILE
 
@@ -11,6 +15,8 @@
 #if __has_include(<platform/CoreLocalInfo.h>)
 #include <platform/CoreLocalInfo.h>
 #endif
+
+struct amd64_tss;
 
 namespace sched {
 class Scheduler;
@@ -41,6 +47,11 @@ struct ProcInfo {
 
     /// IDT pointer
     arch::Idt *idt = nullptr;
+    /// core local TSS structure
+    struct amd64_tss *tss = nullptr;
+    /// core local TSS index
+    size_t tssIndex = 0;
+
     /// interrupt registration (core specific)
     arch::IrqRegistry *irqRegistry = nullptr;
 
@@ -58,8 +69,13 @@ struct ProcInfo {
     ProcInfo() {
         this->selfPtr = this;
     }
+    /// Return the scheduler pointer
+    inline auto getScheduler() {
+        return this->sched;
+    }
 };
 static_assert(offsetof(ProcInfo, syscallStack) == PROCI_OFF_SYSCALL_STACK);
+static_assert(offsetof(ProcInfo, sched) == PROCI_OFF_SCHED);
 #if PLATFORM_WANTS_CORE_LOCAL
 static_assert(offsetof(ProcInfo, p) == PROCI_OFF_PLATFORM);
 #endif
@@ -81,7 +97,15 @@ class PerCpuInfo {
             asm volatile("movq %%gs:0, %0" : "=r"(ptr));
             return ptr;
         }
+        /// Return pointer to the scheduler structure.
+        static inline auto scheduler() {
+            sched::Scheduler *ptr;
+            asm volatile("movq %%gs:PROCI_OFF_SCHED, %0" : "=r"(ptr));
+            return ptr;
+        }
 
+    private:
+        static void set(ProcInfo *);
 };
 
 /**

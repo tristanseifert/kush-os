@@ -1,5 +1,6 @@
 #include "gdt.h"
 
+#include <mem/Heap.h>
 #include <mem/StackPool.h>
 
 #include <log.h>
@@ -16,13 +17,17 @@ gdt_descriptor_t Gdt::gGdt[Gdt::kGdtSize] __attribute__((aligned(64)));
 /// TSS for bootstrap processor
 static amd64_tss_t gBspTss;
 
+// XXX: these should be made larger to match the stack pool size
 /// Size of the IRQ stack (in 8 byte units)
-constexpr static const size_t kIrqStackSz = 256;
+constexpr static const size_t kIrqStackSz = 512;
 /// Interrupt stacks for the bootstrap processor
 static __attribute__((aligned(64))) uintptr_t gBspIrqStacks[7][kIrqStackSz];
 
 bool Gdt::gLogLoad = false;
 bool Gdt::gLogSet = false;
+
+/// next TSS index to allocate (for an AP)
+size_t Gdt::gTssIndex = 1;
 
 /**
  * Loads the task register with the TSS in the given descriptor.
@@ -151,6 +156,68 @@ void Gdt::Load(const size_t numTss) {
     if(gLogLoad) log("Load GDT %p len %u", GDTR.base, GDTR.length);
 
     amd64_gdt_flush();
+}
+
+/**
+ * Allocates a new TSS for an AP core, initializes it and allocate and configure some
+ * interrupt stacks as well.
+ *
+ * @param outTss Pointer to the allocated TSS
+ * @param outTssIdx TSS slot index in the GDT (for activation)
+ * @param load Whether the TSS should be activated before returning
+ */
+void Gdt::AllocTss(amd64_tss_t* &outTss, size_t &outTssIdx, const bool load) {
+    amd64_tss_t *tss = nullptr;
+    size_t tssIdx;
+
+    // allocate the interrupt stacks 
+    constexpr static const size_t kIrqStackBytes = kIrqStackSz * 8;
+
+    void *irqStackBottom[7] = {0};
+    for(size_t i = 0; i < 7; i++) {
+        size_t stackBytes = 0;
+
+        // allocate a stack
+        auto stack = mem::StackPool::get(stackBytes);
+        REQUIRE(stack, "failed to allocate %s", "irq stack");
+        REQUIRE(stackBytes >= kIrqStackBytes, "irq stack too small (%lu) expected %lu",
+                stackBytes, kIrqStackBytes);
+
+        // zero it out
+        void *stackTop = reinterpret_cast<void*>(
+                reinterpret_cast<uintptr_t>(stack) - stackBytes);
+
+        memset(stackTop, 0, stackBytes);
+        irqStackBottom[i] = stack;
+    }
+
+    // allocate the TSS and slot into the GDT
+    tss = static_cast<amd64_tss_t *>(mem::Heap::allocAligned(sizeof(amd64_tss_t), 64));
+    REQUIRE(tss, "failed to allocate %s", "TSS");
+
+    tssIdx = __atomic_fetch_add(&gTssIndex, 1, __ATOMIC_RELAXED);
+    REQUIRE(tssIdx < kNumTssSlots, "all TSS slots full (%lu)", tssIdx);
+
+    // initialize the TSS and install interrupt stacks
+    InitTss(tss);
+
+    for(size_t i = 0; i < 7; i++) {
+        const auto stack = reinterpret_cast<uintptr_t>(irqStackBottom[i]);
+
+        tss->ist[i].low = stack & 0xFFFFFFFF;
+        tss->ist[i].high = stack >> 32ULL;
+    }
+
+    // install TSS into GDT and load if requested
+    InstallTss(tssIdx, tss);
+
+    outTss = tss;
+    outTssIdx = tssIdx;
+
+    if(load) {
+        // XXX: do we need to invalidate GDT?
+        ActivateTask(tssIdx);
+    }
 }
 
 /**

@@ -136,25 +136,72 @@ void Scheduler::yield(const Thread::State state) {
     panic("%s unimplemented", __PRETTY_FUNCTION__);
 }
 
+/**
+ * Selects the next runnable thread.
+ *
+ * This will go through every level's run queue, from highest to lowest priority, and attempt to
+ * pop a thread from its run queue. If successful, a thread is returned immediately. Otherwise,
+ * if no other thread has modified any of the run queues since, we'll exit to allow scheduling of
+ * the idle thread.
+ *
+ * We detect whether another thread modified the queues by testing whether the `levelEpoch` field
+ * changed between the start and end of our loop. If so, we restart the search up to a specified
+ * number of times before giving up.
+ *
+ * @return The highest priority runnable thread, or `nullptr` if none.
+ */
+Thread *Scheduler::findRunnableThread() {
+    size_t tries = 0;
+    uint64_t epoch, newEpoch;
+    bool epochChanged;
+    Thread *thread = nullptr;
 
+beach:;
+    // read the current epoch and check each run queue
+    epoch = __atomic_load_n(&this->levelEpoch, __ATOMIC_RELAXED);
+    newEpoch = epoch + 1;
+
+    for(size_t i = 0; i < kNumLevels; i++) {
+        auto &level = this->levels[i];
+
+        if(level.storage.pop(thread, rt::LockFreeQueueFlags::kPartialPop)) {
+            // found a thread, update last schedule timestamp
+            level.lastScheduledTsc = platform_local_timer_now();
+
+            return thread;
+        }
+    }
+
+    // if we get here, no thread was found. check if epoch changed
+    epochChanged = !__atomic_compare_exchange_n(&this->levelEpoch, &epoch, newEpoch, false,
+            __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+
+    if(epochChanged && ++tries <= this->levelChangeMaxLoops) {
+        goto beach;
+    }
+
+    // exceeded max retries or epoch hasn't changed, so do idle behavior
+    return nullptr;
+}
 
 /**
- * Sends a dispatch IPI on the current core if the run queue has been dirtied.
+ * Checks if there's a thread ready to run with a higher priority than the currently executing one,
+ * and if so, sends a scheduler IPI request that will be serviced on return from the current ISR.
  *
- * Since the scheduler structures can't be updated above the scheduler IRQL (such as from an
- * interrupt context) any pending run queue insertions (which are stored in a separate queue) are
- * processed by the scheduler in an IPI.
+ * @return Whether a higher priority thread became runnable
  */
-void Scheduler::lazyDispatch() {
+bool Scheduler::lazyDispatch() {
     // exit if run queue is not dirty
     bool yes = true, no = false;
 
     if(!__atomic_compare_exchange(&this->isDirty, &yes, &no, false, __ATOMIC_RELEASE,
                 __ATOMIC_RELAXED)) {
-        return;
+        return false;
     }
 
     // perform IPI
+    platform_request_dispatch();
+    return true;
 }
 
 

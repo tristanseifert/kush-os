@@ -11,6 +11,7 @@
 
 #include <bootboot.h>
 #include <stdint.h>
+#include <x86intrin.h>
 
 using namespace platform;
 
@@ -54,3 +55,11 @@ void platform_vm_available() {
 
     // signal APs to start and wait
 }
+
+/**
+ * Read out the TSC of the processor for the core local timestamp.
+ */
+uint64_t platform_local_timer_now() {
+    return __rdtsc();
+}
+

@@ -1,5 +1,5 @@
-#ifndef ARCH_X86_THREADSTATE_H
-#define ARCH_X86_THREADSTATE_H
+#ifndef ARCH_X86_64_THREADSTATE_H
+#define ARCH_X86_64_THREADSTATE_H
 
 // we have to manually define structs offsets for our assembler code
 #define TS_OFF_STACKTOP                 0
@@ -9,10 +9,11 @@
 #ifndef ASM_FILE
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 namespace arch {
 /**
- * Processor state for an x86 thread.
+ * Processor state for an x86_64 thread.
  * 
  * This includes an area for the floating point state. We only save this state when the thread is
  * context switched out if the "FPU used" flag is set. We'll periodically clear this flag if
@@ -42,10 +43,150 @@ struct ThreadState {
 };
 
 /**
- * Task state specific to an x86 processor
+ * Task state specific to an x86_64 processor
  */
 struct TaskState {
-    // nothing 
+    /**
+     * IO permission bitmap, or `nullptr` if the task is not allowed to make any IO calls. Unlike
+     * on 32-bit Intel, we can't use the TSS' IOPB so all IO accesses are performed via syscalls
+     * (because they're reasonably infrequent) and this bitmap serves as an allow list for IO port
+     * accesses.
+     *
+     * When a task requests the IO privilege, we'll allocate an 8K bitmap (for the 64K IO address
+     * space) which is initially set to all 0's, indicating no IO ports may be accessed. The task
+     * may then add or remove ports to this list via syscalls, until the bitmap is locked, at
+     * which point no further port rights can be added: they can only be removed.
+     */
+    uint8_t *ioBitmap = nullptr;
+    /// whether the IO bitmap has been locked
+    bool ioBitmapLocked = false;
+
+    /**
+     * Releases any buffers and other resources allocated for the task.
+     */
+    ~TaskState() {
+        if(this->ioBitmap) {
+            delete[] this->ioBitmap;
+        }
+    }
+
+    /**
+     * Initializes the IO permissions bitmap.
+     *
+     * @return true if successful, false if memory allocation failed
+     */
+    bool initIoPermissions() {
+        // disallow reallocation
+        if(this->ioBitmap) return false;
+
+        // allocate the buffer
+        auto map = new uint8_t[kIopbBytes];
+        if(!map) return false;
+
+        // zero it and save
+        memset(map, 0, kIopbBytes);
+        this->ioBitmap = map;
+
+        return true;
+    }
+
+    /**
+     * Test whether a particular IO port range can be accessed.
+     *
+     * @param base IO port base to test for access permissions
+     * @param len Length of IO port range to test
+     *
+     * @return Whether the access is allowed
+     */
+    bool testIoRange(const uint16_t base, const uint16_t len) const {
+        // ensure we've got an IO bitmap, and that the inputs are valid
+        if(!this->ioBitmap) return false;
+        else if(!len) return false;
+        else if((static_cast<size_t>(base) + static_cast<size_t>(len)) > UINT16_MAX) return false;
+
+        // test the appropriate number of bits (common optimizations)
+        switch(len) {
+            // byte
+            case 1:
+                return this->testIoPort(base    );
+            // word
+            case 2:
+                return this->testIoPort(base    ) && this->testIoPort(base + 1);
+            // dword
+            case 4:
+                return this->testIoPort(base    ) && this->testIoPort(base + 1) &&
+                       this->testIoPort(base + 2) && this->testIoPort(base + 3);
+
+            // unknown length, do a slow test
+            default:
+                for(size_t i = base; i < (base + len); i++) {
+                    const auto byte = this->ioBitmap[i / 8];
+                    if(!(byte & (1 << (1 % 8)))) return false;
+                }
+
+                return true;
+        }
+    }
+
+    /**
+     * Add an IO port range to the allow list so it can be accessed.
+     *
+     * @note Once the bitmap is locked, it's not possible to add any new IO ports to the list.
+     *
+     * @param base First IO port address
+     * @param len Number of subsequent IO port addresses to add to list
+     *
+     * @return Whether the IO port range was successfully added to the allow list
+     */
+    bool allowIoRange(const uint16_t base, const uint16_t len) {
+        // validate inputs
+        if(!this->ioBitmap || this->ioBitmapLocked) return false;
+        else if(!len) return false;
+        else if((static_cast<size_t>(base) + static_cast<size_t>(len)) > UINT16_MAX) return false;
+
+        // mark as allowed (set the bit)
+        for(size_t i = base; i < (base + len); i++) {
+            this->ioBitmap[i / 8] |= (1 << (i % 8));
+        }
+
+        return true;
+    }
+
+    /**
+     * Removes an IO port range from the IO allow list.
+     *
+     * @note This call is allowed after the access bitmap has been locked.
+     *
+     * @param base First IO port address
+     * @param len Number of subsequent IO port addresses to remove from list
+     *
+     * @return Whether the IO port range was removed from the allow list
+     */
+    bool disallowIoRange(const uint16_t base, const uint16_t len) {
+        // validate inputs
+        if(!this->ioBitmap) return false;
+        else if(!len) return false;
+        else if((static_cast<size_t>(base) + static_cast<size_t>(len)) > UINT16_MAX) return false;
+
+        // mark as prohibited (mask off bit)
+        for(size_t i = base; i < (base + len); i++) {
+            this->ioBitmap[i / 8] &= ~(1 << (i % 8));
+        }
+
+        return true;
+    }
+
+    private:
+        constexpr static const size_t kIopbBytes = (65536 / 8);
+
+    private:
+        /**
+         * Tests whether a single IO port is accessible. No sanity checking is performed; it's
+         * assumed the IO bitmap exists.
+         */
+        inline bool testIoPort(const uint16_t base) const {
+            return (this->ioBitmap[base / 8] % (1 << (base % 8))) != 0;
+        }
 };
 
 /**

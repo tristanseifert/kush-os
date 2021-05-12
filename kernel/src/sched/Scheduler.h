@@ -65,12 +65,15 @@ class Scheduler {
         /// Yields the remainder of the current thread's CPU time.
         void yield(const Thread::State state = Thread::State::Runnable);
 
-        /// If the run queue has been dirtied, send a scheduler IPI
-        void lazyDispatch();
+        /// Check if a higher priority thread is runnable and prepare to switch to it
+        bool lazyDispatch();
 
     private:
         static void Init();
         static void InitAp();
+
+        /// Finds the highest priority runnable thread on this core
+        Thread *findRunnableThread();
 
         /// updates the current CPU's running thread
         void setRunningThread(Thread *t) {
@@ -82,18 +85,20 @@ class Scheduler {
 
     private:
         /**
-         * Each level is made up of a queue (implemented as a doubly-linked list) and a lock that
-         * protects access to that queue.
+         * Each level contains a lock free FIFO queue that contains the list of threads that are
+         * runnable. This mechanism supports multiple producers and consumers, allowing for low
+         * overhead work stealing when a core becomes idle.
          *
-         * In most cases, this queue is accessed only by the core that owns this scheduler, so the
-         * locking should be a negligible overhead.
+         * Additionally, some metadata and timestamps (in core local time) are stored that allow
+         * the scheduler to prevent resource starvation.
          */
         struct Level {
-            /// Lock for the queue
-            DECLARE_SPINLOCK(lock);
+            public:
+                /// Queue of runnable threads in this level
+                rt::LockFreeQueue<Thread *> storage;
 
-            /// List (treated as a queue) of runnable threads
-            rt::LockFreeQueue<Thread *> storage;
+                /// Last time a thread from this level was scheduled
+                uint64_t lastScheduledTsc = 0;
         };
 
     private:
@@ -116,6 +121,22 @@ class Scheduler {
 
         /// Each of the levels that may contain a thread to run
         Level levels[kNumLevels];
+
+        /**
+         * Epoch for the run queues. This is incremented any time the levels' queues are modified,
+         * and is used when selecting a runnable thread so that if a queue was updated during a
+         * run queue scan, we'll restart the scan if no results were found instead of scheduling
+         * the idle thread.
+         *
+         * There is no actual meaning behind the value other than it is a monotonically increasing
+         * value.
+         */
+        uint64_t levelEpoch = 0;
+        /**
+         * Maximum number of times to repeat the search for a runnable thread if we detect that
+         * another core modified our run queues.
+         */
+        size_t levelChangeMaxLoops = 5;
 
     public:
         /// idle worker
