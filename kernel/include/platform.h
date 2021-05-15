@@ -190,6 +190,13 @@ uint64_t platform_timer_now();
 uint64_t platform_local_timer_now();
 
 /**
+ * Determines a relative cost value between two cores, as identified by their IDs.
+ *
+ * @return Negative if error, or a cost value [0, INT_MAX).
+ */
+int platform_core_distance(const uintptr_t a, const uintptr_t b);
+
+/**
  * Registers a new timer callback.
  *
  * The given function is invoked at (or after -- there is no guarantee made as to the resolution of

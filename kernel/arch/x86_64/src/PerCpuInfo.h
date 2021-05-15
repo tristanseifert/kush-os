@@ -70,8 +70,12 @@ struct ProcInfo {
         this->selfPtr = this;
     }
     /// Return the scheduler pointer
-    inline auto getScheduler() {
+    inline auto getScheduler() const {
         return this->sched;
+    }
+    /// Return the core's platform specific ID
+    inline auto getCoreId() const {
+        return this->procId;
     }
 };
 static_assert(offsetof(ProcInfo, syscallStack) == PROCI_OFF_SYSCALL_STACK);

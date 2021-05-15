@@ -8,6 +8,7 @@
 #include "mem/SlabAllocator.h"
 
 #include <arch/critical.h>
+#include <arch/rwlock.h>
 #include <arch/PerCpuInfo.h>
 
 #include <platform.h>
@@ -17,6 +18,11 @@
 using namespace sched;
 
 Task *sched::gKernelTask = nullptr;
+
+/// rwlock for the global list of scheduler instances (across all cores)
+DECLARE_RWLOCK_S(gSchedulersLock);
+/// list of all scheduler instances
+rt::Vector<Scheduler::InstanceInfo> *Scheduler::gSchedulers = nullptr;
 
 /**
  * Initializes the global (shared) scheduler structures, as well as the scheduler for the calling
@@ -59,14 +65,44 @@ Scheduler *Scheduler::get() {
  * Sets up the scheduler.
  */
 Scheduler::Scheduler() {
+    // insert into the global list of schedulers
+    InstanceInfo info(this);
+    info.coreId = arch::GetProcLocal()->getCoreId();
+
+    RW_LOCK_WRITE(&gSchedulersLock);
+    if(!gSchedulers) {
+        gSchedulers = new rt::Vector<InstanceInfo>;
+    }
+
+    gSchedulers->push_back(info);
+    RW_UNLOCK_WRITE(&gSchedulersLock);
+
     // set up our idle worker
     this->idle = new IdleWorker(this);
+
+    // initialization is done. ensure other schedulers update their peer lists
+    invalidateAllPeerList(this);
 }
 
 /**
  * Tears down the idle worker.
  */
 Scheduler::~Scheduler() {
+    // remove the scheduler from the global list
+    RW_LOCK_WRITE(&gSchedulersLock);
+
+    for(size_t i = 0; i < gSchedulers->size(); i++) {
+        const auto &info = (*gSchedulers)[i];
+        if(info.instance != this) continue;
+
+        gSchedulers->remove(i);
+        break;
+    }
+
+    RW_UNLOCK_WRITE(&gSchedulersLock);
+
+    invalidateAllPeerList(this);
+
     delete this->idle;
 }
 
@@ -202,6 +238,70 @@ bool Scheduler::lazyDispatch() {
     // perform IPI
     platform_request_dispatch();
     return true;
+}
+
+/**
+ * Iterates over the list of all schedulers and marks their peer lists as dirty. This will cause
+ * that core to recompute its peers next time it becomes idle and needs to steal work.
+ *
+ * @param skip Scheduler instance to skip marking as having an invalid peer list
+ */
+void Scheduler::invalidateAllPeerList(Scheduler *skip) {
+    RW_LOCK_READ(&gSchedulersLock);
+
+    for(const auto &info : *gSchedulers) {
+        auto sched = info.instance;
+        if(sched == skip) continue;
+
+        sched->invalidatePeerList();
+    }
+
+    RW_UNLOCK_READ(&gSchedulersLock);
+}
+
+/**
+ * Iterates the list of all schedulers, and produces a version of this sorted in ascending order by
+ * the cost of moving a thread from that core. This is used for work stealing.
+ *
+ * Sorting is by means of an insertion sort. This doesn't scale very well but even for pretty
+ * ridiculous core counts this should not be too terribly slow; especially considering this code
+ * runs very, very rarely, and even then, only when the core is otherwise idle.
+ *
+ * @note This may only be called from the core that owns this scheduler, as this is the only core
+ * that may access the peer list.
+ */
+void Scheduler::buildPeerList() {
+    // clear the old list of peers
+    this->peers.clear();
+
+    RW_LOCK_READ_GUARD(gSchedulersLock);
+    const auto numSchedulers = gSchedulers->size();
+
+    // if only one core, we have no peers
+    if(numSchedulers == 1) return;
+    this->peers.reserve(numSchedulers - 1);
+
+    // iterate over list of peers to copy the infos and insert in sorted order
+    const auto myId = arch::GetProcLocal()->getCoreId();
+
+    for(const auto &info : *gSchedulers) {
+        const auto cost = platform_core_distance(myId, info.coreId);
+
+        // find index to insert at; it goes immediately before the first with a HIGHER cost
+        size_t i = 0;
+        for(i = 0; i < this->peers.size(); i++) {
+            const auto &peer = this->peers[i];
+
+            if(cost <= platform_core_distance(myId, peer.coreId)) goto beach;
+        }
+
+beach:;
+        // actually insert it
+        this->peers.insert(i, info);
+    }
+
+    // clear the dirty flag
+    __atomic_clear(&this->peersDirty, __ATOMIC_RELAXED);
 }
 
 

@@ -63,3 +63,12 @@ uint64_t platform_local_timer_now() {
     return __rdtsc();
 }
 
+
+
+/**
+ * TODO: implement this
+ */
+int platform_core_distance(const uintptr_t a, const uintptr_t b) {
+    return 0;
+}
+

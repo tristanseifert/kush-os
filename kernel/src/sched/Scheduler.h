@@ -80,6 +80,15 @@ class Scheduler {
             this->running = t;
         }
 
+        /// invalidates all schedulers' peer lists
+        static void invalidateAllPeerList(Scheduler *skip = nullptr);
+        /// invalidates the peer list of this scheduler
+        inline void invalidatePeerList() {
+            __atomic_store_n(&this->peersDirty, true, __ATOMIC_RELEASE);
+        }
+        /// rebuilds the peer map
+        void buildPeerList();
+
         Scheduler();
         ~Scheduler();
 
@@ -101,7 +110,29 @@ class Scheduler {
                 uint64_t lastScheduledTsc = 0;
         };
 
+        /**
+         * Describes information on a particular core's scheduler instance. This consists of a
+         * pointer to its scheduler instance as well as some core identification information.
+         *
+         * This is primarily accessed by idle cores when looking for work to steal. Each core's
+         * local scheduler will build a list of cores to steal from, in ascending order of some
+         * platform defined "cost" of migrating a thread off of that source core. This allows us
+         * to be aware of things like cache structures, SMP, and so forth.
+         */
+        struct InstanceInfo {
+            /// core ID (platform specific)
+            uintptr_t coreId = 0;
+            /// scheduler running on this core
+            Scheduler *instance = nullptr;
+
+            InstanceInfo() = default;
+            InstanceInfo(Scheduler *_instance) : instance(_instance) {}
+        };
+
     private:
+        /// all schedulers on the system. used for work stealing
+        static rt::Vector<InstanceInfo> *gSchedulers;
+
         /// the thread that is currently being executed
         Thread *running = nullptr;
 
@@ -137,6 +168,16 @@ class Scheduler {
          * another core modified our run queues.
          */
         size_t levelChangeMaxLoops = 5;
+
+        /**
+         * List of other cores' schedulers, ordered by ascending cost of migrating a thread from
+         * that core. This list is used when looking for work to steal when we become idle.
+         *
+         * The list is built lazily when we're idle and the dirty flag is set.
+         */
+        rt::Vector<InstanceInfo> peers;
+        /// when set, the peer map is dirty and must be updated
+        bool peersDirty = true;
 
     public:
         /// idle worker

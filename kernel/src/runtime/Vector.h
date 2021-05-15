@@ -127,18 +127,39 @@ class Vector {
          * Inserts a new item to the end of the vector.
          */
         void push_back(const T value) {
-            // grow the buffer if needed
-            if(!this->storage || this->numReserved == this->numAllocated) {
-                // TODO: better growing algorithm
-                const auto nItems = this->numReserved + 64;
-                const size_t newSz = nItems * sizeof(T);
-
-                this->storage = reinterpret_cast<T *>(mem::Heap::realloc(this->storage, newSz));
-                this->numReserved = nItems;
-            }
+            this->ensureStorage();
 
             // insert at the end
             this->storage[this->numAllocated++] = value;
+        }
+        /**
+         * Inserts an item at the given index.
+         *
+         * @param index Index to add the item at, in the range of [0, size].
+         */
+        void insert(const size_t index, const T value) {
+            REQUIRE(index <= this->numAllocated, "vector access out of bounds: %zu", index);
+
+            // end of vector case
+            if(index == this->numAllocated) {
+                return this->push_back(value);
+            }
+            // we'll have to shift items
+            else {
+                // ensure there's space for one more item
+                this->ensureStorage();
+
+                // then shift items down and insert at desired index
+                const auto toMove = (this->numAllocated - index);
+                if(toMove) {
+                    memmove(&this->storage[index+1], &this->storage[index], toMove * sizeof(T));
+                }
+
+                this->storage[index] = value;
+
+                // update counts
+                this->numAllocated++;
+            }
         }
         /**
          * Removes the item at the given index.
@@ -200,6 +221,22 @@ class Vector {
         T& operator[](const size_t index) {
             REQUIRE(index < this->numAllocated, "vector access out of bounds: %zu", index);
             return this->storage[index];
+        }
+
+    private:
+        /**
+         * Allocates the storage buffer or resizes it if needed.
+         */
+        void ensureStorage() {
+            if(!this->storage || this->numReserved == this->numAllocated) {
+                // TODO: better growing algorithm
+                const auto nItems = this->numReserved + 64;
+                const size_t newSz = nItems * sizeof(T);
+
+                this->storage = reinterpret_cast<T *>(mem::Heap::realloc(this->storage, newSz));
+                this->numReserved = nItems;
+            }
+
         }
 
     private:
