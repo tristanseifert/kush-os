@@ -45,6 +45,8 @@ int arch_backtrace(void *stack, char *buf, const size_t bufLen);
 #ifdef __cplusplus
 }
 
+#include <runtime/SmartPointers.h>
+
 namespace sched {
 struct Task;
 struct Thread;
@@ -63,7 +65,7 @@ int PrintState(const void *state, char *buf, const size_t bufLen);
  * When invoked, we're executing in the task's context, and its virtual memory mappings will be
  * active.
  */
-void TaskWillStart(sched::Task *task);
+void TaskWillStart(rt::SharedPtr<sched::Task> &task);
 
 /**
  * Initializes a thread's state so that it will begin executing at the given address.
@@ -83,7 +85,8 @@ int PushDpcHandlerFrame(sched::Thread *thread);
  * function; inevitably, this would probably lead in either a syscall return, or an interrupt frame
  * being popped, returning to that task.
  */
-void RestoreThreadState(sched::Thread *from, sched::Thread *to);
+void RestoreThreadState(const rt::SharedPtr<sched::Thread> &from,
+        const rt::SharedPtr<sched::Thread> &to);
 
 /**
  * Performs a return to user mode code, with the given instruction pointer and stack pointer.

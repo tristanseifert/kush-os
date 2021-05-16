@@ -4,6 +4,7 @@
 #include <platform.h>
 #include <log.h>
 
+#include <runtime/SmartPointers.h>
 #include <mem/PhysicalAllocator.h>
 #include <sched/Scheduler.h>
 #include <sched/Task.h>
@@ -36,7 +37,7 @@ static void AllocSrvStack(const uintptr_t, const uintptr_t);
 /**
  * Loads the root server binary from the ramdisk.
  */
-sched::Task *platform_init_rootsrv() {
+rt::SharedPtr<sched::Task> platform_init_rootsrv() {
     // create the task
     auto task = sched::Task::alloc();
     REQUIRE(task, "failed to allocate rootsrv task");
@@ -44,7 +45,7 @@ sched::Task *platform_init_rootsrv() {
     task->setName("rootsrv");
 
 #if LOG_SETUP
-    log("created rootsrv task: %p $%016llx'h", task, task->handle);
+    log("created rootsrv task: %p $%016llx'h", static_cast<void *>(task), task->handle);
 #endif
 
     // create the main thread
@@ -53,7 +54,7 @@ sched::Task *platform_init_rootsrv() {
     main->setName("Main");
 
 #if LOG_SETUP
-    log("rootsrv thread: $%p $%p'h", main, main->handle);
+    log("rootsrv thread: $%p $%p'h", static_cast<void *>(main), main->handle);
 #endif
 
     // schedule it

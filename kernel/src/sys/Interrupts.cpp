@@ -20,7 +20,7 @@ using namespace sys;
  * - Arg2: Notification bits to send
  */
 intptr_t sys::IrqHandlerInstall(const Syscall::Args *args, const uintptr_t number) {
-    sched::Thread *thread = nullptr;
+    rt::SharedPtr<sched::Thread> thread = nullptr;
 
     // resolve thread handle
     if(args->args[1]) {
@@ -76,15 +76,14 @@ intptr_t sys::IrqHandlerRemove(const Syscall::Args *args, const uintptr_t number
 
     // remove the handler and delete it
     RW_LOCK_WRITE_GUARD(handlerThread->lock);
-    handlerThread->irqHandlers.removeMatching([](void *ctx, ipc::IrqHandler *handler) {
-        auto irq = reinterpret_cast<ipc::IrqHandler *>(ctx);
+    handlerThread->irqHandlers.removeMatching([](void *ctx, rt::SharedPtr<ipc::IrqHandler> &handler) {
+        auto key = reinterpret_cast<ipc::IrqHandler *>(ctx);
 
-        if(irq == handler) {
-            delete handler;
+        if(key == handler.get()) {
             return true;
         }
         return false;
-    }, irq);
+    }, irq.get());
 
     return Errors::Success;
 }

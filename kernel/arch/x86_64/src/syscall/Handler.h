@@ -6,6 +6,8 @@
 
 #include <sched/Task.h>
 #include <sched/Thread.h>
+#include <runtime/SmartPointers.h>
+
 #include <arch.h>
 #include <arch/x86_msr.h>
 #include <arch/PerCpuInfo.h>
@@ -42,12 +44,12 @@ class Handler {
          * When switching to a task, set its stack as the syscall stack in the per-CPU info
          * structure.
          */
-        static inline void handleCtxSwitch(sched::Thread *thread) {
+        static inline void handleCtxSwitch(const rt::SharedPtr<sched::Thread> &thread) {
             PerCpuInfo::get()->syscallStack = thread->stack;
         }
 
         /// Prepares the given task
-        static inline void taskCreated(sched::Task *task) {
+        static inline void taskCreated(rt::SharedPtr<sched::Task> &task) {
             gShared->mapTimePage(task);
         }
 
@@ -55,7 +57,7 @@ class Handler {
         static void init();
 
         Handler();
-        void mapTimePage(sched::Task *);
+        void mapTimePage(rt::SharedPtr<sched::Task> &);
 
         void updateTime();
 

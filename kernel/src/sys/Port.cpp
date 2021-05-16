@@ -134,7 +134,8 @@ intptr_t sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
         }
         // other receive error
         else {
-            log("failed to receive from port %p ($%08x'h): %d", port, port->getHandle(), err);
+            log("failed to receive from port %p ($%llx'h): %d", static_cast<void *>(port),
+                    port->getHandle(), err);
             return Errors::GeneralError;
         }
     }
@@ -227,7 +228,6 @@ intptr_t sys::PortDealloc(const Syscall::Args *args, const uintptr_t number) {
 
     // actually perform the removal and release the port
     task->removePort(port);
-    ipc::Port::free(port);
 
     return Errors::Success;
 }

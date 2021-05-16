@@ -24,17 +24,14 @@ uint32_t Thread::nextTid = 1;
 /**
  * Allocates a new thread.
  */
-Thread *Thread::kernelThread(Task *parent, void (*entry)(uintptr_t), const uintptr_t param) {
-    return new Thread(parent, (uintptr_t) entry, param, true);
-}
+rt::SharedPtr<Thread> Thread::kernelThread(rt::SharedPtr<Task> &parent, void (*entry)(uintptr_t),
+        const uintptr_t param) {
+    auto ptr = rt::MakeShared<Thread>(parent, (uintptr_t) entry, param, true);
+    ptr->handle = handle::Manager::makeThreadHandle(ptr);
 
-/**
- * Frees a previously allocated thread.
- *
- * @note The thread MUST NOT be scheduled or running.
- */
-void Thread::free(Thread *ptr) {
-    delete ptr;
+    // add to the parent task
+    parent->addThread(ptr);
+    return ptr;
 }
 
 
@@ -42,26 +39,19 @@ void Thread::free(Thread *ptr) {
 /**
  * Allocates a new thread.
  */
-Thread::Thread(Task *_parent, const uintptr_t pc, const uintptr_t param, const bool _kernel) : 
-    task(_parent), kernelMode(_kernel) {
+Thread::Thread(rt::SharedPtr<Task> &_parent, const uintptr_t pc, const uintptr_t param,
+        const bool _kernel) : task(_parent), kernelMode(_kernel) {
     this->tid = nextTid++;
 
     // get a kernel stack
     this->stack = mem::StackPool::get(this->stackSize);
     REQUIRE(this->stack, "failed to get stack for thread %p", this);
 
-    log("new thread %p (%u) stack %p parent %p", this, this->tid, this->stack, this->task);
+    log("new thread %p (%u) stack %p parent %p", this, this->tid, this->stack,
+            static_cast<void *>(this->task));
 
     // then initialize thread state
     arch::InitThreadState(this, pc, param);
-
-    // and add to task
-    if(_parent) {
-        _parent->addThread(this);
-    }
-
-    // allocate a handle
-    this->handle = handle::Manager::makeThreadHandle(this);
 }
 
 /**
@@ -69,9 +59,7 @@ Thread::Thread(Task *_parent, const uintptr_t pc, const uintptr_t param, const b
  */
 Thread::~Thread() {
     // remove IRQ handlers
-    for(const auto handler : this->irqHandlers) {
-        delete handler;
-    }
+    this->irqHandlers.clear();
 
     // invoke termination handlers
     while(!this->terminateSignals.empty()) {
@@ -94,7 +82,7 @@ Thread::~Thread() {
 /**
  * Returns the currently executing thread.
  */
-Thread *Thread::current() {
+rt::SharedPtr<Thread> Thread::current() {
     return Scheduler::get()->runningThread();
 }
 
@@ -103,8 +91,8 @@ Thread *Thread::current() {
  */
 void Thread::switchFrom() {
     if(this->lastSwitchedTo) {
-        const auto ran = platform_timer_now() - this->lastSwitchedTo;
-        __atomic_fetch_add(&this->cpuTime, ran, __ATOMIC_RELEASE);
+        //const auto ran = platform_timer_now() - this->lastSwitchedTo;
+        //__atomic_fetch_add(&this->cpuTime, ran, __ATOMIC_RELAXED);
     }
 
     // if we've DPCs, execute them
@@ -136,9 +124,10 @@ void Thread::switchTo() {
 
     this->lastSwitchedTo = platform_timer_now();
 
+    auto to = handle::Manager::getThread(this->handle);
     //log("switching to %s (from %s)", this->name, current ? (current->name) : "<null>");
-    Scheduler::get()->setRunningThread(this);
-    arch::RestoreThreadState(current, this);
+    Scheduler::get()->setRunningThread(to);
+    arch::RestoreThreadState(current, to);
 }
 
 /**

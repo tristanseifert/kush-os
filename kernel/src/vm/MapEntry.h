@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <bitflags.h>
+#include <runtime/SmartPointers.h>
 #include <runtime/List.h>
 #include <runtime/Vector.h>
 #include <handle/Manager.h>
@@ -54,35 +55,14 @@ class MapEntry {
     friend class Map;
     friend class Mapper;
 
+    private:
+
     public:
         // you prob shouldn't really use these
         MapEntry(const size_t length, const MappingFlags flags);
         ~MapEntry();
 
     public:
-        /**
-         * Increments the reference count.
-         */
-        auto retain() {
-            __atomic_add_fetch(&this->refCount, 1, __ATOMIC_RELEASE);
-            return this;
-        }
-
-        /**
-         * Decrements the reference count. If we reach zero, the object is deleted.
-         */
-        MapEntry *release() {
-            REQUIRE(this->refCount, "attempt to release %p with zero refcount", this);
-
-            const auto count = __atomic_sub_fetch(&this->refCount, 1, __ATOMIC_RELEASE);
-            if(!count) {
-                free(this);
-                return nullptr;
-            }
-
-            return this;
-        }
-
         /// Returns the handle for the object
         const Handle getHandle() const {
             return this->handle;
@@ -111,10 +91,10 @@ class MapEntry {
         int resize(const size_t newSize);
 
         /// Allocates a VM object backed by a region of contiguous physical pages
-        static MapEntry *makePhys(const uint64_t physAddr, const size_t length,
+        static rt::SharedPtr<MapEntry> makePhys(const uint64_t physAddr, const size_t length,
                 const MappingFlags flags, const bool kernel = false);
         /// Allocates an anonymous VM object
-        static MapEntry *makeAnon(const size_t length, const MappingFlags flags,
+        static rt::SharedPtr<MapEntry> makeAnon(const size_t length, const MappingFlags flags,
                 const bool kernel = false);
         /// Releases a VM object
         static void free(MapEntry *entry);
@@ -127,8 +107,8 @@ class MapEntry {
             /// physical address of page
             uint64_t physAddr = 0;
 
-            /// task that originally allocated this
-            sched::Task *task = nullptr;
+            /// task that originally allocated this page
+            rt::WeakPtr<sched::Task> task;
         };
 
     private:
@@ -140,7 +120,7 @@ class MapEntry {
         static void initAllocator();
 
         /// The entry was added to a mapping.
-        void addedToMap(Map *, sched::Task *, const uintptr_t base,
+        void addedToMap(Map *, const rt::SharedPtr<sched::Task> &, const uintptr_t base,
                 const MappingFlags flagsMask = MappingFlags::None);
         /// Maps all physical pages we've allocated (for anonymous mappings)
         void mapAnonPages(Map *, const uintptr_t, const MappingFlags);
@@ -148,7 +128,8 @@ class MapEntry {
         void mapPhysMem(Map *, const uintptr_t, const MappingFlags);
 
         /// The entry was removed from a mapping.
-        void removedFromMap(Map *, sched::Task *, const uintptr_t, const size_t);
+        void removedFromMap(Map *, const rt::SharedPtr<sched::Task> &, const uintptr_t,
+                const size_t);
 
         /// Faults in an anonymous memory page.
         void faultInPage(const uintptr_t base, const uintptr_t offset, Map *map);
@@ -161,9 +142,6 @@ class MapEntry {
 
         /// handle referencing this map entry
         Handle handle;
-
-        /// number of references held to the entry
-        uintptr_t refCount = 0;
 
         /// length (in bytes)
         size_t length = 0;

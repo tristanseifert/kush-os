@@ -2,6 +2,8 @@
 #define KERNEL_VM_MAPTREE_H
 
 #include "runtime/BinarySearchTree.h"
+#include "runtime/SmartPointers.h"
+
 #include "MapEntry.h"
 
 namespace vm {
@@ -25,7 +27,7 @@ struct MapTreeLeaf {
     /// Optional mapping flags
     MappingFlags flags = MappingFlags::None;
     /// VM object backing this mapping
-    MapEntry *entry = nullptr;
+    rt::SharedPtr<MapEntry> entry;
 
     // private: // XXX: commented for debugging purposes
         /// Parent node of this leaf (if not root)
@@ -39,8 +41,8 @@ struct MapTreeLeaf {
         MapTreeLeaf() = default;
         MapTreeLeaf(MapTreeLeaf *_parent) : parent(_parent) {}
         MapTreeLeaf(const uintptr_t _address, const size_t _size, const MappingFlags _flags,
-                MapEntry *_entry, MapTreeLeaf *_parent = nullptr) : address(_address),
-        size(_size), flags(_flags), entry(_entry), parent(_parent) {}
+                rt::SharedPtr<MapEntry> _entry, MapTreeLeaf *_parent = nullptr) : 
+            address(_address), size(_size), flags(_flags), entry(_entry), parent(_parent) {}
 
         /// Tree sort key
         const uintptr_t getKey() const {
@@ -98,7 +100,7 @@ class MapTree: public rt::BinarySearchTree<MapTreeLeaf> {
          *
          * @return VM object at that base address, or `nullptr` if not found.
          */
-        MapEntry *findBase(const uintptr_t address) {
+        rt::SharedPtr<MapEntry> findBase(const uintptr_t address) {
             auto leaf = this->findKey(address, this->root);
             return leaf ? leaf->entry : nullptr;
         }
@@ -111,14 +113,14 @@ class MapTree: public rt::BinarySearchTree<MapTreeLeaf> {
          *
          * @return Base address of the VM object, or 0 if not found. (Maps at addr 0 are dumb)
          */
-        const uintptr_t baseAddressFor(const MapEntry *entry) const {
+        const uintptr_t baseAddressFor(const rt::SharedPtr<MapEntry> entry) const {
             auto leaf = this->leafFor(entry, this->root);
             return leaf ? leaf->address : 0;
         }
         /**
          * Locates the base address and mapping window length of a particular VM object.
          */
-        const uintptr_t baseAddressFor(const MapEntry *entry, size_t &outLength) const {
+        const uintptr_t baseAddressFor(const rt::SharedPtr<MapEntry> entry, size_t &outLength) const {
             auto leaf = this->leafFor(entry, this->root);
             outLength = leaf ? leaf->size : 0;
             return leaf ? leaf->address : 0;
@@ -127,7 +129,7 @@ class MapTree: public rt::BinarySearchTree<MapTreeLeaf> {
          * Locates the base address, mapping window length and mapping flags of a particular VM
          * object.
          */
-        const uintptr_t baseAddressFor(const MapEntry *entry, size_t &outLength,
+        const uintptr_t baseAddressFor(const rt::SharedPtr<MapEntry> entry, size_t &outLength,
                 MappingFlags &outFlags) const {
             auto leaf = this->leafFor(entry, this->root);
             outLength = leaf ? leaf->size : 0;
@@ -144,7 +146,7 @@ class MapTree: public rt::BinarySearchTree<MapTreeLeaf> {
          *
          * @return VM object containing the given address, or `nullptr` if not found.
          */
-        MapEntry *find(const uintptr_t address, MapTreeLeaf **outLeaf = nullptr) {
+        rt::SharedPtr<MapEntry> find(const uintptr_t address, MapTreeLeaf **outLeaf = nullptr) {
             auto leaf = this->find(address, this->root);
             if(outLeaf) *outLeaf = leaf;
             return leaf ? leaf->entry : nullptr;
@@ -159,7 +161,7 @@ class MapTree: public rt::BinarySearchTree<MapTreeLeaf> {
          *
          * @return VM object containing the given address, or `nullptr` if not found.
          */
-        MapEntry *find(const uintptr_t address, size_t &offset) {
+        rt::SharedPtr<MapEntry> find(const uintptr_t address, size_t &offset) {
             auto leaf = this->find(address, this->root);
             if(leaf) offset = (address - leaf->address);
             return leaf ? leaf->entry : nullptr;
@@ -191,7 +193,8 @@ class MapTree: public rt::BinarySearchTree<MapTreeLeaf> {
          * @param flags Additional flags to define the mapping; if specified, they replace the
          * permissions of the VM object.
          */
-        void insert(const uintptr_t address, const size_t size, MapEntry *entry, MappingFlags flags = MappingFlags::None) {
+        void insert(const uintptr_t address, const size_t size, rt::SharedPtr<MapEntry> &entry,
+                MappingFlags flags = MappingFlags::None) {
             auto node = new MapTreeLeaf(address, size, flags, entry);
             this->insert(address, node, this->root);
         }
@@ -226,7 +229,7 @@ class MapTree: public rt::BinarySearchTree<MapTreeLeaf> {
          * Searches all nodes in order until one backed by the given VM object is located. Return
          * its tree node.
          */
-        const MapTreeLeaf *leafFor(const MapEntry *entry, MapTreeLeaf *leaf) const {
+        const MapTreeLeaf *leafFor(const rt::SharedPtr<MapEntry> entry, MapTreeLeaf *leaf) const {
             // test if we've reached the end of subtree or found the entry
             if(!leaf) return nullptr;
             else if(leaf->entry == entry) return leaf;

@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <runtime/SmartPointers.h>
+
 #include "Timer.h"
 
 #include <platform.h>
@@ -82,7 +84,7 @@ class Hpet: public Timer {
 
     private:
         /// HPET registers as mapped into VM space
-        vm::MapEntry *vm = nullptr;
+        rt::SharedPtr<vm::MapEntry> vm;
 
         /// Base address of HPET (in VM space)
         void *base = nullptr;

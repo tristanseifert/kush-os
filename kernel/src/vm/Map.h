@@ -12,6 +12,7 @@
 #include <arch/PerCpuInfo.h>
 
 #include <handle/Manager.h>
+#include <runtime/SmartPointers.h>
 #include <runtime/Vector.h>
 #include <runtime/Queue.h>
 
@@ -65,9 +66,7 @@ class Map {
 
     public:
         /// Allocates a new VM map.
-        static Map *alloc();
-        /// Releases a previously allocated mapping struct.
-        static void free(Map *);
+        static rt::SharedPtr<Map> alloc();
 
     public:
         Map(const bool copyKernelMaps);
@@ -76,12 +75,12 @@ class Map {
         const bool isActive() const;
         void activate();
 
-        int add(MapEntry *entry, sched::Task *task, const uintptr_t base = 0,
-                const vm::MappingFlags flagMask = vm::MappingFlags::None,
+        int add(rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task,
+                const uintptr_t base = 0, const vm::MappingFlags flagMask = vm::MappingFlags::None,
                 const uintptr_t searchStart = kVmSearchBase,
                 const uintptr_t searchEnd = kVmMaxAddr);
-        int remove(MapEntry *entry, sched::Task *);
-        const bool contains(MapEntry *entry);
+        int remove(rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task);
+        const bool contains(rt::SharedPtr<MapEntry> entry);
 
         int add(const uint64_t physAddr, const uintptr_t length, const uintptr_t vmAddr, 
                 const MapMode mode);
@@ -101,9 +100,9 @@ class Map {
         /// Searches mappings to find one containing the given address.
         bool findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &outOffset);
         /// Determines the base address of a particular mapping
-        const uintptr_t getRegionBase(const MapEntry *entry);
+        const uintptr_t getRegionBase(const rt::SharedPtr<MapEntry> entry);
         /// Gets information about a VM region.
-        int getRegionInfo(MapEntry *region, uintptr_t &outBase, size_t &outSize,
+        int getRegionInfo(rt::SharedPtr<MapEntry> region, uintptr_t &outBase, size_t &outSize,
                 MappingFlags &outFlags);
 
         /// Returns the number of installed mappings.
@@ -113,7 +112,10 @@ class Map {
 
         /// Returns the global kernel map
         static Map *kern();
-        /// Returns the currently activated map
+        /**
+         * Returns a pointer to the VM object active on the current core. You should not cache the
+         * pointer returned, as it will become invalid if the task exits.
+         */
         static inline Map *current() {
             return arch::PerCpuInfo::get()->activeMap;
         }

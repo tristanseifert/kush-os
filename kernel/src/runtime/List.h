@@ -154,6 +154,23 @@ class List {
         }
 
         /**
+         * Removes all objects from the list.
+         */
+        void clear() {
+            auto ptr = this->head;
+
+            while(ptr) {
+                auto old = ptr;
+
+                // advance to next element
+                ptr = ptr->next;
+
+                // delete this element
+                delete old;
+            }
+        }
+
+        /**
          * Iterates all items in the list, removing those that match certain criteria.
          *
          * The parameters to the callback function are a specified context value, the value in the

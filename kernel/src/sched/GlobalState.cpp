@@ -19,7 +19,7 @@ void GlobalState::Init() {
 /**
  * Registers new tasks.
  */
-void GlobalState::registerTask(Task *task) {
+void GlobalState::registerTask(const rt::SharedPtr<Task> &task) {
     SPIN_LOCK_GUARD(this->tasksLock);
 
     this->tasks.append(task);
@@ -28,18 +28,18 @@ void GlobalState::registerTask(Task *task) {
 /**
  * Removes a previously registered task.
  */
-void GlobalState::unregisterTask(Task *task) {
+void GlobalState::unregisterTask(const rt::SharedPtr<Task> &task) {
     SPIN_LOCK_GUARD(this->tasksLock);
 
-    this->tasks.removeMatching([](void *ctx, Task *task) {
-        return (ctx == task);
-    }, task);
+    this->tasks.removeMatching([](void *ctx, rt::SharedPtr<Task> task) {
+        return (ctx == task.get());
+    }, task.get());
 }
 
 /**
  * Invokes the callback for each task.
  */
-void GlobalState::iterateTasks(void (*callback)(Task *)) {
+void GlobalState::iterateTasks(void (*callback)(rt::SharedPtr<Task> &)) {
     SPIN_LOCK_GUARD(this->tasksLock);
 
     for(auto task : this->tasks) {

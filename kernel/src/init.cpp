@@ -23,7 +23,7 @@
 static void ThreadThymeCock(uintptr_t);
 
 /// root init server
-sched::Task *gRootServer = nullptr;
+rt::SharedPtr<sched::Task> gRootServer = nullptr;
 
 /**
  * Early kernel initialization

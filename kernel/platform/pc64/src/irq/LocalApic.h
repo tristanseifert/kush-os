@@ -3,6 +3,8 @@
 
 #include "../timer/ApicTimer.h"
 
+#include <runtime/SmartPointers.h>
+
 #include <platform.h>
 
 #include <stddef.h>
@@ -96,7 +98,7 @@ class LocalApic {
         volatile uint32_t *base;
 
         /// VM mapping of the phys base
-        vm::MapEntry *vmEnt = nullptr;
+        rt::SharedPtr<vm::MapEntry> vmEnt;
         /// APIC timer
         ApicTimer *timer = nullptr;
 

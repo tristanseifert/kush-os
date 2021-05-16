@@ -4,6 +4,7 @@
 #include <arch/spinlock.h>
 
 #include <runtime/List.h>
+#include <runtime/SmartPointers.h>
 
 namespace sched {
 struct Task;
@@ -22,9 +23,9 @@ class GlobalState {
             return gShared;
         }
 
-        void registerTask(Task *task);
-        void unregisterTask(Task *task);
-        void iterateTasks(void (*callback)(Task *));
+        void registerTask(const rt::SharedPtr<Task> &task);
+        void unregisterTask(const rt::SharedPtr<Task> &task);
+        void iterateTasks(void (*callback)(rt::SharedPtr<Task> &));
 
     private:
         /// global (shared between processors) global state instance
@@ -34,7 +35,7 @@ class GlobalState {
         /// lock protecting tasks
         DECLARE_SPINLOCK(tasksLock);
         /// all active tasks
-        rt::List<Task *> tasks;
+        rt::List<rt::SharedPtr<Task>> tasks;
 } __attribute__((aligned(64)));
 }
 

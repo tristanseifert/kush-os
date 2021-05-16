@@ -125,7 +125,7 @@ amd64_switchto_swap_stub:
  * general purpose registers are cleared.
  *
  * %rdi: Program counter
- * %rsi: Stack
+ * %rsi: Stack pointer
  * %rdx: Argument
  */
 amd64_ring3_return:

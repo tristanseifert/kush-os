@@ -86,7 +86,7 @@ intptr_t sys::ThreadCreate(const Syscall::Args *args, const uintptr_t number) {
  * thread.
  */
 intptr_t sys::ThreadDestroy(const Syscall::Args *args, const uintptr_t number) {
-    sched::Thread *thread = nullptr;
+    rt::SharedPtr<sched::Thread> thread = nullptr;
 
     // get the thread
     if(!args->args[0]) {
@@ -109,7 +109,7 @@ intptr_t sys::ThreadDestroy(const Syscall::Args *args, const uintptr_t number) {
  * value on [-100, 100].
  */
 intptr_t sys::ThreadSetPriority(const Syscall::Args *args, const uintptr_t number) {
-    sched::Thread *thread = nullptr;
+    rt::SharedPtr<sched::Thread> thread = nullptr;
 
     // get the thread
     if(!args->args[0]) {
@@ -136,7 +136,7 @@ intptr_t sys::ThreadSetPriority(const Syscall::Args *args, const uintptr_t numbe
  * Sets the notification mask of the specified thread.
  */
 intptr_t sys::ThreadSetNoteMask(const Syscall::Args *args, const uintptr_t number) {
-    sched::Thread *thread = nullptr;
+    rt::SharedPtr<sched::Thread> thread = nullptr;
 
     // get the thread
     if(!args->args[0]) {
@@ -156,7 +156,7 @@ intptr_t sys::ThreadSetNoteMask(const Syscall::Args *args, const uintptr_t numbe
  * Sets the thread's new name.
  */
 intptr_t sys::ThreadSetName(const Syscall::Args *args, const uintptr_t number) {
-    sched::Thread *thread = nullptr;
+    rt::SharedPtr<sched::Thread> thread = nullptr;
 
     // get the thread
     if(!args->args[0]) {

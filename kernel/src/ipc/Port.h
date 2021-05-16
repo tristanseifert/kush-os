@@ -5,6 +5,7 @@
 
 #include <handle/Manager.h>
 #include <runtime/List.h>
+#include <runtime/SmartPointers.h>
 #include <runtime/Queue.h>
 #include <sched/Blockable.h>
 
@@ -24,12 +25,10 @@ namespace ipc {
 class Port {
     public:
         /// Allocates a new port
-        static Port *alloc();
-        /// Releases a previously allocated port
-        static void free(Port *);
+        static rt::SharedPtr<Port> alloc();
 
         // you ought to use the above functions instead
-        Port();
+        Port() = default;
         ~Port();
 
         /// Sends a message to the port
@@ -146,6 +145,9 @@ class Port {
         /// maximum length of message
         constexpr static const size_t kMaxMsgLen = 4096 * 9;
 
+        /// whether dequeuing of messages is logged
+        static bool gLogQueuing;
+
         static void initAllocator();
 
     private:
@@ -156,7 +158,7 @@ class Port {
         Handle handle;
 
         /// thread that's waiting to receive from this port, if any
-        sched::Thread *receiver = nullptr;
+        rt::SharedPtr<sched::Thread> receiver = nullptr;
         /// the blocker object for the receiver
         Blocker *receiverBlocker = nullptr;
 

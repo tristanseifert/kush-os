@@ -19,34 +19,32 @@ uint32_t Task::nextPid = 0;
 /**
  * Allocates a new task.
  */
-Task *Task::alloc(vm::Map *map) {
-    return new Task(map);
-}
+rt::SharedPtr<Task> Task::alloc(rt::SharedPtr<vm::Map> map, const bool writeVm) {
+    auto task = new Task(map, writeVm);
 
-/**
- * Frees a previously allocated task.
- */
-void Task::free(Task *ptr) {
-    delete ptr;
+    // create ptr and allocate handle
+    auto ptr = rt::SharedPtr<Task>(task);
+    task->handle = handle::Manager::makeTaskHandle(ptr);
+
+    return ptr;
 }
 
 
 
 /**
  * Initializes the task structure.
+ *
+ * @param writeVm Whether the VM field is set, or it remains set to `nullptr` (for kernel task)
  */
-Task::Task(vm::Map *_map) {
+Task::Task(rt::SharedPtr<vm::Map> &_map, const bool writeVm) {
     // set up the virtual memory mappings
-    if(_map) {
-        this->vm = _map;
-        this->ownsVm = false;
-    } else {
-        this->vm = vm::Map::alloc();
-        this->ownsVm = true;
+    if(writeVm) {
+        if(_map) {
+            this->vm = _map;
+        } else {
+            this->vm = vm::Map::alloc();
+        }
     }
-
-    // allocate a handle
-    this->handle = handle::Manager::makeTaskHandle(this);
 
     // misc initialization
     this->pid = __atomic_fetch_add(&nextPid, 1, __ATOMIC_RELEASE);
@@ -64,7 +62,8 @@ Task::~Task() {
     RW_LOCK_WRITE_GUARD(this->lock);
 
     // remove from scheduler
-    GlobalState::the()->unregisterTask(this);
+    auto ptr =  handle::Manager::getTask(this->handle);
+    GlobalState::the()->unregisterTask(ptr);
 
     // terminate all remaining threads
     for(auto thread : this->threads) {
@@ -72,21 +71,10 @@ Task::~Task() {
     }
 
     // release the ports
-    for(auto port : this->ports) {
-        ipc::Port::free(port);
-    }
-
-    // release VM objects
-    for(auto region : this->ownedRegions) {
-        region->release();
-    }
+    this->ports.clear();
 
     // invalidate the handle
     handle::Manager::releaseTaskHandle(this->handle);
-
-    if(this->ownsVm) {
-        vm::Map::free(this->vm);
-    }
 }
 
 /**
@@ -95,7 +83,7 @@ Task::~Task() {
  * This is used for created objects that aren't immediately mapped to a task. They'll have a ref
  * count of one, so when this task exits, the objects are destroyed.
  */
-void Task::addOwnedVmRegion(vm::MapEntry *region) {
+void Task::addOwnedVmRegion(rt::SharedPtr<vm::MapEntry> region) {
     RW_LOCK_WRITE_GUARD(this->lock);
     this->ownedRegions.append(region);
 }
@@ -123,14 +111,18 @@ void Task::setName(const char *newName, const size_t _inLength) {
  * We'll take ownership of the thread, meaning that when the task is destroyed, we'll destroy the
  * threads as well.
  */
-void Task::addThread(Thread *t) {
+void Task::addThread(const rt::SharedPtr<Thread> &t) {
     RW_LOCK_WRITE_GUARD(this->lock);
     this->threads.push_back(t);
 
     bool yes = true;
     __atomic_store(&t->attachedToTask, &yes, __ATOMIC_RELEASE);
 
-    t->task = this;
+    // get a shared ptr
+    auto ptr =  handle::Manager::getTask(this->handle);
+    REQUIRE(ptr, "failed to get task");
+
+    t->task = ptr;
 }
 
 /**
@@ -138,7 +130,7 @@ void Task::addThread(Thread *t) {
  *
  * This is only allowed if the thread is paused or in the zombie state. (or is it)
  */
-void Task::detachThread(Thread *t) {
+void Task::detachThread(const rt::SharedPtr<Thread> &t) {
     bool attached;
     __atomic_load(&t->attachedToTask, &attached, __ATOMIC_ACQUIRE);
 
@@ -161,8 +153,8 @@ void Task::detachThread(Thread *t) {
     }
 
     // failed to find the thread; ignore
-    log("thread %p does not belong to task %p (belongs to %p) attach %d!", t, this, t->task,
-            t->attachedToTask);
+    log("thread %p does not belong to task %p (belongs to %p) attach %d!", static_cast<void *>(t), this, 
+            static_cast<void *>(t->task), t->attachedToTask);
     return;
 }
 
@@ -205,7 +197,7 @@ int Task::terminate(int status) {
     Scheduler::get()->idle->queueDestroyTask(this);
 
     // finally, terminate calling thread, if it is also in this task
-    if(current->task == this) {
+    if(current->task.get() == this) {
         __atomic_store(&current->attachedToTask, &no, __ATOMIC_RELEASE);
         current->terminate();
     }
@@ -224,7 +216,7 @@ void Task::notifyExit(int status) {
 /**
  * Extract the currently executing task from the current thread.
  */
-Task *Task::current() {
+rt::SharedPtr<Task> Task::current() {
     auto thread = Thread::current();
     if(thread) {
         return thread->task;
@@ -236,7 +228,7 @@ Task *Task::current() {
  * Inserts the given port to the task's port list. All ports that remain in this list when the
  * task is released will be released as well.
  */
-void Task::addPort(ipc::Port *port) {
+void Task::addPort(const rt::SharedPtr<ipc::Port> &port) {
     RW_LOCK_WRITE_GUARD(this->lock);
     this->ports.append(port);
 }
@@ -246,20 +238,20 @@ void Task::addPort(ipc::Port *port) {
  *
  * @return Whether the port existed in this task prior to the call.
  */
-bool Task::removePort(ipc::Port *port) {
+bool Task::removePort(const rt::SharedPtr<ipc::Port> &port) {
     RW_LOCK_WRITE_GUARD(this->lock);
     bool removed = false;
 
     // set up info
     struct RemovePortInfo {
-        ipc::Port *port = nullptr;
+        rt::SharedPtr<ipc::Port> port = nullptr;
         bool *found = nullptr;
     };
 
     RemovePortInfo info{port, &removed};
 
     // iterate
-    this->ports.removeMatching([](void *ctx, ipc::Port *port) {
+    this->ports.removeMatching([](void *ctx, rt::SharedPtr<ipc::Port> &port) {
         auto info = reinterpret_cast<RemovePortInfo *>(ctx);
 
         if(port == info->port) {
@@ -276,7 +268,7 @@ bool Task::removePort(ipc::Port *port) {
 /**
  * Iterate all ports to see if we own one.
  */
-bool Task::ownsPort(ipc::Port *port) {
+bool Task::ownsPort(const rt::SharedPtr<ipc::Port> &port) {
     RW_LOCK_READ_GUARD(this->lock);
     for(auto i : this->ports) {
         if(i == port) {

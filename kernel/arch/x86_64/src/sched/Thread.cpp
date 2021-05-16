@@ -59,7 +59,8 @@ void arch::InitThreadState(sched::Thread *thread, const uintptr_t pc, const uint
  * Restores the thread's state. We'll restore the FPU state, then execute the context switch by
  * switching to the correct stack, restoring registers and performing an iret.
  */
-void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
+void arch::RestoreThreadState(const rt::SharedPtr<sched::Thread> &from,
+        const rt::SharedPtr<sched::Thread> &to) {
     bool yes = true, no = false;
 
     /*

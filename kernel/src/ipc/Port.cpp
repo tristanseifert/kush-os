@@ -11,7 +11,16 @@ static char gAllocBuf[sizeof(mem::SlabAllocator<Port>)] __attribute__((aligned(6
 static mem::SlabAllocator<Port> *gPortAllocator = nullptr;
 
 // set to log adding and removing items from queue
-#define LOG_QUEUING                     0
+bool Port::gLogQueuing = false;
+
+/**
+ * Deleter that will release a port back to the appropriate allocation pool
+ */
+struct PortDeleter {
+    void operator()(Port *obj) const {
+        gPortAllocator->free(obj);
+    }
+};
 
 /**
  * Initializes the port allocator.
@@ -24,29 +33,21 @@ void Port::initAllocator() {
 /**
  * Allocates a new port.
  */
-Port *Port::alloc() {
+rt::SharedPtr<Port> Port::alloc() {
+    // allocate the port
     if(!gPortAllocator) initAllocator();
     auto port = gPortAllocator->alloc();
 
-    return port;
+    // create owning ptr and allocate handle
+    rt::SharedPtr<Port> ptr(port, PortDeleter());
+
+    port->handle = handle::Manager::makePortHandle(ptr);
+    REQUIRE(((uintptr_t) port->handle), "failed to create port handle for %p", port);
+
+    return ptr;
 }
 
-/**
- * Frees a previously allocated port.
- */
-void Port::free(Port *ptr) {
-    gPortAllocator->free(ptr);
-}
 
-
-
-/**
- * Initializes a new message port.
- */
-Port::Port() {
-    this->handle = handle::Manager::makePortHandle(this);
-    REQUIRE(((uintptr_t) this->handle), "failed to create port handle for %p", this);
-}
 
 /**
  * Releases the message port's resources.
@@ -74,9 +75,9 @@ int Port::send(const void *msgBuf, const size_t msgLen) {
         return -2;
     }
 
-#if LOG_QUEUING
-    log("sending %p (%d bytes) to %08x'h", msgBuf, msgLen, this->handle);
-#endif
+    if(gLogQueuing) {
+        log("sending %p (%d bytes) to %08x'h", msgBuf, msgLen, this->handle);
+    }
 
     // validate we won't insert too many items
     CRITICAL_ENTER();
@@ -92,9 +93,9 @@ int Port::send(const void *msgBuf, const size_t msgLen) {
     this->messages.push_back(Message(msgBuf, msgLen));
     blocker = this->receiverBlocker;
 
-#if LOG_QUEUING
-    log("enqueued %d %p", this->messages.size(), blocker);
-#endif
+    if(gLogQueuing) {
+        log("enqueued %d %p", this->messages.size(), blocker);
+    }
 
     RW_UNLOCK_WRITE(&this->lock);
     CRITICAL_EXIT();
@@ -136,9 +137,9 @@ int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const ui
         sender = msg.sender;
         msg.done();
 
-#if LOG_QUEUING
-        log("dequeued (ts %llu pending %u)", msg.timestamp, this->messages.size());
-#endif
+        if(gLogQueuing) {
+            log("dequeued (ts %llu pending %u)", msg.timestamp, this->messages.size());
+        }
 
         RW_UNLOCK_WRITE(&this->lock);
         CRITICAL_EXIT();

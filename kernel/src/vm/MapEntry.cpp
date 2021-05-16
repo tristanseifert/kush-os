@@ -18,6 +18,15 @@ static mem::SlabAllocator<MapEntry> *gMapEntryAllocator = nullptr;
 static vm::MapMode ConvertVmMode(const MappingFlags flags, const bool isUser);
 
 /**
+ * Deleter that will release a map entry back to the appropriate allocation pool
+ */
+struct MapEntryDeleter {
+    void operator()(MapEntry *obj) const {
+        gMapEntryAllocator->free(obj);
+    }
+};
+
+/**
  * Initializes the VM mapp entry allocator.
  */
 void MapEntry::initAllocator() {
@@ -32,8 +41,7 @@ void MapEntry::initAllocator() {
  */
 MapEntry::MapEntry(const size_t _length, const MappingFlags _flags) : length(_length),
     flags(_flags) {
-    // allocate a handle for it
-    this->handle = handle::Manager::makeVmObjectHandle(this);
+    // XXX: the allocator (which makes the shared ptr) is responsible for allocating handle
 }
 
 /**
@@ -45,9 +53,10 @@ MapEntry::~MapEntry() {
 
     // release physical pages
     for(const auto &page : this->physOwned) {
-        if(page.task) {
-            __atomic_sub_fetch(&page.task->physPagesOwned, 1, __ATOMIC_RELAXED);
+        if(auto task = page.task.lock()) {
+            __atomic_sub_fetch(&task->physPagesOwned, 1, __ATOMIC_RELAXED);
         }
+
         this->freePage(page.physAddr);
     }
 }
@@ -55,37 +64,43 @@ MapEntry::~MapEntry() {
 /**
  * Allocates a VM map entry that refers to a contiguous range of physical memory.
  */
-MapEntry *MapEntry::makePhys(const uint64_t physAddr, const size_t length, const MappingFlags flags,
-        const bool kernel) {
+rt::SharedPtr<MapEntry> MapEntry::makePhys(const uint64_t physAddr, const size_t length,
+        const MappingFlags flags, const bool kernel) {
     // allocate the bare map
     if(!gMapEntryAllocator) initAllocator();
-    auto map = gMapEntryAllocator->alloc(length, flags);
-    map->isKernel = kernel;
+    auto entry = gMapEntryAllocator->alloc(length, flags);
+    entry->isKernel = kernel;
 
-    // set up the phys mapping
-    map->physBase = physAddr;
+    // set up the phys entryping
+    entry->physBase = physAddr;
 
-    // done!
-    return map;
+    // create shared ptr
+    auto ptr = rt::SharedPtr<MapEntry>(entry, MapEntryDeleter());
+    entry->handle = handle::Manager::makeVmObjectHandle(ptr);
+
+    return ptr;
 }
 
 
 /**
  * Allocates a new anonymous memory backed VM map entry.
  */
-MapEntry *MapEntry::makeAnon(const size_t length, const MappingFlags flags, const bool kernel) {
+rt::SharedPtr<MapEntry> MapEntry::makeAnon(const size_t length, const MappingFlags flags, const bool kernel) {
     // allocate the bare map
     if(!gMapEntryAllocator) initAllocator();
-    auto map = gMapEntryAllocator->alloc(length, flags);
-    map->isKernel = kernel;
+    auto entry = gMapEntryAllocator->alloc(length, flags);
+    entry->isKernel = kernel;
 
     // set it up and fault in all pages if needed
-    map->isAnon = true;
+    entry->isAnon = true;
 
     // TODO: map pages
 
-    // done
-    return map;
+    // create a shared ptr
+    auto ptr = rt::SharedPtr<MapEntry>(entry, MapEntryDeleter());
+    entry->handle = handle::Manager::makeVmObjectHandle(ptr);
+
+    return ptr;
 }
 
 /**
@@ -131,8 +146,8 @@ int MapEntry::resize(const size_t newSize) {
 
             // if it lies beyond the end, release it
             if(info.pageOff >= endPageOff) {
-                if(info.task) {
-                    __atomic_sub_fetch(&info.task->physPagesOwned, 1, __ATOMIC_RELAXED);
+                if(auto task = info.task.lock()) {
+                    __atomic_sub_fetch(&task->physPagesOwned, 1, __ATOMIC_RELAXED);
                 }
 
                 this->freePage(info.physAddr);
@@ -299,7 +314,7 @@ int MapEntry::updateFlags(const MappingFlags newFlags) {
  * @param baseAddress Virtual address for the mapping in this address space
  * @param flagsMask Flags to overwrite from the original mapping
  */
-void MapEntry::addedToMap(Map *map, sched::Task *task, const uintptr_t baseAddr,
+void MapEntry::addedToMap(Map *map, const rt::SharedPtr<sched::Task> &task, const uintptr_t baseAddr,
         const MappingFlags flagsMask) {
     RW_LOCK_READ(&this->lock);
     REQUIRE(baseAddr, "failed to get base address for map entry %p", this);
@@ -384,8 +399,8 @@ struct RemoveCtxInfo {
  * @param base Virtual base address of this VM object in the given task
  * @param length Total length of the mapped region in the memory map
  */
-void MapEntry::removedFromMap(Map *map, sched::Task *task, const uintptr_t base,
-        const size_t length) {
+void MapEntry::removedFromMap(Map *map, const rt::SharedPtr<sched::Task> &task,
+        const uintptr_t base, const size_t length) {
     RemoveCtxInfo info(this, map);
 
     // iterate the maps info dict to get our true base address
@@ -406,7 +421,7 @@ void MapEntry::removedFromMap(Map *map, sched::Task *task, const uintptr_t base,
         this->maps.remove(i);
 
         // TODO: find new task to transfer ownership of pages to
-        sched::Task *newOwner = nullptr;
+        /*sched::Task *newOwner = nullptr;
 
         uintptr_t owned = 0;
         for(auto &physPage : this->physOwned) {
@@ -419,7 +434,7 @@ void MapEntry::removedFromMap(Map *map, sched::Task *task, const uintptr_t base,
         __atomic_sub_fetch(&task->physPagesOwned, owned, __ATOMIC_RELAXED);
         if(newOwner) {
             __atomic_add_fetch(&newOwner->physPagesOwned, owned, __ATOMIC_RELAXED);
-        }
+        }*/
     }
 
     RW_UNLOCK_WRITE(&this->lock);

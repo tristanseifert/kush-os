@@ -1,8 +1,10 @@
 #ifndef KERN_PLATFORM_H
 #define KERN_PLATFORM_H
 
-#include <stdint.h>
-#include <stddef.h>
+#include <cstdint>
+#include <cstddef>
+
+#include <runtime/SmartPointers.h>
 
 namespace sched {
 struct Task;
@@ -227,7 +229,7 @@ void platform_idle();
 /**
  * Initializes the root server task.
  */
-sched::Task *platform_init_rootsrv();
+rt::SharedPtr<sched::Task> platform_init_rootsrv();
 
 
 ////////////////////////////////////////////////////////////////////////////////

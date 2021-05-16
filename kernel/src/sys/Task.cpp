@@ -28,7 +28,7 @@ struct InitTaskDpcInfo {
  * Allocates a new task.
  */
 intptr_t sys::TaskCreate(const Syscall::Args *args, const uintptr_t number) {
-    sched::Task *parent = nullptr;
+    rt::SharedPtr<sched::Task> parent = nullptr;
 
     // set the parent
     if(!args->args[0]) {
@@ -62,7 +62,7 @@ intptr_t sys::TaskCreate(const Syscall::Args *args, const uintptr_t number) {
  */
 intptr_t sys::TaskTerminate(const Syscall::Args *args, const uintptr_t number) {
     int err;
-    sched::Task *task = nullptr;
+    rt::SharedPtr<sched::Task> task = nullptr;
 
     // get the task
     if(!args->args[0]) {
@@ -75,7 +75,7 @@ intptr_t sys::TaskTerminate(const Syscall::Args *args, const uintptr_t number) {
     }
 
     // terminate it aye
-    log("Terminating task %p (code %d)", task, args->args[1]);
+    log("Terminating task %p (code %d)", static_cast<void *>(task), args->args[1]);
     err = task->terminate(args->args[1]);
 
     return (err ? Errors::GeneralError : Errors::Success);
@@ -126,7 +126,7 @@ intptr_t sys::TaskInitialize(const Syscall::Args *args, const uintptr_t number) 
  * Sets the task's new name.
  */
 intptr_t sys::TaskSetName(const Syscall::Args *args, const uintptr_t number) {
-    sched::Task *task = nullptr;
+    rt::SharedPtr<sched::Task> task = nullptr;
 
     // get the task
     if(!args->args[0]) {
@@ -187,6 +187,6 @@ static void UserspaceThreadStub(uintptr_t arg) {
     delete info;
 
     // execute return to userspace
-    log("return to userspace for %p: pc %08x sp %08x", thread, pc, sp);
+    log("return to userspace for %p: pc %08x sp %08x", static_cast<void *>(thread), pc, sp);
     thread->returnToUser(pc, sp);
 }

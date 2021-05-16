@@ -1,4 +1,5 @@
 #include "Scheduler.h"
+#include "SchedulerData.h"
 #include "GlobalState.h"
 #include "Task.h"
 #include "Thread.h"
@@ -17,7 +18,7 @@
 
 using namespace sched;
 
-Task *sched::gKernelTask = nullptr;
+rt::SharedPtr<Task> sched::gKernelTask = nullptr;
 
 /// rwlock for the global list of scheduler instances (across all cores)
 DECLARE_RWLOCK_S(gSchedulersLock);
@@ -36,7 +37,9 @@ void Scheduler::Init() {
     GlobalState::Init();
 
     // create kernel task
-    gKernelTask = Task::alloc(vm::Map::kern());
+    gKernelTask = Task::alloc(nullptr, false);
+    gKernelTask->vm = rt::SharedPtr<vm::Map>(vm::Map::kern());
+
     gKernelTask->setName("kernel_task");
 
     // then, initialize the per-core scheduler the same as for all APs
@@ -77,9 +80,6 @@ Scheduler::Scheduler() {
     gSchedulers->push_back(info);
     RW_UNLOCK_WRITE(&gSchedulersLock);
 
-    // set up our idle worker
-    this->idle = new IdleWorker(this);
-
     // initialization is done. ensure other schedulers update their peer lists
     invalidateAllPeerList(this);
 }
@@ -102,8 +102,6 @@ Scheduler::~Scheduler() {
     RW_UNLOCK_WRITE(&gSchedulersLock);
 
     invalidateAllPeerList(this);
-
-    delete this->idle;
 }
 
 
@@ -113,6 +111,13 @@ Scheduler::~Scheduler() {
  * runnable thread and switch to it.
  */
 void Scheduler::run() {
+    // pick the first thread...
+    auto thread = this->findRunnableThread();
+    REQUIRE(thread, "no runnable threads");
+
+    // switch to it
+    this->switchTo(thread);
+
     // we should NEVER get here
     panic("Scheduler::switchToRunnable() returned (this should never happen)");
 }
@@ -123,21 +128,19 @@ void Scheduler::run() {
  * Schedules all threads in the given task that aren't already scheduled. Any threads that are in
  * the paused state will become runnable. (Other states aren't changed.)
  */
-void Scheduler::scheduleRunnable(Task *task) {
+void Scheduler::scheduleRunnable(rt::SharedPtr<Task> &task) {
     // TODO: check which threas are scheduled already
 
     RW_LOCK_READ_GUARD(task->lock);
-    for(Thread *thread : task->threads) {
+    for(auto &thread : task->threads) {
         // become runnable if needed
         if(thread->state == Thread::State::Paused) {
             thread->setState(Thread::State::Runnable);
         }
 
-        // ignore if not runnable; otherwise, add it to the "possibly runnable" queue
+        // if thread is runnable, add it to the run queue
         if(thread->state != Thread::State::Runnable) continue;
-
-        // TODO: mark thread runnable
-        // this->markThreadAsRunnable(thread, false, true);
+        this->markThreadAsRunnable(thread, false);
     }
 
     if(!task->registered) {
@@ -149,27 +152,54 @@ void Scheduler::scheduleRunnable(Task *task) {
 }
 
 /**
- * Adds the given thread to the run queue. If the thread's priority is higher than the currently
- * executing one, an immediate context switch is performed.
+ * Adds the given thread to the run queue of the current core. If the thread's priority is higher
+ * than the currently executing one, an immediate context switch is performed.
  *
  * @param t Thread to switch to
  * @param shouldSwitch Whether the context switch should be performed by the scheduler. An ISR may
  * want to perform some cleanup before a context switch is initiated.
+ * @param higherPriorityRunnable If non-null, location where we write a flag indicating if a higher
+ *        priority thread became runnable. This can be used to manually invoke the scheduler at
+ *        the end of an interrupt handler, for example.
  *
- * @return Whether a higher priority thread became runnable: this can be used to perform a manual
- * scheduler invocation later, for example, in an interrupt handler.
+ * @return Whether we successfully added the thread to the appropriate run queue (0) or not
  */
-bool Scheduler::markThreadAsRunnable(Thread *t, const bool shouldSwitch) {
-    panic("%s unimplemented", __PRETTY_FUNCTION__);
+int Scheduler::markThreadAsRunnable(const rt::SharedPtr<Thread> &t, const bool shouldSwitch,
+        bool *higherPriorityRunnable) {
+    if(int err = this->schedule(t)) {
+        return err;
+    }
 
-    return false;
+    // TODO: perform context switch (if requested)
+    if(shouldSwitch) {
+
+    }
+
+    // determine if this thread is at a higher priority than the current runnable
+    // TODO: should this check the entire structure? other threads don't push work to us...
+    if(higherPriorityRunnable) {
+        *higherPriorityRunnable = (this->currentLevel > this->getLevelFor(t));
+    }
+
+    return 0;
 }
 
 /**
- * Gives up the remainder of the thread's time quantum.
+ * Gives up the remainder of the current thread's time quantum.
  */
 void Scheduler::yield(const Thread::State state) {
     panic("%s unimplemented", __PRETTY_FUNCTION__);
+
+    // place back on the run queue
+    const auto levelNum = this->getLevelFor(this->running);
+    auto &level = this->levels[levelNum];
+
+    if(!level.push(this->running)) {
+        panic("sched(%p) level %lu queue overflow (thread %p)", this, levelNum,
+                static_cast<void *>(this->running));
+    }
+
+    // perform context switch to next runnable
 }
 
 /**
@@ -184,13 +214,13 @@ void Scheduler::yield(const Thread::State state) {
  * changed between the start and end of our loop. If so, we restart the search up to a specified
  * number of times before giving up.
  *
- * @return The highest priority runnable thread, or `nullptr` if none.
+ * @return The highest priority runnable thread on this core, or `nullptr` if none.
  */
-Thread *Scheduler::findRunnableThread() {
+rt::SharedPtr<Thread> Scheduler::findRunnableThread() {
     size_t tries = 0;
     uint64_t epoch, newEpoch;
     bool epochChanged;
-    Thread *thread = nullptr;
+    rt::SharedPtr<Thread> thread = nullptr;
 
 beach:;
     // read the current epoch and check each run queue
@@ -204,6 +234,7 @@ beach:;
             // found a thread, update last schedule timestamp
             level.lastScheduledTsc = platform_local_timer_now();
 
+            this->currentLevel = i;
             return thread;
         }
     }
@@ -217,7 +248,68 @@ beach:;
     }
 
     // exceeded max retries or epoch hasn't changed, so do idle behavior
+    this->currentLevel = kNumLevels;
     return nullptr;
+}
+
+/**
+ * Pushes the given thread into the appropriate level's run queue.
+ *
+ * Additionally, if the thread's quantum has fully expired or it moved levels since it was last
+ * executed, it will be updated with the level's quantum value, plus or minus any adjustments due
+ * to the thread's priority.
+ */
+int Scheduler::schedule(const rt::SharedPtr<Thread> &thread) {
+    auto &sched = thread->sched;
+
+    // get level
+    const auto levelNum = this->getLevelFor(thread);
+    auto &level = this->levels[levelNum];
+
+    // update its quantum (if level changed)
+    if(levelNum != sched.lastLevel || sched.quantumTotal) {
+        sched.lastLevel = levelNum;
+        sched.quantumTotal = level.quantumLength;
+        sched.quantumUsed = 0; // XXX: is this proper?
+    }
+
+    // try to insert it to that level's queue
+    if(!level.push(thread)) {
+        panic("sched(%p) level %lu queue overflow (thread %p)", this, levelNum,
+                static_cast<void *>(this->running));
+        return -1;
+    }
+
+    // update epoch
+    __atomic_fetch_add(&this->levelEpoch, 1, __ATOMIC_RELAXED);
+
+    return 0;
+}
+
+/**
+ * Returns the run queue level to which the given thread belongs.
+ *
+ * If it is not currently executing, this is the run queue into which it should be inserted when it
+ * becomes runnable again. If it is running, this indicates not necessarily the queue it was pulled
+ * from when it started execution, but the queue that it will be placed back on if it gave up the
+ * processor at that particular instant.
+ */
+size_t Scheduler::getLevelFor(const rt::SharedPtr<Thread> &thread) {
+    // TODO: take into account priority offset
+    const auto &data = thread->sched;
+    return (data.level >= kNumLevels) ? (kNumLevels - 1) : data.level;
+}
+
+/**
+ * Switches to the given thread.
+ */
+void Scheduler::switchTo(const rt::SharedPtr<Thread> &thread) {
+    log("switch: %p ($%p'h %s)", static_cast<void*>(thread), thread->handle, thread->name);
+
+    // determine when quantum expiration timer fires
+
+    // finally, perform context switch
+    thread->switchTo();
 }
 
 /**

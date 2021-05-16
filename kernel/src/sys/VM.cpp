@@ -76,7 +76,7 @@ static vm::MappingFlags ConvertFlags(const uintptr_t flags);
  */
 intptr_t sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
     int err;
-    vm::MapEntry *region = nullptr;
+    rt::SharedPtr<vm::MapEntry> region = nullptr;
     const auto pageSz = arch_page_size();
     auto task = sched::Task::current();
 
@@ -110,13 +110,12 @@ intptr_t sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
         err = vm->add(region, task, vmAddr);
 
         if(err) {
-            vm::MapEntry::free(region);
             return Errors::GeneralError;
         }
     } 
     // if not, associate it with the task; if nobody maps it, that will keep us from leaking it
     else {
-        task->addOwnedVmRegion(region->retain());
+        task->addOwnedVmRegion(region);
     }
 
     // return the handle of the region
@@ -127,7 +126,7 @@ intptr_t sys::VmAlloc(const Syscall::Args *args, const uintptr_t number) {
  * Allocates an anonymous memory region, backed by physical memory.
  */
 intptr_t sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
-    vm::MapEntry *region = nullptr;
+    rt::SharedPtr<vm::MapEntry> region = nullptr;
     int err;
     const auto pageSz = arch_page_size();
     auto task = sched::Task::current();
@@ -158,13 +157,12 @@ intptr_t sys::VmAllocAnon(const Syscall::Args *args, const uintptr_t number) {
         err = vm->add(region, task, vmAddr);
 
         if(err) {
-            vm::MapEntry::free(region);
             return Errors::GeneralError;
         }
     } 
     // if not, associate it with the task; if nobody maps it, that will keep us from leaking it
     else {
-        task->addOwnedVmRegion(region->retain());
+        task->addOwnedVmRegion(region);
     }
 
     // return the handle of the region
@@ -227,7 +225,7 @@ intptr_t sys::VmRegionResize(const Syscall::Args *args, const uintptr_t number) 
  */
 intptr_t sys::VmRegionMap(const Syscall::Args *args, const uintptr_t number) {
     int err;
-    sched::Task *task = nullptr;
+    rt::SharedPtr<sched::Task> task = nullptr;
 
     // get the task handle
     if(!args->args[1]) {
@@ -270,7 +268,7 @@ intptr_t sys::VmRegionMap(const Syscall::Args *args, const uintptr_t number) {
  * Unmaps the given VM region.
  */
 intptr_t sys::VmRegionUnmap(const Syscall::Args *args, const uintptr_t number) {
-    sched::Task *task = nullptr;
+    rt::SharedPtr<sched::Task> task = nullptr;
 
     // get the task handle
     if(!args->args[1]) {
@@ -298,7 +296,7 @@ intptr_t sys::VmRegionUnmap(const Syscall::Args *args, const uintptr_t number) {
  */
 intptr_t sys::VmRegionGetInfo(const Syscall::Args *args, const uintptr_t number) {
     int err;
-    sched::Task *task = nullptr;
+    rt::SharedPtr<sched::Task> task = nullptr;
 
     // validate the info region buffer and size
     auto infoPtr = reinterpret_cast<VmInfo *>(args->args[2]);
@@ -376,7 +374,7 @@ intptr_t sys::VmRegionGetInfo(const Syscall::Args *args, const uintptr_t number)
  * Retrieves information about a task's VM environment.
  */
 intptr_t sys::VmTaskGetInfo(const Syscall::Args *args, const uintptr_t number) {
-    sched::Task *task = nullptr;
+    rt::SharedPtr<sched::Task> task = nullptr;
 
     // validate the info region buffer and size
     auto infoPtr = reinterpret_cast<VmTaskInfo *>(args->args[1]);
@@ -410,7 +408,7 @@ intptr_t sys::VmTaskGetInfo(const Syscall::Args *args, const uintptr_t number) {
  * Determines the virtual memory region that contains the given virtual address.
  */
 intptr_t sys::VmAddrToRegion(const Syscall::Args *args, const uintptr_t number) {
-    sched::Task *task = nullptr;
+    rt::SharedPtr<sched::Task> task = nullptr;
 
     // get the task handle
     if(!args->args[0]) {
@@ -434,7 +432,7 @@ intptr_t sys::VmAddrToRegion(const Syscall::Args *args, const uintptr_t number) 
     uintptr_t offset;
 
     auto vm = task->vm;
-    REQUIRE(vm, "failed to get vm object for task %p ($%08x'h)", task, task->handle);
+    REQUIRE(vm, "failed to get vm object for task %p ($%08x'h)", static_cast<void *>(task), task->handle);
 
     bool found = vm->findRegion(vmAddr, regionHandle, offset);
 

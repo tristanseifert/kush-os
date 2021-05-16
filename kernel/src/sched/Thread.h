@@ -7,10 +7,13 @@
 #include <runtime/List.h>
 #include <runtime/Queue.h>
 #include <runtime/Vector.h>
+#include <runtime/SmartPointers.h>
 #include <handle/Manager.h>
 
 #include <arch/ThreadState.h>
 #include <arch/rwlock.h>
+
+#include "SchedulerData.h"
 
 namespace ipc {
 class IrqHandler;
@@ -80,7 +83,7 @@ struct Thread {
         /// Global thread id
         uint32_t tid = 0;
         /// task that owns us
-        Task *task = nullptr;
+        rt::SharedPtr<Task> task = nullptr;
         /// when set, we're attached to the given task
         bool attachedToTask = false;
 
@@ -117,24 +120,15 @@ struct Thread {
         /// number of the last syscall this thread performed
         uintptr_t lastSyscall = UINTPTR_MAX;
 
+        /// scheduler data
+        SchedulerThreadData sched;
+
         /**
          * Priority of the thread; this should be a value between -100 and 100, with negative
          * values having the lowest priority. The scheduler internally converts this to whatever
          * priority system it uses.
          */
         int16_t priority = 0;
-        /// Priority boost for this thread; incremented any time it's not scheduled
-        int16_t priorityBoost = 0;
-
-        // Number of ticks that the thread's quantum is in length. Ticks are usually 1ms.
-        uint16_t quantumTicks = 10;
-        // Ticks left in the thread's current quantum
-        uint16_t quantum = 0;
-
-        /**
-         * Number of nanoseconds this thread has been executing on the CPU.
-         */
-        uint64_t cpuTime __attribute__((aligned(8))) = 0;
 
         /**
          * Notification value and mask for the thread.
@@ -161,7 +155,7 @@ struct Thread {
         Blockable *blockingOn = nullptr;
 
         /// Interrupt handlers owned by the thread; they're removed when we deallocate
-        rt::List<ipc::IrqHandler *> irqHandlers;
+        rt::List<rt::SharedPtr<ipc::IrqHandler>> irqHandlers;
 
         /**
          * The thread can be accessed read-only by multiple processes, but the scheduler will
@@ -187,11 +181,10 @@ struct Thread {
 
     public:
         /// Allocates a new kernel space thread
-        static Thread *kernelThread(Task *task, void (*entry)(uintptr_t), const uintptr_t param = 0);
-        /// Releases a previously allocated thread struct
-        static void free(Thread *);
+        static rt::SharedPtr<Thread> kernelThread(rt::SharedPtr<Task> &task,
+                void (*entry)(uintptr_t), const uintptr_t param = 0);
 
-        Thread(Task *task, const uintptr_t pc, const uintptr_t param,
+        Thread(rt::SharedPtr<Task> &task, const uintptr_t pc, const uintptr_t param,
                 const bool kernelThread = true);
         ~Thread();
 
@@ -248,7 +241,7 @@ struct Thread {
         void handleFault(const FaultType type, const uintptr_t pc, void *context, const void *arch);
 
         /// Returns a handle to the currently executing thread.
-        static Thread *current();
+        static rt::SharedPtr<Thread> current();
         /// Blocks the current thread for the given number of nanoseconds.
         static void sleep(const uint64_t nanos);
         /// Give up the rest of this thread's CPU time

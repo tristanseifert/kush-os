@@ -11,10 +11,19 @@
 
 using namespace vm;
 
+bool Map::gLogAdd = false;
+
 static char gAllocBuf[sizeof(mem::SlabAllocator<Map>)] __attribute__((aligned(64)));
 static mem::SlabAllocator<Map> *gMapAllocator = nullptr;
 
-bool Map::gLogAdd = false;
+/**
+ * Deleter that will release a map back to the appropriate allocation pool
+ */
+struct MapDeleter {
+    void operator()(Map *obj) const {
+        gMapAllocator->free(obj);
+    }
+};
 
 /**
  * Initializes the VM mapping allocator.
@@ -37,31 +46,23 @@ Map::Map(const bool copyKernel) :
 }
 
 /**
- * Decrements the ref counts of all memory referenced by this map.
+ * Performs cleanup of the map.
+ *
+ * We don't have to deallocate entries, as these are referenced from the map tree with smart
+ * pointers.
  */
 Map::~Map() {
-    // release all map entries
-    this->entries.iterate([](auto node) {
-        // TODO: do we need to invoke the removal callbacks too?
-        node.entry->release();
-    });
 
-    // TODO: implement
 }
 
 /**
  * Allocates a new VM map.
  */
-Map *Map::alloc() {
+rt::SharedPtr<Map> Map::alloc() {
     if(!gMapAllocator) initAllocator();
-    return gMapAllocator->alloc(true);
-}
+    auto map = gMapAllocator->alloc(true);
 
-/**
- * Frees a previously allocated VM map.
- */
-void Map::free(Map *ptr) {
-    gMapAllocator->free(ptr);
+    return rt::SharedPtr<Map>(map, MapDeleter());
 }
 
 
@@ -206,8 +207,9 @@ int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
  *
  * @return 0 on success
  */
-int Map::add(MapEntry *entry, sched::Task *task, const uintptr_t requestedBase,
-        const MappingFlags flagsMask, const uintptr_t searchStart, const uintptr_t searchEnd) {
+int Map::add(rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task,
+        const uintptr_t requestedBase, const MappingFlags flagsMask, const uintptr_t searchStart,
+        const uintptr_t searchEnd) {
     REQUIRE(entry, "invalid %s", "vm object");
     REQUIRE(task, "invalid %s", "task");
 
@@ -215,9 +217,6 @@ int Map::add(MapEntry *entry, sched::Task *task, const uintptr_t requestedBase,
 
     uintptr_t base = requestedBase;
     const auto size = entry->length;
-
-    // retain entry
-    entry = entry->retain();
 
     // either test whether the provided base address is valid, or select one
     RW_LOCK_WRITE(&this->lock);
@@ -257,10 +256,9 @@ success:;
     return 0;
 
 fail:;
-    // release lock and decrement entry retain count
+    // release lock
     RW_UNLOCK_WRITE(&this->lock);
 
-    entry->release();
     return -1;
 }
 
@@ -292,7 +290,7 @@ bool Map::findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &out
  *
  * @return Virtual base address of the region, or 0 if not found
  */
-const uintptr_t Map::getRegionBase(const MapEntry *entry) {
+const uintptr_t Map::getRegionBase(const rt::SharedPtr<MapEntry> entry) {
     RW_LOCK_READ_GUARD(this->lock);
     return this->entries.baseAddressFor(entry);
 }
@@ -307,7 +305,7 @@ const uintptr_t Map::getRegionBase(const MapEntry *entry) {
  *
  * @return 0 on success, negative error code otherwise
  */
-int Map::getRegionInfo(MapEntry *region, uintptr_t &outBase, size_t &outSize,
+int Map::getRegionInfo(rt::SharedPtr<MapEntry> region, uintptr_t &outBase, size_t &outSize,
         MappingFlags &outFlags) {
     size_t length;
     MappingFlags flags = MappingFlags::None;
@@ -336,8 +334,7 @@ int Map::getRegionInfo(MapEntry *region, uintptr_t &outBase, size_t &outSize,
 /**
  * Removes the given entry from this map.
  */
-int Map::remove(MapEntry *entry, sched::Task *task) {
-    REQUIRE(entry, "invalid %s", "vm object");
+int Map::remove(rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task) {
     REQUIRE(task, "invalid %s", "task");
 
     RW_LOCK_WRITE(&this->lock);
@@ -357,7 +354,6 @@ int Map::remove(MapEntry *entry, sched::Task *task) {
     RW_UNLOCK_WRITE(&this->lock);
 
     entry->removedFromMap(this, task, base, length);
-    entry->release();
 
     return 0;
 }
@@ -365,7 +361,7 @@ int Map::remove(MapEntry *entry, sched::Task *task) {
 /**
  * Iterates the list of allocated mappings to see if we contain one.
  */
-const bool Map::contains(MapEntry *entry) {
+const bool Map::contains(rt::SharedPtr<MapEntry> entry) {
     RW_LOCK_READ_GUARD(this->lock);
     return (this->entries.baseAddressFor(entry) != 0);
 }

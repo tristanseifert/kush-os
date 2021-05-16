@@ -49,3 +49,10 @@ void operator delete[](void *p) {
 void operator delete(void *p, std::align_val_t al) {
     mem::Heap::free(p);
 }
+
+/**
+ * Fake support for destructors (doesn't actually do anything)
+ */
+extern "C" int __cxa_atexit(void (*f)(void *), void *objptr, void *dso) {
+    return 0;
+}

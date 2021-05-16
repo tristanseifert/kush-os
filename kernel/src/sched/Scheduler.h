@@ -7,6 +7,7 @@
 #include <arch/spinlock.h>
 #include <runtime/Queue.h>
 #include <runtime/LockFreeQueue.h>
+#include <runtime/SmartPointers.h>
 
 #include "Thread.h"
 
@@ -51,14 +52,15 @@ class Scheduler {
         static Scheduler *get();
 
         // return the thread running on the calling processor
-        Thread *runningThread() const {
+        rt::SharedPtr<Thread> runningThread() const {
             return this->running;
         }
 
         /// schedules all runnable threads in the given task
-        void scheduleRunnable(Task *task);
+        void scheduleRunnable(rt::SharedPtr<Task> &task);
         /// adds the given thread to the runnable queue
-        bool markThreadAsRunnable(Thread *thread, const bool shouldSwitch = true);
+        int markThreadAsRunnable(const rt::SharedPtr<Thread> &thread,
+                const bool shouldSwitch = true, bool *higherPriorityRunnable = nullptr);
 
         /// Runs the scheduler.
         void run() __attribute__((noreturn));
@@ -73,10 +75,17 @@ class Scheduler {
         static void InitAp();
 
         /// Finds the highest priority runnable thread on this core
-        Thread *findRunnableThread();
+        rt::SharedPtr<Thread> findRunnableThread();
+        /// Inserts the given thread into the appropriate run queue
+        int schedule(const rt::SharedPtr<Thread> &thread);
+        /// Returns the run queue level to which the given thread belongs
+        size_t getLevelFor(const rt::SharedPtr<Thread> &thread);
+
+        /// Switch to the given thread
+        void switchTo(const rt::SharedPtr<Thread> &thread);
 
         /// updates the current CPU's running thread
-        void setRunningThread(Thread *t) {
+        void setRunningThread(const rt::SharedPtr<Thread> &t) {
             this->running = t;
         }
 
@@ -104,10 +113,19 @@ class Scheduler {
         struct Level {
             public:
                 /// Queue of runnable threads in this level
-                rt::LockFreeQueue<Thread *> storage;
+                rt::LockFreeQueue<rt::SharedPtr<Thread>> storage;
 
                 /// Last time a thread from this level was scheduled
                 uint64_t lastScheduledTsc = 0;
+
+                /// Length of this level's time quantum, in nanoseconds
+                uint64_t quantumLength = 0;
+
+            public:
+                /// Push a new thread into the run queue
+                bool push(const rt::SharedPtr<Thread> &thread) {
+                    return (this->storage.insert(thread) != 0);
+                }
         };
 
         /**
@@ -134,7 +152,7 @@ class Scheduler {
         static rt::Vector<InstanceInfo> *gSchedulers;
 
         /// the thread that is currently being executed
-        Thread *running = nullptr;
+        rt::SharedPtr<Thread> running = nullptr;
 
         /**
          * Whether the run queue has been modified. This is set whenever a new thread is made
@@ -168,6 +186,12 @@ class Scheduler {
          * another core modified our run queues.
          */
         size_t levelChangeMaxLoops = 5;
+
+        /**
+         * Level from which the currently executing thread was pulled, or `kNumLevels` if we're
+         * executing the idle thread.
+         */
+        size_t currentLevel = kNumLevels;
 
         /**
          * List of other cores' schedulers, ordered by ascending cost of migrating a thread from

@@ -69,14 +69,15 @@ Handler::Handler() {
 /**
  * Maps the kernel time info page into the specified task.
  */
-void Handler::mapTimePage(sched::Task *task) {
+void Handler::mapTimePage(rt::SharedPtr<sched::Task> &task) {
     int err;
 
     // map the stub into the userspace
     auto map = task->vm;
 
     err = map->add(this->timePage & ~0xFFF, 0x1000, kTimeUserVmAddr, ::vm::MapMode::kUserRead);
-    REQUIRE(!err, "failed to map time page into task %p (%s): %d", task, task->name, err);
+    REQUIRE(!err, "failed to map time page into task %p (%s): %d", static_cast<void *>(task),
+            task->name, err);
 }
 
 /**
@@ -126,7 +127,7 @@ uintptr_t arch_syscall_msgsend_slow(const uintptr_t type) {
 /**
  * Maps the syscall stub page into the given task.
  */
-void arch::TaskWillStart(sched::Task *task) {
+void arch::TaskWillStart(rt::SharedPtr<sched::Task> &task) {
     Handler::taskCreated(task);
 }
 

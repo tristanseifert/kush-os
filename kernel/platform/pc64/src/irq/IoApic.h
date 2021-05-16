@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <runtime/SmartPointers.h>
+
 #include "Manager.h"
 #include "../acpi/Parser.h"
 
@@ -94,7 +96,7 @@ class IoApic {
         size_t numIrqs = 0;
 
         /// Mapping object for the APIC's registers
-        vm::MapEntry *vm;
+        rt::SharedPtr<vm::MapEntry> vm;
         /// APIC register base
         void *base;
 };
