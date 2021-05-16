@@ -32,6 +32,8 @@ enum Errors: int {
     InvalidState                        = -11,
     /// The call was aborted because it would result in a deadlock.
     DeadlockPrevented                   = -12,
+    /// Required memory allocation failed
+    NoMemory                            = -13,
 };
 }
 

@@ -14,7 +14,7 @@ int TaskCreateWithParent(const uintptr_t parent, uintptr_t *outHandle) {
         return -1;
     }
 
-    intptr_t err = __do_syscall1(SYS_TASK_CREATE, parent);
+    intptr_t err = __do_syscall1(parent, SYS_TASK_CREATE);
 
     if(err > 0) {
         *outHandle = err;
@@ -35,7 +35,7 @@ int TaskCreate(uintptr_t *outHandle) {
  * Executes a return to usermode in the given task's main thread.
  */
 int TaskInitialize(const uintptr_t taskHandle, const uintptr_t pc, const uintptr_t sp) {
-    return __do_syscall3(SYS_TASK_INIT, taskHandle, pc, sp);
+    return __do_syscall3(taskHandle, pc, sp, SYS_TASK_INIT);
 }
 
 /**
@@ -55,7 +55,7 @@ int TaskGetHandle(uintptr_t *outHandle) {
  * Terminates the specified task.
  */
 int TaskExit(const uintptr_t handle, const uintptr_t code) {
-    return __do_syscall2(SYS_TASK_TERMINATE, handle, code);
+    return __do_syscall2(handle, code, SYS_TASK_TERMINATE);
 }
 
 /**
@@ -66,7 +66,7 @@ int TaskExit(const uintptr_t handle, const uintptr_t code) {
  */
 int TaskSetName(const uintptr_t handle, const char *name) {
     const size_t nameLen = strlen(name);
-    return __do_syscall3(SYS_TASK_RENAME, handle, (uintptr_t) name, nameLen);
+    return __do_syscall3(handle, (uintptr_t) name, nameLen, SYS_TASK_RENAME);
 }
 
 
@@ -75,5 +75,5 @@ int TaskSetName(const uintptr_t handle, const char *name) {
  * Writes the given string to the debug output stream for the process.
  */
 int DbgOut(const char *string, const size_t length) {
-    return __do_syscall2(SYS_TASK_DBG_OUT, (uintptr_t) string, length);
+    return __do_syscall2((uintptr_t) string, length, SYS_TASK_DBG_OUT);
 }

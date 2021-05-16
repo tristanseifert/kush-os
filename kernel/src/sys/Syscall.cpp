@@ -19,162 +19,11 @@ static uint8_t gSharedBuf[sizeof(Syscall)] __attribute__((aligned(64)));
 Syscall *Syscall::gShared = nullptr;
 
 /**
- * Stub for an unimplemented syscall
- */
-static intptr_t UnimplementedSyscall(const Syscall::Args *, const uintptr_t) {
-    return Errors::InvalidSyscall;
-}
-
-/**
- * Global syscall table
- */
-static intptr_t (* const gSyscalls[])(const Syscall::Args *, const uintptr_t) = {
-    // 0x00: Receive message
-    PortReceive,
-    // 0x01: Send message
-    PortSend,
-    // 0x02: Update port parameters
-    PortSetParams,
-    /// 0x03: Allocate port
-    PortAlloc,
-    // 0x04: Deallocate port
-    PortDealloc,
-    // 0x05: Share virtual memory region
-    UnimplementedSyscall,
-    // 0x06-0x07: Reserved
-    UnimplementedSyscall, UnimplementedSyscall,
-
-    // 0x08: Receive notification
-    NotifyReceive,
-    // 0x09: Send notification
-    NotifySend,
-    // 0x0A-0x0F: Reserved
-    UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall,
-    UnimplementedSyscall, UnimplementedSyscall,
-
-    // 0x10: Create VM region
-    VmAlloc,
-    // 0x11: Create anonymous VM region
-    VmAllocAnon,
-    // 0x12: Destroy VM region
-    UnimplementedSyscall,
-    // 0x13: Update VM region permissions
-    VmRegionUpdatePermissions,
-    // 0x14: Resize VM region
-    VmRegionResize,
-    // 0x15: Map VM region
-    VmRegionMap,
-    // 0x16: Unmaps VM region
-    VmRegionUnmap,
-    // 0x17: Get VM region info
-    VmRegionGetInfo,
-    // 0x18: Get task VM info
-    VmTaskGetInfo,
-    // 0x19: Convert virtual address to region handle
-    VmAddrToRegion,
-
-    // 0x1A-0x1F: VM calls (reserved)
-    UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall,
-    UnimplementedSyscall, UnimplementedSyscall,
-
-    // 0x20: Return current thread handle
-    [](auto, auto) -> intptr_t {
-        auto thread = sched::Thread::current();
-        if(!thread) {
-            return Errors::GeneralError;
-        }
-        return static_cast<int>(thread->handle);
-    },
-    // 0x21: Give up remaining CPU quantum
-    [](auto, auto) -> intptr_t {
-        sched::Thread::yield();
-        return Errors::Success;
-    },
-    // 0x22: Microsecond granularity sleep
-    [](auto args, auto) -> intptr_t {
-        // validate args
-        const uint64_t sleepNs = 1000ULL * args->args[0];
-        if(!sleepNs) return Errors::InvalidArgument;
-        // call sleep handler
-        sched::Thread::sleep(sleepNs);
-        return Errors::Success;
-    },
-    // 0x23: Create thread
-    ThreadCreate,
-    // 0x24: Join with thread
-    ThreadJoin,
-    // 0x25: Destroy thread
-    ThreadDestroy,
-    // 0x26: Set thread state 
-    UnimplementedSyscall,
-    // 0x27: Set thread priority 
-    ThreadSetPriority,
-    // 0x28: Set thread notification mask
-    ThreadSetNoteMask,
-    // 0x29: Set thread name
-    ThreadSetName,
-    // 0x2A: resume thread
-    ThreadResume,
-
-    // 0x2B-0x2F: reserved
-    UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall, UnimplementedSyscall,
-    UnimplementedSyscall,
-
-    // 0x30: Get task handle
-    [](auto, auto) -> intptr_t {
-        auto thread = sched::Thread::current();
-        if(!thread || !thread->task) {
-            return Errors::GeneralError;
-        }
-        return static_cast<int>(thread->task->handle);
-    },
-    // 0x31: Create task
-    TaskCreate,
-    // 0x32: Terminate task,
-    TaskTerminate,
-    // 0x33: Initialize task
-    TaskInitialize,
-    // 0x34: Set task name
-    TaskSetName,
-    // 0x35: Wait on task
-    UnimplementedSyscall,
-    // 0x36: Debug printing
-    TaskDbgOut,
-
-    // 0x37: Reserved
-    UnimplementedSyscall,
-
-    // 0x38: Register IRQ handler
-    IrqHandlerInstall,
-    // 0x39: Unregister IRQ handler
-    IrqHandlerRemove,
-    // 0x3A: Architecture specific syscall
-    arch::HandleSyscall,
-};
-static const size_t gNumSyscalls = 0x3A;
-
-/**
  * Initializes the syscall handler.
  */
 void Syscall::init() {
     gShared = reinterpret_cast<Syscall *>(&gSharedBuf);
     new(gShared) Syscall();
-}
-
-/**
- * Handles a syscall that wasn't handled by fast path code, nor platform or architecture code.
- */
-intptr_t Syscall::_handle(const Args *args, const uintptr_t code) {
-    // validate syscall number
-    const size_t syscallIdx = (code & 0xFFFF);
-    if(syscallIdx > gNumSyscalls) {
-        return Errors::InvalidSyscall;
-    }
-
-    sched::Thread::current()->lastSyscall = code;
-
-    // invoke it
-    return gSyscalls[syscallIdx](args, code);
 }
 
 
@@ -207,7 +56,7 @@ bool Syscall::validateUserPtr(const void *address, const size_t _length) {
 
     const uintptr_t base = reinterpret_cast<uintptr_t>(address) & ~(pageSz - 1);
 #if LOG_PTR_VALIDATE
-    log("buffer %p -> base %08x", address, base);
+    log("buffer %p -> base %p", address, base);
 #endif
 
     // check each page referenced by the buffer
@@ -217,13 +66,13 @@ bool Syscall::validateUserPtr(const void *address, const size_t _length) {
 
         if(err) {
             // 1 = no page, -1 = error codes
-            log("invalid user ptr %p! (page %08x err %d)", address, virtAddr, err);
+            log("invalid user ptr %p! (page %llx err %d)", address, virtAddr, err);
             return false;
         }
 
         // the page is mapped. ensure the user flag is set
         if(!TestFlags(mode & vm::MapMode::ACCESS_USER)) {
-            log("invalid user ptr %p! (page %08x flags %d)", address, virtAddr, (int) mode);
+            log("invalid user ptr %p! (page %llx flags %d)", address, virtAddr, (int) mode);
             return false;
         }
     }
@@ -231,3 +80,35 @@ bool Syscall::validateUserPtr(const void *address, const size_t _length) {
     // if we get here, the entire range was valid and user accessible
     return true;
 }
+
+/**
+ * Copies data from userspace.
+ *
+ * TODO: implement actual validation and SMAP support
+ */
+void Syscall::copyIn(const void *from, const size_t fromBytes, void *to, const size_t toBytes) {
+    REQUIRE((reinterpret_cast<uintptr_t>(from) + fromBytes) < vm::kKernelVmBound, "%s(%p, %d, %p, %d)",
+            "copyin", from, fromBytes, to, toBytes);
+
+    memcpy(to, from, (toBytes > fromBytes) ? fromBytes : toBytes);
+}
+/**
+ * Copies data to userspace.
+ *
+ * TODO: implement actual validation and SMAP support
+ */
+void Syscall::copyOut(const void *from, const size_t fromBytes, void *to, const size_t toBytes) {
+    REQUIRE((reinterpret_cast<uintptr_t>(to) + toBytes) < vm::kKernelVmBound, "%s(%p, %d, %p, %d)",
+            "copyout", from, fromBytes, to, toBytes);
+
+    memcpy(to, from, (toBytes > fromBytes) ? fromBytes : toBytes);
+}
+
+
+/**
+ * Stub for an unimplemented syscall
+ */
+intptr_t Syscall::UnimplementedSyscall() {
+    return Errors::InvalidSyscall;
+}
+

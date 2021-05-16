@@ -13,13 +13,15 @@
 /// Makes a syscall with no arguments.
 LIBSYSTEM_INTERNAL intptr_t __do_syscall0(const uintptr_t number);
 /// Makes a syscall with a single argument.
-LIBSYSTEM_INTERNAL intptr_t __do_syscall1(const uintptr_t number, const uintptr_t arg0);
+LIBSYSTEM_INTERNAL intptr_t __do_syscall1(const uintptr_t arg0, const uintptr_t number);
 /// Makes a syscall with two arguments.
-LIBSYSTEM_INTERNAL intptr_t __do_syscall2(const uintptr_t number, const uintptr_t arg0, const uintptr_t arg1);
+LIBSYSTEM_INTERNAL intptr_t __do_syscall2(const uintptr_t arg0, const uintptr_t arg1, const uintptr_t number);
 /// Makes a syscall with three arguments.
-LIBSYSTEM_INTERNAL intptr_t __do_syscall3(const uintptr_t number, const uintptr_t arg0, const uintptr_t arg1, const uintptr_t arg2);
+LIBSYSTEM_INTERNAL intptr_t __do_syscall3(const uintptr_t arg0, const uintptr_t arg1, const uintptr_t arg2, const uintptr_t number);
 /// Makes a syscall with four arguments.
-LIBSYSTEM_INTERNAL intptr_t __do_syscall4(const uintptr_t number, const uintptr_t arg0, const uintptr_t arg1, const uintptr_t arg2, const uintptr_t arg3);
+LIBSYSTEM_INTERNAL intptr_t __do_syscall4(const uintptr_t arg0, const uintptr_t arg1, const uintptr_t arg2, const uintptr_t arg3, const uintptr_t number);
+/// Makes a syscall with five arguments.
+LIBSYSTEM_INTERNAL intptr_t __do_syscall5(const uintptr_t arg0, const uintptr_t arg1, const uintptr_t arg2, const uintptr_t arg3, const uintptr_t arg4, const uintptr_t number);
 
 /*
  * Define syscall numbers.
@@ -39,10 +41,11 @@ LIBSYSTEM_INTERNAL intptr_t __do_syscall4(const uintptr_t number, const uintptr_
 #define SYS_VM_UPDATE_FLAGS             0x13
 #define SYS_VM_RESIZE                   0x14
 #define SYS_VM_MAP                      0x15
-#define SYS_VM_UNMAP                    0x16
-#define SYS_VM_GET_INFO                 0x17
-#define SYS_VM_GET_TASK_INFO            0x18
-#define SYS_VM_ADDR_TO_HANDLE           0x19
+#define SYS_VM_MAP_EX                   0x16
+#define SYS_VM_UNMAP                    0x17
+#define SYS_VM_GET_INFO                 0x18
+#define SYS_VM_GET_TASK_INFO            0x19
+#define SYS_VM_ADDR_TO_HANDLE           0x1A
 
 #define SYS_THREAD_GET_HANDLE           0x20
 #define SYS_THREAD_YIELD                0x21
@@ -67,11 +70,13 @@ LIBSYSTEM_INTERNAL intptr_t __do_syscall4(const uintptr_t number, const uintptr_
 
 #define SYS_ARCH_INSTALL_IRQ            0x38
 #define SYS_ARCH_UNINSTALL_IRQ          0x39
-#define SYS_ARCH                        0x3A
 
-#define SYS_ARCH_X86_UPDATE_IOPB        (SYS_ARCH | (0x0000 << 16))
-#define SYS_ARCH_X86_SET_TLS_BASE       (SYS_ARCH | (0x0001 << 16))
+// first architecture specific syscall number
+#define SYS_ARCH                        0x40
 
-#define SYS_ARCH_AMD64_SET_FGS_BASE     (SYS_ARCH | (0x0001 << 16))
+#define SYS_ARCH_X86_UPDATE_IOPB        (SYS_ARCH + 0x00)
+#define SYS_ARCH_X86_SET_TLS_BASE       (SYS_ARCH + 0x01)
+
+#define SYS_ARCH_AMD64_SET_FGS_BASE     (SYS_ARCH + 0x01)
 
 #endif

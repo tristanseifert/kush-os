@@ -37,7 +37,7 @@ IoApic::IoApic(const uintptr_t base, const uint32_t _irqBase, const uint8_t _id)
     REQUIRE(this->vm, "failed to create %s phys map", "IOAPIC");
 
     auto map = vm::Map::kern();
-    err = map->add(this->vm, sched::Task::kern(), 0, vm::MappingFlags::None, kPlatformRegionMmio,
+    err = map->add(this->vm, sched::Task::kern(), 0, vm::MappingFlags::None, 0, kPlatformRegionMmio,
             (kPlatformRegionMmio + kPlatformRegionMmioLen - 1));
     REQUIRE(!err, "failed to map %s: %d", "IOAPIC", err);
 

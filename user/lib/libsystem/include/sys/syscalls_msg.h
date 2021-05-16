@@ -17,10 +17,8 @@ typedef struct MessageHeader {
     /// number of bytes of message data
     uint16_t receivedBytes;
 
-    uintptr_t reserved[1];
-
     /// message data
-    uint8_t data[];
+    uint8_t data[] __attribute__((aligned(16)));
 } MessageHeader_t __attribute__((aligned(16)));
 
 LIBSYSTEM_EXPORT int PortCreate(uintptr_t *outHandle);

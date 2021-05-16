@@ -16,37 +16,39 @@ using namespace sys;
 /**
  * Sends a notification to a thread.
  *
- * - Arg0: Thread handle
- * - Arg1: Notification bits to send
+ * @param threadHandle Thread to notify
+ * @param bits Notification bits to set
+ *
+ * @return 0 if notification was sent, negative error code otherwise
  */
-intptr_t sys::NotifySend(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::NotifySend(const Handle threadHandle, const uintptr_t bits) {
+    // validate arguments
+    if(!bits) {
+        return Errors::InvalidArgument;
+    }
+
     // resolve thread handle
-    auto thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
+    auto thread = handle::Manager::getThread(threadHandle);
     if(!thread) {
         return Errors::InvalidHandle;
     }
 
     // send notification to it
-    const auto bits = args->args[1];
-    if(!bits) {
-        return Errors::InvalidArgument;
-    }
-
     thread->notify(bits);
-
     return Errors::Success;
 }
 
 /**
  * Blocks the calling thread waiting to receive notifications.
  *
- * - Arg0: Notification mask to use, a value of 0 is equivalent to setting all bits
+ * @param mask Notification mask to set; 0 is equivalent to all bits set
+ *
+ * @return Notify bits that were set when the thread was unblocked
  */
-intptr_t sys::NotifyReceive(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::NotifyReceive(uintptr_t mask) {
     auto thread = sched::Thread::current();
 
     // get mask
-    auto mask = args->args[0];
     if(!mask) {
         mask = UINTPTR_MAX;
     }

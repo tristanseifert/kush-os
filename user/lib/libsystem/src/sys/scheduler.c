@@ -30,7 +30,7 @@ int ThreadYield() {
  * Sleeps for the given number of microseconds.
  */
 int ThreadUsleep(const uintptr_t usecs) {
-    return __do_syscall1(SYS_THREAD_SLEEP, usecs);
+    return __do_syscall1(usecs, SYS_THREAD_SLEEP);
 }
 
 /**
@@ -54,8 +54,8 @@ int ThreadCreateFlags(void (*entry)(uintptr_t), const uintptr_t entryArg, const 
     }
 
     // create the thread
-    intptr_t err = __do_syscall3(SYS_THREAD_CREATE | (flags & 0xFFFF) << 16, 
-            (uintptr_t) &__ThreadTrampoline, 0, stack);
+    intptr_t err = __do_syscall4((uintptr_t) &__ThreadTrampoline, 0, stack, flags,
+            SYS_THREAD_CREATE);
 
     // extract handle if desired; return 0 for success, syscall error otherwise
     if(outHandle && err > 0) {
@@ -78,7 +78,7 @@ int ThreadCreate(void (*entry)(uintptr_t), const uintptr_t entryArg, const uintp
  * @param handle Thread handle, or 0 for the current thread
  */
 int ThreadDestroy(const uintptr_t handle) {
-    return __do_syscall1(SYS_THREAD_DESTROY, handle);
+    return __do_syscall1(handle, SYS_THREAD_DESTROY);
 }
 
 /**
@@ -87,7 +87,10 @@ int ThreadDestroy(const uintptr_t handle) {
  * @param thread Thread handle, or 0 for the current thread.
  */
 int ThreadSetPriority(const uintptr_t handle, const int priority) {
-    return __do_syscall2(SYS_THREAD_SET_PRIORITY, handle, (uintptr_t) priority);
+    // priority must be [-100, 100]
+    // if(priority < -100 || priority > 100) return -1;
+
+    return __do_syscall2(handle, (uintptr_t) priority, SYS_THREAD_SET_PRIORITY);
 }
 
 /**
@@ -98,7 +101,7 @@ int ThreadSetPriority(const uintptr_t handle, const int priority) {
  */
 int ThreadSetName(const uintptr_t handle, const char *name) {
     const size_t nameLen = strlen(name);
-    return __do_syscall3(SYS_THREAD_RENAME, handle, (uintptr_t) name, nameLen);
+    return __do_syscall3(handle, (uintptr_t) name, nameLen, SYS_THREAD_RENAME);
 }
 
 /**
@@ -111,7 +114,7 @@ int ThreadSetName(const uintptr_t handle, const char *name) {
  * @return 0 on success, or a negative error code.
  */
 int ThreadResume(const uintptr_t threadHandle) {
-    return __do_syscall1(SYS_THREAD_RESUME, threadHandle);
+    return __do_syscall1(threadHandle, SYS_THREAD_RESUME);
 }
 
 /**
@@ -125,7 +128,7 @@ int ThreadResume(const uintptr_t threadHandle) {
 int ThreadWait(const uintptr_t threadHandle, const uintptr_t timeoutUsecs) {
     int err;
 
-    err = __do_syscall2(SYS_THREAD_JOIN, threadHandle, timeoutUsecs);
+    err = __do_syscall2(threadHandle, timeoutUsecs, SYS_THREAD_JOIN);
 
     // timeout expired
     if(err == -9) {

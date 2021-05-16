@@ -207,16 +207,16 @@ int Map::get(const uintptr_t virtAddr, uint64_t &phys, MapMode &mode) {
  *
  * @return 0 on success
  */
-int Map::add(rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task,
-        const uintptr_t requestedBase, const MappingFlags flagsMask, const uintptr_t searchStart,
-        const uintptr_t searchEnd) {
+int Map::add(const rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task,
+        const uintptr_t requestedBase, const MappingFlags flagsMask, const size_t _size,
+        const uintptr_t searchStart, const uintptr_t searchEnd) {
     REQUIRE(entry, "invalid %s", "vm object");
     REQUIRE(task, "invalid %s", "task");
 
     uintptr_t nextFree;
 
     uintptr_t base = requestedBase;
-    const auto size = entry->length;
+    const auto size = _size ? _size : entry->length;
 
     // either test whether the provided base address is valid, or select one
     RW_LOCK_WRITE(&this->lock);
@@ -334,7 +334,7 @@ int Map::getRegionInfo(rt::SharedPtr<MapEntry> region, uintptr_t &outBase, size_
 /**
  * Removes the given entry from this map.
  */
-int Map::remove(rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task) {
+int Map::remove(const rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task) {
     REQUIRE(task, "invalid %s", "task");
 
     RW_LOCK_WRITE(&this->lock);
@@ -361,7 +361,7 @@ int Map::remove(rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task>
 /**
  * Iterates the list of allocated mappings to see if we contain one.
  */
-const bool Map::contains(rt::SharedPtr<MapEntry> entry) {
+const bool Map::contains(const rt::SharedPtr<MapEntry> &entry) {
     RW_LOCK_READ_GUARD(this->lock);
     return (this->entries.baseAddressFor(entry) != 0);
 }

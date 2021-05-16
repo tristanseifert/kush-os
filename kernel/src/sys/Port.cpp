@@ -17,7 +17,7 @@ using namespace sys;
  * Receive message buffer; these must always be 16-byte aligned. This is a header for a message
  * buffer, which is allocated in 16-byte chunks.
  */
-struct RecvInfo {
+struct sys::RecvInfo {
     /// thread handle of the thread that sent this message
     Handle thread;
     /// task handle of the task that contains the thread
@@ -28,7 +28,7 @@ struct RecvInfo {
     uint16_t messageLength;
 
     /// data buffer; must be allocated in 16-byte chunks
-    uint8_t data[] __attribute__((aligned(64)));
+    uint8_t data[] __attribute__((aligned(16)));
 } __attribute__((aligned(16)));
 
 static_assert(offsetof(RecvInfo, data) % 16 == 0, "RecvInfo data must be 16 byte aligned");
@@ -37,22 +37,22 @@ static_assert(offsetof(RecvInfo, data) % 16 == 0, "RecvInfo data must be 16 byte
 /**
  * Sends message data to a port.
  *
- * Arg0: Port handle
- * Arg1: Message buffer pointer (16-byte aligned)
- * Arg2: Message length
+ * @param portHandle Handle of the port to send a message to
+ * @param msgPtr Pointer to the message data structure
+ * @param msgLen Number of bytes of message data to copy
+ *
+ * @return 0 on success or a negative error code
  */
-intptr_t sys::PortSend(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::PortSend(const Handle portHandle, const void *msgPtr, const size_t msgLen) {
     int err;
 
     // validate the message buffer
-    const auto msgLen = args->args[2];
-    auto msgPtr = reinterpret_cast<RecvInfo *>(args->args[1]);
     if(!Syscall::validateUserPtr(msgPtr, msgLen)) {
         return Errors::InvalidPointer;
     }
 
     // look up the port 
-    auto port = handle::Manager::getPort(static_cast<Handle>(args->args[0]));
+    auto port = handle::Manager::getPort(portHandle);
     if(!port) {
         return Errors::InvalidHandle;
     }
@@ -71,8 +71,16 @@ intptr_t sys::PortSend(const Syscall::Args *args, const uintptr_t number) {
 
 /**
  * Receives a message on the given port.
+ *
+ * @param portHandle Port to receive from
+ * @param recvPtr Receive buffer structure
+ * @param recvLen Total bytes of receive struct space allocated
+ * @param timeout How long to wait for a message, in nanoseconds.
+ *
+ * @return Negative error code or the number of bytes of message data returned
  */
-intptr_t sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::PortReceive(const Handle portHandle, RecvInfo *recvPtr, const size_t recvLen,
+        const size_t timeout) {
     int err;
     auto task = sched::Task::current();
     if(!task) {
@@ -80,7 +88,6 @@ intptr_t sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
     }
 
     // basic validation of lengths
-    const auto recvLen = args->args[2];
     if(recvLen < sizeof(RecvInfo)) {
         return Errors::InvalidArgument;
     } else if(recvLen % 16) {
@@ -93,13 +100,12 @@ intptr_t sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
     }
 
     // validate the destination buffer
-    auto recvPtr = reinterpret_cast<RecvInfo *>(args->args[1]);
     if(!Syscall::validateUserPtr(recvPtr, recvLen)) {
         return Errors::InvalidPointer;
     }
 
     // get port handle and ensure we own it
-    auto port = handle::Manager::getPort(static_cast<Handle>(args->args[0]));
+    auto port = handle::Manager::getPort(portHandle);
     if(!port) {
         return Errors::InvalidHandle;
     }
@@ -108,17 +114,16 @@ intptr_t sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
     }
 
     // calculate timeout
-    uint64_t timeout = 0;
+    uint64_t timeoutNs = 0;
 
-    if(args->args[3]) {
+    if(timeout) {
         // if it's the max value of the type, block forever
-        if(args->args[3] == UINTPTR_MAX) {
-            timeout = UINT64_MAX;
+        if(timeout == UINTPTR_MAX) {
+            timeoutNs = UINT64_MAX;
         } 
         // otherwise, it's a timeout in usec
         else {
-            timeout = (args->args[3] * 1000); // usec -> ns
-            timeout += platform_timer_now();
+            timeoutNs = platform_timer_now() + (timeout * 1000ULL); // usec -> ns
         }
     }
 
@@ -157,20 +162,21 @@ intptr_t sys::PortReceive(const Syscall::Args *args, const uintptr_t number) {
 }
 
 /**
- * Updates a port's parameters.
+ * Updates a port's parameters. The caller must be the owner of the port.
  *
- * The caller must be the owner of the port.
+ * @param portHandle Handle of the port to modify
+ * @param queueDepth Maximum number of messages that may be pending on the port
  *
- * Arg0: New port queue size
+ * @return 0 on success or a negative error code
  */
-intptr_t sys::PortSetParams(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::PortSetParams(const Handle portHandle, const uintptr_t queueDepth) {
     auto task = sched::Task::current();
     if(!task) {
         return Errors::GeneralError;
     }
 
     // convert the port handle
-    auto port = handle::Manager::getPort(static_cast<Handle>(args->args[0]));
+    auto port = handle::Manager::getPort(portHandle);
     if(!port) {
         return Errors::InvalidHandle;
     }
@@ -181,15 +187,17 @@ intptr_t sys::PortSetParams(const Syscall::Args *args, const uintptr_t number) {
     }
 
     // update params
-    port->setQueueDepth(args->args[1]);
+    port->setQueueDepth(queueDepth);
 
     return Errors::Success;
 }
 
 /**
  * Allocates a new port.
+ *
+ * @return Valid handle to the newly created port or a negative error code
  */
-intptr_t sys::PortAlloc(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::PortAlloc() {
     // allocate the port
     auto port = ipc::Port::alloc();
     if(!port) {
@@ -205,18 +213,20 @@ intptr_t sys::PortAlloc(const Syscall::Args *args, const uintptr_t number) {
 }
 
 /**
- * Deallocates a port.
+ * Deallocates a port. The caller must be the owner of the port.
  *
- * Arg0 is the port handle. The calling task must have been the one that created the port.
+ * @param portHandle Port to deallocate
+ *
+ * @return 0 on success, or a negative error code
  */
-intptr_t sys::PortDealloc(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::PortDealloc(const Handle portHandle) {
     auto task = sched::Task::current();
     if(!task) {
         return Errors::GeneralError;
     }
 
     // convert the port handle
-    auto port = handle::Manager::getPort(static_cast<Handle>(args->args[0]));
+    auto port = handle::Manager::getPort(portHandle);
     if(!port) {
         return Errors::InvalidHandle;
     }

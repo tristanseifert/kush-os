@@ -221,14 +221,14 @@ Sets the provided notification bits on the specified thread. The thread may be w
 \subsection{Virtual Memory}
 %%%%%
 \subsubsection{{\tt 0x10}: Create VM region}
-\textbf{Arguments:} (3) Physical address, requested virtual address, allocation size  \\
-\textbf{Flags:} See below \\
+\textbf{Arguments:} (3) Physical base address, size, flags  \\
 \textbf{Returns:} VM object handle ($>0$) or error code ($\leq0$) \\
 
-Allocates a virtual memory region backed by physical memory, starting with the given address, and incrementing linearly for the requested allocation size.  If a zero virtual address is specified, the kernel will pick an address somewhere in the task's address space that can fit the entire region.
+Allocates a virtual memory region backed by physical memory, starting with the given address, and incrementing linearly for the requested allocation size. It is not yet mapped in any process address space.
 
-This call will fail if the entire region of $[\text{start}, \text{start} + \text{length})$ has any pages that are mapped. Likewise, the length must be a multiple of the platform-specific minimum page size.
+This call will fail if the length and base address are not a multiple of the platform-specific minimum page size.
 
+\paragraph{Flags}
 \begin{itemize}
 \item \texttt{1 << 1}: Use large pages, if supported, to satisfy this virtual memory mapping. The kernel will attempt to map as much of the physical memory region as possible with large pages, and use regular pages to map the remainder.
 \item \texttt{1 << 10}: Allow read access to the memory region.
@@ -240,34 +240,38 @@ This call will fail if the entire region of $[\text{start}, \text{start} + \text
 
 %%%%%
 \subsubsection{{\tt 0x11}: Create anonymous VM region}
-\textbf{Arguments:} (2) Requested virtual address, allocation size  \\
-\textbf{Flags:} See below \\
+\textbf{Arguments:} (2) Allocation size, flags  \\
 \textbf{Returns:} VM object handle ($>0$) or error code ($\leq0$) \\
 
-Allocates a virtual memory region backed by anonymous memory.
+Allocates a virtual memory region backed by anonymous memory. Allocation size must be a multiple of the platform-specific minimum page size, or the call will fail; the platform is free to use pages larger than this, if supported, to satisfy the allocation.
 
-The kernel will attempt to place the region at the address requested by the caller; however, this is treated more as a hint than a hard requirement -- the call will fail if a non-zero virtual address is specified, and the allocation cannot be fully satisfied at that address. If a zero virtual address is specified, the kernel will pick an address somewhere in the task's address space that can fit the entire region.
-
-Allocation size must be a multiple of the platform-specific minimum page size, or the call will fail; the platform is free to use pages larger than this, if supported, to satisfy the allocation.
-
+\paragraph{Flags}
 \begin{itemize}
 \item \texttt{1 << 0}: Force all memory to be allocated at the time the call returns; if the system has insufficient virtual memory space to satisfy the allocation, the call fails.
 \item \texttt{1 << 10}: Allow read access to the memory region.
 \item \texttt{1 << 11}: Allow write access to the memory region.
 \item \texttt{1 << 12}: Allow code execution from the memory region. (This flag may not be supported on all architectures; on those that do not support it, all virtual maps are executable, so you should pass this flag to ensure your code works correctly where the flag is considered.)
-\item \texttt{1 << 15}: Create the VM object, but do not add it to the calling process' address space. (Even when all tasks unmap the range, its kernel object will hang around until the task that created it terminates. Consider this a side effect of the implementation, rather than a feature.)
 \end{itemize}
 
 %%%%%
-\subsubsection{{\tt 0x13}: Update VM region permissions}
-\textbf{Arguments:} (1) VM object handle \\
-\textbf{Flags:} See below \\
+\subsubsection{{\tt 0x12}: Deallocate VM region}
+\textbf{Arguments:} (1) VM object handle  \\
+\textbf{Returns:} Success ($0$) or error code ($\leq0$) \\
+
+Deallocates a virtual memory region. The specified region will be removed from the calling task's virtual address space (if it's mapped,) and then removed from the task's list of owned VM regions, if it is the owner.
+
+This means it's safe to make this call against a region that's shared with other tasks. Since each mapping of the region holds a reference to it, it will only be completely deallocated once all tasks have unmapped it, even if the owner invoked this method. (The region becomes orphaned at this point; but it will still be correctly deallocated later when it's completely unmapped.)
+
+%%%%%
+\subsubsection{{\tt 0x13}: Update VM region flags}
+\textbf{Arguments:} (2) VM object handle, flags \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
-Changes the access permissions of the specified virtual memory region.
+Changes the access permissions and specifiers of the specified virtual memory region.
 
 Only the task that created a VM object can change its permissions. (More concretely, this means you cannot adjust the permissions of a shared memory object you received from another task.)
 
+\paragraph{Flags}
 \begin{itemize}
 \item \texttt{1 << 10}: Allow read access to the memory region.
 \item \texttt{1 << 11}: Allow write access to the memory region.
@@ -278,26 +282,30 @@ Only the task that created a VM object can change its permissions. (More concret
 
 %%%%%
 \subsubsection{{\tt 0x14}: Resize VM region}
-\textbf{Arguments:} (2) VM object handle, new size (in bytes) \\
-\textbf{Flags:} None \\
+\textbf{Arguments:} (3) VM object handle, new size (in bytes), flags \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
-Resizes a previously allocated virtual memory region. The new size may be larger or smaller than the current size, but it must be a multiple of the platform's page size.
+Resizes a previously allocated virtual memory region. The new size may be larger or smaller than the current size, but it must be a multiple of the platform's page size. Only the task that created a VM object can resize it.
 
-Only the task that created a VM object can resize it. Additionally, once a VM region has been mapped by more than one process, it cannot be resized.
+When a VM region is resized, none of the mappings in tasks are updated as a result. So, if the region shrank, accesses beyond its new ending address will cause a page fault. If it grows, tasks will not be able to access any additional pages beyond its old length until their map is updated.
 
+\paragraph{Flags}
 \begin{itemize}
 \item \texttt{1 << 0}: If the object represents an anonymous mapping, and the resize operation requires the allocation of additional physical memory, force that memory to be allocated eagerly. This call will fail if the system has insufficient physical memory available to satisfy the request.
 \end{itemize}
 
 %%%%%
-\subsubsection{{\tt 0x15}: Map VM region}
-\textbf{Arguments:} (3) VM object handle, destination task handle, destination VM base \\
-\textbf{Flags:} See below \\
+\subsubsection{{\tt 0x15}: Map VM region at fixed address}
+\textbf{Arguments:} (5) VM object handle, destination task handle, virtual base address, mapping length, flags \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
-Maps the specified virtual memory object into the address space of the specified task, if possible; possible failure reasons include a conflicting mapping in the destination address space. A page aligned base address must be specified.
+Maps the specified virtual memory object into the address space of the specified task, reserving a particular length region of virtual address space for it, if possible. A page aligned base address for the view must be specified.
 
+The mapping length \textit{does not} have to be the same as the size of the VM region, though it often is. This allows creating "views" into a region in virtual address space, allowing the region to grow or shrink as necessary. This is particularly useful for shared memory, as it allows the region to grow over time without needing to modify memory maps of other tasks.
+
+Specify a task handle of \texttt{0} to use the currently running task.
+
+\paragraph{Flags}
 If any flags are specified at all, they are interpreted as a mask to be applied against the map's flags. For example, this can be used to map a page read-only into another task. The supported flags are:
 
 \begin{itemize}
@@ -306,12 +314,39 @@ If any flags are specified at all, they are interpreted as a mask to be applied 
 \item \texttt{1 << 12}: Allow code execution from the memory region.
 \end{itemize}
 
-Specify a task handle of \texttt{0} to use the currently running task.
+%%%%%
+\subsubsection{{\tt 0x16}: Map VM region (advanced)}
+\textbf{Arguments:} (4) VM object handle, destination task handle, info structure, info structure size \\
+\textbf{Returns:} 0 on success, or negative error code \\
+
+Creates a view into a particular virtual memory region in a task's virtual address space. Specify a task handle of \texttt{0} to use the currently running task.
+
+The info structure is of the following format:
+
+\begin{bytefield}[bitwidth=0.65em]{64} \\
+\bitheader[endianness=big]{0,63} \\
+\bitbox{64}{Desired VM address range start} \\
+\bitbox{64}{Desired VM address range end} \\
+\bitbox{64}{Mapping length (bytes)} \\
+\bitbox{64}{Flags} \\
+\end{bytefield}
+
+The kernel will attempt to find a free region of address space in the given bounds to create a view into the specified VM object. If the base address of the mapping should be fixed, specify it as the search range start, and set the search range ending address to \texttt{0}.
+
+If the mapping is successful, the kernel writes into the first field the actual base address at which the VM object was mapped.
+
+\paragraph{Flags}
+If any flags are specified, they are interpreted as a mask to be applied against the map's flags. For example, this can be used to map a page read-only into another task. The supported flags are:
+
+\begin{itemize}
+\item \texttt{1 << 10}: Allow read access to the memory region.
+\item \texttt{1 << 11}: Allow write access to the memory region.
+\item \texttt{1 << 12}: Allow code execution from the memory region.
+\end{itemize}
 
 %%%%%
-\subsubsection{{\tt 0x16}: Unmap VM region}
+\subsubsection{{\tt 0x17}: Unmap VM region}
 \textbf{Arguments:} (2) VM object handle, destination task handle \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
 Unmaps a previously mapped VM region from the specified task. If this is the last task that had this object mapped, it will be destroyed automatically.
@@ -319,38 +354,36 @@ Unmaps a previously mapped VM region from the specified task. If this is the las
 Specify a task handle of \texttt{0} to use the currently running task.
 
 %%%%%
-\subsubsection{{\tt 0x17}: Get VM region info}
+\subsubsection{{\tt 0x18}: Get VM region info}
 \textbf{Arguments:} (4) VM object handle, task handle, info buffer, info buffer length \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
 Gets information about the specified VM region. If the task handle is not \texttt{0}, the info is provided from the perspective of that task; otherwise, the running task is used. The information is then written into a buffer with the specified location. The buffer contains a structure with the following fields:
 
-\begin{bytefield}[bitwidth=1.3em]{32} \\
-\bitheader[endianness=big]{0,15,16,31} \\
-\bitbox{32}{Virtual base address} \\
-\bitbox{32}{Length (bytes)} \\
-\bitbox{16}{\it Reserved} & \bitbox{16}{Flags} \\
+\begin{bytefield}[bitwidth=0.65em]{64} \\
+\bitheader[endianness=big]{0,63} \\
+\bitbox{64}{Virtual base address} \\
+\bitbox{64}{Length (bytes)} \\
+\bitbox{64}{Flags} \\
 \end{bytefield}
 
 %%%%%
-\subsubsection{{\tt 0x18}: Get task VM info}
+\subsubsection{{\tt 0x19}: Get task VM info}
 \textbf{Arguments:} (3) Task handle, info buffer, info buffer length \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
 Retrieves information on a task's virtual memory environment. If the task handle is specified as \texttt{0}, the current task's information is returned.
 
 Information is placed into an info buffer with the following structure:
 
-\begin{bytefield}[bitwidth=1.3em]{32} \\
-\bitheader[endianness=big]{0,15,16,31} \\
-\bitbox{32}{Pages owned} \\
-\bitbox{32}{Number of VM mappings} \\
+\begin{bytefield}[bitwidth=0.65em]{64} \\
+\bitheader[endianness=big]{0,063} \\
+\bitbox{64}{Pages owned} \\
+\bitbox{64}{Number of VM mappings} \\
 \end{bytefield}
 
 %%%%%
-\subsubsection{{\tt 0x19}: Get handle for address}
+\subsubsection{{\tt 0x1A}: Get handle for address}
 \textbf{Arguments:} (2) Task handle, virtual address \\
 \textbf{Flags:} None \\
 \textbf{Returns:} VM region handle ($>0$) or error code ($\leq0$) \\
@@ -359,13 +392,14 @@ Searches the given task's virtual address space to determine if there is a mappi
 
 We'll return either the handle of the region, a value of \texttt{0} to indicate that there is no mapping at the given address, or a negative error code.
 
+
+
 %%%%%%%%%%
 \newpage
 \subsection{Scheduler}
 %%%%%
 \subsubsection{{\tt 0x20}: Get current thread handle}
 \textbf{Arguments:} None \\
-\textbf{Flags:} None \\
 \textbf{Returns:} Thread handle ($>0$) or error code ($\leq0$) \\
 
 Retrieves a kernel handle representing the currently executing thread.
@@ -373,7 +407,6 @@ Retrieves a kernel handle representing the currently executing thread.
 %%%%%
 \subsubsection{{\tt 0x21}: Yield remaining time quantum}
 \textbf{Arguments:} None \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success or negative error code \\
 
 Gives up the remainder of the thread's time quantum. It will remain on the ready queue.
@@ -381,15 +414,13 @@ Gives up the remainder of the thread's time quantum. It will remain on the ready
 %%%%%
 \subsubsection{{\tt 0x22}: Sleep}
 \textbf{Arguments:} (1) Sleep duration (in $\mu s$) \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success or negative error code \\
 
 Blocks the thread for the specified amount of time. The kernel makes no guarantee that the thread will sleep for the precise amount specified; it should instead be considered a hint the kernel will make a \textit{best effort} to satisfy. This means this call may return immediately without blocking the thread, before the duration specified has elapsed, or even at some point significantly thereafter.
 
 %%%%%
 \subsubsection{{\tt 0x23}: Create thread}
-\textbf{Arguments:} (3) Thread entry point; entry point argument; initial stack pointer \\
-\textbf{Flags:} See below \\
+\textbf{Arguments:} (4) Thread entry point; entry point argument; initial stack pointer, flags \\
 \textbf{Returns:} Thread handle ($>0$) or error code ($\leq0$) \\
 
 Creates a new thread and attaches it to the running task. The caller must have set up a region of memory for the thread's stack. After the associated kernel thread has been initialized, the thread will execute a return to user mode with the given stack and program counter value. It will be invoked as if it were a function declared as \texttt{void ThreadEntry(const uintptr\_t param)}.
@@ -397,13 +428,12 @@ Creates a new thread and attaches it to the running task. The caller must have s
 It is undefined behavior to return from the user thread entry routine. (Doing so will probably just crash the task; however, runtime libraries may wish to wrap thread entry points such that returning from threads will terminate them, or do something else more desirable.)
 
 \begin{itemize}
-\item \texttt{1 << 15}: The is not scheduled by default; you need to resume it later.
+\item \texttt{1 << 15}: The thread begins suspended; you need to resume it later.
 \end{itemize}
 
 %%%%%
 \subsubsection{{\tt 0x24}: Join with thread}
 \textbf{Arguments:} (2) Thread handle, timeout (in $\mu s$) \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, 1 on timeout, or negative error code \\
 
 Waits for the specified thread to terminate, for up to the given amount of time.
@@ -411,7 +441,6 @@ Waits for the specified thread to terminate, for up to the given amount of time.
 %%%%%
 \subsubsection{{\tt 0x25}: Destroy thread}
 \textbf{Arguments:} (1) Thread handle \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success or negative error code \\
 
 Cleans up all resources associated with a thread. This call returns as soon as the request has been received; if you need to wait for the thread to actually be terminated, you need to wait on it.
@@ -421,7 +450,6 @@ Cleans up all resources associated with a thread. This call returns as soon as t
 %%%%%
 \subsubsection{{\tt 0x26}: Set thread state}
 \textbf{Arguments:} (2) Thread handle, new thread state \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success or negative error code \\
 
 Sets the state of the given thread; the thread state can be one of the following: \texttt{0} = paused, \texttt{1} = running. A running thread will transition to the paused state the next time it calls into the kernel.
@@ -429,7 +457,6 @@ Sets the state of the given thread; the thread state can be one of the following
 %%%%%
 \subsubsection{{\tt 0x27}: Set thread priority}
 \textbf{Arguments:} (2) Thread handle, new priority value \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
 Updates the thread's base priority value. Valid priority values are in $[-100, 100]$, where a priority of $0$ indicates the standard (normal) priority level.
@@ -437,7 +464,6 @@ Updates the thread's base priority value. Valid priority values are in $[-100, 1
 %%%%%
 \subsubsection{{\tt 0x28}: Set thread notification mask}
 \textbf{Arguments:} (2) Thread handle, new notification mask \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
 Updates the thread's notification mask. Any bits that are cleared in the mask will be ignored when the thread is waiting on notifications.
@@ -447,7 +473,6 @@ Updates the thread's notification mask. Any bits that are cleared in the mask wi
 %%%%%
 \subsubsection{{\tt 0x29}: Set thread name}
 \textbf{Arguments:} (3) Thread handle, address of new name, length of new name (in bytes) \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
 Updates the thread's name with the contents of the specified string buffer; if the buffer is zero terminated, the terminator is not included in the byte count. The thread name is used purely for informational purposes. 
@@ -455,7 +480,6 @@ Updates the thread's name with the contents of the specified string buffer; if t
 %%%%%
 \subsubsection{{\tt 0x2A}: Resume thread}
 \textbf{Arguments:} (1) Thread handle \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
 Resumes a thread that's currently paused. This can only be called on threads that are in the suspended state, i.e. those created with the \texttt{THREAD\_SUSPENDED} flag.
@@ -466,7 +490,6 @@ Resumes a thread that's currently paused. This can only be called on threads tha
 %%%%%
 \subsubsection{{\tt 0x30}: Get current task handle}
 \textbf{Arguments:} None \\
-\textbf{Flags:} None \\
 \textbf{Returns:} Task handle ($>0$) or error code ($\leq0$) \\
 
 Retrieves a kernel handle representing the currently executing task.
@@ -474,7 +497,6 @@ Retrieves a kernel handle representing the currently executing task.
 %%%%%
 \subsubsection{{\tt 0x31}: Create task}
 \textbf{Arguments:} (1) Parent task handle \\
-\textbf{Flags:} None \\
 \textbf{Returns:} Task handle ($>0$) or error code ($\leq0$) \\
 
 Creates a new task with a single thread. The task's parent is set to either the task specified, or the current task if the task handle is zero. You should use the "initialize task" call to kick this main thread into user space once you have finished setting up the memory map of the task.
@@ -486,7 +508,6 @@ At this point, the task will have no memory mapped in userspace (with the except
 %%%%%
 \subsubsection{{\tt 0x32}: Terminate task}
 \textbf{Arguments:} (2) Task handle, exit code \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, negative error code otherwise. \\
 
 Terminates the task (and all threads within it) as identified by the given task handle. If the task handle is not specified (i.e. it is zero) the currently executing task will be terminated; the call will not return control back to the caller before the task is destroyed.
@@ -494,7 +515,6 @@ Terminates the task (and all threads within it) as identified by the given task 
 %%%%%
 \subsubsection{{\tt 0x33}: Initialize task}
 \textbf{Arguments:} (3) Task handle, entry point address, stack address \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, negative error code otherwise. \\
 
 Sets up the task's main thread to return to userspace with the specified stack at the specified address. The addresses are virtual addresses in the task's memory map, not the caller's.
@@ -504,7 +524,6 @@ You can only make this call on a freshly created task handle. Attempts to execut
 %%%%%
 \subsubsection{{\tt 0x34}: Set task name}
 \textbf{Arguments:} (3) Task handle, address of new name, length of new name (in bytes) \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success, or negative error code \\
 
 Updates the task's name with the contents of the specified string buffer; if the buffer is zero terminated, the terminator is not included in the byte count. The task name is used purely for informational purposes.
@@ -512,25 +531,19 @@ Updates the task's name with the contents of the specified string buffer; if the
 %%%%%
 \subsubsection{{\tt 0x35}: Wait on task}
 \textbf{Arguments:} (2) Task handle, timeout \\
-\textbf{Flags:} None \\
 \textbf{Returns:} Task exit code ($\geq0$) or error code ($<0$) \\
 
 Waits for the specified task to exit, up to the specified the timeout, then returns its exit code.
 
 
 
-
-
 %%%%%%%%%%%%%%%
-\section{Architecture Specific Calls}
-Architecture code may expose its own system calls to userspace applications, for tasks such as interrupt routing or other per-task configuration. Note that the kernel does not do any permissions checks; you are responsible for doing these.
-
-Some of these architecture calls are abstracted by the kernel into one regular syscall-style API: this is the case for interrupt handling. However, all arch specific (such as for x86 only) calls are filtered through syscall \texttt{0x3A} as described below.
+\newpage
+\subsection{Interrupt Handling}
 
 %%%%%
 \subsubsection{{\tt 0x38}: Register IRQ handler}
 \textbf{Arguments:} (3) IRQ number, thread handle, notification bits \\
-\textbf{Flags:} None \\
 \textbf{Returns:} Handler token on success ($> 0$) or error code ($\leq0$) \\
 
 Installs an interrupt handler for the given platform-specific interrupt. When the interrupt fires, the specified thread will have the requested notification bit(s) set. The interrupt is unmasked and enabled in any associated interrupt controllers when the first registration is added for it.
@@ -538,23 +551,21 @@ Installs an interrupt handler for the given platform-specific interrupt. When th
 %%%%%
 \subsubsection{{\tt 0x39}: Unregister IRQ handler}
 \textbf{Arguments:} (1) IRQ handler token \\
-\textbf{Flags:} None \\
 \textbf{Returns:} 0 on success or error code ($\leq0$) \\
 
 Removes a previously registered interrupt handler. If there are no other handlers for the interrupt this handler belongs to, it is masked and disabled in all relevant interrupt controllers. 
 
-%%%%%
-\subsubsection{{\tt 0x3A}: Arch specific syscall}
-\textbf{Arguments:} Varies \\
-\textbf{Flags:} Used for the "real" architecture syscall number \\
-\textbf{Returns:} Varies \\
 
-Performs an architecture specific system call. The 16 bits reserved for the flag are used instead as the "real" architecture specific system call number. These real numbers are described below.
+
+%%%%%%%%%%%%%%%
+\newpage
+\section{Architecture Specific Calls}
+Architecture code may expose its own system calls to userspace applications, for tasks such as interrupt routing or other per-task configuration. Note that the kernel does not do any permissions checks; you are responsible for doing these.
 
 %%%%%%%%%%
 \subsection{x86}
 %%%%%
-\subsubsection{{\tt 0x00}: Set IO permission bitmap}
+\subsubsection{{\tt 0x40}: Set IO permission bitmap}
 \textbf{Arguments:} (3) Task handle, IO bitmap buffer, IO bitmap offset/length \\
 \textbf{Returns:} 0 on success, or a negative error code \\
 
@@ -572,11 +583,22 @@ Its length is specified as a number of ports (i.e. bits) but it will always be r
 If the task does not already have a TSS associated with it, this will allocate one. This TSS has the full 8K (plus one byte) allocated to map all 64K IO ports on the platform. This is a little wasteful, but avoids several common bugs resulting from partial TSS IO permission bitmaps.
 
 %%%%%
-\subsubsection{{\tt 0x01}: Set thread-local base}
+\subsubsection{{\tt 0x41}: Set thread-local base}
 \textbf{Arguments:} (2) Thread handle, Thread-local base address \\
 \textbf{Returns:} 0 on success, or a negative error code \\
 
 Sets the thread-local base to the given address. This updates the value of \texttt{\%gs} that's updated every time the thread is switched in. The initial value of the register is 0.
 
+%%%%%%%%%%
+\subsection{amd64}
+
+%%%%%
+\subsubsection{{\tt 0x40}: Set thread-local base}
+\textbf{Arguments:} (3) Thread handle, Base register index, Thread-local base address \\
+\textbf{Returns:} 0 on success, or a negative error code \\
+
+Sets the thread-local base to the given address. This updates the value of \texttt{\%gs} or \texttt{\%fs} that's updated every time the thread is switched in. The initial value of both registers is 0.
+
+An index of $1$ writes to \texttt{\%gs}, and $0$ to \texttt{\%fs}.
 
 \end{document}  

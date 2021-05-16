@@ -49,7 +49,7 @@ Hpet::Hpet(const uintptr_t phys, const void *table) {
     REQUIRE(this->vm, "failed to create %s phys map", "HPET");
 
     auto map = vm::Map::kern();
-    err = map->add(this->vm, sched::Task::kern(), 0, vm::MappingFlags::None, kPlatformRegionMmio,
+    err = map->add(this->vm, sched::Task::kern(), 0, vm::MappingFlags::None, 0, kPlatformRegionMmio,
             (kPlatformRegionMmio + kPlatformRegionMmioLen - 1));
     REQUIRE(!err, "failed to map %s: %d", "HPET", err);
 

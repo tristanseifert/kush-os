@@ -13,7 +13,7 @@ int IrqHandlerInstall(const uintptr_t irqNum, const uintptr_t threadHandle,
     }
 
     // do syscall
-    intptr_t err = __do_syscall3(SYS_ARCH_INSTALL_IRQ, irqNum, threadHandle, bits);
+    intptr_t err = __do_syscall3(irqNum, threadHandle, bits, SYS_ARCH_INSTALL_IRQ);
 
     if(err > 0) {
         *outHandle = err;
@@ -29,5 +29,5 @@ int IrqHandlerInstall(const uintptr_t irqNum, const uintptr_t threadHandle,
  * @note You can only remove interrupt handlers inside the calling task.
  */
 int IrqHandlerRemove(const uintptr_t handle) {
-    return __do_syscall1(SYS_ARCH_UNINSTALL_IRQ, handle);
+    return __do_syscall1(handle, SYS_ARCH_UNINSTALL_IRQ);
 }

@@ -109,11 +109,6 @@ void RestoreThreadState(const rt::SharedPtr<sched::Thread> &from,
 void ReturnToUser(const uintptr_t pc, const uintptr_t stack, const uintptr_t arg = 0) __attribute__((noreturn));
 
 /**
- * Handles architecture-specific system call.
- */
-intptr_t HandleSyscall(const sys::Syscall::Args *args, const uintptr_t number);
-
-/**
  * Tick callback
  */
 void Tick();

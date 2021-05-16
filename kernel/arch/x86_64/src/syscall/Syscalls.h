@@ -6,7 +6,7 @@
 #include <sys/Syscall.h>
 
 namespace arch::syscall {
-intptr_t UpdateThreadTlsBase(const sys::Syscall::Args *, const uintptr_t);
+intptr_t UpdateThreadTlsBase(const uintptr_t threadHandle, const bool gs, const uintptr_t base);
 }
 
 #endif

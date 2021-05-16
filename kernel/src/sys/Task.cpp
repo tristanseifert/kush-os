@@ -25,17 +25,32 @@ struct InitTaskDpcInfo {
 };
 
 /**
- * Allocates a new task.
+ * Returns the task handle of the currently executing task.
  */
-intptr_t sys::TaskCreate(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::TaskGetHandle() {
+    auto thread = sched::Thread::current();
+    if(!thread || !thread->task) {
+        return Errors::GeneralError;
+    }
+    return static_cast<intptr_t>(thread->task->handle);
+}
+
+/**
+ * Allocates a new task.
+ *
+ * @param parentTaskHandle Task to register this task as a child to, or 0 for current task
+ *
+ * @return Negative error code, or a valid task handle to the newly created task
+ */
+intptr_t sys::TaskCreate(const Handle parentTaskHandle) {
     rt::SharedPtr<sched::Task> parent = nullptr;
 
     // set the parent
-    if(!args->args[0]) {
+    if(!parentTaskHandle) {
         parent = sched::Task::current();
         REQUIRE(parent, "no current task wtf");
     } else {
-        parent = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
+        parent = handle::Manager::getTask(parentTaskHandle);
         if(!parent) {
             return Errors::InvalidHandle;
         }
@@ -47,7 +62,7 @@ intptr_t sys::TaskCreate(const Syscall::Args *args, const uintptr_t number) {
     // allocate a task
     auto task = sched::Task::alloc();
     if(!task) {
-        return Errors::GeneralError;
+        return Errors::NoMemory;
     }
 
     // return task handle
@@ -59,24 +74,29 @@ intptr_t sys::TaskCreate(const Syscall::Args *args, const uintptr_t number) {
  *
  * The first argument is the task handle; if zero, the current task is terminated. The second
  * argument specifies the return code.
+ *
+ * @param taskHandle Handle of the task to terminate, or 0 for current task
+ * @param code Return code to associate with termination
+ *
+ * @return A negative error code or 0 if success
  */
-intptr_t sys::TaskTerminate(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::TaskTerminate(const Handle taskHandle, const intptr_t code) {
     int err;
     rt::SharedPtr<sched::Task> task = nullptr;
 
     // get the task
-    if(!args->args[0]) {
+    if(!taskHandle) {
         task = sched::Task::current();
     } else {
-        task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
+        task = handle::Manager::getTask(taskHandle);
         if(!task) {
             return Errors::InvalidHandle;
         }
     }
 
     // terminate it aye
-    log("Terminating task %p (code %d)", static_cast<void *>(task), args->args[1]);
-    err = task->terminate(args->args[1]);
+    log("Terminating task %p (code %d)", static_cast<void *>(task), code);
+    err = task->terminate(code);
 
     return (err ? Errors::GeneralError : Errors::Success);
 }
@@ -92,17 +112,24 @@ intptr_t sys::TaskTerminate(const Syscall::Args *args, const uintptr_t number) {
  * executing; and even if it has, it may have failed at some initialization stage in userspace. If
  * you're interested in determining that the process properly started, wait on the task object and
  * see if an unexpected exit code is returned before looking up the task handle.
+ *
+ * @param taskHandle Task to initialize
+ * @param userPc Address to begin execution at in the task's address space
+ * @param userStack Address of the bottom of the stack in the task's address space
+ *
+ * @return 0 if the task was successfully started, or a negative error code.
  */
-intptr_t sys::TaskInitialize(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::TaskInitialize(const Handle taskHandle, const uintptr_t userPc,
+        const uintptr_t userStack) {
     int err;
 
     // get the task handle
-    auto task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
+    auto task = handle::Manager::getTask(taskHandle);
     if(!task) {
         return Errors::InvalidHandle;
     }
 
-    auto info = new InitTaskDpcInfo(args->args[1], args->args[2]);
+    auto info = new InitTaskDpcInfo(userPc, userStack);
 
     // set up the main thread
     auto main = sched::Thread::kernelThread(task, &UserspaceThreadStub, (uintptr_t) info);
@@ -124,23 +151,27 @@ intptr_t sys::TaskInitialize(const Syscall::Args *args, const uintptr_t number) 
 
 /**
  * Sets the task's new name.
+ *
+ * @param taskHandle Task handle for the task to rename, or 0 for current task
+ * @param namePtr Pointer to a string (does NOT have to be zero terminated) to use as new name
+ * @param nameLen Total number of bytes of name to copy
+ *
+ * @return A negative error code or 0 if success
  */
-intptr_t sys::TaskSetName(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::TaskSetName(const Handle taskHandle, const char *namePtr, const size_t nameLen) {
     rt::SharedPtr<sched::Task> task = nullptr;
 
     // get the task
-    if(!args->args[0]) {
+    if(!taskHandle) {
         task = sched::Task::current();
     } else {
-        task = handle::Manager::getTask(static_cast<Handle>(args->args[0]));
+        task = handle::Manager::getTask(taskHandle);
         if(!task) {
             return Errors::InvalidHandle;
         }
     }
 
     // validate the user pointer
-    auto namePtr = reinterpret_cast<const char *>(args->args[1]);
-    const auto nameLen = args->args[2];
     if(!Syscall::validateUserPtr(namePtr, nameLen)) {
         return Errors::InvalidPointer;
     }
@@ -151,20 +182,26 @@ intptr_t sys::TaskSetName(const Syscall::Args *args, const uintptr_t number) {
     return Errors::Success;
 }
 
-intptr_t sys::TaskDbgOut(const Syscall::Args *args, const uintptr_t number) {
+/**
+ * Writes a zero-terminated message to the kernel's debug console.
+ *
+ * @param msgPtr Pointer to message buffer
+ * @param msgLen Number of characters of message data to print
+ *
+ * @return A negative error code or 0 if success
+ */
+intptr_t sys::TaskDbgOut(const char *msgPtr, const size_t msgLen) {
     // validate the user pointer
-    auto namePtr = reinterpret_cast<const char *>(args->args[0]);
-    const auto nameLen = args->args[1];
-    if(!Syscall::validateUserPtr(namePtr, nameLen)) {
+    if(!Syscall::validateUserPtr(msgPtr, msgLen)) {
         return Errors::InvalidPointer;
     }
 
     // copy the message
     char message[1024];
     memset(&message, 0, 1024);
-    strncpy(message, namePtr, 1024);
+    strncpy(message, msgPtr, 1024);
 
-    // set it
+    // print it
     DECLARE_CRITICAL();
     CRITICAL_ENTER();
     log("%15s) %s", sched::Thread::current()->name, message);

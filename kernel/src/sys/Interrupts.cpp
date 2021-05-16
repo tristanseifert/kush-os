@@ -12,38 +12,43 @@
 
 using namespace sys;
 
+// TODO: all functions need to be tested again
+
 /**
  * Sets up an interrupt handler that notifies a thread when fired.
  *
- * - Arg0: Interrupt number
- * - Arg1: Thread handle (0 = current thread)
- * - Arg2: Notification bits to send
+ * @param irqNum Platform specific IRQ number to register a handler for
+ * @param threadHandle Thread to notify when interrupt triggers (0 for current thread)
+ * @param bits Notification bits to send when interrupt is triggered
+ *
+ * @return Negative error code, or a valid handle for the IRQ handler object
  */
-intptr_t sys::IrqHandlerInstall(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::IrqHandlerInstall(const uintptr_t irqNum, const Handle threadHandle,
+        const uintptr_t bits) {
     rt::SharedPtr<sched::Thread> thread = nullptr;
 
-    // resolve thread handle
-    if(args->args[1]) {
-        thread = handle::Manager::getThread(static_cast<Handle>(args->args[1]));
-    } else {
-        thread = sched::Thread::current();
-    }
-
-    // get notification bits
-    const auto bits = args->args[2];
+    // validate some arguments
     if(!bits) {
         return Errors::InvalidArgument;
     }
 
-    // get irq number
-    const auto irqNum = args->args[0];
+    // resolve thread handle
+    if(!threadHandle) {
+        thread = sched::Thread::current();
+    } else {
+        thread = handle::Manager::getThread(threadHandle);
+    }
+
+    if(!thread) {
+        return Errors::InvalidHandle;
+    } 
 
     // register the IRQ handler
     RW_LOCK_WRITE_GUARD(thread->lock);
 
     auto handler = ipc::Interrupts::create(irqNum, thread, bits);
     if(!handler) {
-        return Errors::GeneralError;
+        return Errors::NoMemory;
     }
 
     thread->irqHandlers.append(handler);
@@ -55,10 +60,14 @@ intptr_t sys::IrqHandlerInstall(const Syscall::Args *args, const uintptr_t numbe
  *
  * The calling thread must be in the same task as the thread to which the interrupt is delivering
  * notifications to.
+ *
+ * @param irqHandle Handle of the interrupt handler object
+ *
+ * @return 0 on success, or a negative reror code
  */
-intptr_t sys::IrqHandlerRemove(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::IrqHandlerRemove(const Handle irqHandle) {
     // get the interrupt handler
-    auto irq = handle::Manager::getIrq(static_cast<Handle>(args->args[0]));
+    auto irq = handle::Manager::getIrq(irqHandle);
     if(!irq) {
         return Errors::InvalidHandle;
     }

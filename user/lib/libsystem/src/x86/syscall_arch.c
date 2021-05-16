@@ -23,7 +23,7 @@ int X86UpdateIopbFor(const uintptr_t taskHandle, const void *bitmap,
     const uintptr_t off = (offset & 0xFFFF) | ((numBits << 16) & 0xFFFF0000);
 
     // perform call
-    return __do_syscall3(SYS_ARCH_X86_UPDATE_IOPB, taskHandle, (uintptr_t) bitmap, off);
+    return __do_syscall3(taskHandle, (uintptr_t) bitmap, off, SYS_ARCH_X86_UPDATE_IOPB);
 }
 
 /**
@@ -38,5 +38,5 @@ int X86SetThreadLocalBase(const uintptr_t base) {
  * segment register.
  */
 int X86SetThreadLocalBaseFor(const uintptr_t threadHandle, const uintptr_t base) {
-    return __do_syscall2(SYS_ARCH_X86_SET_TLS_BASE, threadHandle, base);
+    return __do_syscall2(threadHandle, base, SYS_ARCH_X86_SET_TLS_BASE);
 }

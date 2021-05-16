@@ -20,15 +20,6 @@ Handler *Handler::gShared = nullptr;
 
 extern "C" void arch_syscall_entry();
 
-/// Total number of architecture-specific syscalls
-static const size_t gNumArchSyscalls = 2;
-static intptr_t (* const gArchSyscalls[])(const sys::Syscall::Args *, const uintptr_t) = {
-    // 0x00: reserved 
-    nullptr,
-    // 0x01: Update a thread's thread-local base address (%fs/%gs base)
-    UpdateThreadTlsBase,
-};
-
 
 /**
  * Initializes the shared syscall handler.
@@ -100,31 +91,6 @@ void Handler::updateTime() {
 
 
 /**
- * Handles the given syscall.
- */
-uintptr_t arch_syscall_handle(const uintptr_t number, const void *_args) {
-    const auto args = reinterpret_cast<const sys::Syscall::Args *>(_args);
-
-    // handle platform specific syscalls
-
-    // handle HW specific syscalls
-
-    // kernel syscalls
-    auto ret = sys::Syscall::handle(args, number);
-    return ret;
-}
-
-/**
- * Slow path for the msgsend-family of functions.
- */
-uintptr_t arch_syscall_msgsend_slow(const uintptr_t type) {
-    log("Slow path for msgsend (type %08x)", type);
-    return -1;
-}
-
-
-
-/**
  * Maps the syscall stub page into the given task.
  */
 void arch::TaskWillStart(rt::SharedPtr<sched::Task> &task) {
@@ -132,20 +98,6 @@ void arch::TaskWillStart(rt::SharedPtr<sched::Task> &task) {
 }
 
 
-
-/**
- * Dispatch an architecture-specific system call.
- */
-intptr_t arch::HandleSyscall(const sys::Syscall::Args *args, const uintptr_t _number) {
-    // validate the arch specific syscall number
-    const auto index = (_number & 0xFFFF0000) >> 16;
-    if(index > gNumArchSyscalls) {
-        return -5; // invalid syscall
-    }
-
-    // dispatch it
-    return (gArchSyscalls[index])(args, _number);
-}
 
 void arch::Tick() {
     Handler::gShared->updateTime();

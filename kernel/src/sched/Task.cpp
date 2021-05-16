@@ -83,9 +83,41 @@ Task::~Task() {
  * This is used for created objects that aren't immediately mapped to a task. They'll have a ref
  * count of one, so when this task exits, the objects are destroyed.
  */
-void Task::addOwnedVmRegion(rt::SharedPtr<vm::MapEntry> region) {
+void Task::addVmRegion(const rt::SharedPtr<vm::MapEntry> &region) {
     RW_LOCK_WRITE_GUARD(this->lock);
     this->ownedRegions.append(region);
+}
+
+/**
+ * Removes the given VM region from the task, if owned.
+ *
+ * @return Whether the VM region was successfully removed or not.
+ */
+bool Task::removeVmRegion(const rt::SharedPtr<vm::MapEntry> &region) {
+    RW_LOCK_WRITE_GUARD(this->lock);
+    bool removed = false;
+
+    // set up info
+    struct RemoveRegionInfo {
+        rt::SharedPtr<vm::MapEntry> region = nullptr;
+        bool *found = nullptr;
+    };
+
+    RemoveRegionInfo info{region, &removed};
+
+    // iterate
+    this->ownedRegions.removeMatching([](void *ctx, rt::SharedPtr<vm::MapEntry> &region) {
+        auto info = reinterpret_cast<RemoveRegionInfo *>(ctx);
+
+        if(region == info->region) {
+            *info->found = true;
+            return true;
+        }
+        return false;
+    }, &info);
+
+    // return whether we removed it
+    return removed;
 }
 
 /**
@@ -194,7 +226,7 @@ int Task::terminate(int status) {
     RW_UNLOCK_WRITE(&this->lock);
 
     // request task deletion later
-    Scheduler::get()->idle->queueDestroyTask(this);
+    //Scheduler::get()->idle->queueDestroyTask(this);
 
     // finally, terminate calling thread, if it is also in this task
     if(current->task.get() == this) {

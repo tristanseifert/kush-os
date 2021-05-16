@@ -193,8 +193,8 @@ class MapTree: public rt::BinarySearchTree<MapTreeLeaf> {
          * @param flags Additional flags to define the mapping; if specified, they replace the
          * permissions of the VM object.
          */
-        void insert(const uintptr_t address, const size_t size, rt::SharedPtr<MapEntry> &entry,
-                MappingFlags flags = MappingFlags::None) {
+        void insert(const uintptr_t address, const size_t size,
+                const rt::SharedPtr<MapEntry> &entry, MappingFlags flags = MappingFlags::None) {
             auto node = new MapTreeLeaf(address, size, flags, entry);
             this->insert(address, node, this->root);
         }

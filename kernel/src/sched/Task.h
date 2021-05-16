@@ -100,7 +100,9 @@ struct Task {
         ~Task();
 
         /// Adds the given VM map object to the list
-        void addOwnedVmRegion(rt::SharedPtr<vm::MapEntry> region);
+        void addVmRegion(const rt::SharedPtr<vm::MapEntry> &region);
+        /// Removes a VM region we own
+        bool removeVmRegion(const rt::SharedPtr<vm::MapEntry> &region);
 
         /// Sets the task's name.
         void setName(const char *name, const size_t length = 0);

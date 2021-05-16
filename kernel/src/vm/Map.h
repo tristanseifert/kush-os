@@ -19,6 +19,13 @@
 namespace vm {
 class Mapper;
 
+/// Cutoff for the user/kernel boundary
+#if defined(__i386__)
+constexpr static const uintptr_t kKernelVmBound = 0xC0000000;
+#elif defined(__amd64__)
+constexpr static const uintptr_t kKernelVmBound = (1ULL << 63);
+#endif
+
 /// modifier flags for mappings, defining its protection level
 ENUM_FLAGS(MapMode)
 enum class MapMode {
@@ -75,12 +82,12 @@ class Map {
         const bool isActive() const;
         void activate();
 
-        int add(rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task,
+        int add(const rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task,
                 const uintptr_t base = 0, const vm::MappingFlags flagMask = vm::MappingFlags::None,
-                const uintptr_t searchStart = kVmSearchBase,
+                const size_t viewSize = 0, const uintptr_t searchStart = kVmSearchBase,
                 const uintptr_t searchEnd = kVmMaxAddr);
-        int remove(rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task);
-        const bool contains(rt::SharedPtr<MapEntry> entry);
+        int remove(const rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task);
+        const bool contains(const rt::SharedPtr<MapEntry> &entry);
 
         int add(const uint64_t physAddr, const uintptr_t length, const uintptr_t vmAddr, 
                 const MapMode mode);

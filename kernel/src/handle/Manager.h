@@ -12,7 +12,15 @@
 extern "C" void kernel_init();
 
 /// Handle type
-enum class Handle: uintptr_t {};
+enum class Handle: uintptr_t {
+    // invalid handle
+    Invalid                     = 0,
+};
+
+/// test whether a handle is valid: e.g. !!handle
+constexpr inline bool operator!(Handle h) {
+    return h == Handle::Invalid;
+}
 
 namespace vm {
 class MapEntry;

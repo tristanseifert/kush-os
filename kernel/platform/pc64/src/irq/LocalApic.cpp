@@ -55,7 +55,7 @@ LocalApic::LocalApic(const uintptr_t _id, const uintptr_t cpuId, const uintptr_t
     REQUIRE(this->vmEnt, "failed to create %s phys map", "LAPIC");
 
     auto map = vm::Map::kern();
-    err = map->add(this->vmEnt, sched::Task::kern(), 0, vm::MappingFlags::None, kPlatformRegionMmio,
+    err = map->add(this->vmEnt, sched::Task::kern(), 0, vm::MappingFlags::None, 0, kPlatformRegionMmio,
             (kPlatformRegionMmio + kPlatformRegionMmioLen - 1));
     REQUIRE(!err, "failed to map %s: %d", "LAPIC", err);
 
