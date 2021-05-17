@@ -1,7 +1,6 @@
 #include "Tsc.h"
 #include "Hpet.h"
 
-#include <arch/PerCpuInfo.h>
 #include <log.h>
 
 using namespace platform;
@@ -17,13 +16,6 @@ bool Tsc::gLogInit      = true;
 void Tsc::InitCoreLocal() {
     auto tsc = new Tsc;
     arch::PerCpuInfo::get()->p.tsc = tsc;
-}
-
-/**
- * Return the current core's TSC timer.
- */
-Tsc *Tsc::the() {
-    return arch::PerCpuInfo::get()->p.tsc;
 }
 
 /**
@@ -112,3 +104,14 @@ uint64_t Tsc::nsToTicks(const uint64_t desiredNs, uint64_t &actualNs) const {
     return desiredTicks;
 }
 
+/**
+ * Reads the core's timestamp counter and returns its value in nanoseconds. There is no absolute
+ * meaning to this value, but you can use it to acccurately get the delta between two points in
+ * time in real world nanoseconds.
+ *
+ * TODO: We should use RDTSCP to read out a processor id value as well and use that for the correct
+ * conversion factors
+ */
+uint64_t platform::GetLocalTsc() {
+    return Tsc::the()->ticksToNs(Tsc::GetCount());
+}

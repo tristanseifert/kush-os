@@ -80,6 +80,7 @@ void Scheduler::InitAp() {
  */
 Scheduler *Scheduler::get() {
     return arch::GetProcLocal()->sched;
+    // return arch::PerCpuInfo::scheduler();
 }
 
 
@@ -303,15 +304,12 @@ int Scheduler::schedule(const rt::SharedPtr<Thread> &thread) {
 
     // get level
     const auto levelNum = this->getLevelFor(thread);
-
     auto &level = this->levels[levelNum];
-    const auto &levelInfo = gLevelInfo[levelNum];
 
     // update its quantum (if level changed)
-    if(levelNum != sched.lastLevel || sched.quantumTotal) {
+    if(levelNum != sched.lastLevel || !sched.quantumTotal) {
+        this->updateQuantumLength(thread);
         sched.lastLevel = levelNum;
-        sched.quantumTotal = levelInfo.quantumLength;
-        sched.quantumUsed = 0; // XXX: is this proper?
     }
 
     // try to insert it to that level's queue
@@ -353,10 +351,76 @@ void Scheduler::switchTo(const rt::SharedPtr<Thread> &thread) {
     log("switch: %p ($%p'h %s) quantum %lu/%lu", static_cast<void*>(thread), thread->handle,
             thread->name, sched.quantumUsed, sched.quantumTotal);
 
-    // TODO: determine when quantum expiration timer fires / nearest deadline
+    // how much time is left in the quantum?
+    REQUIRE(sched.quantumTotal >= sched.quantumUsed,
+            "invalid time quantum for thread $%p'h (%lu/%lu)", thread->handle, sched.quantumUsed,
+            sched.quantumTotal);
+    //auto quantumRemaining = sched.quantumTotal - sched.quantumUsed;
+
+    // TODO: find the nearest deadline
+
+    // whichever is sooner, set a timer for it
 
     // finally, perform context switch
     thread->switchTo();
+}
+
+
+
+/**
+ * A thread is being context switched out. We'll stop the appropriate time counters and figure out
+ * how much of the time quantum the thread spent executing.
+ */
+void Scheduler::willSwitchFrom(const rt::SharedPtr<Thread> &from) {
+    // stop timer and read out
+    this->timer.stop();
+    const auto nsec = this->timer.reset(Oclock::Type::ThreadKernel);
+
+    // add it to the total quantum used by the thread
+    auto &sched = from->sched;
+
+    auto used = sched.quantumUsed + nsec;
+    if(used > sched.quantumTotal) {
+        // it used the entire quantum, decrement its priority
+        if(++sched.level >= kNumLevels) {
+            sched.level = (kNumLevels - 1);
+        }
+
+        // set up time quantum for the next lowest level
+        // XXX: this can still be greater than the quantum length?
+        sched.quantumUsed = used - sched.quantumTotal;
+        this->updateQuantumLength(from);
+    }
+    // only part of the quantum was used
+    else {
+        sched.quantumUsed = used;
+    }
+
+    log("executed for %lu nsec (%lu/%lu)", nsec, sched.quantumUsed, sched.quantumTotal);
+}
+
+/**
+ * Updates the total length of a task's time quantum.
+ */
+void Scheduler::updateQuantumLength(const rt::SharedPtr<Thread> &thread) {
+    auto &sched = thread->sched;
+
+    // look up the level's base quantum
+    const auto levelNum = this->getLevelFor(thread);
+    const auto &levelInfo = gLevelInfo[levelNum];
+
+    auto total = levelInfo.quantumLength;
+
+    // apply adjustments
+    sched.quantumTotal = total;
+
+}
+
+/**
+ * The thread is about to start executing on the processor. Start the thread execution time.
+ */
+void Scheduler::willSwitchTo(const rt::SharedPtr<Thread> &to) {
+    this->timer.start(Oclock::Type::ThreadKernel);
 }
 
 

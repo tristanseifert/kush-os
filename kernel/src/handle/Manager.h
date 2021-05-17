@@ -211,7 +211,7 @@ class Manager {
         template<class T>
         struct HandleInfo {
             // pointer to allocated object, or null if it's free
-            rt::WeakPtr<T> object = nullptr;
+            rt::WeakPtr<T> object;
             // epoch counter
             uintptr_t epoch = 0;
 
@@ -287,11 +287,12 @@ class Manager {
          * You must hold the appropriate write lock when calling this function.
          */
         template<class T>
-        Handle allocate(rt::SharedPtr<T> object, rt::Vector<HandleInfo<T>> &handles, const Type type) {
+        Handle allocate(const rt::SharedPtr<T> &object, rt::Vector<HandleInfo<T>> &handles,
+                const Type type) {
             // try to find a free slot
             for(size_t i = 0; i < handles.size(); i++) {
                 auto &slot = handles[i];
-                if(!slot.object.expired()) continue;
+                if(slot.object && !slot.object.expired()) continue;
 
                 slot.object = object;
                 return makeHandle(type, i, slot.epoch);

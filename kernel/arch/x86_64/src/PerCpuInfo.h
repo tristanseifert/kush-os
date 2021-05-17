@@ -104,7 +104,7 @@ class PerCpuInfo {
         /// Return pointer to the scheduler structure.
         static inline auto scheduler() {
             sched::Scheduler *ptr;
-            asm volatile("movq %%gs:PROCI_OFF_SCHED, %0" : "=r"(ptr));
+            asm volatile("movq %%gs:%1, %0" : "=r"(ptr) : "n"(PROCI_OFF_SCHED));
             return ptr;
         }
 

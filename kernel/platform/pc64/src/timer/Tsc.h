@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <arch/PerCpuInfo.h>
+
 #include "Timer.h"
 
 namespace platform {
@@ -19,13 +21,13 @@ class Tsc: public Timer {
         static void InitCoreLocal();
 
         /// Return the core local TSC timer
-        static Tsc *the();
+        static inline Tsc *the() {
+            return arch::PerCpuInfo::get()->p.tsc;
+        }
 
         /// Reads the TSC of the current core.
         static inline uint64_t GetCount() {
-            uint32_t low, high;
-            asm volatile("rdtsc" : "=a"(low), "=d"(high));
-            return ((uint64_t) high << 32) | low;
+            return __rdtsc();
         }
 
 

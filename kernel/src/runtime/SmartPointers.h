@@ -416,6 +416,10 @@ class WeakPtr {
             return (this->getStrongRefs() == 0);
         }
 
+        /// Test whether the pointee is null
+        explicit operator bool() const {
+            return (this->ptr != nullptr);
+        }
 };
 
 

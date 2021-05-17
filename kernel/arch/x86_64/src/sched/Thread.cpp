@@ -100,12 +100,16 @@ void arch::RestoreThreadState(const rt::SharedPtr<sched::Thread> &from,
 
     // save state into current thread and switch to next
     if(from) {
+        // stop the task timer
+        sched::Scheduler::get()->willSwitchFrom(from);
+
         //log("old task %%esp = %p, new task %%esp = %p (stack %p)", from->regs.stackTop, to->regs.stackTop, to->stack);
         // set the running flags
         __atomic_store(&from->isActive, &no, __ATOMIC_RELAXED);
         __atomic_store(&to->isActive, &yes, __ATOMIC_RELAXED);
         __atomic_thread_fence(__ATOMIC_ACQUIRE);
 
+        sched::Scheduler::get()->willSwitchTo(to);
         amd64_switchto_save(&from->regs, &to->regs);
     }
     // no thread context to save; just switch
@@ -114,6 +118,7 @@ void arch::RestoreThreadState(const rt::SharedPtr<sched::Thread> &from,
         __atomic_store(&to->isActive, &yes, __ATOMIC_RELAXED);
         __atomic_thread_fence(__ATOMIC_ACQUIRE);
 
+        sched::Scheduler::get()->willSwitchTo(to);
         amd64_switchto(&to->regs);
     }
 }

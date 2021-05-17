@@ -234,9 +234,14 @@ class Vector {
                 const size_t newSz = nItems * sizeof(T);
 
                 this->storage = reinterpret_cast<T *>(mem::Heap::realloc(this->storage, newSz));
+
+                // default initialize the newly allocated objects
+                for(size_t i = this->numReserved; i < nItems; i++) {
+                    new(&this->storage[i]) T();
+                }
+
                 this->numReserved = nItems;
             }
-
         }
 
     private:

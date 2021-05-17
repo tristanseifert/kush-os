@@ -9,6 +9,7 @@
 #include <runtime/SmartPointers.h>
 
 #include "Thread.h"
+#include "Oclock.h"
 
 extern "C" void kernel_init();
 
@@ -69,6 +70,11 @@ class Scheduler {
         /// Yields the remainder of the current thread's CPU time.
         void yield(const Thread::State state = Thread::State::Runnable);
 
+        /// The specified thread is leaving the processor
+        void willSwitchFrom(const rt::SharedPtr<Thread> &from);
+        /// The specified thread is about to be switched in
+        void willSwitchTo(const rt::SharedPtr<Thread> &to);
+
     private:
         static void Init();
         static void InitAp();
@@ -79,6 +85,8 @@ class Scheduler {
         int schedule(const rt::SharedPtr<Thread> &thread);
         /// Returns the run queue level to which the given thread belongs
         size_t getLevelFor(const rt::SharedPtr<Thread> &thread);
+        /// Calculate the total quantum length for a given thread
+        void updateQuantumLength(const rt::SharedPtr<Thread> &thread);
 
         /// Switch to the given thread
         void switchTo(const rt::SharedPtr<Thread> &thread);
@@ -209,6 +217,9 @@ class Scheduler {
         rt::Vector<InstanceInfo> peers;
         /// when set, the peer map is dirty and must be updated
         bool peersDirty = true;
+
+        /// timer for tracking CPU usage (how much to yeet quantum by)
+        Oclock timer;
 
     public:
         /// idle worker

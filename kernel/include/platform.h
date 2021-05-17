@@ -49,6 +49,9 @@ enum class Irql {
 
 /// Invoked immediately after the kernel VM map is activated the first time
 void KernelMapEarlyInit();
+
+/// Read the current value of the core local timestamp counter (in nanoseconds)
+uint64_t GetLocalTsc();
 }
 
 /**
