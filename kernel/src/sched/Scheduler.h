@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-#include <platform.h>
 #include <arch/spinlock.h>
 #include <runtime/Queue.h>
 #include <runtime/LockFreeQueue.h>
@@ -34,8 +33,6 @@ struct Task;
  */
 class Scheduler {
     friend void ::kernel_init();
-    friend void ::platform_kern_tick(const uintptr_t);
-    friend void ::platform_kern_scheduler_update(const uintptr_t);
     friend struct Thread;
 
     public:
@@ -47,9 +44,14 @@ class Scheduler {
          */
         constexpr static const size_t kNumLevels = 32;
 
+        /// First run queue for user threads
+        constexpr static const size_t kUserPriorityLevel = 4;
+
     public:
         // return the scheduler for the current core
         static Scheduler *get();
+        // initializes the scheduler data in the given thread object
+        static void threadWasCreated(Thread &t);
 
         // return the thread running on the calling processor
         rt::SharedPtr<Thread> runningThread() const {
@@ -66,9 +68,6 @@ class Scheduler {
         void run() __attribute__((noreturn));
         /// Yields the remainder of the current thread's CPU time.
         void yield(const Thread::State state = Thread::State::Runnable);
-
-        /// Check if a higher priority thread is runnable and prepare to switch to it
-        bool lazyDispatch();
 
     private:
         static void Init();
@@ -118,14 +117,20 @@ class Scheduler {
                 /// Last time a thread from this level was scheduled
                 uint64_t lastScheduledTsc = 0;
 
-                /// Length of this level's time quantum, in nanoseconds
-                uint64_t quantumLength = 0;
-
             public:
                 /// Push a new thread into the run queue
                 bool push(const rt::SharedPtr<Thread> &thread) {
                     return (this->storage.insert(thread) != 0);
                 }
+        };
+
+        /**
+         * Information about the scheduler properties of a particular level. These are shared by
+         * all scheduler instances, and are reasonably static.
+         */
+        struct LevelInfo {
+            /// length of this level's quantum, in nanoseconds
+            uint64_t quantumLength = 0;
         };
 
         /**
@@ -150,6 +155,8 @@ class Scheduler {
     private:
         /// all schedulers on the system. used for work stealing
         static rt::Vector<InstanceInfo> *gSchedulers;
+        /// per level configuration
+        static LevelInfo gLevelInfo[kNumLevels];
 
         /// the thread that is currently being executed
         rt::SharedPtr<Thread> running = nullptr;

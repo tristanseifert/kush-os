@@ -166,6 +166,24 @@ class MapTree: public rt::BinarySearchTree<MapTreeLeaf> {
             if(leaf) offset = (address - leaf->address);
             return leaf ? leaf->entry : nullptr;
         }
+        /**
+         * Locates the VM mapping object that contains the given address and calculates the offset
+         * into the object, as well as returning its base address
+         *
+         * @param address Virtual address to locate a mapping for
+         * @param offset Byte offset into the VM object (i.e. address - base)
+         * @param base Base address of the VM object in this map
+         *
+         * @return VM object containing the given address, or `nullptr` if not found.
+         */
+        rt::SharedPtr<MapEntry> find(const uintptr_t address, size_t &offset, uintptr_t &base) {
+            auto leaf = this->find(address, this->root);
+            if(leaf) {
+                offset = (address - leaf->address);
+                base = leaf->address;
+            }
+            return leaf ? leaf->entry : nullptr;
+        }
 
         /**
          * Determines if the given region of [start, start+length) conflicts with any existing

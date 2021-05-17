@@ -18,6 +18,8 @@ using vm::kKernelVmBound;
 static bool gLogAlloc = true;
 /// Are map/unmap requests logged?
 static bool gLogMap = true;
+/// Are map manipulations (resize, flag changes) logged?
+static bool gLogChanges = true;
 
 /**
  * Info buffer written to userspace for the "get VM region info" syscall
@@ -113,7 +115,7 @@ intptr_t sys::VmAllocPhysRegion(const uintptr_t physAddr, const size_t length, c
     auto task = sched::Task::current();
 
     if(gLogAlloc) {
-        log("VmAllocPhysRegion(%p, %d, %x)", physAddr, length, flags);
+        log("VmAllocPhysRegion($%p, %lu, %04x)", physAddr, length, flags);
     }
 
     // validate the arguments
@@ -153,7 +155,7 @@ intptr_t sys::VmAllocAnonRegion(const uintptr_t length, const VmFlags flags) {
     auto task = sched::Task::current();
 
     if(gLogAlloc) {
-        log("VmAllocAnonRegion(%d, %x)", length, flags);
+        log("VmAllocAnonRegion(%lu, %04x)", length, flags);
     }
 
     // validate arguments
@@ -224,6 +226,11 @@ intptr_t sys::VmDealloc(const Handle vmHandle) {
  */
 intptr_t sys::VmRegionUpdatePermissions(const Handle vmHandle, const VmFlags newFlags) {
     int err;
+
+    if(gLogChanges) {
+        log("VmRegionUpdatePermissions($%p'h, %04x)", vmHandle, newFlags);
+    }
+
     // get the VM map
     auto map = handle::Manager::getVmObject(vmHandle);
     if(!map) {
@@ -256,6 +263,10 @@ intptr_t sys::VmRegionUpdatePermissions(const Handle vmHandle, const VmFlags new
  */
 intptr_t sys::VmRegionResize(const Handle vmHandle, const size_t newSize, const VmFlags flags) {
     int err;
+
+    if(gLogChanges) {
+        log("VmRegionResize($%p'h, %lu, %04x)", vmHandle, newSize, flags);
+    }
 
     const auto pageSz = arch_page_size();
     if(newSize % pageSz) {
@@ -334,7 +345,7 @@ intptr_t sys::VmRegionMap(const Handle vmHandle, const Handle taskHandle, const 
     const auto pageSz = arch_page_size();
 
     if(gLogMap) {
-        log("VmRegionMap($%p'h, $%p'h, %p, %d, %x)", vmHandle, taskHandle, base, length, flags);
+        log("VmRegionMap($%p'h, $%p'h, $%p, %lu, %04x)", vmHandle, taskHandle, base, length, flags);
     }
 
     // validate some of the arguments

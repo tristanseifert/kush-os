@@ -99,7 +99,7 @@ intptr_t sys::ThreadCreate(const uintptr_t entryPtr, const uintptr_t entryParam,
     // create a new thread
     auto info = new InitThreadInfo(entryPtr, entryParam, stackPtr);
 
-    auto thread = sched::Thread::kernelThread(running->task, &CreateThreadEntryStub,
+    auto thread = sched::Thread::userThread(running->task, &CreateThreadEntryStub,
             (uintptr_t) info);
     thread->kernelMode = false;
 
@@ -315,7 +315,7 @@ static void CreateThreadEntryStub(uintptr_t _ctx) {
     const auto [pc, arg, sp] = *info;
     delete info;
 
-    log("entry stub %p: pc %p sp %p arg %p", _ctx, pc, sp, arg);
+    //log("entry stub %p ($%p'h): pc %p sp %p arg %p", _ctx, thread->handle, pc, sp, arg);
 
     // perform return to userspace
     thread->returnToUser(pc, sp, arg);

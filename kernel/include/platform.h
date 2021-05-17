@@ -232,12 +232,4 @@ void platform_idle();
 rt::SharedPtr<sched::Task> platform_init_rootsrv();
 
 
-////////////////////////////////////////////////////////////////////////////////
-/// Functions below are defined by the kernel.
-
-/// Indicates to the kernel a time tick has taken place.
-extern void platform_kern_tick(const uintptr_t irqToken);
-/// Invokes the scheduler, in response to a scheduler IPI.
-extern void platform_kern_scheduler_update(const uintptr_t irqToken);
-
 #endif

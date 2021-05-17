@@ -12,9 +12,6 @@
 #include <arch/x86_msr.h>
 #include <arch/PerCpuInfo.h>
 
-extern "C" uintptr_t arch_syscall_handle(const uintptr_t number, const void *args);
-extern "C" uintptr_t arch_syscall_msgsend_slow(const uintptr_t eax);
-
 namespace arch::syscall {
 /**
  * Format of the time info page

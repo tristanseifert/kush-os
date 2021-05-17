@@ -91,7 +91,9 @@ void arch::RestoreThreadState(const rt::SharedPtr<sched::Thread> &from,
         //}
     }
 
-    // update thread-local
+    // update thread-local address (%gs and %fs)
+    x86_msr_write(X86_MSR_KERNEL_GSBASE, (to->regs.gsBase), (to->regs.gsBase) >> 32ULL);
+    x86_msr_write(X86_MSR_FSBASE, (to->regs.fsBase), (to->regs.fsBase) >> 32ULL);
 
     // update syscall handler and kernel stack in TSS
     syscall::Handler::handleCtxSwitch(to);

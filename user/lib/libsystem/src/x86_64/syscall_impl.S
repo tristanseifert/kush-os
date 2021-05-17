@@ -39,9 +39,8 @@ __do_syscall1:
     // back up stack ptr
     mov         %rsp, %r9
 
-    // move syscall number and args
-    mov         %rdi, %rax
-    mov         %rsi, %rdi
+    // move syscall number
+    mov         %rsi, %rax
 
     // perform call
     syscall
@@ -131,7 +130,7 @@ __do_syscall5:
     mov         %rcx, %r10
 
     // back up stack ptr
-    mov         %rsp, %r12
+    mov         %rsp, %r9
 
     // perform call
     syscall

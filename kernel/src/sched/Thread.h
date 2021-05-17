@@ -81,7 +81,7 @@ struct Thread {
 
     public:
         /// Global thread id
-        uint32_t tid = 0;
+        uintptr_t tid = 0;
         /// task that owns us
         rt::SharedPtr<Task> task = nullptr;
         /// when set, we're attached to the given task
@@ -96,12 +96,8 @@ struct Thread {
         /// current thread state
         State state = State::Paused;
         /**
-         * Determines whether the thread is run in the context of the kernel, or as an user-mode
-         * thread. Platforms may treat userspace and kernel threads differently (from the
-         * perspective of stacks, for example) but are not required to do so.
-         *
-         * The scheduler itself makes no core differentiation between user and kernel mode threads;
-         * the only difference is that kernel threads may not make system calls.
+         * Threads marked as kernel mode are treated a bit specially by the scheduler, in that
+         * only kernel threads may be placed in the highest priority run queues.
          */
         bool kernelMode = false;
 
@@ -180,12 +176,15 @@ struct Thread {
         arch::ThreadState regs __attribute__((aligned(16)));
 
     public:
-        /// Allocates a new kernel space thread
+        /// Allocates a new kernel thread
         static rt::SharedPtr<Thread> kernelThread(rt::SharedPtr<Task> &task,
+                void (*entry)(uintptr_t), const uintptr_t param = 0);
+        /// Allocates a new userspace thread
+        static rt::SharedPtr<Thread> userThread(rt::SharedPtr<Task> &task,
                 void (*entry)(uintptr_t), const uintptr_t param = 0);
 
         Thread(rt::SharedPtr<Task> &task, const uintptr_t pc, const uintptr_t param,
-                const bool kernelThread = true);
+                const bool kernelThread = false);
         ~Thread();
 
         /// Context switches to this thread.
@@ -251,7 +250,10 @@ struct Thread {
 
     private:
         /// next thread id
-        static uint32_t nextTid;
+        static uintptr_t nextTid;
+
+        /// whether creation/deallocation of threads is logged
+        static bool gLogLifecycle;
 
     private:
         void unblock(Blockable *b);

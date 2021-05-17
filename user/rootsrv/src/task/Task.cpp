@@ -266,7 +266,7 @@ uintptr_t Task::buildInfoStruct(const std::vector<std::string> &args) {
         std::copy(argPtrsBytes, argPtrsBytes + argPtrsLen, std::back_inserter(buf));
     }
 
-    // allocate a memory region for it
+    // allocate a memory region for it and map it somewhere
     const auto pageSz = sysconf(_SC_PAGESIZE);
     if(pageSz <= 0) {
         throw std::system_error(errno, std::generic_category(), "Failed to determine page size");
@@ -275,9 +275,14 @@ uintptr_t Task::buildInfoStruct(const std::vector<std::string> &args) {
     const auto totalInfoBytes = sizeof(kush_task_launchinfo_t) + buf.size();
     const auto vmAllocSize = ((totalInfoBytes + pageSz - 1) / pageSz) * pageSz;
 
-    err = AllocVirtualAnonRegion(0, vmAllocSize, VM_REGION_RW, &vmHandle);
+    err = AllocVirtualAnonRegion(vmAllocSize, VM_REGION_RW, &vmHandle);
     if(err) {
         throw std::system_error(err, std::generic_category(), "AllocVirtualAnonRegion");
+    }
+
+    err = MapVirtualRegion(vmHandle, 0, vmAllocSize, 0);
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "MapVirtualRegion");
     }
 
     // get its base and copy the data into it
@@ -299,9 +304,9 @@ uintptr_t Task::buildInfoStruct(const std::vector<std::string> &args) {
     }
 
     // map the page into destination task's address space
-    err = MapVirtualRegionAtTo(vmHandle, this->taskHandle, kVmBase);
+    err = MapVirtualRegionRemote(this->taskHandle, vmHandle, kVmBase, vmAllocSize, VM_REGION_READ);
     if(err) {
-        throw std::system_error(err, std::generic_category(), "MapVirtualRegionAtTo");
+        throw std::system_error(err, std::generic_category(), "MapVirtualRegionRemote");
     }
 
     // unmap the page from our address space

@@ -49,7 +49,7 @@ rt::SharedPtr<sched::Task> platform_init_rootsrv() {
 #endif
 
     // create the main thread
-    auto main = sched::Thread::kernelThread(task, &RootSrvEntry);
+    auto main = sched::Thread::userThread(task, &RootSrvEntry);
     main->kernelMode = false;
     main->setName("Main");
 

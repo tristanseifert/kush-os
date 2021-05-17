@@ -26,6 +26,25 @@ DECLARE_RWLOCK_S(gSchedulersLock);
 rt::Vector<Scheduler::InstanceInfo> *Scheduler::gSchedulers = nullptr;
 
 /**
+ * Default configuration for the 32 levels the scheduler is currently configured with. The top
+ * 4 levels are reserved for kernel threads, while the low 28 are avaialble for all user threads.
+ *
+ * The lengths of time quantums decrease steadily between levels.
+ */
+Scheduler::LevelInfo Scheduler::gLevelInfo[kNumLevels] = {
+    // kernel queues
+    { (1000000ULL *   3) }, { (1000000ULL *   6) }, { (1000000ULL *  12) }, { (1000000ULL *  20) },
+    // user queues 
+    { (1000000ULL *   5) }, { (1000000ULL *  10) }, { (1000000ULL *  15) }, { (1000000ULL *  20) },
+    { (1000000ULL *  25) }, { (1000000ULL *  30) }, { (1000000ULL *  35) }, { (1000000ULL *  40) },
+    { (1000000ULL *  45) }, { (1000000ULL *  50) }, { (1000000ULL *  55) }, { (1000000ULL *  60) },
+    { (1000000ULL *  70) }, { (1000000ULL *  80) }, { (1000000ULL *  90) }, { (1000000ULL * 100) },
+    { (1000000ULL * 110) }, { (1000000ULL * 120) }, { (1000000ULL * 130) }, { (1000000ULL * 140) },
+    { (1000000ULL * 150) }, { (1000000ULL * 175) }, { (1000000ULL * 200) }, { (1000000ULL * 225) },
+    { (1000000ULL * 250) }, { (1000000ULL * 300) }, { (1000000ULL * 400) }, { (1000000ULL * 500) },
+};
+
+/**
  * Initializes the global (shared) scheduler structures, as well as the scheduler for the calling
  * processor.
  *
@@ -105,6 +124,22 @@ Scheduler::~Scheduler() {
 }
 
 
+/**
+ * Initializes the scheduler data structures in a newly created thread.\
+ */
+void Scheduler::threadWasCreated(Thread &t) {
+    auto &sched = t.sched;
+
+    // set the base priority levels
+    if(t.kernelMode) {
+        sched.maxLevel = 0;
+    } else {
+        sched.maxLevel = kUserPriorityLevel;
+    }
+
+    // ensure the thread is scheduled in its maximum level initially
+    sched.level = sched.maxLevel;
+}
 
 /**
  * Scheduler entry point; this will jump to the switch function which will select the first
@@ -188,9 +223,10 @@ int Scheduler::markThreadAsRunnable(const rt::SharedPtr<Thread> &t, const bool s
  * Gives up the remainder of the current thread's time quantum.
  */
 void Scheduler::yield(const Thread::State state) {
-    panic("%s unimplemented", __PRETTY_FUNCTION__);
+    // find the next runnable thread
+    auto runnable = this->findRunnableThread();
 
-    // place back on the run queue
+    // place this back on the run queue
     const auto levelNum = this->getLevelFor(this->running);
     auto &level = this->levels[levelNum];
 
@@ -199,7 +235,10 @@ void Scheduler::yield(const Thread::State state) {
                 static_cast<void *>(this->running));
     }
 
-    // perform context switch to next runnable
+    // perform context switch to next runnable (if one was found)
+    if(runnable) {
+        this->switchTo(runnable);
+    }
 }
 
 /**
@@ -264,12 +303,14 @@ int Scheduler::schedule(const rt::SharedPtr<Thread> &thread) {
 
     // get level
     const auto levelNum = this->getLevelFor(thread);
+
     auto &level = this->levels[levelNum];
+    const auto &levelInfo = gLevelInfo[levelNum];
 
     // update its quantum (if level changed)
     if(levelNum != sched.lastLevel || sched.quantumTotal) {
         sched.lastLevel = levelNum;
-        sched.quantumTotal = level.quantumLength;
+        sched.quantumTotal = levelInfo.quantumLength;
         sched.quantumUsed = 0; // XXX: is this proper?
     }
 
@@ -297,40 +338,28 @@ int Scheduler::schedule(const rt::SharedPtr<Thread> &thread) {
 size_t Scheduler::getLevelFor(const rt::SharedPtr<Thread> &thread) {
     // TODO: take into account priority offset
     const auto &data = thread->sched;
-    return (data.level >= kNumLevels) ? (kNumLevels - 1) : data.level;
+
+    // ensure we don't go out of bounds (past end or higher than max priority)
+    const auto level = (data.level >= kNumLevels) ? (kNumLevels - 1) : data.level;
+    return (level < data.maxLevel) ? data.maxLevel : level;
 }
 
 /**
  * Switches to the given thread.
  */
 void Scheduler::switchTo(const rt::SharedPtr<Thread> &thread) {
-    log("switch: %p ($%p'h %s)", static_cast<void*>(thread), thread->handle, thread->name);
+    auto &sched = thread->sched;
 
-    // determine when quantum expiration timer fires
+    log("switch: %p ($%p'h %s) quantum %lu/%lu", static_cast<void*>(thread), thread->handle,
+            thread->name, sched.quantumUsed, sched.quantumTotal);
+
+    // TODO: determine when quantum expiration timer fires / nearest deadline
 
     // finally, perform context switch
     thread->switchTo();
 }
 
-/**
- * Checks if there's a thread ready to run with a higher priority than the currently executing one,
- * and if so, sends a scheduler IPI request that will be serviced on return from the current ISR.
- *
- * @return Whether a higher priority thread became runnable
- */
-bool Scheduler::lazyDispatch() {
-    // exit if run queue is not dirty
-    bool yes = true, no = false;
 
-    if(!__atomic_compare_exchange(&this->isDirty, &yes, &no, false, __ATOMIC_RELEASE,
-                __ATOMIC_RELAXED)) {
-        return false;
-    }
-
-    // perform IPI
-    platform_request_dispatch();
-    return true;
-}
 
 /**
  * Iterates over the list of all schedulers and marks their peer lists as dirty. This will cause
@@ -397,20 +426,4 @@ beach:;
 }
 
 
-/**
- * Handle kernel time ticks.
- *
- * XXX: This should go somewhere better than in scheduler code.
- */
-void platform_kern_tick(const uintptr_t irqToken) {
-    panic("%s unimplemented", __PRETTY_FUNCTION__);
-}
 
-/**
- * Performs deferred scheduler updates if needed.
- *
- * This is called in response to a scheduler IPI.
- */
-void platform_kern_scheduler_update(const uintptr_t irqToken) {
-    panic("%s unimplemented", __PRETTY_FUNCTION__);
-}

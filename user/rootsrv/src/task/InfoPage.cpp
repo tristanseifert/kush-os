@@ -18,9 +18,14 @@ InfoPage::InfoPage() {
     int err;
 
     // allocate a single page of anonymous memory
-    err = AllocVirtualAnonRegion(kBaseAddr, kPageLength, VM_REGION_RW, &this->vmHandle);
+    err = AllocVirtualAnonRegion(kPageLength, VM_REGION_RW, &this->vmHandle);
     if(err) {
         throw std::system_error(err, std::generic_category(), "AllocVirtualAnonRegion");
+    }
+
+    err = MapVirtualRegion(this->vmHandle, kBaseAddr, kPageLength, 0);
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "MapVirtualRegion");
     }
 
     // populate the header of the struct
@@ -45,8 +50,8 @@ InfoPage::InfoPage() {
 void InfoPage::mapInto(std::shared_ptr<Task> &task) {
     int err;
 
-    err = MapVirtualRegionToFlags(this->vmHandle, task->getHandle(), VM_REGION_READ);
+    err = MapVirtualRegionRemote(task->getHandle(), this->vmHandle, kBaseAddr, kPageLength, VM_REGION_READ);
     if(err) {
-        throw std::system_error(err, std::generic_category(), "MapVirtualRegionTo");
+        throw std::system_error(err, std::generic_category(), "MapVirtualRegionRemote");
     }
 }

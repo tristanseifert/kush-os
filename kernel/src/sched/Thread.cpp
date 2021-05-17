@@ -19,7 +19,9 @@
 using namespace sched;
 
 /// Thread id for the next thread
-uint32_t Thread::nextTid = 1;
+uintptr_t Thread::nextTid = 1;
+
+bool Thread::gLogLifecycle = false;
 
 /**
  * Allocates a new thread.
@@ -34,6 +36,18 @@ rt::SharedPtr<Thread> Thread::kernelThread(rt::SharedPtr<Task> &parent, void (*e
     return ptr;
 }
 
+/**
+ * Allocates a new thread.
+ */
+rt::SharedPtr<Thread> Thread::userThread(rt::SharedPtr<Task> &parent, void (*entry)(uintptr_t),
+        const uintptr_t param) {
+    auto ptr = rt::MakeShared<Thread>(parent, (uintptr_t) entry, param, false);
+    ptr->handle = handle::Manager::makeThreadHandle(ptr);
+
+    // add to the parent task
+    parent->addThread(ptr);
+    return ptr;
+}
 
 
 /**
@@ -47,17 +61,25 @@ Thread::Thread(rt::SharedPtr<Task> &_parent, const uintptr_t pc, const uintptr_t
     this->stack = mem::StackPool::get(this->stackSize);
     REQUIRE(this->stack, "failed to get stack for thread %p", this);
 
-    log("new thread %p (%u) stack %p parent %p", this, this->tid, this->stack,
-            static_cast<void *>(this->task));
+    if(gLogLifecycle) {
+        log("* alloc thread $%p'h (%lu) stack $%p parent $%p'h", this->handle, this->tid,
+                this->stack, this->task->handle);
+    }
 
     // then initialize thread state
     arch::InitThreadState(this, pc, param);
+
+    Scheduler::threadWasCreated(*this);
 }
 
 /**
  * Destroys all resources associated with this thread.
  */
 Thread::~Thread() {
+    if(gLogLifecycle) {
+        log("* dealloc thread $%p'h (%lu)", this->handle, this->tid);
+    }
+
     // remove IRQ handlers
     this->irqHandlers.clear();
 

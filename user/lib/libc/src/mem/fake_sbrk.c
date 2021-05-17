@@ -16,12 +16,14 @@ static void *gSbrkBase = NULL;
 /// VM base of the heap
 #if defined(__i386__)
 LIBC_INTERNAL static uintptr_t gHeapInitialAddr = 0x30000000;
+static const size_t kHeapMaxSize =  0x10000000; // 1 gig
 #elif defined(__amd64__)
 LIBC_INTERNAL static uintptr_t gHeapInitialAddr = 0x1000000000;
+static const size_t kHeapMaxSize =  0x1000000000; // 64 gigs
 #endif
 
 /// Maximum heap size: 0 indicates unlimited (we'll grow til we hit something else)
-LIBC_INTERNAL static size_t gHeapMaxSize = 0;
+LIBC_INTERNAL static size_t gHeapMaxSize = kHeapMaxSize;
 
 /**
  * Adjusts the initial address of the heap.
@@ -34,7 +36,7 @@ LIBC_INTERNAL static size_t gHeapMaxSize = 0;
  */
 LIBC_EXPORT void __libc_set_heap_start(const uintptr_t start, const size_t maxSize) {
     gHeapInitialAddr = start;
-    gHeapMaxSize = maxSize;
+    gHeapMaxSize = (maxSize > kHeapMaxSize) ? kHeapMaxSize : maxSize;
 }
 
 /**
@@ -44,7 +46,13 @@ LIBC_INTERNAL void __fake_sbrk_init(const size_t initialSize) {
     int err;
 
     // allocate a region for the heap
-    err = AllocVirtualAnonRegion(gHeapInitialAddr, initialSize, VM_REGION_RW, &gHeapHandle);
+    err = AllocVirtualAnonRegion(initialSize, VM_REGION_RW, &gHeapHandle);
+    if(err) {
+        abort();
+    }
+
+    // create a view into that region with the maximum heap size
+    err = MapVirtualRegion(gHeapHandle, gHeapInitialAddr, kHeapMaxSize, 0);
     if(err) {
         abort();
     }

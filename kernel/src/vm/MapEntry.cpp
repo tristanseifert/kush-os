@@ -221,9 +221,11 @@ void MapEntry::faultInPage(const uintptr_t base, const uintptr_t offset, Map *ma
         if(physPage.pageOff == pageOff) {
             const auto destAddr = base + (pageOff * pageSz);
             const auto mode = ConvertVmMode(flg, !this->isKernel);
+
             err = map->add(physPage.physAddr, pageSz, destAddr, mode);
             REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", pageOff, this, this->handle);
 
+            arch::InvalidateTlb(destAddr);
             return;
         }
     }

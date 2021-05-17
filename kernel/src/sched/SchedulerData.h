@@ -16,6 +16,9 @@ namespace sched {
 struct SchedulerThreadData {
     /// Current run queue level
     size_t level = 0;
+
+    /// highest priority queue into which the thread may be scheduled (lower = higher priority)
+    size_t maxLevel = 0;
     /// last level at which the thread was scheduled
     size_t lastLevel = UINTPTR_MAX;
 

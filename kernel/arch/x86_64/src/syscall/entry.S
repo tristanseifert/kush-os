@@ -7,7 +7,7 @@
  *
  * Note that the registers RDI, RSI, RDX, R10, R8, R9 are missing, because they are used to pass
  * parameters, so we can save time by not restoring them. The same goes for RAX, which holds the
- * system call number.
+ * system call number. (R9 is saved anyways though because it's a temporary for stack ptr)
  *
  * A total of 8 quadwords are pushed, ensuring 16-byte alignment of the resulting stack as required
  * by the ABI.
@@ -16,6 +16,7 @@
     pushq        %rbx
     pushq        %rcx
     pushq        %rbp
+    pushq        %r9
     pushq        %r11
     pushq        %r12
     pushq        %r13
@@ -29,6 +30,7 @@
     popq         %r13
     popq         %r12
     popq         %r11
+    popq         %r9
     popq         %rbp
     popq         %rcx
     popq         %rbx
@@ -182,6 +184,8 @@ arch_syscall_entry:
     // otherwise, bounds check and jump to handler
     cmp         $(arch_syscall_table_end - arch_syscall_table)/8, %rax
     jg          .invalidSyscall
+
+    mov         %r10, %rcx // fix the 4th argument
 
     lea         arch_syscall_table(%rip), %rbx
     call        *(%rbx, %rax, 8)

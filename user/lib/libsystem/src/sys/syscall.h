@@ -38,6 +38,7 @@ LIBSYSTEM_INTERNAL intptr_t __do_syscall5(const uintptr_t arg0, const uintptr_t 
 
 #define SYS_VM_CREATE                   0x10
 #define SYS_VM_CREATE_ANON              0x11
+#define SYS_VM_DEALLOC                  0x12
 #define SYS_VM_UPDATE_FLAGS             0x13
 #define SYS_VM_RESIZE                   0x14
 #define SYS_VM_MAP                      0x15

@@ -177,7 +177,9 @@ intptr_t sys::TaskSetName(const Handle taskHandle, const char *namePtr, const si
     }
 
     // set it
-    task->setName(namePtr, nameLen);
+    char buffer[256]{0};
+    Syscall::copyIn(namePtr, nameLen, &buffer, 255);
+    task->setName(buffer, (nameLen > 255) ? 255 : nameLen);
 
     return Errors::Success;
 }
@@ -199,7 +201,9 @@ intptr_t sys::TaskDbgOut(const char *msgPtr, const size_t msgLen) {
     // copy the message
     char message[1024];
     memset(&message, 0, 1024);
-    strncpy(message, msgPtr, 1024);
+
+    Syscall::copyIn(msgPtr, msgLen, &message, sizeof(message));
+    // strncpy(message, msgPtr, 1024);
 
     // print it
     DECLARE_CRITICAL();
