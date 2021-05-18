@@ -89,7 +89,7 @@ class Port {
                 }
 
                 /// Sets the receive blockable object of the port when we're validly blocked on.
-                void willBlockOn(sched::Thread *t) override {
+                void willBlockOn(const rt::SharedPtr<sched::Thread> &t) override {
                     Blockable::willBlockOn(t);
 
                     if(this->unblockedSignalled) {
@@ -158,9 +158,9 @@ class Port {
         Handle handle;
 
         /// thread that's waiting to receive from this port, if any
-        rt::SharedPtr<sched::Thread> receiver = nullptr;
+        rt::SharedPtr<sched::Thread> receiver;
         /// the blocker object for the receiver
-        Blocker *receiverBlocker = nullptr;
+        rt::SharedPtr<Blocker> receiverBlocker;
 
         /// maximum queue size (0 = unlimited)
         size_t maxMessages = 0;

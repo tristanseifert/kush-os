@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "PerCpuInfo.h"
+
 void pc64_irq_entry(struct amd64_exception_info *);
 
 namespace arch {
@@ -37,6 +39,10 @@ class IrqRegistry {
 
         /// Initialize the IRQ registry for the bootstrap processor
         static void Init();
+        /// Returns the IRQ registry for the calling processor
+        static inline IrqRegistry *the() {
+            return arch::PerCpuInfo::get()->irqRegistry;
+        }
 
     private:
         /// Combination of callback function + context for an interrupt handler

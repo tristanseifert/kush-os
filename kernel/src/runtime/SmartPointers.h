@@ -4,8 +4,16 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
+
+#include <log.h>
 
 namespace rt {
+// forward declare weak ptr so we can befriend it in the shared ptr
+template<class T> class SharedPtr;
+template<class T> class SharedFromThis;
+template<class T> class WeakPtr;
+
 /**
  * Deleters are used by the smart pointers to properly discard objects we don't need anymore. This
  * is just a simple class that has a call operator implemented.
@@ -13,6 +21,15 @@ namespace rt {
 template<typename T>
 concept Deleter = requires(T deleter, T object) {
     { deleter(object) } -> std::same_as<void>;
+};
+
+/**
+ * A class may implement the SharedFromThis trait
+ */
+template<typename T>
+concept Shareable = requires(T ptr) {
+    { ptr.sharedFromThis() } -> std::same_as<SharedPtr<T>>;
+    { ptr._weakRef } -> std::same_as<WeakPtr<T>>;
 };
 
 /**
@@ -54,8 +71,6 @@ namespace PtrImpl {
     };
 };
 
-// forward declare weak ptr so we can befriend it in the shared ptr
-template<class T> class WeakPtr;
 
 /**
  * Shared pointers implement reference counting for any object `T`, allowing multiple references
@@ -63,6 +78,7 @@ template<class T> class WeakPtr;
  */
 template<class T>
 class SharedPtr {
+    template<typename> friend class SharedPtr;
     friend class WeakPtr<T>;
 
     private:
@@ -117,7 +133,7 @@ class SharedPtr {
             }
         }
 
-    private:
+    protected:
         /// info block (stores reference counts)
         PtrImpl::InfoBlock *info = nullptr;
         /// owned object
@@ -147,16 +163,65 @@ class SharedPtr {
         /**
          * Allocate a shared pointer that owns `obj` with a custom deleter.
          */
-        template<class U, class Deleter>
+        template<class U, class Deleter,
+            std::enable_if_t<std::negation<std::is_base_of<SharedFromThis<U>, U>>::value, bool> = true>
         SharedPtr(U *_ptr, Deleter d) : info(new InfoBlockImpl<U, Deleter>(_ptr, d)), ptr(_ptr) {}
+        /**
+         * Allocate a shared pointer from an object that supports converting a plain *this
+         * reference to a shared pointer, using a custom deleter.
+         */
+        template<class U, class Deleter,
+            std::enable_if_t<std::is_base_of<SharedFromThis<U>, U>::value, bool> = true>
+        SharedPtr(SharedFromThis<U> *_ptr, Deleter d) {
+            auto &weak = _ptr->_weakRef;
+
+            // if weak reference is valid, copy its info block and get another strong reference
+            if(weak) {
+                this->info = weak.info;
+                this->ptr = weak.ptr;
+                this->incrementStrongRefs();
+            }
+            // otherwise, allocate this shared ptr as normal and create weak ptr to store in object
+            else {
+                this->info = new InfoBlockImpl<U, Deleter>(_ptr, d);
+                this->ptr = _ptr;
+                weak = rt::WeakPtr<U>(*this);
+            }
+        }
+
 
         /**
          * Allocate a shared pointer, with reference count 1 to the given object, with the default
          * deleter that invokes `operator delete`.
          */
-        template<class U>
-        explicit SharedPtr(U *_ptr) : info(new InfoBlockImpl<U, 
+        template<class U,
+            std::enable_if_t<std::negation<std::is_base_of<SharedFromThis<U>, U>>::value, bool> = true>
+        explicit SharedPtr(U *_ptr) : info(new InfoBlockImpl<U,
                 PtrImpl::DefaultDeleter<U>>(_ptr, PtrImpl::DefaultDeleter<U>())), ptr(_ptr) {}
+        /**
+         * Allocate a shared pointer, from an object that supports converting a plain *this
+         * reference into a smart pointer.
+         */
+        template<class U,
+            std::enable_if_t<std::is_base_of<SharedFromThis<U>, U>::value, bool> = true>
+        explicit SharedPtr(U *_ptr) {
+            auto &weak = _ptr->_weakRef;
+
+            // if weak reference exists, we can try to get the shared ptr
+            if(weak) {
+                this->info = weak.info;
+                this->ptr = weak.ptr;
+                this->incrementStrongRefs();
+            }
+            // otherwise, allocate this shared ptr as normal and create weak ptr to store in object
+            else {
+                this->info = new InfoBlockImpl<U, PtrImpl::DefaultDeleter<U>>(_ptr, 
+                        PtrImpl::DefaultDeleter<U>());
+                this->ptr = _ptr;
+                weak = rt::WeakPtr<U>(*this);
+            }
+        }
+
 
         /**
          * Copies a shared pointer. The strong reference count is incremented.
@@ -273,6 +338,9 @@ class SharedPtr {
  */
 template<class T>
 class WeakPtr {
+    friend class SharedPtr<T>;
+    template<typename> friend class WeakPtr;
+
     private:
         /**
          * Increments the number of weak references to the info block.
@@ -420,6 +488,53 @@ class WeakPtr {
         explicit operator bool() const {
             return (this->ptr != nullptr);
         }
+};
+
+
+
+/**
+ * Base class to inherit from to allow creating a shared pointer from a plain this pointer.
+ *
+ * This is implemented by having special versions of the SharedPtr constructor that detect this
+ * class (it must be accessible to the SharedPtr class, so public inheritance must be used) and
+ * store a weak reference to that first shared pointer inside the object itself. All subsequent
+ * invocations of the SharedPtr destructor will lock the weak pointer and all share the same
+ * allocation state.
+ */
+template<class T>
+class SharedFromThis {
+    friend class SharedPtr<T>;
+
+    public:
+        /**
+         * Generates a shared pointer to reference this object.
+         *
+         * @note Behavior of this function is undefined if this object has never been the pointee
+         * of a SharedPtr.
+         */
+        SharedPtr<T> sharedFromThis() {
+            return this->_weakRef.lock();
+        }
+        SharedPtr<T const> sharedFromThis() const {
+            return this->_weakRef.lock();
+        }
+
+        /**
+         * Returns the underlying weak pointer that shares ownership of *this.
+         */
+        WeakPtr<T> weakFromThis() {
+            return this->_weakRef;
+        }
+        WeakPtr<T const> weakFromThis() const {
+            return this->_weakRef;
+        }
+
+    private:
+        /**
+         * Weak reference to `this`, generated by the first invocation to a SharedPtr constructor
+         * and dereferenced subsequently.
+         */
+        WeakPtr<T> _weakRef;
 };
 
 

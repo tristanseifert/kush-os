@@ -4,6 +4,7 @@
 #include "../irq/ApicRegs.h"
 
 #include <cpuid.h>
+#include <sched/Scheduler.h>
 #include <arch/IrqRegistry.h>
 #include <arch/PerCpuInfo.h>
 #include <arch/spinlock.h>
@@ -61,10 +62,11 @@ ApicTimer::~ApicTimer() {
 
 
 /**
- * The timer has fired; increment the per-core timebase and do whatever else needs doing.
+ * When the local APIC timer has fired, we'll want to call into the scheduler code to notify it of
+ * the event. The scheduler has exclusive control over this timer.
  */
 void ApicTimer::fired() {
-    log("apic thymer fired");
+    sched::Scheduler::get()->timerFired();
 
     // acknowledge interrupt
     this->parent->eoi();

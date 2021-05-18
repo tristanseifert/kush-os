@@ -7,6 +7,8 @@ extern "C" {
 
 // declare all of the interrupt stubs
 void pc64_irq_stub_32();
+// ^ reserved for scheduler IPI
+
 void pc64_irq_stub_33();
 void pc64_irq_stub_34();
 void pc64_irq_stub_35();

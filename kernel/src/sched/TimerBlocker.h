@@ -37,7 +37,7 @@ class TimerBlocker: public Blockable {
         }
 
         /// When we're going to start blocking, actually install the timer.
-        void willBlockOn(Thread *t) override {
+        void willBlockOn(const rt::SharedPtr<Thread> &t) override {
             Blockable::willBlockOn(t);
 
             // set the timer (multiples of 10ms). include a fudge factor

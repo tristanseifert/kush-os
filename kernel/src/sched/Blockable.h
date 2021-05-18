@@ -3,6 +3,8 @@
 
 #include "Thread.h"
 
+#include "runtime/SmartPointers.h"
+
 namespace sched {
 /**
  * Abstract interface of an object on which threads may block.
@@ -10,12 +12,12 @@ namespace sched {
  * Each blockable object, when blocked on, holds a reference to the thread and can wake it up to
  * place it back in the runnable state.
  */
-class Blockable {
+class Blockable: public rt::SharedFromThis<Blockable> {
     public:
         // this does nothing
         virtual ~Blockable() {
             REQUIRE(!this->blocker, "cannot deallocate blockable %p while thread %p is waiting",
-                    this, this->blocker);
+                    this, static_cast<void *>(this->blocker));
             this->blocker = nullptr;
         }
 
@@ -37,25 +39,21 @@ class Blockable {
          * Determines if there's a thread currently blocking on us.
          */
         virtual bool hasBlocker() {
-            Thread *temp = nullptr;
-            __atomic_load(&this->blocker, &temp, __ATOMIC_CONSUME);
-            return (temp != nullptr);
+            return !!this->blocker;
         }
 
         /**
          * We're about to block the current thread on this object.
          */
-        virtual void willBlockOn(Thread *t) {
-            //this->blocker = t;
-            __atomic_store(&this->blocker, &t, __ATOMIC_RELEASE);
+        virtual void willBlockOn(const rt::SharedPtr<Thread> &t) {
+            this->blocker = t;
         }
 
         /**
          * We've just been unblocked, possibly because of this object.
          */
         virtual void didUnblock() {
-            Thread *prev = nullptr, *zero = nullptr;
-            __atomic_exchange(&this->blocker, &zero, &prev, __ATOMIC_RELEASE);
+            this->blocker = nullptr;
         }
 
     protected:
@@ -65,11 +63,11 @@ class Blockable {
          */
         virtual void unblock() {
             REQUIRE(this->blocker, "cannot unblock object without blocker");
-            this->blocker->unblock(this);
+            this->blocker->unblock(this->sharedFromThis());
         }
 
         /// thread currently blocking on us, if any
-        Thread *blocker = nullptr;
+        rt::SharedPtr<Thread> blocker = nullptr;
 };
 }
 

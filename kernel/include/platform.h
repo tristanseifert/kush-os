@@ -52,6 +52,14 @@ void KernelMapEarlyInit();
 
 /// Read the current value of the core local timestamp counter (in nanoseconds)
 uint64_t GetLocalTsc();
+
+/// Sets the core local timer to fire in the given number of nanoseconds
+void SetLocalTimer(const uint64_t interval);
+
+/// Sends a scheduler self IPI
+void RequestSchedulerIpi();
+/// Sends a scheduler IPI to the given core
+void RequestSchedulerIpi(const uintptr_t coreId);
 }
 
 /**

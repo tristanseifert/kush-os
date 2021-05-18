@@ -17,7 +17,10 @@ class MapEntry;
 }
 
 namespace platform {
-/**
+void ApicSpuriousIrq(const uintptr_t vector, void *ctx);
+void ApicSchedulerIpi(const uintptr_t vector, void *ctx);
+
+    /**
  * Handles a processor-local interrupt controller.
  *
  * These contain the logic for handling NMIs, inter-processor interrupts, as well as providing the
@@ -28,6 +31,14 @@ class LocalApic {
     friend class ApicTimer;
 
     public:
+        /**
+         * Scheduler IPI vector number
+         *
+         * This should be the lowest priority vector in the system, so that any and all interrupts
+         * from external sources preempt this.
+         */
+        constexpr static const uint8_t kVectorSchedulerIpi = 0x20;
+
         /// NMI interrupt vector
         constexpr static const uint8_t kVectorNMI = 0xDF;
         /// Spurious vector number
@@ -53,6 +64,11 @@ class LocalApic {
 
         /// Signals the end of interrupt to the APIC. This should be called at the end of all ISRs.
         void eoi();
+
+        /// Sends an IPI to the currently executing core
+        void selfIpi(const uint8_t vector);
+        /// Sends an IPI to a core identified by the given id
+        void remoteIpi(const uintptr_t coreId, const uint8_t vector);
 
     private:
         /// Writes the given APIC register.

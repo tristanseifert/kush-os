@@ -37,7 +37,7 @@ struct Task;
  * queue if it's ready to run again and not blocked. (This implies threads cannot change from
  * runnable to blocked if they're not currently executing.)
  */
-struct Thread {
+struct Thread: public rt::SharedFromThis<Thread> {
     friend class Scheduler;
     friend class Blockable;
 
@@ -143,12 +143,12 @@ struct Thread {
         uintptr_t notifications = 0;
         uintptr_t notificationMask = 0;
         bool notified = false;
-        SignalFlag *notificationsFlag = nullptr;
+        rt::SharedPtr <SignalFlag> notificationsFlag;
 
         /**
          * Objects this thread is currently blocking on
          */
-        Blockable *blockingOn = nullptr;
+        rt::SharedPtr<Blockable> blockingOn;
 
         /// Interrupt handlers owned by the thread; they're removed when we deallocate
         rt::List<rt::SharedPtr<ipc::IrqHandler>> irqHandlers;
@@ -160,7 +160,7 @@ struct Thread {
         DECLARE_RWLOCK(lock);
 
         /// notification flags to signal when terminating
-        rt::Queue<SignalFlag *> terminateSignals;
+        rt::Queue<rt::SharedPtr<SignalFlag>> terminateSignals;
 
         /// DPCs queued for the thread
         rt::Queue<DpcInfo> dpcs;
@@ -219,7 +219,7 @@ struct Thread {
         }
 
         /// Blocks the thread on the given object.
-        int blockOn(Blockable *b, const uint64_t until = 0);
+        int blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until = 0);
 
         /// Sets the given notification bits.
         void notify(const uintptr_t bits);
@@ -256,12 +256,9 @@ struct Thread {
         static bool gLogLifecycle;
 
     private:
-        void unblock(Blockable *b);
+        void unblock(const rt::SharedPtr<Blockable> &b);
         /// Called when this thread is switching out
         void switchFrom();
-
-        /// Invoked by the scheduler when a thread that is blocked yields
-        void prepareBlocks();
 
         /// Called on context switch out to complete termination.
         void deferredTerminate();

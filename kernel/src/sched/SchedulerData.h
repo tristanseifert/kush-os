@@ -37,6 +37,8 @@ struct SchedulerThreadData {
      */
     int16_t priorityOffset = 0;
 
+    /// whether the thread was most recently preempted
+    bool preempted = false;
 };
 
 }

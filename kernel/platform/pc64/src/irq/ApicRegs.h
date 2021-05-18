@@ -34,10 +34,10 @@ constexpr static const uint32_t kApicRegEndOfInt        = 0x0B0;
  */
 constexpr static const uint32_t kApicRegSpurious        = 0x0F0;
 
-/**
- * Low half of the interrupt command register
- */
+/// Low half of the interrupt command register
 constexpr static const uint32_t kApicRegInterruptCmdLow = 0x300;
+/// High half of the interrupt command register
+constexpr static const uint32_t kApicRegInterruptCmdHi  = 0x310;
 
 /**
  * LVT entry for the core local timer

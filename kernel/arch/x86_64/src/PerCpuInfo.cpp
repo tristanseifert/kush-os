@@ -11,6 +11,9 @@
 
 using namespace arch;
 
+/// declared in gdt.cpp
+extern amd64_tss_t gBspTss;
+
 // memory for the BSP's per processor info struct
 static char gBspInfoStruct[sizeof(ProcInfo)] __attribute__((aligned(64)));
 
@@ -28,6 +31,8 @@ void PerCpuInfo::BspInit() {
     // install IDT
     proc->idt = gBspIdt;
     proc->irqRegistry = gBspIrqRegistry;
+
+    proc->tss = &gBspTss;
 
     // once configured, install the structure
     set(proc);

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include <bitflags.h>
 #include <arch/spinlock.h>
 #include <runtime/Queue.h>
 #include <runtime/LockFreeQueue.h>
@@ -13,9 +14,27 @@
 
 extern "C" void kernel_init();
 
+namespace platform {
+class ApicTimer;
+}
+
 namespace sched {
 class IdleWorker;
 struct Task;
+
+/**
+ * Bitfield indicating what work a scheduler IPI has to do
+ */
+ENUM_FLAGS_EX(IpiWorkFlags, uintptr_t);
+enum class IpiWorkFlags: uintptr_t {
+    /// No work to be done (default value)
+    None                        = 0,
+
+    /// The current thread should be preempted (quantum expired)
+    QuantumExpired              = (1 << 0),
+    /// Work has been enqueued on the scheduler's queue from another core
+    WorkGifted                  = (1 << 1),
+};
 
 /**
  * Provides multitasking abilities for multiple cores. Each scheduler handles the workload for a
@@ -75,6 +94,11 @@ class Scheduler {
         /// The specified thread is about to be switched in
         void willSwitchTo(const rt::SharedPtr<Thread> &to);
 
+        /// Core local timer has expired
+        void timerFired();
+        /// Scheduler IPI fired
+        void handleIpi(void (*ackIrq)(void *), void *ackCtx);
+
     private:
         static void Init();
         static void InitAp();
@@ -88,8 +112,13 @@ class Scheduler {
         /// Calculate the total quantum length for a given thread
         void updateQuantumLength(const rt::SharedPtr<Thread> &thread);
 
+        /// Enqueue a scheduler IPI
+        void sendIpi(const IpiWorkFlags);
+        /// Updates the time quantum used by the given thread
+        void updateQuantumUsed(const rt::SharedPtr<Thread> &thread);
+
         /// Switch to the given thread
-        void switchTo(const rt::SharedPtr<Thread> &thread);
+        void switchTo(const rt::SharedPtr<Thread> &thread, const bool fake = false);
 
         /// updates the current CPU's running thread
         void setRunningThread(const rt::SharedPtr<Thread> &t) {
@@ -160,6 +189,28 @@ class Scheduler {
             InstanceInfo(Scheduler *_instance) : instance(_instance) {}
         };
 
+        /**
+         * Information consumed during a scheduler IPI to determine what work is to be done
+         *
+         * This is a separate structure, allocated separately, so that it may be aligned to the
+         * size of a cache line. This decreases the overhead of sharing it between cores, and also
+         * avoids false sharing of the regular scheduler data structure.
+         */
+        struct IpiInfo {
+            /// What work is there to be done?
+            IpiWorkFlags work;
+        } __attribute__((aligned(64)));
+
+        /// Reasons why we received a timer interrupt
+        enum class TimerReason {
+            /// There is no scheduled timer interrupt
+            None,
+            /// Current thread's time quantum expired
+            QuantumExpired,
+            /// A deadline has arrived
+            Deadline,
+        };
+
     private:
         /// all schedulers on the system. used for work stealing
         static rt::Vector<InstanceInfo> *gSchedulers;
@@ -168,6 +219,11 @@ class Scheduler {
 
         /// the thread that is currently being executed
         rt::SharedPtr<Thread> running = nullptr;
+
+        /// timer for tracking CPU usage (how much to yeet quantum by)
+        Oclock timer;
+        /// what was the intent behind the last timer interrupt we set?
+        TimerReason timerReason = TimerReason::None;
 
         /**
          * Whether the run queue has been modified. This is set whenever a new thread is made
@@ -218,8 +274,10 @@ class Scheduler {
         /// when set, the peer map is dirty and must be updated
         bool peersDirty = true;
 
-        /// timer for tracking CPU usage (how much to yeet quantum by)
-        Oclock timer;
+        /// Platform specific core ID to which this scheduler belongs
+        uintptr_t coreId;
+        /// IPI information structure
+        IpiInfo *ipi = nullptr;
 
     public:
         /// idle worker

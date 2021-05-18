@@ -256,10 +256,10 @@ void Thread::sleep(const uint64_t nanos) {
     int err;
 
     // create the timer blockable
-    TimerBlocker block(nanos);
+    auto block = rt::MakeShared<TimerBlocker>(nanos);
 
     // wait on it
-    err = thread->blockOn(&block);
+    err = thread->blockOn(block);
 
     if(err) {
         log("sleep failed: %d state %d", err, (int) thread->state);
@@ -278,23 +278,27 @@ void Thread::sleep(const uint64_t nanos) {
  *
  * TODO: Handle the timeouts
  */
-int Thread::blockOn(Blockable *b, const uint64_t until) {
-    REQUIRE(b, "invalid blockable %p", b);
+int Thread::blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until) {
+    REQUIRE(b, "invalid blockable %p", static_cast<void *>(b));
     REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
 
     // raise IRQL to scheduler level (to prevent being preempted)
+    // XXX: change this?
     platform_raise_irql(platform::Irql::Scheduler);
 
     // update thread state
     RW_LOCK_WRITE(&this->lock);
 
     REQUIRE(this->state == State::Runnable, "Cannot %s thread %p with state: %d (blockable %p)",
-            "block", this, (int) this->state, b);
+            "block", this, (int) this->state, static_cast<void *>(b));
     REQUIRE(!this->blockingOn, "cannot block thread %p (object %p) while already blocking (%p)",
-            this, b, this->blockingOn);
+            this, static_cast<void *>(b), static_cast<void *>(this->blockingOn));
 
     this->blockingOn = b;
     this->setState(State::Blocked);
+
+    // prepare the blockables
+    b->willBlockOn(this->sharedFromThis());
 
     RW_UNLOCK_WRITE(&this->lock);
 
@@ -310,27 +314,20 @@ int Thread::blockOn(Blockable *b, const uint64_t until) {
 }
 
 /**
- * Prepares any objects that we're blocking on.
- */
-void Thread::prepareBlocks() {
-    REQUIRE(this->blockingOn, "no blocking objects");
-    this->blockingOn->willBlockOn(this);
-}
-
-/**
  * Unblocks the thread.
  */
-void Thread::unblock(Blockable *b) {
+void Thread::unblock(const rt::SharedPtr<Blockable> &b) {
     REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
     REQUIRE(this->state == State::Blocked, "Cannot %s thread %p with state: %d (blockable %p)",
-            "unblock", this, (int) this->state, b);
+            "unblock", this, (int) this->state, static_cast<void *>(b));
 
     DECLARE_CRITICAL();
     CRITICAL_ENTER();
 
     // clear the blockable list
     RW_LOCK_WRITE(&this->lock);
-    REQUIRE(b == this->blockingOn, "thread not blocking on %p! (is %p)", b, this->blockingOn);
+    REQUIRE(b == this->blockingOn, "thread not blocking on %p! (is %p)", static_cast<void *>(b), 
+            static_cast<void *>(this->blockingOn));
 
     // finish setting state
     this->blockingOn->didUnblock();
@@ -341,8 +338,8 @@ void Thread::unblock(Blockable *b) {
     RW_UNLOCK_WRITE(&this->lock);
     CRITICAL_EXIT();
 
-    // TODO: queue in scheduler
-    // Scheduler::get()->markThreadAsRunnable(this, true);
+    // enqueue in scheduler
+    Scheduler::get()->markThreadAsRunnable(this->sharedFromThis(), true);
 }
 
 
@@ -431,7 +428,7 @@ int Thread::waitOn(const uint64_t waitUntil) {
     DECLARE_CRITICAL();
 
     // create the notification flag
-    auto flag = new SignalFlag;
+    auto flag = rt::MakeShared<SignalFlag>();
     if(!flag) {
         return -1;
     }
@@ -447,9 +444,6 @@ int Thread::waitOn(const uint64_t waitUntil) {
 
     // now, block the caller on this object
     err = sched::Thread::current()->blockOn(flag, waitUntil);
-
-    // release the flag and interpret the block return
-    delete flag;
 
     if(!err) { // block completed
         return 0;
@@ -558,7 +552,7 @@ uintptr_t Thread::blockNotify(const uintptr_t _mask) {
     }
 
     // prepare for blocking
-    auto flag = new SignalFlag;
+    auto flag = rt::MakeShared<SignalFlag>();
     this->notificationsFlag = flag;
 
     CRITICAL_EXIT();
@@ -569,7 +563,6 @@ uintptr_t Thread::blockNotify(const uintptr_t _mask) {
     // woke up from blocking. return the set bits
     this->notificationsFlag = nullptr;
     __atomic_clear(&this->notified, __ATOMIC_RELEASE);
-    delete flag;
 
     const auto newBits = __atomic_fetch_and(&this->notifications, ~mask, __ATOMIC_RELAXED);
     return (newBits & mask);

@@ -36,8 +36,14 @@ IrqRegistry::IrqRegistry(Idt *_idt) : idt(_idt) {
     // set up IDT entries
     for(size_t i = 0; i < kNumVectors; i++) {
         const auto vec = i + kVectorMin;
-        idt->set(vec, (uintptr_t) kIrqStubTable[i], GDT_KERN_CODE_SEG, IDT_FLAGS_ISR,
-                Idt::Stack::Stack6);
+
+        // determine what IRQ stack to use
+        auto stack = Idt::Stack::Stack6;
+        if(vec == 0x20) { // IPIs in range of [0x20, 0x27]
+            stack = Idt::Stack::None;
+        }
+
+        idt->set(vec, (uintptr_t) kIrqStubTable[i], GDT_KERN_CODE_SEG, IDT_FLAGS_ISR, stack);
     }
 }
 
@@ -103,6 +109,6 @@ void IrqRegistry::remove(const uintptr_t vector) {
  * turn invoke the appropriate handler, if one is installed.
  */
 void pc64_irq_entry(struct amd64_exception_info *info) {
-    log("irq %3u %p", info->errCode, info);
+    //log("irq %3u %p", info->errCode, info);
     arch::PerCpuInfo::get()->irqRegistry->handle(info->errCode);
 }

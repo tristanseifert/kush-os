@@ -68,7 +68,7 @@ Port::~Port() {
  */
 int Port::send(const void *msgBuf, const size_t msgLen) {
     DECLARE_CRITICAL();
-    Blocker *blocker = nullptr;
+    rt::SharedPtr<Blocker> blocker;
 
     // ensure message isn't too long
     if(!msgBuf || msgLen > kMaxMsgLen) {
@@ -94,7 +94,7 @@ int Port::send(const void *msgBuf, const size_t msgLen) {
     blocker = this->receiverBlocker;
 
     if(gLogQueuing) {
-        log("enqueued %d %p", this->messages.size(), blocker);
+        log("enqueued %d %p", this->messages.size(), static_cast<void *>(blocker));
     }
 
     RW_UNLOCK_WRITE(&this->lock);
@@ -161,7 +161,7 @@ int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const ui
         auto thread = sched::Thread::current();
 
         this->receiver = thread;
-        this->receiverBlocker = new Blocker(this);
+        this->receiverBlocker = rt::SharedPtr<Blocker>(new Blocker(this));
 
         RW_UNLOCK_WRITE(&this->lock);
         CRITICAL_EXIT();
@@ -182,7 +182,6 @@ int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const ui
 
     this->receiver = nullptr;
     if(this->receiverBlocker) {
-        delete this->receiverBlocker;
         this->receiverBlocker = nullptr;
     }
 

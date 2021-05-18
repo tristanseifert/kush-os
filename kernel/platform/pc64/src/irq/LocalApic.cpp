@@ -7,6 +7,7 @@
 #include <stdint.h>
 
 #include <sched/Task.h>
+#include <sched/Scheduler.h>
 #include <vm/Map.h>
 #include <vm/MapEntry.h>
 
@@ -42,6 +43,13 @@ static void SetApicBase(const uint32_t base) {
 void platform::ApicSpuriousIrq(const uintptr_t vector, void *ctx) {
     reinterpret_cast<LocalApic *>(ctx)->irqSpurious();
 }
+/// Scheduler IPI trampoline
+void platform::ApicSchedulerIpi(const uintptr_t vector, void *ctx) {
+    sched::Scheduler::get()->handleIpi([](void *ctx) {
+        auto apic = reinterpret_cast<LocalApic *>(ctx);
+        apic->eoi();
+    }, ctx);
+}
 
 /**
  * Initializes a local APIC.
@@ -75,8 +83,10 @@ LocalApic::LocalApic(const uintptr_t _id, const uintptr_t cpuId, const uintptr_t
     this->configNmi(cpuId);
 
     // install amd64 irq handlers and enable APIC
-    auto irq = arch::PerCpuInfo::get()->irqRegistry;
+    auto irq = arch::IrqRegistry::the();
     irq->install(kVectorSpurious, ApicSpuriousIrq, this);
+
+    irq->install(kVectorSchedulerIpi, ApicSchedulerIpi, this);
 
     this->enable();
 
@@ -250,4 +260,49 @@ LocalApic *LocalApic::the() {
     auto gs = arch::PerCpuInfo::get();
     if(!gs) return nullptr;
     return gs->p.lapic;
+}
+
+/**
+ * Sends a self IPI.
+ */
+void LocalApic::selfIpi(const uint8_t vector) {
+    this->write(kApicRegInterruptCmdLow, 
+            (0b01 << 18) | // destination shorthand = self
+               (1 << 14) | // level = 1
+            (0b000 << 8) | // fixed delivery
+            vector);
+}
+
+/**
+ * Sends an IPI to a remote APIC.
+ */
+void LocalApic::remoteIpi(const uintptr_t coreId, const uint8_t vector) {
+    panic("%s unimplemented", __PRETTY_FUNCTION__);
+}
+
+
+
+
+/**
+ * Configure the core local timer, used by the scheduler code.
+ */
+void platform::SetLocalTimer(const uint64_t interval) {
+    auto timer = LocalApic::theTimer();
+    REQUIRE(timer, "invalid %s", "LAPIC timer");
+
+    timer->setInterval(interval, false);
+}
+
+/**
+ * Sends a scheduler self IPI to the current core.
+ */
+void platform::RequestSchedulerIpi() {
+    LocalApic::the()->selfIpi(LocalApic::kVectorSchedulerIpi);
+}
+
+/**
+ * Sends a scheduler IPI to the given core.
+ */
+void platform::RequestSchedulerIpi(const uintptr_t coreId) {
+    LocalApic::the()->remoteIpi(coreId, LocalApic::kVectorSchedulerIpi);
 }

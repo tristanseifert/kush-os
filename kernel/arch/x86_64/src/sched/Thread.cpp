@@ -98,6 +98,14 @@ void arch::RestoreThreadState(const rt::SharedPtr<sched::Thread> &from,
     // update syscall handler and kernel stack in TSS
     syscall::Handler::handleCtxSwitch(to);
 
+    // TSS stack is kernel stack of thread (for scheduler IPI)
+    const auto toStackAddr = reinterpret_cast<uintptr_t>(to->stack);
+    auto tss = PerCpuInfo::get()->tss;
+    REQUIRE(tss, "failed to get tss ptr");
+
+    tss->rsp[0].low =  (toStackAddr & 0xFFFFFFFF);
+    tss->rsp[0].high = (toStackAddr >> 32ULL);
+
     // save state into current thread and switch to next
     if(from) {
         // stop the task timer

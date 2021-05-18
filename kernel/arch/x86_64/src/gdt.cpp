@@ -15,7 +15,7 @@ using namespace arch;
 gdt_descriptor_t Gdt::gGdt[Gdt::kGdtSize] __attribute__((aligned(64)));
 
 /// TSS for bootstrap processor
-static amd64_tss_t gBspTss;
+amd64_tss_t gBspTss;
 
 // XXX: these should be made larger to match the stack pool size
 /// Size of the IRQ stack (in 8 byte units)
