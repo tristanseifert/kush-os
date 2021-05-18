@@ -126,9 +126,10 @@ void ApicTimer::measureTimerFreq() {
 uint64_t ApicTimer::setInterval(const uint64_t nsec, const bool repeat) {
     // convert to period
     const uint64_t divisor = 16; // XXX: should this be supported to change?
-    const uint64_t ticks = ((nsec * 1000ULL) / (this->psPerTick * divisor));
+    const uint64_t ticks = ((nsec * 1000ULL) / (this->psPerTick /** divisor*/));
 
-    if(gLogSet) log("ps per tick %lu ticks %lu", nsec, ticks);
+    if(gLogSet) log("desired %lu ns -> %lu ticks (@ %lu ps/tick)", nsec, ticks,
+            (this->psPerTick * divisor));
 
     // mask existing timer interrupt
     auto lvt = this->parent->read(kApicRegLvtTimer);
@@ -151,4 +152,19 @@ uint64_t ApicTimer::setInterval(const uint64_t nsec, const bool repeat) {
     // return what we've actually achieved
     this->intervalPs = (ticks * psPerTick * divisor);
     return this->intervalPs / 1000ULL;
+}
+
+/**
+ * Stops the timer.
+ */
+void ApicTimer::stop() {
+    // mask the timer interrupt
+    auto lvt = this->parent->read(kApicRegLvtTimer);
+    lvt |=  (1 << 16);
+    lvt &= ~(0b11 << 17); // clear timer type (0b00 = one shot)
+
+    this->parent->write(kApicRegLvtTimer, lvt);
+
+    // write a 0 initial count to stop
+    this->parent->write(kApicRegTimerInitial, 0);
 }

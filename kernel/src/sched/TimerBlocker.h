@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "Blockable.h"
+#include "Deadline.h"
 
 #include <platform.h>
 
@@ -12,6 +13,29 @@ namespace sched {
  * Blocks a thread for a certain amount of time, based on the system time tick.
  */
 class TimerBlocker: public Blockable {
+    private:
+        /**
+         * Deadline object for timed waits (sleeps)
+         *
+         * Note that the pointer to the blocker is stored as a plain pointer; as long as the
+         * blocker is valid, we'll exist. At deallocation, if still outstanding, the deadline is
+         * removed.
+         */
+        struct TimerDeadline: public Deadline {
+            TimerDeadline(const uint64_t _when, TimerBlocker* _blocker) : Deadline(_when),
+                blocker(_blocker) {}
+
+            /**
+             * On expiration, call back into the blocker object
+             */
+            void operator()() override {
+                this->blocker->timerFired();
+            }
+
+            /// the timer blocker to yeet when the deadline expires
+            TimerBlocker *blocker;
+        };
+
     public:
         /**
          * Creates a new timer blocker, with the given number of nanoseconds set in the future.
@@ -31,8 +55,9 @@ class TimerBlocker: public Blockable {
         }
         /// Disables the timer, if set.
         void reset() override {
-            if(!this->hasFired) {
-                platform_timer_remove(this->timer);
+            if(auto death = this->deadline.lock()) {
+                sched::Scheduler::get()->removeDeadline(death);
+                this->deadline = nullptr;
             }
         }
 
@@ -43,28 +68,27 @@ class TimerBlocker: public Blockable {
             // set the timer (multiples of 10ms). include a fudge factor
             //const auto interval = (this->interval / 10000000ULL) * 10000000ULL;
             const auto interval = this->interval;
-            const auto deadline = platform_timer_now() + interval + 10000ULL;
+            const auto dueAt = platform_timer_now() + interval + 10000ULL;
 
-            this->timer = platform_timer_add(deadline, [](const uintptr_t tok, void *ctx) {
-                if(!ctx) return;
-                auto blocker = reinterpret_cast<TimerBlocker *>(ctx);
+            // create deadline
+            auto death = rt::MakeShared<TimerDeadline>(dueAt, this);
+            REQUIRE(death, "failed to allocate timer deadline object");
 
-                // log("timer blocker %p", ctx);
-                blocker->timerFired(tok);
-            }, this);
+            this->deadline = rt::WeakPtr<TimerDeadline>(death);
 
-            REQUIRE(this->timer, "failed to allocate timer");
+            // add to scheduler
+            sched::Scheduler::get()->addDeadline(death);
         }
 
     private:
         /**
          * Unblocks the task when the timer has fired.
          */
-        void timerFired(const uintptr_t tok) {
+        void timerFired() {
             bool no = false, yes = true;
             if(__atomic_compare_exchange(&this->hasFired, &no, &yes, false, __ATOMIC_RELEASE,
                         __ATOMIC_RELAXED)) {
-                // log("unblocking %p", this->blocker);
+                log("unblocking %p", static_cast<void *>(this->blocker));
 
                 // unblock the task
                 this->unblock();
@@ -72,8 +96,8 @@ class TimerBlocker: public Blockable {
         }
 
     private:
-        /// timer token
-        uintptr_t timer = 0;
+        /// the associated deadline
+        rt::WeakPtr<TimerDeadline> deadline;
         /// whether the timer has fired or not
         bool hasFired = false;
 

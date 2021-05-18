@@ -55,11 +55,19 @@ uint64_t GetLocalTsc();
 
 /// Sets the core local timer to fire in the given number of nanoseconds
 void SetLocalTimer(const uint64_t interval);
+/// Stops the core local timer
+void StopLocalTimer();
 
 /// Sends a scheduler self IPI
 void RequestSchedulerIpi();
 /// Sends a scheduler IPI to the given core
 void RequestSchedulerIpi(const uintptr_t coreId);
+
+/**
+ * Called by the idle task when there is no other work to be performed on this processor core. The
+ * platform code can use this to place the processor in a low power state.
+ */
+void Idle();
 }
 
 /**
@@ -230,12 +238,6 @@ uintptr_t platform_timer_add(const uint64_t at, void (*callback)(const uintptr_t
  */
 void platform_timer_remove(const uintptr_t token);
 
-
-/**
- * Called by the idle task when there is no other work to be performed on this processor core. The
- * platform code can use this to place the processor in a low power state.
- */
-void platform_idle();
 
 /**
  * Initializes the root server task.

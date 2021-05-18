@@ -8,7 +8,7 @@
  * This will sleep the processor until the next interrupt. It assumes interrupts are enabled
  * when called.
  */
-void platform_idle() {
+void platform::Idle() {
     asm volatile("hlt" ::: "memory");
 }
 

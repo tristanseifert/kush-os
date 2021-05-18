@@ -26,6 +26,8 @@ class ApicTimer {
 
         /// Set the interval (in ns) until the timer fires
         uint64_t setInterval(const uint64_t nsec, const bool repeat = false);
+        /// Stops the timer
+        void stop();
 
     private:
         /// interrupt callback indicating the timer was triggered

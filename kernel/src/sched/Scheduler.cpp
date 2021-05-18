@@ -1,6 +1,7 @@
 #include "Scheduler.h"
 #include "SchedulerData.h"
 #include "GlobalState.h"
+#include "Deadline.h"
 #include "Task.h"
 #include "Thread.h"
 #include "IdleWorker.h"
@@ -91,6 +92,8 @@ Scheduler::Scheduler() {
     this->ipi = new IpiInfo;
     this->coreId = arch::GetProcLocal()->getCoreId();
 
+    this->idle = new IdleWorker(this);
+
     // insert into the global list of schedulers
     InstanceInfo info(this);
     info.coreId = arch::GetProcLocal()->getCoreId();
@@ -123,6 +126,9 @@ Scheduler::~Scheduler() {
     }
 
     RW_UNLOCK_WRITE(&gSchedulersLock);
+
+    // clean up any worker threads we've spawned
+    delete this->idle;
 
     // clean up some other resources
     invalidateAllPeerList(this);
@@ -247,8 +253,10 @@ void Scheduler::yield(const Thread::State state) {
     // perform context switch to next runnable (if one was found)
     if(runnable) {
         this->switchTo(runnable);
-    } else {
-        panic("TODO: do idle stuff");
+    }
+    // no runnable thread, so go start the idle worker
+    else {
+        this->switchTo(this->idle->thread);
     }
 }
 
@@ -280,11 +288,34 @@ beach:;
     for(size_t i = 0; i < kNumLevels; i++) {
         auto &level = this->levels[i];
 
+again:;
         if(level.storage.pop(thread, rt::LockFreeQueueFlags::kPartialPop)) {
+            /*
+             * Ignore the thread if it's not runnable and simply go again.
+             *
+             * A thread may be added back to the run queue, then immediately block, which would
+             * otherwise result in Bad Things happening. If we just ignore that case here, we avoid
+             * having to go through the entire run queue to remove this thread.
+             */
+            if(thread->state != Thread::State::Runnable) {
+                if(kLogQueueOps) {
+                    log("sched pull %p (%d) from %lu (ignored)", static_cast<void *>(thread),
+                            static_cast<int>(thread->state), i);
+                }
+                goto again;
+            }
+            REQUIRE(thread->state == Thread::State::Runnable,
+                    "invalid thread state in run queue %lu: %d", i, static_cast<int>(thread->state));
+
             // found a thread, update last schedule timestamp
             level.lastScheduledTsc = platform_local_timer_now();
 
             this->currentLevel = i;
+
+            if(kLogQueueOps) {
+                log("sched pull %p (%d) from %lu", static_cast<void *>(thread),
+                        static_cast<int>(thread->state), i);
+            }
             return thread;
         }
     }
@@ -322,11 +353,21 @@ int Scheduler::schedule(const rt::SharedPtr<Thread> &thread) {
         sched.lastLevel = levelNum;
     }
 
+    // do not actually push it on the run queue if not schedulable
+    if(TestFlags(sched.flags & SchedulerThreadDataFlags::DoNotSchedule)) {
+        return 1;
+    }
+
     // try to insert it to that level's queue
     if(!level.push(thread)) {
         panic("sched(%p) level %lu queue overflow (thread %p)", this, levelNum,
                 static_cast<void *>(this->running));
         return -1;
+    }
+
+    if(kLogQueueOps) {
+        log("sched push %p (%d)   to %lu", static_cast<void *>(thread), static_cast<int>(thread->state),
+                levelNum);
     }
 
     // update epoch
@@ -359,16 +400,38 @@ size_t Scheduler::getLevelFor(const rt::SharedPtr<Thread> &thread) {
  *             gets an extension on its quantum, for example.
  */
 void Scheduler::switchTo(const rt::SharedPtr<Thread> &thread, const bool fake) {
-    auto &sched = thread->sched;
-
-    // how much time is left in the quantum?
-    REQUIRE(sched.quantumTotal >= sched.quantumUsed,
-            "invalid time quantum for thread $%p'h (%lu/%lu)", thread->handle, sched.quantumUsed,
-            sched.quantumTotal);
-    auto quantumRemaining = sched.quantumTotal - sched.quantumUsed;
-
+    // auto &sched = thread->sched;
     //log("switch: %p ($%p'h %s) quantum %lu/%lu", static_cast<void*>(thread), thread->handle,
     //        thread->name, sched.quantumUsed, sched.quantumTotal);
+
+    // set the timer
+    this->updateTimer();
+
+    // finally, perform context switch
+    if(!fake) thread->switchTo();
+}
+
+
+
+/**
+ * Updates the timer interval. It will select either the end of the current thread's time quantum,
+ * or the nearest deadline.
+ */
+void Scheduler::updateTimer() {
+    uint64_t quantumRemaining;
+
+    // calculate remaining quantum
+    if(this->running) [[likely]] {
+        auto &sched = this->running->sched;
+
+        if(TestFlags(sched.flags & SchedulerThreadDataFlags::Idle)) [[unlikely]] {
+            quantumRemaining = kIdleWakeupInterval;
+        } else {
+            quantumRemaining = sched.quantumTotal - sched.quantumUsed;
+        }
+    } else {
+        quantumRemaining = kIdleWakeupInterval;
+    }
 
     // TODO: find the nearest deadline
     const auto deadline = UINTPTR_MAX;
@@ -382,10 +445,7 @@ void Scheduler::switchTo(const rt::SharedPtr<Thread> &thread, const bool fake) {
         platform::SetLocalTimer(quantumRemaining);
     }
 
-    // finally, perform context switch
-    if(!fake) thread->switchTo();
 }
-
 
 
 /**
@@ -402,9 +462,12 @@ void Scheduler::timerFired() {
             this->updateQuantumUsed(this->running);
             this->running->sched.preempted = true;
 
-            this->schedule(this->running);
+            if(this->running->state == Thread::State::Runnable) {
+                this->schedule(this->running);
+            }
 
             // timer is now stopped until the IPI restarts it
+            platform::StopLocalTimer();
             this->sendIpi(IpiWorkFlags::QuantumExpired);
             break;
 
@@ -483,9 +546,16 @@ void Scheduler::handleIpi(void (*ackIrq)(void *), void *ackCtx) {
 
         return ackIrq(ackCtx);
     } else if(!next) {
-        // there are no runnable threads anymore, go and become idle
-        panic("idlen't");
-        return ackIrq(ackCtx);
+        // there are no runnable threads anymore, go and become idle (if not already)
+        if(this->running == this->idle->thread) {
+            this->switchTo(this->running, true);
+            this->timer.start(Oclock::Type::ThreadKernel);
+
+            return ackIrq(ackCtx);
+        }
+
+        // otherwise, perform a switch to it
+        next = this->idle->thread;
     }
 
     // we found a thread that's suitable to switch to so go that
@@ -511,6 +581,8 @@ void Scheduler::updateQuantumUsed(const rt::SharedPtr<Thread> &thread) {
 
     // add it to the total quantum used by the thread
     auto &sched = thread->sched;
+
+    sched.cpuTime += nsec;
 
     auto used = sched.quantumUsed + nsec;
     if(used > sched.quantumTotal) {
@@ -571,6 +643,23 @@ void Scheduler::updateQuantumLength(const rt::SharedPtr<Thread> &thread) {
 void Scheduler::willSwitchTo(const rt::SharedPtr<Thread> &to) {
     this->timer.start(Oclock::Type::ThreadKernel);
 }
+
+
+
+/**
+ * Adds a new deadline for the scheduler to consider.
+ */
+void Scheduler::addDeadline(const rt::SharedPtr<Deadline> &deadline) {
+    log("adding deadline: %p", static_cast<void *>(deadline));
+}
+
+/**
+ * Removes an existing deadline, if it has not yet expired.
+ */
+void Scheduler::removeDeadline(const rt::SharedPtr<Deadline> &deadline) {
+    log("removing deadline: %p", static_cast<void *>(deadline));
+}
+
 
 
 

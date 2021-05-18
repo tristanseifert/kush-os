@@ -8,7 +8,25 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <bitflags.h>
+
 namespace sched {
+ENUM_FLAGS_EX(SchedulerThreadDataFlags, uintptr_t);
+enum class SchedulerThreadDataFlags: uintptr_t {
+    /**
+     * Do not automatically reschedule the thread, if it becomes preempted
+     */
+    DoNotSchedule                       = (1 << 15),
+    /**
+     * Thread should be executed when idle; this means that it's not preempted as normal, but will
+     * instead get to run as long as there's nothing else to do.
+     *
+     * Used internally by the scheduler.
+     */
+    Idle                                = (1 << 16),
+};
+
+
 /**
  * Scheduler specific data that becomes a part of every thread's info structure for use in
  * storing info like priorities.
@@ -22,10 +40,15 @@ struct SchedulerThreadData {
     /// last level at which the thread was scheduled
     size_t lastLevel = UINTPTR_MAX;
 
+    /// Total number of nanoseconds of CPU time this thread has received
+    uint64_t cpuTime;
     /// Actual number of nanoseconds of quantum time at this level
     uint64_t quantumTotal = 0;
     /// Number of nanoseconds of time quantum used at this level
     uint64_t quantumUsed = 0;
+
+    /// flags defining the thread's state and scheduler beahvior
+    SchedulerThreadDataFlags flags;
 
     /**
      * User specified priority; this is a number in [-100, 100] that affects the run queue level,

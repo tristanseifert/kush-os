@@ -43,7 +43,7 @@ add_executable(kernel
     src/sched/Scheduler.cpp
     src/sched/Task.cpp
     src/sched/Thread.cpp
-    #    src/sched/IdleWorker.cpp
+    src/sched/IdleWorker.cpp
     src/sched/Oclock.cpp
     src/sys/Interrupts.cpp
     src/sys/Notifications.cpp

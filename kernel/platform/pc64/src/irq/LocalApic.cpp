@@ -294,6 +294,16 @@ void platform::SetLocalTimer(const uint64_t interval) {
 }
 
 /**
+ * Stops the local APIC timer.
+ */
+void platform::StopLocalTimer() {
+    auto timer = LocalApic::theTimer();
+    REQUIRE(timer, "invalid %s", "LAPIC timer");
+
+    timer->stop();
+}
+
+/**
  * Sends a scheduler self IPI to the current core.
  */
 void platform::RequestSchedulerIpi() {

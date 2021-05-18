@@ -3,6 +3,7 @@
 #include "Task.h"
 #include "Thread.h"
 
+#include <platform.h>
 #include <log.h>
 
 using namespace sched;
@@ -23,15 +24,12 @@ IdleWorker::IdleWorker(Scheduler *_sched) : sched(_sched) {
 
     this->thread->setState(Thread::State::Runnable);
 
+    // mark it such that it doesn't automatically get scheduled
+    this->thread->sched.flags |= SchedulerThreadDataFlags::DoNotSchedule | 
+                                 SchedulerThreadDataFlags::Idle;
+
     // add it to the scheduler
     //sched->markThreadAsRunnable(this->thread);
-}
-
-/**
- * We can just delete the threads.
- */
-IdleWorker::~IdleWorker() {
-    Thread::free(this->thread);
 }
 
 /**
@@ -49,11 +47,11 @@ void sched::IdleEntry(uintptr_t arg) {
  * we'll just get the CPU back.
  */
 void IdleWorker::main() {
+    log("idle worker :)");
+
     while(1) {
         this->checkWork();
-
-        platform_idle();
-        //Thread::yield();
+        platform::Idle();
     }
 }
 
@@ -61,34 +59,14 @@ void IdleWorker::main() {
  * Checks pending work requests and executes them.
  */
 void IdleWorker::checkWork() {
-    // bail if no work is available
-    SPIN_LOCK_GUARD(this->workLock);
-    if(this->work.empty()) return;
+    WorkItem *item = nullptr;
 
-    // pop all work items off of it
-    while(!this->work.empty()) {
-        auto item = this->work.pop();
+    // pop, execute and delete work items until queue is no longer full
+    while(this->work.pop(item, rt::LockFreeQueueFlags::kSingleConsumer)) {
+        REQUIRE(item, "got invalid NULL work item");
 
-        switch(item.type) {
-            // the payload pointer is a thread
-            case Type::DestroyThread: {
-                auto thread = reinterpret_cast<Thread *>(item.payload);
-                this->destroyThread(thread);
-                break;
-            }
-            // the payload pointer is a task
-            case Type::DestroyTask: {
-                auto task = reinterpret_cast<Task *>(item.payload);
-                this->destroyTask(task);
-                break;
-            }
-            // this is a no-op
-            case Type::Unknown:
-                break;
-            // we should handle all types!
-            default:
-                panic("unknown work item type: %d", (int) item.type);
-        }
+        (*item)();
+        delete item;
     }
 }
 
@@ -98,19 +76,17 @@ void IdleWorker::checkWork() {
  * This will usually only come from requests to terminate threads; if an entire task is terminating
  * it will directly deallocate its threads.
  */
-void IdleWorker::destroyThread(Thread *thread) {
+void IdleWorker::DeleteThreadItem::operator()() {
     // detach it from its task if needed
-    if(thread->task) {
-        thread->task->detachThread(thread);
+    if(this->thread->task) {
+        this->thread->task->detachThread(this->thread);
     }
 
-    // lastly, release it
-    Thread::free(thread);
+    // it will automatically be freed as the last ref is dropped
 }
 
 /**
  * Deallocates a task.
  */
-void IdleWorker::destroyTask(Task *task) {
-    Task::free(task);
+void IdleWorker::DeleteTaskItem::operator()() {
 }

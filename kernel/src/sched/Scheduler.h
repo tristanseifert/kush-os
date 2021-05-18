@@ -20,6 +20,7 @@ class ApicTimer;
 
 namespace sched {
 class IdleWorker;
+struct Deadline;
 struct Task;
 
 /**
@@ -67,6 +68,12 @@ class Scheduler {
         /// First run queue for user threads
         constexpr static const size_t kUserPriorityLevel = 4;
 
+        /**
+         * Interval at which the scheduler will wake the core to check for new work if it enters
+         * the idle state, in nanoseconds.
+         */
+        constexpr static const uintptr_t kIdleWakeupInterval = (1000000 * 100); // 100ms
+
     public:
         // return the scheduler for the current core
         static Scheduler *get();
@@ -99,6 +106,11 @@ class Scheduler {
         /// Scheduler IPI fired
         void handleIpi(void (*ackIrq)(void *), void *ackCtx);
 
+        /// Adds a deadline to the scheduler
+        void addDeadline(const rt::SharedPtr<Deadline> &deadline);
+        /// Removes an existing deadline, if it hasn't expired yet
+        void removeDeadline(const rt::SharedPtr<Deadline> &deadline);
+
     private:
         static void Init();
         static void InitAp();
@@ -117,6 +129,8 @@ class Scheduler {
         /// Updates the time quantum used by the given thread
         void updateQuantumUsed(const rt::SharedPtr<Thread> &thread);
 
+        /// Updates the scheduler timer for the next deadline
+        void updateTimer();
         /// Switch to the given thread
         void switchTo(const rt::SharedPtr<Thread> &thread, const bool fake = false);
 
@@ -212,6 +226,9 @@ class Scheduler {
         };
 
     private:
+        /// whether pops/pushes to queue are logged
+        constexpr static const bool kLogQueueOps = true;
+
         /// all schedulers on the system. used for work stealing
         static rt::Vector<InstanceInfo> *gSchedulers;
         /// per level configuration

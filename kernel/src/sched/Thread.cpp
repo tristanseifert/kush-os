@@ -230,7 +230,7 @@ void Thread::terminate(bool release) {
     } 
     // delete it right away since the thread isn't running
     else {
-        if(release) Scheduler::get()->idle->queueDestroyThread(this);
+        if(release) Scheduler::get()->idle->queueDestroyThread(this->sharedFromThis());
     }
 }
 
@@ -240,7 +240,7 @@ void Thread::terminate(bool release) {
 void Thread::deferredTerminate() {
     this->setState(State::Zombie);
 
-    Scheduler::get()->idle->queueDestroyThread(this);
+    Scheduler::get()->idle->queueDestroyThread(this->sharedFromThis());
 }
 
 
@@ -279,12 +279,15 @@ void Thread::sleep(const uint64_t nanos) {
  * TODO: Handle the timeouts
  */
 int Thread::blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until) {
+    DECLARE_CRITICAL();
+
     REQUIRE(b, "invalid blockable %p", static_cast<void *>(b));
     REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
 
     // raise IRQL to scheduler level (to prevent being preempted)
     // XXX: change this?
     platform_raise_irql(platform::Irql::Scheduler);
+    CRITICAL_ENTER();
 
     // update thread state
     RW_LOCK_WRITE(&this->lock);
@@ -301,6 +304,7 @@ int Thread::blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until) {
     b->willBlockOn(this->sharedFromThis());
 
     RW_UNLOCK_WRITE(&this->lock);
+    CRITICAL_EXIT();
 
     // yield the rest of the CPU time
     Scheduler::get()->yield();
