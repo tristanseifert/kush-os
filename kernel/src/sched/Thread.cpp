@@ -255,11 +255,12 @@ void Thread::sleep(const uint64_t nanos) {
     auto thread = current();
     int err;
 
-    // create the timer blockable
-    auto block = rt::MakeShared<TimerBlocker>(nanos);
-
-    // wait on it
-    err = thread->blockOn(block);
+    {
+        // create the timer blockable
+        auto block = TimerBlocker::make(nanos);
+        // wait on it
+        err = thread->blockOn(block);
+    }
 
     if(err) {
         log("sleep failed: %d state %d", err, (int) thread->state);

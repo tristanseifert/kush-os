@@ -9,20 +9,17 @@
 #include "sys/Syscall.h"
 #include "handle/Manager.h"
 
-#include "sched/Thread.h"
-#include "sched/IdleWorker.h"
 
 #include <arch.h>
 #include <platform.h>
 #include <stdint.h>
 
 #include <version.h>
-#include <printf.h>
 #include <log.h>
 
 
 /// root init server
-rt::SharedPtr<sched::Task> gRootServer = nullptr;
+rt::SharedPtr<sched::Task> gRootServer;
 
 /**
  * Early kernel initialization

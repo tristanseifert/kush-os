@@ -13,6 +13,13 @@ namespace sched {
  * Blocks a thread for a certain amount of time, based on the system time tick.
  */
 class TimerBlocker: public Blockable {
+    public:
+        static rt::SharedPtr<TimerBlocker> make(const uint64_t nanos) {
+            rt::SharedPtr<TimerBlocker> ptr(new TimerBlocker(nanos));
+            ptr->us = rt::WeakPtr<TimerBlocker>(ptr);
+            return ptr;
+        }
+
     private:
         /**
          * Deadline object for timed waits (sleeps)
@@ -91,11 +98,13 @@ class TimerBlocker: public Blockable {
                 log("unblocking %p", static_cast<void *>(this->blocker));
 
                 // unblock the task
-                this->unblock();
+                this->blocker->unblock(this->us.lock());
             }
         }
 
     private:
+        rt::WeakPtr<TimerBlocker> us;
+
         /// the associated deadline
         rt::WeakPtr<TimerDeadline> deadline;
         /// whether the timer has fired or not

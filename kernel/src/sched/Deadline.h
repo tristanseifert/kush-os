@@ -31,6 +31,26 @@ struct Deadline {
      * such as placing a thread back on the run queue.
      */
     virtual void operator()()= 0;
+
+
+    bool operator ==(const Deadline &d) const {
+        return this->expires == d.expires;
+    }
+    bool operator !=(const Deadline &d) const {
+        return this->expires != d.expires;
+    }
+    bool operator <(const Deadline &d) const {
+        return this->expires < d.expires;
+    }
+    bool operator <=(const Deadline &d) const {
+        return this->expires <= d.expires;
+    }
+    bool operator >(const Deadline &d) const {
+        return this->expires > d.expires;
+    }
+    bool operator >=(const Deadline &d) const {
+        return this->expires >= d.expires;
+    }
 };
 }
 

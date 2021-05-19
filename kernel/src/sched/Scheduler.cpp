@@ -433,8 +433,25 @@ void Scheduler::updateTimer() {
         quantumRemaining = kIdleWakeupInterval;
     }
 
-    // TODO: find the nearest deadline
-    const auto deadline = UINTPTR_MAX;
+    // find the nearest deadline
+    auto deadline = UINTPTR_MAX;
+    const auto now = platform_timer_now();
+
+    {
+        RW_LOCK_READ_GUARD(this->deadlinesLock);
+
+        if(!this->deadlines.empty()) {
+            // is the front deadline expired/close to expiring?
+            const auto &next = this->deadlines.min();
+            const auto expires = next.expires();
+
+            if(expires <= now) { // already expired
+                deadline = 0;
+            } else { // expires in the future
+                deadline = expires - now;
+            }
+        }
+    }
 
     // whichever is sooner, set a timer for it
     if(deadline < quantumRemaining) { // impending deadline
@@ -447,7 +464,6 @@ void Scheduler::updateTimer() {
 
 }
 
-
 /**
  * Scheduler specific timer has expired; handle deadlines or figure out if the current thread can
  * be preempted.
@@ -455,31 +471,20 @@ void Scheduler::updateTimer() {
  * @note This is invoked from an interrupt context; it is not allowed to block.
  */
 void Scheduler::timerFired() {
-    // why did the timer expire?
-    switch(this->timerReason) {
-        // preempt the currently running thread
-        case TimerReason::QuantumExpired:
-            this->updateQuantumUsed(this->running);
-            this->running->sched.preempted = true;
+    // update running thread's quantum
+    if(this->updateQuantumUsed(this->running)) {
+        // entire quantum used so preempt it
+        this->running->sched.preempted = true;
 
-            if(this->running->state == Thread::State::Runnable) {
-                this->schedule(this->running);
-            }
-
-            // timer is now stopped until the IPI restarts it
-            platform::StopLocalTimer();
-            this->sendIpi(IpiWorkFlags::QuantumExpired);
-            break;
-
-        // process any impending timed waits/other events
-        case TimerReason::Deadline:
-            log("deadline expired");
-            break;
-
-        default:
-            panic("unknown timer reason %lu", static_cast<uintptr_t>(this->timerReason));
-            break;
+        // if still runnable, reschedule
+        if(this->running->state == Thread::State::Runnable) {
+            this->schedule(this->running);
+        }
     }
+
+    // stop timer and request scheduler invocation
+    platform::StopLocalTimer();
+    this->sendIpi();
 }
 
 /**
@@ -489,11 +494,7 @@ void Scheduler::timerFired() {
  *
  * @param flags Work flag bits to set
  */
-void Scheduler::sendIpi(const IpiWorkFlags flags) {
-    // set flags
-    __atomic_or_fetch(reinterpret_cast<uintptr_t *>(&this->ipi->work),
-            static_cast<uintptr_t>(flags), __ATOMIC_RELAXED);
-
+void Scheduler::sendIpi() {
     // perform self IPI
     if(this->coreId == arch::GetProcLocal()->getCoreId()) { [[ likely ]]
         platform::RequestSchedulerIpi();
@@ -522,19 +523,33 @@ void Scheduler::sendIpi(const IpiWorkFlags flags) {
  * @param ackCtx Arbitrary pointer passed to acknowledgement function
  */
 void Scheduler::handleIpi(void (*ackIrq)(void *), void *ackCtx) {
-    IpiWorkFlags f;
+    // process any deadlines that expired already / expire soon
+    {
+        RW_LOCK_WRITE_GUARD(this->deadlinesLock);
+        const auto now = platform_timer_now();
 
-    // atomically read the IPI actions and bail if it was spurious
-    f = static_cast<IpiWorkFlags>(
-            __atomic_exchange_n(reinterpret_cast<uintptr_t *>(&this->ipi->work),
-            static_cast<uintptr_t>(IpiWorkFlags::None), __ATOMIC_RELAXED));
+        bool doNext = true;
 
-    if(f == IpiWorkFlags::None) {
-        return ackIrq(ackCtx);
+        while(!this->deadlines.empty() && doNext) {
+            auto &next = this->deadlines.min();
+            const auto expires = next.expires();
+
+            // does the deadline lie in the past?
+            if(expires <= now) {
+                next();
+                this->deadlines.extract();
+            }
+            // does it expire within the fudge time?
+            else if((expires - now) <= this->deadlineSlack) {
+                next();
+                this->deadlines.extract();
+            }
+            // the deadline doesn't expire until later. chill
+            else {
+                doNext = false;
+            }
+        }
     }
-
-    // the time quantum of the current thread has expired
-    if(TestFlags(f & IpiWorkFlags::QuantumExpired)) {}
 
     // pick the next highest priority thread and switch to it
     auto next = this->findRunnableThread();
@@ -573,8 +588,12 @@ void Scheduler::handleIpi(void (*ackIrq)(void *), void *ackCtx) {
  *       nothing to actually ensure this though.
  *
  * @param thread Thread to account against
+ *
+ * @return Whether the thread's quantum has expired
  */
-void Scheduler::updateQuantumUsed(const rt::SharedPtr<Thread> &thread) {
+bool Scheduler::updateQuantumUsed(const rt::SharedPtr<Thread> &thread) {
+    bool expired = false;
+
     // stop timer and read out
     this->timer.stop();
     const auto nsec = this->timer.reset(Oclock::Type::ThreadKernel);
@@ -595,11 +614,15 @@ void Scheduler::updateQuantumUsed(const rt::SharedPtr<Thread> &thread) {
         // XXX: this can still be greater than the quantum length?
         sched.quantumUsed = used - sched.quantumTotal;
         this->updateQuantumLength(thread);
+
+        expired = true;
     }
     // only part of the quantum was used
     else {
         sched.quantumUsed = used;
     }
+
+    return expired;
 }
 
 /**
@@ -650,7 +673,10 @@ void Scheduler::willSwitchTo(const rt::SharedPtr<Thread> &to) {
  * Adds a new deadline for the scheduler to consider.
  */
 void Scheduler::addDeadline(const rt::SharedPtr<Deadline> &deadline) {
-    log("adding deadline: %p", static_cast<void *>(deadline));
+    DeadlineWrapper wrap(deadline);
+
+    RW_LOCK_WRITE_GUARD(this->deadlinesLock);
+    this->deadlines.insert(wrap);
 }
 
 /**
@@ -658,6 +684,30 @@ void Scheduler::addDeadline(const rt::SharedPtr<Deadline> &deadline) {
  */
 void Scheduler::removeDeadline(const rt::SharedPtr<Deadline> &deadline) {
     log("removing deadline: %p", static_cast<void *>(deadline));
+
+    // prepare info for removal
+    struct RemoveInfo {
+        rt::SharedPtr<Deadline> deadline;
+
+        RemoveInfo(const rt::SharedPtr<Deadline> &_deadline) : deadline(_deadline) {}
+    };
+
+    RemoveInfo info(deadline);
+
+    // enumerate over all the objects
+    RW_LOCK_WRITE_GUARD(this->deadlinesLock);
+
+    this->deadlines.enumerateObjects([](DeadlineWrapper &wrap, bool *remove, void *ctx) -> bool {
+        auto info = reinterpret_cast<RemoveInfo *>(ctx);
+
+        // we've found the deadline object to remove
+        if(wrap == info->deadline) {
+            *remove = true;
+            return false;
+        }
+        // continue iterating
+        return true;
+    }, &info);
 }
 
 

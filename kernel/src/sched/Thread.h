@@ -220,6 +220,8 @@ struct Thread: public rt::SharedFromThis<Thread> {
 
         /// Blocks the thread on the given object.
         int blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until = 0);
+        /// Unblocks the thread due to the given blockable
+        void unblock(const rt::SharedPtr<Blockable> &b);
 
         /// Sets the given notification bits.
         void notify(const uintptr_t bits);
@@ -256,7 +258,6 @@ struct Thread: public rt::SharedFromThis<Thread> {
         static bool gLogLifecycle;
 
     private:
-        void unblock(const rt::SharedPtr<Blockable> &b);
         /// Called when this thread is switching out
         void switchFrom();
 

@@ -129,7 +129,8 @@ class Vector {
         void push_back(const T value) {
             this->ensureStorage();
 
-            // insert at the end
+            // insert at the end (XXX: is the default allocation needed?)
+            new(&this->storage[this->numAllocated]) T();
             this->storage[this->numAllocated++] = value;
         }
         /**
@@ -152,7 +153,11 @@ class Vector {
                 // then shift items down and insert at desired index
                 const auto toMove = (this->numAllocated - index);
                 if(toMove) {
-                    memmove(&this->storage[index+1], &this->storage[index], toMove * sizeof(T));
+                    // shift items down, but do it in reverse
+                    for(size_t j = (toMove - 1); j; j--) {
+                        this->storage[index + j + 1] = this->storage[index + j];
+                    }
+                    //memmove(&this->storage[index+1], &this->storage[index], toMove * sizeof(T));
                 }
 
                 this->storage[index] = value;
@@ -171,11 +176,14 @@ class Vector {
             const size_t toMove = (this->numAllocated - index) - 1;
 
             if(toMove) {
-                memmove(&this->storage[index], &this->storage[index+1], toMove * sizeof(T));
+                for(size_t j = 0; j < toMove; j++) {
+                    this->storage[index + j] = this->storage[index + j + 1];
+                }
+                //memmove(&this->storage[index], &this->storage[index+1], toMove * sizeof(T));
             }
 
-            // update counts
-            this->numAllocated--;
+            // invoke destructor for last item and update counts
+            this->storage[(this->numAllocated-- - 1)].~T();
         }
         /**
          * Removes all objects from the vector.
@@ -188,6 +196,15 @@ class Vector {
             }
 
             this->numAllocated = 0;
+        }
+
+        /**
+         * Removes the last element.
+         */
+        void pop_back() {
+            REQUIRE(this->numAllocated, "cannot %s empty vector", "pop");
+
+            this->storage[(this->numAllocated-- - 1)].~T();
         }
 
         /// Gets an iterator to the start of the vector
@@ -210,6 +227,28 @@ class Vector {
         /// Whether the vector is empty
         const bool empty() const {
             return !this->numAllocated;
+        }
+
+        /// Return a reference to the last item in the vector
+        T& back() {
+            REQUIRE(this->numAllocated, "cannot %s empty vector", "get back element of");
+            return this->storage[this->numAllocated - 1];
+        }
+        /// Return a reference to the last item in the vector
+        const T& back() const {
+            REQUIRE(this->numAllocated, "cannot %s empty vector", "get back element of");
+            return this->storage[this->numAllocated - 1];
+        }
+
+        /// Return a reference to the first item in the vector
+        T& front() {
+            REQUIRE(this->numAllocated, "cannot %s empty vector", "get front element of");
+            return this->storage[0];
+        }
+        /// Return a reference to the first item in the vector
+        const T& front() const {
+            REQUIRE(this->numAllocated, "cannot %s empty vector", "get front element of");
+            return this->storage[0];
         }
 
         /// Gets a reference to the given item

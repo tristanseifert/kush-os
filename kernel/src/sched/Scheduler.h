@@ -4,11 +4,12 @@
 #include <stdint.h>
 
 #include <bitflags.h>
-#include <arch/spinlock.h>
-#include <runtime/Queue.h>
+#include <arch/rwlock.h>
+#include <runtime/MinHeap.h>
 #include <runtime/LockFreeQueue.h>
 #include <runtime/SmartPointers.h>
 
+#include "Deadline.h"
 #include "Thread.h"
 #include "Oclock.h"
 
@@ -20,7 +21,6 @@ class ApicTimer;
 
 namespace sched {
 class IdleWorker;
-struct Deadline;
 struct Task;
 
 /**
@@ -74,6 +74,9 @@ class Scheduler {
          */
         constexpr static const uintptr_t kIdleWakeupInterval = (1000000 * 100); // 100ms
 
+        /// Default positive slack for deadlines
+        constexpr static const uint64_t kDeadlineSlack = 500;
+
     public:
         // return the scheduler for the current core
         static Scheduler *get();
@@ -125,9 +128,9 @@ class Scheduler {
         void updateQuantumLength(const rt::SharedPtr<Thread> &thread);
 
         /// Enqueue a scheduler IPI
-        void sendIpi(const IpiWorkFlags);
+        void sendIpi();
         /// Updates the time quantum used by the given thread
-        void updateQuantumUsed(const rt::SharedPtr<Thread> &thread);
+        bool updateQuantumUsed(const rt::SharedPtr<Thread> &thread);
 
         /// Updates the scheduler timer for the next deadline
         void updateTimer();
@@ -215,6 +218,48 @@ class Scheduler {
             IpiWorkFlags work;
         } __attribute__((aligned(64)));
 
+        /**
+         * Small wrapper around a polymorphic Deadline shared pointer, to provide the appropriate
+         * operators to make it work in the minheap
+         */
+        struct DeadlineWrapper {
+            DeadlineWrapper() = default;
+            DeadlineWrapper(const rt::SharedPtr<Deadline> &_deadline) : deadline(_deadline) {}
+
+            /// deadline object we represent
+            rt::SharedPtr<Deadline> deadline;
+
+            /// get expiration time or 0 if invalid
+            inline uint64_t expires() const {
+                if(!deadline) return 0;
+                return deadline->expires;
+            }
+
+            /// call through to the object
+            inline void operator()() {
+                (*this->deadline)();
+            }
+
+            bool operator ==(const DeadlineWrapper &d) const {
+                return this->expires() == d.expires();
+            }
+            bool operator !=(const DeadlineWrapper &d) const {
+                return this->expires() != d.expires();
+            }
+            bool operator <(const DeadlineWrapper &d) const {
+                return this->expires() < d.expires();
+            }
+            bool operator <=(const DeadlineWrapper &d) const {
+                return this->expires() <= d.expires();
+            }
+            bool operator >(const DeadlineWrapper &d) const {
+                return this->expires() > d.expires();
+            }
+            bool operator >=(const DeadlineWrapper &d) const {
+                return this->expires() >= d.expires();
+            }
+        };
+
         /// Reasons why we received a timer interrupt
         enum class TimerReason {
             /// There is no scheduled timer interrupt
@@ -276,6 +321,13 @@ class Scheduler {
         size_t levelChangeMaxLoops = 5;
 
         /**
+         * When a deadline is evaluated, it may lie up to this amount of time in the future and
+         * still be considered expired, in nanoseconds. Higher values will reduce the number of
+         * scheduler invocations at the cost of timing resolution.
+         */
+        uint64_t deadlineSlack = kDeadlineSlack;
+
+        /**
          * Level from which the currently executing thread was pulled, or `kNumLevels` if we're
          * executing the idle thread.
          */
@@ -295,6 +347,14 @@ class Scheduler {
         uintptr_t coreId;
         /// IPI information structure
         IpiInfo *ipi = nullptr;
+
+        /// lock for the deadline objects
+        DECLARE_RWLOCK(deadlinesLock);
+        /**
+         * All upcoming deadlines for this core; they are processed at every scheduler invocation
+         * if they've passed or are about to occur (to avoid some overhead)
+         */
+        rt::MinHeap<DeadlineWrapper> deadlines;
 
     public:
         /// idle worker
