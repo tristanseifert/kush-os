@@ -22,7 +22,7 @@ namespace ipc {
  * Threads may block on a port; only one thread may block for receiving, while multiple threads
  * may be blocked waiting to send on a port.
  */
-class Port {
+class Port: public rt::SharedFromThis<Port> {
     public:
         /// Allocates a new port
         static rt::SharedPtr<Port> alloc();
@@ -61,7 +61,18 @@ class Port {
             friend class Port;
 
             /// Construct a new blocker for the given port.
-            Blocker(Port *_port) : port(_port) {}
+            Blocker(const rt::SharedPtr<Port> &_port) : port(_port) {}
+
+            public:
+                inline static auto make(Port * port) {
+                    return make(port->sharedFromThis());
+                }
+
+                static rt::SharedPtr<Blocker> make(const rt::SharedPtr<Port> &port) {
+                    rt::SharedPtr<Blocker> ptr(new Blocker(port));
+                    ptr->us = rt::WeakPtr<Blocker>(ptr);
+                    return ptr;
+                }
 
             public:
                 /// We're signalled whenever the port's message queue is not empty.
@@ -84,7 +95,7 @@ class Port {
                     //bool yes = true, no = false;
                     //if(__atomic_compare_exchange(&this->signalled, &no, &yes, false, __ATOMIC_ACQUIRE, __ATOMIC_RELEASE)) {
                     if(!__atomic_test_and_set(&this->signalled, __ATOMIC_RELEASE)) {
-                        this->unblock();
+                        this->blocker->unblock(this->us.lock());
                     }
                 }
 
@@ -93,12 +104,16 @@ class Port {
                     Blockable::willBlockOn(t);
 
                     if(this->unblockedSignalled) {
-                        this->unblock();
+                        this->blocker->unblock(this->us.lock());
                     }
                 }
 
             private:
-                Port *port = nullptr;
+                rt::WeakPtr<Blocker> us;
+
+                /// port we're gonna signal
+                rt::SharedPtr<Port> port;
+
                 bool unblockedSignalled = false;
                 bool signalled = false;
         };

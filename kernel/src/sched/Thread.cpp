@@ -104,25 +104,32 @@ Thread::~Thread() {
         log("* dealloc thread $%p'h (%lu)", this->handle, this->tid);
     }
 
-    // remove IRQ handlers
-    this->irqHandlers.clear();
-
-    // invoke termination handlers
-    while(!this->terminateSignals.empty()) {
-        auto signal = this->terminateSignals.pop();
-        signal->signal();
-    }
-
-    // remove all objects we're blocking on
-    for(auto &blocker : this->blockingOn) {
-        blocker->reset();
-    }
-
     // invalidate the handle
     handle::Manager::releaseThreadHandle(this->handle);
 
     // release kernel stack
     mem::StackPool::release(this->stack);
+}
+
+/**
+ * The thread is to be terminated, so invoke all termination handles and clean up some state ahead
+ * of the actual object deallocation.
+ */
+void Thread::callTerminators() {
+    RW_LOCK_WRITE_GUARD(this->lock);
+
+    // invoke termination handlers
+    for(const auto &flag : this->terminateSignals) {
+        flag->signal();
+    }
+
+    // remove IRQ handlers
+    this->irqHandlers.clear();
+
+    // remove all objects we're blocking on
+    for(auto &blocker : this->blockingOn) {
+        blocker->reset();
+    }
 }
 
 /**
@@ -513,7 +520,7 @@ void Thread::runDpcs() {
  * @param waitUntil Absolute timepoint until which to wait, 0 to poll, or the maximum value of
  * the type to wait forever.
  *
- * @return 0 if the thread terminated, 1 if the wait timed out, or a negativ error code.
+ * @return 0 if the thread terminated, 1 if the wait timed out, or a negative error code.
  */
 int Thread::waitOn(const uint64_t waitUntil) {
     int err;
@@ -521,7 +528,7 @@ int Thread::waitOn(const uint64_t waitUntil) {
     DECLARE_CRITICAL();
 
     // create the notification flag
-    auto flag = rt::MakeShared<SignalFlag>();
+    auto flag = SignalFlag::make();
     if(!flag) {
         return -1;
     }
@@ -530,7 +537,7 @@ int Thread::waitOn(const uint64_t waitUntil) {
     CRITICAL_ENTER();
     RW_LOCK_WRITE(&this->lock);
 
-    this->terminateSignals.push_back(flag);
+    this->terminateSignals.append(flag);
 
     RW_UNLOCK_WRITE(&this->lock);
     CRITICAL_EXIT();
@@ -538,6 +545,16 @@ int Thread::waitOn(const uint64_t waitUntil) {
     // now, block the caller on this object
     err = sched::Thread::current()->blockOn(flag, waitUntil);
 
+    // remove the termination flag again
+    CRITICAL_ENTER();
+    RW_LOCK_WRITE(&this->lock);
+
+    this->terminateSignals.remove(flag);
+
+    RW_UNLOCK_WRITE(&this->lock);
+    CRITICAL_EXIT();
+
+    // return appropriate code
     if(!err) { // block completed
         return 0;
     } else { // some sort of error
@@ -645,7 +662,7 @@ uintptr_t Thread::blockNotify(const uintptr_t _mask) {
     }
 
     // prepare for blocking
-    auto flag = rt::MakeShared<SignalFlag>();
+    auto flag = SignalFlag::make();
     this->notificationsFlag = flag;
 
     CRITICAL_EXIT();

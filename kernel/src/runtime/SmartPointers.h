@@ -172,7 +172,7 @@ class SharedPtr {
          */
         template<class U, class Deleter,
             std::enable_if_t<std::is_base_of<SharedFromThis<U>, U>::value, bool> = true>
-        SharedPtr(SharedFromThis<U> *_ptr, Deleter d) {
+        SharedPtr(U *_ptr, Deleter d) {
             auto &weak = _ptr->_weakRef;
 
             // if weak reference is valid, copy its info block and get another strong reference

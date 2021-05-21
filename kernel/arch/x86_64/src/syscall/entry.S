@@ -183,7 +183,7 @@ arch_syscall_entry:
 
     // otherwise, bounds check and jump to handler
     cmp         $(arch_syscall_table_end - arch_syscall_table)/8, %rax
-    jg          .invalidSyscall
+    jge         .invalidSyscall
 
     mov         %r10, %rcx // fix the 4th argument
 

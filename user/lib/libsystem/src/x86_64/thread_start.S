@@ -13,6 +13,9 @@ __ThreadTrampoline:
     // then jump to the destination routine
     call        *%rbx
 
+    // exit thread
+    call        Amd64ThreadExit
+
     // we should never get here!
     ud2
 

@@ -78,6 +78,6 @@ LIBSYSTEM_INTERNAL intptr_t __do_syscall5(const uintptr_t arg0, const uintptr_t 
 #define SYS_ARCH_X86_UPDATE_IOPB        (SYS_ARCH + 0x00)
 #define SYS_ARCH_X86_SET_TLS_BASE       (SYS_ARCH + 0x01)
 
-#define SYS_ARCH_AMD64_SET_FGS_BASE     (SYS_ARCH + 0x01)
+#define SYS_ARCH_AMD64_SET_FGS_BASE     (SYS_ARCH + 0x00)
 
 #endif

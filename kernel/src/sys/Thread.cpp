@@ -278,6 +278,11 @@ intptr_t sys::ThreadJoin(const Handle threadHandle, const uintptr_t timeout) {
         return Errors::DeadlockPrevented;
     }
 
+    // has the thread already terminated?
+    if(thread->needsToDie) {
+        return Errors::Success;
+    }
+
     // get the time to wait
     uint64_t nanos = 0;
 

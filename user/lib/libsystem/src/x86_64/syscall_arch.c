@@ -19,3 +19,20 @@ int Amd64SetThreadLocalBaseFor(const uintptr_t threadHandle, const int which, co
     return __do_syscall3(threadHandle, (which == SYS_ARCH_AMD64_TLS_GS) ? true : false, base,
             SYS_ARCH_AMD64_SET_FGS_BASE);
 }
+
+/**
+ * Called when a thread returns; it'll gracefully destroy this one.
+ */
+void Amd64ThreadExit() {
+    int err;
+    uintptr_t handle;
+
+    // get handle
+    err = ThreadGetHandle(&handle);
+    if(err) {
+        asm volatile("ud2" ::: "memory");
+    }
+
+    // then destroy
+    ThreadDestroy(handle);
+}

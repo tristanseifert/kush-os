@@ -161,7 +161,7 @@ int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const ui
         auto thread = sched::Thread::current();
 
         this->receiver = thread;
-        this->receiverBlocker = rt::SharedPtr<Blocker>(new Blocker(this));
+        this->receiverBlocker = Blocker::make(this);
 
         RW_UNLOCK_WRITE(&this->lock);
         CRITICAL_EXIT();

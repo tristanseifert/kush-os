@@ -16,8 +16,8 @@ class Blockable: public rt::SharedFromThis<Blockable> {
     public:
         // this does nothing
         virtual ~Blockable() {
-            REQUIRE(!this->blocker, "cannot deallocate blockable %p while thread %p is waiting",
-                    this, static_cast<void *>(this->blocker));
+            //REQUIRE(!this->blocker, "cannot deallocate blockable %p while thread %p is waiting",
+            //        this, static_cast<void *>(this->blocker));
             this->blocker = nullptr;
         }
 
@@ -56,16 +56,17 @@ class Blockable: public rt::SharedFromThis<Blockable> {
             this->blocker = nullptr;
         }
 
-    protected:
+    private:
         /**
          * Internal method called when the blockable object has signalled and wants to unblock any
          * thread waiting on it.
          */
-        virtual void unblock() {
+        void unblock() {
             REQUIRE(this->blocker, "cannot unblock object without blocker");
             this->blocker->unblock(this->sharedFromThis());
         }
 
+    protected:
         /// thread currently blocking on us, if any
         rt::SharedPtr<Thread> blocker = nullptr;
 };

@@ -41,6 +41,7 @@ struct BlockWait;
 struct Thread: public rt::SharedFromThis<Thread> {
     friend class Scheduler;
     friend class Blockable;
+    friend class IdleWorker;
     friend struct BlockWait;
 
     /// Length of thread names
@@ -172,7 +173,7 @@ struct Thread: public rt::SharedFromThis<Thread> {
         DECLARE_RWLOCK(lock);
 
         /// notification flags to signal when terminating
-        rt::Queue<rt::SharedPtr<SignalFlag>> terminateSignals;
+        rt::List<rt::SharedPtr<SignalFlag>> terminateSignals;
 
         /// DPCs queued for the thread
         rt::Queue<DpcInfo> dpcs;
@@ -279,6 +280,8 @@ struct Thread: public rt::SharedFromThis<Thread> {
 
         /// Called on context switch out to complete termination.
         void deferredTerminate();
+        /// Invoke all termination handlers
+        void callTerminators();
 
         /// any pending blocks should be cancelled
         void blockExpired();

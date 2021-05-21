@@ -227,6 +227,23 @@ class List {
             return _removeMatching(callback, ctx);
         }
 
+        /**
+         * Removes the given item.
+         */
+        void remove(const T &item) {
+            struct Info {
+                const T &item;
+                Info(const T& ref) : item(ref) {}
+            };
+
+            Info i(item);
+
+            this->removeMatching([](void *ctx, T &item) -> bool {
+                auto info = reinterpret_cast<Info *>(ctx);
+                return (item == info->item);
+            }, &i);
+        }
+
         /// Gets a reference to the given item
         const T& operator[](const size_t index) const {
             REQUIRE(index < this->numElements, "list access out of bounds: %zu (%zu %p %p)",

@@ -43,12 +43,12 @@ class TimerBlocker: public Blockable {
             TimerBlocker *blocker;
         };
 
-    public:
         /**
          * Creates a new timer blocker, with the given number of nanoseconds set in the future.
          */
         TimerBlocker(const uint64_t nanos) : interval(nanos) {}
 
+    public:
         /**
          * Ensures the timer is deallocated if it hasn't fired.
          */

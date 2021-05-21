@@ -6,7 +6,7 @@ SECTIONS {
     . = 0x08000000;
 
     /* code (immutable) section */
-    .text ALIGN(4K) : {
+    .text : {
         *(.text)
         *(.text*)
     }
@@ -53,8 +53,22 @@ SECTIONS {
         *(.bss*)
         *(COMMON)
     }
-
     __bss_size = SIZEOF(.bss);
     __bss_size_dwords = SIZEOF(.bss)/4;
+
+    /* thread local */
+    .tdata : {
+        __tls_data_start = .;
+        *(.tdata);
+        *(.tdata*);
+    }
+    .tbss : {
+        *(.tbss);
+        *(.tbss*);
+    }
+
+    __tls_size = SIZEOF(.tdata) + SIZEOF(.tbss);
+    __tls_data_size = SIZEOF(.tdata);
+    __tls_bss_size = SIZEOF(.tbss);
 }
 

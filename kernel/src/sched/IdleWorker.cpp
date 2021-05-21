@@ -82,9 +82,11 @@ void IdleWorker::DeleteThreadItem::operator()() {
         this->thread->task->detachThread(this->thread);
     }
 
+    this->thread->callTerminators();
+
     // it will automatically be freed as the last ref is dropped
     if(gLog) {
-        log("deleting thread %p", static_cast<void *>(this->thread));
+        log("deleting thread %p (%lu)", static_cast<void *>(this->thread), this->thread.getStrongRefs());
     }
 }
 

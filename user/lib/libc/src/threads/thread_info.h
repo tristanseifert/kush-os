@@ -1,6 +1,7 @@
 #ifndef LIBC_THREAD_THREAD_INFO_H
 #define LIBC_THREAD_THREAD_INFO_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -34,9 +35,17 @@ typedef struct uthread {
     uintptr_t handle;
 
     /// when set, the thread is detached
-    uintptr_t detached;
+    bool detached;
     /// when set, thread is executing
-    uintptr_t isRunning;
+    bool isRunning;
+    /**
+     * When set, the thread has been launched and the info block can be considered valid, but it
+     * has not yet started executing.
+     *
+     * This allows us to detect that the thread hasn't gotten its first CPU cycles yet, so we do
+     * not assume it's already exited then.
+     */
+    bool isLaunching;
 
     /// number of threads joined; all but the first must take an extra ref
     size_t numJoining;
@@ -48,6 +57,24 @@ typedef struct uthread {
 
     /// return value of the user function that was invoked; provided via thrd_join()
     int exitCode;
+
+    /// info for thread-local storage
+    union {
+        /// static thread local info
+        struct {
+            /// Base of this thread's TLS allocation
+            void *base;
+            /// total size of the TLS allocation
+            size_t length;
+            /// how much of the allocated region is for thread-locals?
+            size_t tlsRegionLength;
+        } s;
+
+        /// dynamic thread local info
+        struct {
+
+        } d;
+    } tls;
 
     /// auxiliary thread information that needs to be released when we're going away
     void *auxInfo;

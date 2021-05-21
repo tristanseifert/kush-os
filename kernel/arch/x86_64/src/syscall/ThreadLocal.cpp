@@ -14,6 +14,9 @@
 using namespace sys;
 using namespace arch;
 
+/// are thread local updates logged?
+static bool gLogTls = false;
+
 /**
  * Updates the thread-local base (the base of the %fs/%gs segment) for the current thread.
  *
@@ -39,6 +42,9 @@ intptr_t syscall::UpdateThreadTlsBase(const uintptr_t threadHandle, const bool g
     }
 
     // validate base address (TODO: implement?)
+    if(gLogTls) {
+        log("Setting thread $%p'h %s base to %p", thread->handle, gs ? "gs" : "fs", base);
+    }
 
     // take the thread's lock and update the gs value
     RW_LOCK_WRITE_GUARD(thread->lock);
@@ -54,7 +60,14 @@ intptr_t syscall::UpdateThreadTlsBase(const uintptr_t threadHandle, const bool g
      * Reload the %fs and %gs base addresses for the thread if this is the current thread.
      */
     if(thread == sched::Thread::current()) {
-        // TODO: implement lmfao
+        // we can reload %fs immediately as the kernel doesn't use it
+        if(!gs) {
+            x86_msr_write(X86_MSR_FSBASE, (base), (base) >> 32ULL);
+        }
+        // but %gs we just haven't implemented yet
+        else {
+            panic("cannot auto-reload %%gs yet!");
+        }
     }
 
     return Errors::Success;
