@@ -1,5 +1,5 @@
-#ifndef TASK_LOADER_ELF32_H
-#define TASK_LOADER_ELF32_H
+#ifndef TASK_LOADER_ELF64_H
+#define TASK_LOADER_ELF64_H
 
 #include "Loader.h"
 #include "ElfCommon.h"
@@ -11,21 +11,21 @@
 #include <sys/elf.h>
 
 namespace task::loader {
-class Elf32: public ElfCommon {
+class Elf64: public ElfCommon {
     public:
         /// Default stack address
         constexpr static const uintptr_t kDefaultStackAddr = 0x01000000;
         /// Default stack size (bytes)
-        constexpr static const uintptr_t kDefaultStackSz = 0x20000;
+        constexpr static const uintptr_t kDefaultStackSz = 0x40000;
 
     public:
-        Elf32(FILE *file);
+        Elf64(FILE *file);
 
         void mapInto(const std::shared_ptr<Task> &task) override;
 
         virtual std::string_view getLoaderId() const override {
             using namespace std::literals;
-            return "me.blraaz.exec.loader.elf32"sv;
+            return "me.blraaz.exec.loader.elf64"sv;
         }
 
     protected:
@@ -37,12 +37,11 @@ class Elf32: public ElfCommon {
         }
 
     private:
-        void processProgHdr(const std::shared_ptr<Task> &, const Elf32_Phdr &);
+        void processProgHdr(const std::shared_ptr<Task> &, const Elf64_Phdr &);
 
-        void phdrLoad(const std::shared_ptr<Task> &, const Elf32_Phdr &);
-        void phdrGnuStack(const std::shared_ptr<Task> &, const Elf32_Phdr &);
-        void phdrInterp(const std::shared_ptr<Task> &, const Elf32_Phdr &);
+        void phdrLoad(const std::shared_ptr<Task> &, const Elf64_Phdr &);
+        void phdrGnuStack(const std::shared_ptr<Task> &, const Elf64_Phdr &);
+        void phdrInterp(const std::shared_ptr<Task> &, const Elf64_Phdr &);
 };
 }
-
 #endif

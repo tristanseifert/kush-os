@@ -2,6 +2,7 @@
  * Thread-local implementation for statically linked executables
  */
 #include "tls.h"
+#include "tss_private.h"
 #include "thread_info.h"
 
 #include <threads.h>
@@ -81,6 +82,9 @@ LIBC_INTERNAL void __libc_tls_init() {
     // store base ptr thread info block
     uthread_t *thrd = thrd_current();
     thrd->tls.s.base = base;
+
+    // set up the C11 thread specific storage
+    __libc_tss_thread_init();
 }
 
 /**

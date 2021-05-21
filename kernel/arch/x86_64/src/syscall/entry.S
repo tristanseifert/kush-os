@@ -82,7 +82,7 @@ arch_syscall_table:
     // 0x15: Map VM region (basic)
     .quad       _ZN3sys11VmRegionMapE6HandleS0_mmNS_7VmFlagsE
     // 0x16: Map VM region (advanced)
-    .quad       _ZN3sys7Syscall20UnimplementedSyscallEv
+    .quad       _ZN3sys13VmRegionMapExE6HandleS0_PNS_12VmMapRequestEm
     // 0x17: Unmaps VM region
     .quad       _ZN3sys13VmRegionUnmapE6HandleS0_
     // 0x18: Get VM region info

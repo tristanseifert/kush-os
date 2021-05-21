@@ -21,9 +21,10 @@ uint32_t Task::nextPid = 0;
  */
 rt::SharedPtr<Task> Task::alloc(rt::SharedPtr<vm::Map> map, const bool writeVm) {
     auto task = new Task(map, writeVm);
+    if(!task) return nullptr;
 
     // create ptr and allocate handle
-    auto ptr = rt::SharedPtr<Task>(task);
+    rt::SharedPtr<Task> ptr(task);
     task->handle = handle::Manager::makeTaskHandle(ptr);
 
     return ptr;

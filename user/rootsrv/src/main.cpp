@@ -62,6 +62,7 @@ int main(int argc, const char **argv) {
     task::RpcHandler::init();
 
     // load bundle and the associated servers
+    fprintf(stderr, "starting bundle init\n");
     BundleInit();
 
     // wait for quit notification

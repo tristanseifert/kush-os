@@ -191,10 +191,8 @@ void Scheduler::scheduleRunnable(rt::SharedPtr<Task> &task) {
         this->markThreadAsRunnable(thread, false);
     }
 
-    if(!task->registered) {
-        bool yes = true;
-        __atomic_store(&task->registered, &yes, __ATOMIC_RELEASE);
-
+    // register the task with the global state if needed
+    if(!__atomic_test_and_set(&task->registered, __ATOMIC_RELAXED)) {
         GlobalState::the()->registerTask(task);
     }
 }

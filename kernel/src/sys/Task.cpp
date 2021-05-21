@@ -65,6 +65,13 @@ intptr_t sys::TaskCreate(const Handle parentTaskHandle) {
         return Errors::NoMemory;
     }
 
+    /*
+     * We need to register the task with the scheduler so it gets stored into the global task
+     * list, so a strong reference to the task remain after this call returns. Otherwise, it will
+     * be deallocated since the handle manager only holds a weak ref.
+     */
+    sched::Scheduler::get()->scheduleRunnable(task);
+
     // return task handle
     return static_cast<intptr_t>(task->handle);
 }
@@ -159,16 +166,17 @@ intptr_t sys::TaskInitialize(const Handle taskHandle, const uintptr_t userPc,
  * @return A negative error code or 0 if success
  */
 intptr_t sys::TaskSetName(const Handle taskHandle, const char *namePtr, const size_t nameLen) {
-    rt::SharedPtr<sched::Task> task = nullptr;
+    rt::SharedPtr<sched::Task> task;
 
     // get the task
     if(!taskHandle) {
         task = sched::Task::current();
     } else {
         task = handle::Manager::getTask(taskHandle);
-        if(!task) {
-            return Errors::InvalidHandle;
-        }
+    }
+
+    if(!task) {
+        return Errors::InvalidHandle;
     }
 
     // validate the user pointer
@@ -208,7 +216,7 @@ intptr_t sys::TaskDbgOut(const char *msgPtr, const size_t msgLen) {
     // print it
     DECLARE_CRITICAL();
     CRITICAL_ENTER();
-    log("%15s) %s", sched::Thread::current()->name, message);
+    log("%4lu %4lu) %s", sched::Task::current()->pid, sched::Thread::current()->tid, message);
     CRITICAL_EXIT();
 
     return Errors::Success;

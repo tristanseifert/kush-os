@@ -216,7 +216,7 @@ class Manager {
             uintptr_t epoch = 0;
 
             HandleInfo() = default;
-            HandleInfo(rt::SharedPtr<T> _object) : object(rt::WeakPtr<T>(_object)) {};
+            HandleInfo(const rt::SharedPtr<T> &_object) : object(rt::WeakPtr<T>(_object)) {};
         };
 
     private:
@@ -293,6 +293,9 @@ class Manager {
             for(size_t i = 0; i < handles.size(); i++) {
                 auto &slot = handles[i];
                 if(slot.object && !slot.object.expired()) continue;
+
+                // we don't know when the object expired so increment epoch to be safe
+                if(slot.object.expired()) slot.epoch++;
 
                 slot.object = object;
                 return makeHandle(type, i, slot.epoch);

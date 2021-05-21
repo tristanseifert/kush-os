@@ -1,4 +1,4 @@
-#include "Elf32.h"
+#include "Elf64.h"
 #include "../Task.h"
 #include "StringHelpers.h"
 
@@ -14,15 +14,15 @@
 using namespace task::loader;
 
 /**
- * Initializes a 32-bit ELF loader.
+ * Initializes a 64-bit ELF loader.
  *
  * This performs some validation of the header of the ELF.
  *
  * @throws An exception is thrown if the ELF header is invalid.
  */
-Elf32::Elf32(FILE *file) : ElfCommon(file) {
+Elf64::Elf64(FILE *file) : ElfCommon(file) {
     // get the header
-    Elf32_Ehdr hdr;
+    Elf64_Ehdr hdr;
     memset(&hdr, 0, sizeof hdr);
 
     this->read(sizeof hdr, &hdr, 0);
@@ -50,19 +50,21 @@ Elf32::Elf32(FILE *file) : ElfCommon(file) {
     }
 
     // ensure CPU architecture
-#if defined(__i386__) || defined(__amd64__)
-    if(hdr.e_machine != EM_386) {
+#if defined(__i386__)
+    throw LoaderError("64 bit ELF not supported on 32 bit x86");
+#elif defined(__amd64__)
+    if(hdr.e_machine != EM_X86_64) {
         throw LoaderError(fmt::format("Invalid ELF machine type {:08x}", hdr.e_type));
     }
 #else
-#error Update Elf32 to handle the current arch
+#error Update Elf64 to handle the current arch
 #endif
 
     // ensure the program header and section header sizes make sense
-    if(hdr.e_shentsize != sizeof(Elf32_Shdr)) {
+    if(hdr.e_shentsize != sizeof(Elf64_Shdr)) {
         throw LoaderError(fmt::format("Invalid section header size {}", hdr.e_shentsize));
     }
-    else if(hdr.e_phentsize != sizeof(Elf32_Phdr)) {
+    else if(hdr.e_phentsize != sizeof(Elf64_Phdr)) {
         throw LoaderError(fmt::format("Invalid program header size {}", hdr.e_phentsize));
     }
 
@@ -76,12 +78,12 @@ Elf32::Elf32(FILE *file) : ElfCommon(file) {
 /**
  * Maps all sections defined by the program headers into the task.
  */
-void Elf32::mapInto(const std::shared_ptr<Task> &task) {
+void Elf64::mapInto(const std::shared_ptr<Task> &task) {
     // read program headers 
-    std::vector<Elf32_Phdr> phdrs;
+    std::vector<Elf64_Phdr> phdrs;
     phdrs.resize(this->numPhdr);
 
-    this->read((this->numPhdr * sizeof(Elf32_Phdr)), phdrs.data(), this->phdrOff);
+    this->read((this->numPhdr * sizeof(Elf64_Phdr)), phdrs.data(), this->phdrOff);
 
     // process each program header
     for(const auto &phdr : phdrs) {
@@ -92,7 +94,7 @@ void Elf32::mapInto(const std::shared_ptr<Task> &task) {
 /**
  * Processes a loaded program header.
  */
-void Elf32::processProgHdr(const std::shared_ptr<Task> &task, const Elf32_Phdr &phdr) {
+void Elf64::processProgHdr(const std::shared_ptr<Task> &task, const Elf64_Phdr &phdr) {
     switch(phdr.p_type) {
         // load from file
         case PT_LOAD:
@@ -116,8 +118,8 @@ void Elf32::processProgHdr(const std::shared_ptr<Task> &task, const Elf32_Phdr &
 
         // unhandled program header type
         default:
-            LOG("Unhandled phdr type %u offset %p vaddr $%p filesz %u memsz %u"
-                " flags $%08x align %u", phdr.p_type, phdr.p_offset, phdr.p_vaddr, phdr.p_filesz,
+            LOG("Unhandled phdr type %lu offset %p vaddr $%p filesz %lu memsz %lu"
+                " flags $%08x align %lu", phdr.p_type, phdr.p_offset, phdr.p_vaddr, phdr.p_filesz,
                 phdr.p_memsz, phdr.p_flags, phdr.p_align);
             break;
     }
@@ -129,7 +131,7 @@ void Elf32::processProgHdr(const std::shared_ptr<Task> &task, const Elf32_Phdr &
  * This will allocate an anonymous memory region, and copy from the file buffer. It will be mapped
  * in virtual address space at the location specified.
  */
-void Elf32::phdrLoad(const std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
+void Elf64::phdrLoad(const std::shared_ptr<Task> &task, const Elf64_Phdr &hdr) {
     int err;
     uintptr_t vmHandle, taskHandle, regionBase;
     void *vmBase;
@@ -147,8 +149,6 @@ void Elf32::phdrLoad(const std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
         allocSize = ((allocSize + pageSz - 1) / pageSz) * pageSz;
     }
 
-    // LOG("Alloc size %08x (orig %08x)", allocSize, hdr.p_memsz);
-
     // allocate an anonymous region (RW for now) and get its base address in our vm map
     err = AllocVirtualAnonRegion(allocSize, VM_REGION_RW, &vmHandle);
     if(err) {
@@ -163,7 +163,6 @@ void Elf32::phdrLoad(const std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
 
     // set up to write to it
     vmBase = reinterpret_cast<void *>(regionBase + inPageOff);
-    // LOG("Handle $%08x'h (base %p)", vmHandle, vmBase);
 
     // get the corresponding file region and copy it
     if(hdr.p_filesz) {
@@ -218,7 +217,7 @@ void Elf32::phdrLoad(const std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
  *
  * This just asserts that the flag is only RW; we do not support executable stack segments.
  */
-void Elf32::phdrGnuStack(const std::shared_ptr<Task> &, const Elf32_Phdr &hdr) {
+void Elf64::phdrGnuStack(const std::shared_ptr<Task> &, const Elf64_Phdr &hdr) {
     const auto flags = hdr.p_flags & ~(PF_MASKOS | PF_MASKPROC);
     if(flags & PF_X) {
         throw LoaderError(fmt::format("Unsupported stack flags {:08x}", hdr.p_flags));
@@ -233,7 +232,7 @@ void Elf32::phdrGnuStack(const std::shared_ptr<Task> &, const Elf32_Phdr &hdr) {
  * Per the ELF specification, the string always has a NULL terminator byte. SInce we're going to
  * store this as a C++ string, we chop that off.
  */
-void Elf32::phdrInterp(const std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
+void Elf64::phdrInterp(const std::shared_ptr<Task> &task, const Elf64_Phdr &hdr) {
     std::string path;
 
     // read zero terminated string

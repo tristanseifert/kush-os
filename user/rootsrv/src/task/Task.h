@@ -24,7 +24,7 @@ class DyldoPipe;
  * created by directly calling the syscall aren't represented by one of these, but we're really
  * the only task that should create other tasks.
  */
-class Task {
+class Task: public std::enable_shared_from_this<Task> {
     public:
         using Buffer = std::span<std::byte>;
 

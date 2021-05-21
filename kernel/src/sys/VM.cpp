@@ -387,7 +387,7 @@ intptr_t sys::VmRegionMap(const Handle vmHandle, const Handle taskHandle, const 
  *
  * @return 0 on success, or negative error code
  */
-intptr_t VmRegionMapEx(const Handle vmHandle, const Handle taskHandle, VmMapRequest *inReq,
+intptr_t sys::VmRegionMapEx(const Handle vmHandle, const Handle taskHandle, VmMapRequest *inReq,
         const size_t inReqLen) {
     rt::SharedPtr<sched::Task> task;
     const auto pageSz = arch_page_size();

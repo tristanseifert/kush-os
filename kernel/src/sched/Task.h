@@ -91,12 +91,14 @@ struct Task: public rt::SharedFromThis<Task> {
         /// architecture-specific task state
         arch::TaskState archState __attribute__((aligned(16)));
 
+    private:
+        Task(rt::SharedPtr<vm::Map> &map, const bool writeVm);
+
     public:
         /// Allocates a new task from the task struct pool
         static rt::SharedPtr<Task> alloc(rt::SharedPtr<vm::Map> map = rt::SharedPtr<vm::Map>(),
                 const bool writeVm = true);
 
-        Task(rt::SharedPtr<vm::Map> &map, const bool writeVm);
         ~Task();
 
         /// Adds the given VM map object to the list
