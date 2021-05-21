@@ -158,6 +158,7 @@ class List {
          */
         void clear() {
             auto ptr = this->head;
+            this->head = nullptr;
 
             while(ptr) {
                 auto old = ptr;
@@ -166,8 +167,11 @@ class List {
                 ptr = ptr->next;
 
                 // delete this element
+                this->numElements--;
                 delete old;
             }
+
+            this->tail = nullptr;
         }
 
         /**

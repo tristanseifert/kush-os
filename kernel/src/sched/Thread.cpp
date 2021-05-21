@@ -23,6 +23,30 @@ uintptr_t Thread::nextTid = 1;
 
 bool Thread::gLogLifecycle = false;
 
+
+
+
+/**
+ * Scheduler deadline object that will cancel any pending blocks on the thread when it expires,
+ * allowing for blocks to time out.
+ */
+struct sched::BlockWait: public Deadline {
+    BlockWait(const uint64_t _when, const rt::SharedPtr<Thread> &_thread) : Deadline(_when),
+    thread(_thread) {}
+
+    /**
+     * On expiration, call back into the blocker object
+     */
+    void operator()() override {
+        this->thread->blockExpired();
+    }
+
+    /// thread whose blocks time out
+    rt::SharedPtr<Thread> thread;
+};
+
+
+
 /**
  * Allocates a new thread.
  */
@@ -90,8 +114,8 @@ Thread::~Thread() {
     }
 
     // remove all objects we're blocking on
-    if(this->blockingOn) {
-        this->blockingOn->reset();
+    for(auto &blocker : this->blockingOn) {
+        blocker->reset();
     }
 
     // invalidate the handle
@@ -206,29 +230,32 @@ void Thread::die() {
 void Thread::terminate(bool release) {
     DECLARE_CRITICAL();
 
+    bool no = false, yes = true;
+
+    // bail if we're already setting the needs2die flag
+    if(!__atomic_compare_exchange(&this->needsToDie, &no, &yes, false, __ATOMIC_RELEASE,
+                __ATOMIC_RELEASE)) {
+        return;
+    }
+
     // update state
     CRITICAL_ENTER();
 
+    // if not running, set to zombie state
     bool isRunning;
     __atomic_load(&this->isActive, &isRunning, __ATOMIC_ACQUIRE);
 
     if(!isRunning) {
         this->setState(State::Zombie);
-    } else {
-        bool yes = true;
-        __atomic_store(&this->needsToDie, &yes, __ATOMIC_RELEASE);
     }
 
     CRITICAL_EXIT();
-
-    // TODO: ensure it's removed from run queues
-    // Scheduler::get()->removeThreadFromRunQueue(this);
 
     // if running, context switch away
     if(isRunning) {
         yield();
     } 
-    // delete it right away since the thread isn't running
+    // not running so we can enqueue deletion right away
     else {
         if(release) Scheduler::get()->idle->queueDestroyThread(this->sharedFromThis());
     }
@@ -276,14 +303,19 @@ void Thread::sleep(const uint64_t nanos) {
  * Note that we raise the IRQL, but do not ever lower it; this is because when we get switched back
  * in, the IRQL will be lowered again to the Passive level, i.e. what most threads that are running
  * will be using.
- *
- * TODO: Handle the timeouts
  */
 int Thread::blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until) {
+    rt::SharedPtr<BlockWait> deadline;
+
     DECLARE_CRITICAL();
 
     REQUIRE(b, "invalid blockable %p", static_cast<void *>(b));
     REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
+
+    // create the timeout blockable
+    if(until) {
+        deadline = rt::SharedPtr<BlockWait>(new BlockWait(until, this->sharedFromThis()));
+    }
 
     // raise IRQL to scheduler level (to prevent being preempted)
     // XXX: change this?
@@ -295,14 +327,20 @@ int Thread::blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until) {
 
     REQUIRE(this->state == State::Runnable, "Cannot %s thread %p with state: %d (blockable %p)",
             "block", this, (int) this->state, static_cast<void *>(b));
-    REQUIRE(!this->blockingOn, "cannot block thread %p (object %p) while already blocking (%p)",
-            this, static_cast<void *>(b), static_cast<void *>(this->blockingOn));
+    REQUIRE(this->blockingOn.empty(), "cannot block thread %p (object %p) while already blocking on %lu objects",
+            this, static_cast<void *>(b), this->blockingOn.size());
 
-    this->blockingOn = b;
+    this->blockingOn.append(b);
+
+    this->blockState = BlockState::Blocking;
     this->setState(State::Blocked);
 
     // prepare the blockables
     b->willBlockOn(this->sharedFromThis());
+
+    if(deadline){
+        Scheduler::get()->addDeadline(deadline);
+    }
 
     RW_UNLOCK_WRITE(&this->lock);
     CRITICAL_EXIT();
@@ -310,12 +348,25 @@ int Thread::blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until) {
     // yield the rest of the CPU time
     Scheduler::get()->yield();
 
+    // remove deadline if it was allocated
+    if(deadline) {
+        Scheduler::get()->removeDeadline(deadline);
+    }
+
     // get state from the blockable
     bool signaled = b->isSignalled();
     b->reset();
 
+    // clear the list of blocking objects
+    this->blockingOn.clear();
+
     // return whether the thread woke correctly or nah
-    return (signaled ? 0 : -1);
+    const auto state = this->blockState;
+    this->blockState = BlockState::None;
+
+    // 1 = timeout, 0 = success, -1 = error
+    if(state == BlockState::Timeout) return 1;
+    else return (signaled ? 0 : -1);
 }
 
 /**
@@ -326,24 +377,61 @@ void Thread::unblock(const rt::SharedPtr<Blockable> &b) {
     REQUIRE(this->state == State::Blocked, "Cannot %s thread %p with state: %d (blockable %p)",
             "unblock", this, (int) this->state, static_cast<void *>(b));
 
+    // create info for removing the blockable
+    struct RemoveInfo {
+        rt::SharedPtr<Blockable> ptr;
+        size_t numRemoved = 0;
+
+        RemoveInfo(const rt::SharedPtr<Blockable> &_ptr) : ptr(_ptr) {}
+    };
+    RemoveInfo info(b);
+
     DECLARE_CRITICAL();
     CRITICAL_ENTER();
 
-    // clear the blockable list
+    // clear item from the blockable list
     RW_LOCK_WRITE(&this->lock);
-    REQUIRE(b == this->blockingOn, "thread not blocking on %p! (is %p)", static_cast<void *>(b), 
-            static_cast<void *>(this->blockingOn));
 
-    // finish setting state
-    this->blockingOn->didUnblock();
-    this->blockingOn = nullptr;
+    this->blockingOn.removeMatching([](void *ctx, rt::SharedPtr<Blockable> &blocker) -> bool {
+        auto info = reinterpret_cast<RemoveInfo *>(ctx);
 
+        if(blocker == info->ptr) {
+            info->numRemoved++;
+            return true;
+        }
+        return false;
+    }, &info);
+    REQUIRE(info.numRemoved, "failed to unblock thread %p on %p", this,
+            static_cast<void *>(b));
+
+    // invoke callback and update thread state
+    b->didUnblock();
+
+    this->blockState = BlockState::Unblocked;
     this->setState(State::Runnable);
 
     RW_UNLOCK_WRITE(&this->lock);
     CRITICAL_EXIT();
 
     // enqueue in scheduler
+    Scheduler::get()->markThreadAsRunnable(this->sharedFromThis(), true);
+}
+
+/**
+ * Cancels any pending blocks.
+ */
+void Thread::blockExpired() {
+    DECLARE_CRITICAL();
+
+    // update thread state
+    CRITICAL_ENTER();
+
+    this->blockState = BlockState::Timeout;
+    this->setState(State::Runnable, false);
+
+    CRITICAL_EXIT();
+
+    // re-enqueue into scheduler
     Scheduler::get()->markThreadAsRunnable(this->sharedFromThis(), true);
 }
 

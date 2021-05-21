@@ -240,7 +240,7 @@ void Scheduler::yield(const Thread::State state) {
     auto runnable = this->findRunnableThread();
 
     // place this back on the run queue (if still runnable)
-    if(this->running->state == Thread::State::Runnable) {
+    if(this->running->state == Thread::State::Runnable && !this->running->needsToDie) {
         const auto levelNum = this->getLevelFor(this->running);
         auto &level = this->levels[levelNum];
 
@@ -304,6 +304,16 @@ again:;
                 }
                 goto again;
             }
+            /**
+             * If the thread was supposed to previously terminate, but it's still in the run queue,
+             * make sure that the deferred handlers are invoked and we pick another thread to
+             * execute instead.
+             */
+            else if(thread->needsToDie) {
+                thread->deferredTerminate();
+                goto again;
+            }
+
             REQUIRE(thread->state == Thread::State::Runnable,
                     "invalid thread state in run queue %lu: %d", i, static_cast<int>(thread->state));
 
@@ -461,7 +471,6 @@ void Scheduler::updateTimer() {
         this->timerReason = TimerReason::QuantumExpired;
         platform::SetLocalTimer(quantumRemaining);
     }
-
 }
 
 /**
@@ -640,7 +649,9 @@ void Scheduler::willSwitchFrom(const rt::SharedPtr<Thread> &from) {
 
     this->updateQuantumUsed(from);
 
-    log("executed '%s' for %lu/%lu nsec", from->name, sched.quantumUsed, sched.quantumTotal);
+    if(kLogQuantum) {
+        log("executed '%s' for %lu/%lu nsec", from->name, sched.quantumUsed, sched.quantumTotal);
+    }
 }
 
 /**
@@ -673,21 +684,38 @@ void Scheduler::willSwitchTo(const rt::SharedPtr<Thread> &to) {
  * Adds a new deadline for the scheduler to consider.
  */
 void Scheduler::addDeadline(const rt::SharedPtr<Deadline> &deadline) {
+    DECLARE_CRITICAL();
+
     DeadlineWrapper wrap(deadline);
 
-    RW_LOCK_WRITE_GUARD(this->deadlinesLock);
-    this->deadlines.insert(wrap);
+    if(kLogDeadlines) {
+        log("adding deadline: %p (%lu %lu) %p", static_cast<void *>(deadline),
+                deadline->expires, wrap.expires(), &deadline->expires);
+    }
+
+    CRITICAL_ENTER();
+    {
+        RW_LOCK_WRITE_GUARD(this->deadlinesLock);
+        this->deadlines.insert(wrap);
+    }
+    CRITICAL_EXIT();
 }
 
 /**
  * Removes an existing deadline, if it has not yet expired.
+ *
+ * @return Whether the given deadline was found and removed
  */
-void Scheduler::removeDeadline(const rt::SharedPtr<Deadline> &deadline) {
-    log("removing deadline: %p", static_cast<void *>(deadline));
+bool Scheduler::removeDeadline(const rt::SharedPtr<Deadline> &deadline) {
+    DECLARE_CRITICAL();
+    if(kLogDeadlines) {
+        log("removing deadline: %p", static_cast<void *>(deadline));
+    }
 
     // prepare info for removal
     struct RemoveInfo {
         rt::SharedPtr<Deadline> deadline;
+        size_t numRemoved = 0;
 
         RemoveInfo(const rt::SharedPtr<Deadline> &_deadline) : deadline(_deadline) {}
     };
@@ -695,19 +723,26 @@ void Scheduler::removeDeadline(const rt::SharedPtr<Deadline> &deadline) {
     RemoveInfo info(deadline);
 
     // enumerate over all the objects
-    RW_LOCK_WRITE_GUARD(this->deadlinesLock);
+    CRITICAL_ENTER();
+    {
+        RW_LOCK_WRITE_GUARD(this->deadlinesLock);
 
-    this->deadlines.enumerateObjects([](DeadlineWrapper &wrap, bool *remove, void *ctx) -> bool {
-        auto info = reinterpret_cast<RemoveInfo *>(ctx);
+        this->deadlines.enumerateObjects([](DeadlineWrapper &wrap, bool *remove, void *ctx) -> bool {
+            auto info = reinterpret_cast<RemoveInfo *>(ctx);
 
-        // we've found the deadline object to remove
-        if(wrap == info->deadline) {
-            *remove = true;
-            return false;
-        }
-        // continue iterating
-        return true;
-    }, &info);
+            // we've found the deadline object to remove
+            if(wrap == info->deadline) {
+                info->numRemoved++;
+                *remove = true;
+                return false;
+            }
+            // continue iterating
+            return true;
+        }, &info);
+    }
+    CRITICAL_EXIT();
+
+    return (info.numRemoved != 0);
 }
 
 

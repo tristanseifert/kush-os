@@ -112,7 +112,7 @@ class Scheduler {
         /// Adds a deadline to the scheduler
         void addDeadline(const rt::SharedPtr<Deadline> &deadline);
         /// Removes an existing deadline, if it hasn't expired yet
-        void removeDeadline(const rt::SharedPtr<Deadline> &deadline);
+        bool removeDeadline(const rt::SharedPtr<Deadline> &deadline);
 
     private:
         static void Init();
@@ -272,7 +272,11 @@ class Scheduler {
 
     private:
         /// whether pops/pushes to queue are logged
-        constexpr static const bool kLogQueueOps = true;
+        constexpr static const bool kLogQueueOps = false;
+        /// whether time quantum updates are logged
+        constexpr static const bool kLogQuantum = false;
+        /// whether deadline operations are logged
+        constexpr static const bool kLogDeadlines = true;
 
         /// all schedulers on the system. used for work stealing
         static rt::Vector<InstanceInfo> *gSchedulers;

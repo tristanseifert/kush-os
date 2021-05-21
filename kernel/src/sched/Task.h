@@ -28,7 +28,7 @@ struct Thread;
 /**
  * Tasks are the basic 
  */
-struct Task {
+struct Task: public rt::SharedFromThis<Task> {
     friend class Scheduler;
 
     /// Length of process names

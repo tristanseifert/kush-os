@@ -66,6 +66,8 @@ class IdleWorker {
 
             /// thread to be destroyed
             rt::SharedPtr<Thread> thread;
+            /// whether thread deletion is logged
+            static const bool gLog = true;
         };
         /// Work item for deleting a task
         struct DeleteTaskItem: public WorkItem {
@@ -76,6 +78,8 @@ class IdleWorker {
 
             /// thread to be destroyed
             rt::SharedPtr<Task> task;
+            /// whether task deletion is logged
+            static const bool gLog = true;
         };
 
     public:

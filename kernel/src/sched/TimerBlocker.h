@@ -95,8 +95,6 @@ class TimerBlocker: public Blockable {
             bool no = false, yes = true;
             if(__atomic_compare_exchange(&this->hasFired, &no, &yes, false, __ATOMIC_RELEASE,
                         __ATOMIC_RELAXED)) {
-                log("unblocking %p", static_cast<void *>(this->blocker));
-
                 // unblock the task
                 this->blocker->unblock(this->us.lock());
             }

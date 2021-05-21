@@ -83,10 +83,16 @@ void IdleWorker::DeleteThreadItem::operator()() {
     }
 
     // it will automatically be freed as the last ref is dropped
+    if(gLog) {
+        log("deleting thread %p", static_cast<void *>(this->thread));
+    }
 }
 
 /**
  * Deallocates a task.
  */
 void IdleWorker::DeleteTaskItem::operator()() {
+    if(gLog) {
+        log("deleting task %p", static_cast<void *>(this->task));
+    }
 }

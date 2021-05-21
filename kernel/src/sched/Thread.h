@@ -23,6 +23,7 @@ namespace sched {
 class Blockable;
 class SignalFlag;
 struct Task;
+struct BlockWait;
 
 /**
  * Threads are the smallest units of execution in the kernel. They are the unit of work that the
@@ -40,6 +41,7 @@ struct Task;
 struct Thread: public rt::SharedFromThis<Thread> {
     friend class Scheduler;
     friend class Blockable;
+    friend struct BlockWait;
 
     /// Length of thread names
     constexpr static const size_t kNameLength = 32;
@@ -49,6 +51,16 @@ struct Thread: public rt::SharedFromThis<Thread> {
         struct DpcInfo {
             void (*handler)(Thread *, void *);
             void *context = nullptr;
+        };
+        /// why a block returned
+        enum class BlockState {
+            None,
+            /// Currently blocking
+            Blocking,
+            /// The blocking condition(s) were signalled
+            Unblocked,
+            /// The block was timed, and the timeout has expired
+            Timeout,
         };
 
     public:
@@ -148,7 +160,7 @@ struct Thread: public rt::SharedFromThis<Thread> {
         /**
          * Objects this thread is currently blocking on
          */
-        rt::SharedPtr<Blockable> blockingOn;
+        rt::List<rt::SharedPtr<Blockable>> blockingOn;
 
         /// Interrupt handlers owned by the thread; they're removed when we deallocate
         rt::List<rt::SharedPtr<ipc::IrqHandler>> irqHandlers;
@@ -174,6 +186,10 @@ struct Thread: public rt::SharedFromThis<Thread> {
 
         /// architecture-specific thread state
         arch::ThreadState regs __attribute__((aligned(16)));
+
+    private:
+        /// whether we're blocking and why the block finished
+        BlockState blockState = BlockState::None;
 
     public:
         /// Allocates a new kernel thread
@@ -206,7 +222,7 @@ struct Thread: public rt::SharedFromThis<Thread> {
         /// Sets the thread's state.
         void setState(State newState) {
             if(newState == State::Runnable) {
-                REQUIRE(!this->blockingOn, "cannot be runnable while blocking");
+                REQUIRE(this->blockingOn.empty(), "cannot be runnable while blocking");
             }
 
             __atomic_store(&this->state, &newState, __ATOMIC_RELEASE);
@@ -263,6 +279,17 @@ struct Thread: public rt::SharedFromThis<Thread> {
 
         /// Called on context switch out to complete termination.
         void deferredTerminate();
+
+        /// any pending blocks should be cancelled
+        void blockExpired();
+        /// set thread state with optionally idsabling validation
+        void setState(State newState, const bool validate) {
+            if(validate) {
+                return this->setState(newState);
+            }
+
+            __atomic_store(&this->state, &newState, __ATOMIC_RELEASE);
+        }
 };
 }
 

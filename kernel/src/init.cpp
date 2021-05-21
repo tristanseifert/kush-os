@@ -9,7 +9,6 @@
 #include "sys/Syscall.h"
 #include "handle/Manager.h"
 
-
 #include <arch.h>
 #include <platform.h>
 #include <stdint.h>

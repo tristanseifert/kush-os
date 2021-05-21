@@ -226,7 +226,7 @@ int Task::terminate(int status) {
     RW_UNLOCK_WRITE(&this->lock);
 
     // request task deletion later
-    //Scheduler::get()->idle->queueDestroyTask(this);
+    Scheduler::get()->idle->queueDestroyTask(this->sharedFromThis());
 
     // finally, terminate calling thread, if it is also in this task
     if(current->task.get() == this) {
