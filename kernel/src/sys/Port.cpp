@@ -13,6 +13,8 @@
 
 using namespace sys;
 
+static const bool gLogMsg = true;
+
 /**
  * Receive message buffer; these must always be 16-byte aligned. This is a header for a message
  * buffer, which is allocated in 16-byte chunks.
@@ -45,6 +47,8 @@ static_assert(offsetof(RecvInfo, data) % 16 == 0, "RecvInfo data must be 16 byte
  */
 intptr_t sys::PortSend(const Handle portHandle, const void *msgPtr, const size_t msgLen) {
     int err;
+
+    if(gLogMsg) log("%4u %4u) PortSend($%p'h, %p, %lu)", sched::Task::current()->pid, sched::Thread::current()->tid, portHandle, msgPtr, msgLen);
 
     // validate the message buffer
     if(!Syscall::validateUserPtr(msgPtr, msgLen)) {
@@ -128,7 +132,8 @@ intptr_t sys::PortReceive(const Handle portHandle, RecvInfo *recvPtr, const size
     }
 
     // receive from port
-    Handle senderThreadHandle;
+    Handle senderThreadHandle = Handle::Invalid;
+
     err = port->receive(senderThreadHandle, recvPtr->data, msgBufLen, timeout);
 
     if(err < 0) {

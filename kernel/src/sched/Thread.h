@@ -62,6 +62,8 @@ struct Thread: public rt::SharedFromThis<Thread> {
             Unblocked,
             /// The block was timed, and the timeout has expired
             Timeout,
+            /// One of the blockables aborted the attempt to go to sleep
+            Aborted,
         };
 
     public:

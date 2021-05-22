@@ -64,7 +64,7 @@ class Port: public rt::SharedFromThis<Port> {
             Blocker(const rt::SharedPtr<Port> &_port) : port(_port) {}
 
             public:
-                inline static auto make(Port * port) {
+                inline static auto make(Port *port) {
                     return make(port->sharedFromThis());
                 }
 
@@ -100,12 +100,13 @@ class Port: public rt::SharedFromThis<Port> {
                 }
 
                 /// Sets the receive blockable object of the port when we're validly blocked on.
-                void willBlockOn(const rt::SharedPtr<sched::Thread> &t) override {
+                int willBlockOn(const rt::SharedPtr<sched::Thread> &t) override {
                     Blockable::willBlockOn(t);
 
-                    if(this->unblockedSignalled) {
-                        this->blocker->unblock(this->us.lock());
+                    if(this->signalled || this->unblockedSignalled) {
+                        return -1;
                     }
+                    return 0;
                 }
 
             private:

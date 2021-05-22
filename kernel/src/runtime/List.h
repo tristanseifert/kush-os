@@ -267,7 +267,7 @@ class List {
 
         /// Is the list empty?
         const bool empty() const {
-            return (this->head == nullptr);
+            return !this->numElements;
         }
         /// Number of items in the list
         const size_t size() const {

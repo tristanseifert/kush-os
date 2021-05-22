@@ -10,9 +10,11 @@
 extern uintptr_t __elf_base, __elf_headers_start, __elf_headers_end;
 
 /**
- * Iterates the list of shared objects, invoking the user-specified callback for each of them.
+ * Iterates the list of loaded objects. Since this binary is statically linked, the only object
+ * that is loaded is the base executable.
  *
- * This is a Linux-ism, but libunwind seems to require it...
+ * This requires that we use the specific libc linker script for static executables, due to the
+ * required symbol names.
  */
 int dl_iterate_phdr(int (*callback) (struct dl_phdr_info *info, const size_t size, void *data),
         void *data) {

@@ -69,7 +69,7 @@ class TimerBlocker: public Blockable {
         }
 
         /// When we're going to start blocking, actually install the timer.
-        void willBlockOn(const rt::SharedPtr<Thread> &t) override {
+        int willBlockOn(const rt::SharedPtr<Thread> &t) override {
             Blockable::willBlockOn(t);
 
             // set the timer (multiples of 10ms). include a fudge factor
@@ -85,6 +85,8 @@ class TimerBlocker: public Blockable {
 
             // add to scheduler
             sched::Scheduler::get()->addDeadline(death);
+
+            return 0;
         }
 
     private:

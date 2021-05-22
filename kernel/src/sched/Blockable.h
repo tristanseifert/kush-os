@@ -44,9 +44,12 @@ class Blockable: public rt::SharedFromThis<Blockable> {
 
         /**
          * We're about to block the current thread on this object.
+         *
+         * @return Status code; a nonzero value will abort the block
          */
-        virtual void willBlockOn(const rt::SharedPtr<Thread> &t) {
+        virtual int willBlockOn(const rt::SharedPtr<Thread> &t) {
             this->blocker = t;
+            return 0;
         }
 
         /**
