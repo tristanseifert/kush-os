@@ -312,75 +312,95 @@ void Thread::sleep(const uint64_t nanos) {
  * will be using.
  */
 int Thread::blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until) {
+    int err;
     rt::SharedPtr<BlockWait> deadline;
 
-    DECLARE_CRITICAL();
-
     REQUIRE(b, "invalid blockable %p", static_cast<void *>(b));
-    REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
 
     // create the timeout blockable
     if(until) {
         deadline = rt::SharedPtr<BlockWait>(new BlockWait(until, this->sharedFromThis()));
     }
 
-    // raise IRQL to scheduler level (to prevent being preempted)
-    // XXX: change this?
-    platform_raise_irql(platform::Irql::Scheduler);
-    CRITICAL_ENTER();
+    {
+        DECLARE_CRITICAL();
 
-    // update thread state
-    RW_LOCK_WRITE(&this->lock);
+        /*
+         * Enter the critical section. We'll go into the scheduler with it held, and the context switch
+         * will implicitly release it.
+         */
+        CRITICAL_ENTER();
 
-    REQUIRE(this->state == State::Runnable, "Cannot %s thread %p with state: %d (blockable %p)",
-            "block", this, (int) this->state, static_cast<void *>(b));
-    REQUIRE(this->blockingOn.empty(), "cannot block thread %p (object %p) while already blocking on %lu objects",
-            this, static_cast<void *>(b), this->blockingOn.size());
+        // update thread state
+        RW_LOCK_WRITE(&this->lock);
 
-    this->blockingOn.append(b);
+        REQUIRE(this->state == State::Runnable, "Cannot %s thread %p with state: %d (blockable %p)",
+                "block", this, (int) this->state, static_cast<void *>(b));
+        REQUIRE(this->blockingOn.empty(), "cannot block thread %p (object %p) while already blocking on %lu objects",
+                this, static_cast<void *>(b), this->blockingOn.size());
 
-    this->blockState = BlockState::Blocking;
-    this->setState(State::Blocked);
+        this->blockingOn.append(b);
 
-    // prepare the blockables
-    b->willBlockOn(this->sharedFromThis());
+        this->blockState = BlockState::Blocking;
+        this->setState(State::Blocked);
 
-    if(deadline){
-        Scheduler::get()->addDeadline(deadline);
+        // prepare the blockables
+        err = b->willBlockOn(this->sharedFromThis());
+        if(err) {
+            this->blockState = BlockState::Aborted;
+            this->setState(State::Runnable);
+
+            this->blockingOn.clear();
+
+            log("aborting block: %d", err);
+
+            RW_UNLOCK_WRITE(&this->lock);
+            CRITICAL_EXIT();
+
+            return -1;
+        }
+
+        if(deadline){
+            Scheduler::get()->addDeadline(deadline);
+        }
+
+        RW_UNLOCK_WRITE(&this->lock);
+
+        // yield the rest of the CPU time
+        Scheduler::get()->yield();
     }
 
-    RW_UNLOCK_WRITE(&this->lock);
-    CRITICAL_EXIT();
+    {
+        RW_LOCK_WRITE(&this->lock);
 
-    // yield the rest of the CPU time
-    Scheduler::get()->yield();
+        // remove deadline if it was allocated
+        if(deadline) {
+            Scheduler::get()->removeDeadline(deadline);
+        }
 
-    // remove deadline if it was allocated
-    if(deadline) {
-        Scheduler::get()->removeDeadline(deadline);
+        // get state from the blockable
+        bool signaled = b->isSignalled();
+        b->reset();
+
+        // clear the list of blocking objects
+        this->blockingOn.clear();
+
+        RW_UNLOCK_WRITE(&this->lock);
+
+        // return whether the thread woke correctly or nah
+        const auto state = this->blockState;
+        this->blockState = BlockState::None;
+
+        // 1 = timeout, 0 = success, -1 = error
+        if(state == BlockState::Timeout) return 1;
+        else return (signaled ? 0 : -1);
     }
-
-    // get state from the blockable
-    bool signaled = b->isSignalled();
-    b->reset();
-
-    // clear the list of blocking objects
-    this->blockingOn.clear();
-
-    // return whether the thread woke correctly or nah
-    const auto state = this->blockState;
-    this->blockState = BlockState::None;
-
-    // 1 = timeout, 0 = success, -1 = error
-    if(state == BlockState::Timeout) return 1;
-    else return (signaled ? 0 : -1);
 }
 
 /**
  * Unblocks the thread.
  */
 void Thread::unblock(const rt::SharedPtr<Blockable> &b) {
-    REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
     REQUIRE(this->state == State::Blocked, "Cannot %s thread %p with state: %d (blockable %p)",
             "unblock", this, (int) this->state, static_cast<void *>(b));
 

@@ -252,7 +252,7 @@ intptr_t sys::ThreadResume(const Handle threadHandle) {
 
     // go ahead and resume it
     thread->setState(sched::Thread::State::Runnable);
-    sched::Scheduler::get()->markThreadAsRunnable(thread);
+    sched::Scheduler::get()->markThreadAsRunnable(thread, false);
 
     return Errors::Success;
 }

@@ -91,6 +91,8 @@ intptr_t sys::PortReceive(const Handle portHandle, RecvInfo *recvPtr, const size
         return Errors::GeneralError;
     }
 
+    if(gLogMsg) log("%4u %4u) PortReceive($%p'h, %p, %lu, %lu)", task->pid, sched::Thread::current()->tid, portHandle, recvPtr, recvLen, timeout);
+
     // basic validation of lengths
     if(recvLen < sizeof(RecvInfo)) {
         return Errors::InvalidArgument;

@@ -218,13 +218,24 @@ int Scheduler::markThreadAsRunnable(const rt::SharedPtr<Thread> &t, const bool s
 
     // TODO: perform context switch (if requested)
     if(shouldSwitch) {
+        auto next = this->findRunnableThread();
+        log("switch to %p", static_cast<void *>(next));
 
-    }
-
-    // determine if this thread is at a higher priority than the current runnable
-    // TODO: should this check the entire structure? other threads don't push work to us...
-    if(higherPriorityRunnable) {
-        *higherPriorityRunnable = (this->currentLevel > this->getLevelFor(t));
+        if(next == this->running) {
+            this->switchTo(this->running, true);
+            this->timer.start(Oclock::Type::ThreadKernel);
+        } else if(next) {
+            this->switchTo(next);
+            if(*higherPriorityRunnable) *higherPriorityRunnable = true;
+        }
+        //this->sendIpi();
+    } 
+    // just check if another higher priority thread became runnable
+    else {
+        // TODO: should this check the entire structure? other threads don't push work to us...
+        if(higherPriorityRunnable) {
+            *higherPriorityRunnable = (this->currentLevel > this->getLevelFor(t));
+        }
     }
 
     return 0;

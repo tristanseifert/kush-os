@@ -173,8 +173,6 @@ class Port: public rt::SharedFromThis<Port> {
         /// kernel object handle for this port
         Handle handle;
 
-        /// thread that's waiting to receive from this port, if any
-        rt::SharedPtr<sched::Thread> receiver;
         /// the blocker object for the receiver
         rt::SharedPtr<Blocker> receiverBlocker;
 
