@@ -26,7 +26,7 @@ platform::Irql platform_raise_irql(const platform::Irql irql, const bool enableI
         info->p.lapic->updateTpr(irql);
     }
 
-    if(enableIrq) {
+    if(enableIrq && irql < Irql::CriticalSection) {
         asm volatile("sti");
     }
 
@@ -49,12 +49,12 @@ void platform_lower_irql(const platform::Irql irql, const bool enableIrq) {
     Irql _irql = irql;
     __atomic_store(&info->irql, &_irql, __ATOMIC_RELAXED);
 
-   if(gLogIrql) log("lower irql: %u (%p)", (uintptr_t) irql, info->p.lapic);
+    if(gLogIrql) log("lower irql: %u (%p)", (uintptr_t) irql, info->p.lapic);
     if(info->p.lapic) {
         info->p.lapic->updateTpr(irql);
     }
 
-    if(enableIrq) {
+    if(enableIrq && irql < Irql::CriticalSection) {
         asm volatile("sti");
     }
 }

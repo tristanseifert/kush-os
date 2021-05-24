@@ -55,6 +55,7 @@ enum class IpiWorkFlags: uintptr_t {
 class Scheduler {
     friend void ::kernel_init();
     friend struct Thread;
+    friend struct SleepDeadline;
 
     public:
         /**
@@ -92,7 +93,7 @@ class Scheduler {
         void scheduleRunnable(rt::SharedPtr<Task> &task);
         /// adds the given thread to the runnable queue
         int markThreadAsRunnable(const rt::SharedPtr<Thread> &thread,
-                const bool shouldSwitch = true, bool *higherPriorityRunnable = nullptr);
+                const bool shouldSwitch = true);
 
         /// Runs the scheduler.
         void run() __attribute__((noreturn));
@@ -276,7 +277,7 @@ class Scheduler {
         /// whether time quantum updates are logged
         constexpr static const bool kLogQuantum = false;
         /// whether deadline operations are logged
-        constexpr static const bool kLogDeadlines = true;
+        constexpr static const bool kLogDeadlines = false;
 
         /// all schedulers on the system. used for work stealing
         static rt::Vector<InstanceInfo> *gSchedulers;

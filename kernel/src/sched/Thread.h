@@ -74,8 +74,12 @@ struct Thread: public rt::SharedFromThis<Thread> {
             Runnable                    = 1,
             /// Thread is waiting on some event to occur
             Blocked                     = 2,
+            /// Blocked on sleep (may end early)
+            Sleeping                    = 3,
+            /// Waiting for notification
+            NotifyWait                  = 4,
             /// About to be destroyed; do not schedule or access.
-            Zombie                      = 3,
+            Zombie                      = 5,
         };
 
         /**

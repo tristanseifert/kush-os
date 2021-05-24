@@ -15,6 +15,7 @@ add_library(system_objs OBJECT
     src/sys/infopage.c
     # stack stuff
     src/stack/stack_guard.c
+    src/helpers.c
 )
 target_compile_options(system_objs PRIVATE -fPIC)
 

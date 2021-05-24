@@ -188,7 +188,7 @@ void Scheduler::scheduleRunnable(rt::SharedPtr<Task> &task) {
 
         // if thread is runnable, add it to the run queue
         if(thread->state != Thread::State::Runnable) continue;
-        this->markThreadAsRunnable(thread, false);
+        this->schedule(thread);
     }
 
     // register the task with the global state if needed
@@ -204,14 +204,10 @@ void Scheduler::scheduleRunnable(rt::SharedPtr<Task> &task) {
  * @param t Thread to switch to
  * @param shouldSwitch Whether the context switch should be performed by the scheduler. An ISR may
  * want to perform some cleanup before a context switch is initiated.
- * @param higherPriorityRunnable If non-null, location where we write a flag indicating if a higher
- *        priority thread became runnable. This can be used to manually invoke the scheduler at
- *        the end of an interrupt handler, for example.
  *
  * @return Whether we successfully added the thread to the appropriate run queue (0) or not
  */
-int Scheduler::markThreadAsRunnable(const rt::SharedPtr<Thread> &t, const bool shouldSwitch,
-        bool *higherPriorityRunnable) {
+int Scheduler::markThreadAsRunnable(const rt::SharedPtr<Thread> &t, const bool shouldSwitch) {
     if(int err = this->schedule(t)) {
         return err;
     }
@@ -221,20 +217,12 @@ int Scheduler::markThreadAsRunnable(const rt::SharedPtr<Thread> &t, const bool s
         auto next = this->findRunnableThread();
         log("switch to %p", static_cast<void *>(next));
 
+        // switch to that thread
         if(next == this->running) {
             this->switchTo(this->running, true);
             this->timer.start(Oclock::Type::ThreadKernel);
         } else if(next) {
             this->switchTo(next);
-            if(*higherPriorityRunnable) *higherPriorityRunnable = true;
-        }
-        //this->sendIpi();
-    } 
-    // just check if another higher priority thread became runnable
-    else {
-        // TODO: should this check the entire structure? other threads don't push work to us...
-        if(higherPriorityRunnable) {
-            *higherPriorityRunnable = (this->currentLevel > this->getLevelFor(t));
         }
     }
 
@@ -243,21 +231,14 @@ int Scheduler::markThreadAsRunnable(const rt::SharedPtr<Thread> &t, const bool s
 
 /**
  * Gives up the remainder of the current thread's time quantum.
+ *
+ * TODO: Is this right? Currently if there's no runnable threads we'll become idle immediately, or
+ * go down the next priority level, rather than returning directly to the current thread. This is
+ * because the thread isn't actually rescheduled until it's actually context switched out.
  */
 void Scheduler::yield(const Thread::State state) {
     // find the next runnable thread
     auto runnable = this->findRunnableThread();
-
-    // place this back on the run queue (if still runnable)
-    if(this->running->state == Thread::State::Runnable && !this->running->needsToDie) {
-        const auto levelNum = this->getLevelFor(this->running);
-        auto &level = this->levels[levelNum];
-
-        if(!level.push(this->running)) {
-            panic("sched(%p) level %lu queue overflow (thread %p)", this, levelNum,
-                    static_cast<void *>(this->running));
-        }
-    }
 
     // perform context switch to next runnable (if one was found)
     if(runnable) {
@@ -383,14 +364,12 @@ int Scheduler::schedule(const rt::SharedPtr<Thread> &thread) {
                 static_cast<void *>(this->running));
         return -1;
     }
+    __atomic_fetch_add(&this->levelEpoch, 1, __ATOMIC_RELAXED);
 
     if(kLogQueueOps) {
         log("sched push %p (%d)   to %lu", static_cast<void *>(thread), static_cast<int>(thread->state),
                 levelNum);
     }
-
-    // update epoch
-    __atomic_fetch_add(&this->levelEpoch, 1, __ATOMIC_RELAXED);
 
     return 0;
 }
@@ -493,11 +472,6 @@ void Scheduler::timerFired() {
     if(this->updateQuantumUsed(this->running)) {
         // entire quantum used so preempt it
         this->running->sched.preempted = true;
-
-        // if still runnable, reschedule
-        if(this->running->state == Thread::State::Runnable) {
-            this->schedule(this->running);
-        }
     }
 
     // stop timer and request scheduler invocation
@@ -660,6 +634,11 @@ void Scheduler::willSwitchFrom(const rt::SharedPtr<Thread> &from) {
 
     if(kLogQuantum) {
         log("executed '%s' for %lu/%lu nsec", from->name, sched.quantumUsed, sched.quantumTotal);
+    }
+
+    // place this back on the run queue (if still runnable)
+    if(from->state == Thread::State::Runnable && !from->needsToDie) {
+        this->schedule(from);
     }
 }
 

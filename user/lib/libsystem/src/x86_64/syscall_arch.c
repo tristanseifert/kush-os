@@ -23,7 +23,7 @@ int Amd64SetThreadLocalBaseFor(const uintptr_t threadHandle, const int which, co
 /**
  * Called when a thread returns; it'll gracefully destroy this one.
  */
-void Amd64ThreadExit() {
+void LIBSYSTEM_INTERNAL Amd64ThreadExit() {
     int err;
     uintptr_t handle;
 

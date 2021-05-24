@@ -1,4 +1,5 @@
 #include "syscall.h"
+#include "helpers.h"
 #include <sys/syscalls.h>
 #include <stdint.h>
 #include <string.h>
@@ -302,7 +303,7 @@ int VirtualRegionGetInfoFor(const uintptr_t regionHandle, const uintptr_t taskHa
 
     // make the call to populate temporary struct
     struct VmInfoStruct info;
-    memset(&info, 0, sizeof(info));
+    InternalMemset(&info, 0, sizeof(info));
 
     err = __do_syscall4(regionHandle, taskHandle, (uintptr_t) &info, sizeof(info),
             SYS_VM_GET_INFO);

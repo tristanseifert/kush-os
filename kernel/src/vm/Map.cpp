@@ -70,8 +70,11 @@ rt::SharedPtr<Map> Map::alloc() {
  * Activates this map, switching the processor to use the translations defined within.
  */
 void Map::activate() {
-    this->table.activate();
-    arch::PerCpuInfo::get()->activeMap = this;
+    // avoid activating map if not necessary
+    if(arch::PerCpuInfo::get()->activeMap != this) {
+        this->table.activate();
+        arch::PerCpuInfo::get()->activeMap = this;
+    }
 }
 
 /**

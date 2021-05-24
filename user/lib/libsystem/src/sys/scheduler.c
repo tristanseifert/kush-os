@@ -1,4 +1,5 @@
 #include "syscall.h"
+#include "helpers.h"
 #include <sys/syscalls.h>
 #include <stdint.h>
 #include <string.h>
@@ -100,7 +101,7 @@ int ThreadSetPriority(const uintptr_t handle, const int priority) {
  * @param namePtr Pointer to a NULL terminated UTF-8 string.
  */
 int ThreadSetName(const uintptr_t handle, const char *name) {
-    const size_t nameLen = strlen(name);
+    const size_t nameLen = InternalStrlen(name);
     return __do_syscall3(handle, (uintptr_t) name, nameLen, SYS_THREAD_RENAME);
 }
 

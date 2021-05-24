@@ -86,9 +86,9 @@ void arch::RestoreThreadState(const rt::SharedPtr<sched::Thread> &from,
          * page table. Since kernel mappings are always shared, this saves us a pretty expensive
          * TLB flush the MOV to CR3 operation causes.
          */
-        //if(::vm::Mapper::getKernelMap() != destVm) {
+        if(::vm::Mapper::getKernelMap() != destVm.get()) {
             destVm->activate();
-        //}
+        }
     }
 
     // update thread-local address (%gs and %fs)

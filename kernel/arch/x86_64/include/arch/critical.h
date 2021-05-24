@@ -14,10 +14,12 @@ struct CriticalSection {
 
     /// enters the critical section
     inline void enter() {
+        //asm volatile("cli" ::: "memory");
         this->lastIrql = platform_raise_irql(platform::Irql::CriticalSection);
     }
     /// returns the irql to the previous level
     inline void exit() {
+        //asm volatile("sti" ::: "memory");
         platform_lower_irql(this->lastIrql);
     }
 };
