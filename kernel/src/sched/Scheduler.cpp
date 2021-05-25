@@ -280,6 +280,15 @@ beach:;
 
 again:;
         if(level.storage.pop(thread, rt::LockFreeQueueFlags::kPartialPop)) {
+            /**
+             * If the thread was supposed to previously terminate, but it's still in the run queue,
+             * make sure that the deferred handlers are invoked and we pick another thread to
+             * execute instead.
+             */
+            if(thread->needsToDie) {
+                thread->deferredTerminate();
+                goto again;
+            }
             /*
              * Ignore the thread if it's not runnable and simply go again.
              *
@@ -287,20 +296,11 @@ again:;
              * otherwise result in Bad Things happening. If we just ignore that case here, we avoid
              * having to go through the entire run queue to remove this thread.
              */
-            if(thread->state != Thread::State::Runnable) {
+            else if(thread->state != Thread::State::Runnable) {
                 if(kLogQueueOps) {
                     log("sched pull %p (%d) from %lu (ignored)", static_cast<void *>(thread),
                             static_cast<int>(thread->state), i);
                 }
-                goto again;
-            }
-            /**
-             * If the thread was supposed to previously terminate, but it's still in the run queue,
-             * make sure that the deferred handlers are invoked and we pick another thread to
-             * execute instead.
-             */
-            else if(thread->needsToDie) {
-                thread->deferredTerminate();
                 goto again;
             }
 
@@ -452,12 +452,13 @@ void Scheduler::updateTimer() {
     }
 
     // whichever is sooner, set a timer for it
-    if(deadline < quantumRemaining) { // impending deadline
-        this->timerReason = TimerReason::Deadline;
-        platform::SetLocalTimer(deadline);
-    } else { // time quantum expires
-        this->timerReason = TimerReason::QuantumExpired;
-        platform::SetLocalTimer(quantumRemaining);
+    uint64_t interval = (deadline < quantumRemaining) ? deadline : quantumRemaining;
+
+    // take an IPI directly if below fudge factor
+    if(interval >= this->timerMinInterval) {
+        platform::SetLocalTimer(interval);
+    } else {
+        this->sendIpi();
     }
 }
 
@@ -627,10 +628,9 @@ void Scheduler::willSwitchFrom(const rt::SharedPtr<Thread> &from) {
 
     if(sched.preempted) {
         sched.preempted = false;
-        return;
+    } else {
+        this->updateQuantumUsed(from);
     }
-
-    this->updateQuantumUsed(from);
 
     if(kLogQuantum) {
         log("executed '%s' for %lu/%lu nsec", from->name, sched.quantumUsed, sched.quantumTotal);

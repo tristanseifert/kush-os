@@ -261,16 +261,6 @@ class Scheduler {
             }
         };
 
-        /// Reasons why we received a timer interrupt
-        enum class TimerReason {
-            /// There is no scheduled timer interrupt
-            None,
-            /// Current thread's time quantum expired
-            QuantumExpired,
-            /// A deadline has arrived
-            Deadline,
-        };
-
     private:
         /// whether pops/pushes to queue are logged
         constexpr static const bool kLogQueueOps = false;
@@ -289,8 +279,6 @@ class Scheduler {
 
         /// timer for tracking CPU usage (how much to yeet quantum by)
         Oclock timer;
-        /// what was the intent behind the last timer interrupt we set?
-        TimerReason timerReason = TimerReason::None;
 
         /**
          * Whether the run queue has been modified. This is set whenever a new thread is made
@@ -331,6 +319,18 @@ class Scheduler {
          * scheduler invocations at the cost of timing resolution.
          */
         uint64_t deadlineSlack = kDeadlineSlack;
+
+        /**
+         * If an event (thread preemption or deadline) occurs within this time period (in ns) the
+         * scheduler will take an IPI directly rather than setting the core local timer.
+         *
+         * This value really needs to be tweaked so the scheduler doesn't get random "freezes"
+         * where all activity in the system seems to stop. This is mostly an issue on
+         * virtualized environments where the timer's resolution is rather shit, and it's
+         * totally possible for us to get in the timer setup function with some whacky values
+         * that cause a lost timer interrupt.
+         */
+        uint64_t timerMinInterval = 50000;
 
         /**
          * Level from which the currently executing thread was pulled, or `kNumLevels` if we're

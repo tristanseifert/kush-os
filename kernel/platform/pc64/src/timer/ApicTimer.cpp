@@ -7,6 +7,7 @@
 #include <sched/Scheduler.h>
 #include <arch/IrqRegistry.h>
 #include <arch/PerCpuInfo.h>
+#include <arch/critical.h>
 #include <arch/spinlock.h>
 #include <log.h>
 
@@ -43,6 +44,12 @@ ApicTimer::ApicTimer(LocalApic *_parent) : parent(_parent) {
     // install the irq handler
     auto irq = arch::PerCpuInfo::get()->irqRegistry;
     irq->install(kVector, ApicTimerIrq, this);
+
+    // configure the local interrupt for timer
+    this->parent->write(kApicRegTimerInitial, 0);
+    this->parent->write(kApicRegTimerDivide, 0b0011); // divide by 16
+
+    this->parent->write(kApicRegLvtTimer, kVector);
 }
 
 /**
@@ -124,6 +131,9 @@ void ApicTimer::measureTimerFreq() {
  * @return The actually achieved time set
  */
 uint64_t ApicTimer::setInterval(const uint64_t nsec, const bool repeat) {
+    DECLARE_CRITICAL();
+    REQUIRE(nsec, "invalid interval");
+
     // convert to period
     const uint64_t divisor = 16; // XXX: should this be supported to change?
     const uint64_t ticks = ((nsec * 1000ULL) / (this->psPerTick /** divisor*/));
@@ -131,23 +141,29 @@ uint64_t ApicTimer::setInterval(const uint64_t nsec, const bool repeat) {
     if(gLogSet) log("desired %lu ns -> %lu ticks (@ %lu ps/tick)", nsec, ticks,
             (this->psPerTick * divisor));
 
-    // mask existing timer interrupt
-    auto lvt = this->parent->read(kApicRegLvtTimer);
-    lvt |=  (1 << 16);
-    lvt &= ~(0b11 << 17); // clear timer type
-    lvt |=  (repeat ? 0b01 : 0b00) << 17;
+    /*
+     * Perform timer setup in a critical section
+     *
+     * This is mostly to prevent self-interruptions where the timer value is really small and we
+     * could get interrupted while we're doing the configuration, and thus lose the timer
+     * interrupt.
+     */
+    {
+        CRITICAL_ENTER();
+        // reset timer
+        this->parent->write(kApicRegTimerInitial, 0);
 
-    this->parent->write(kApicRegLvtTimer, lvt);
+        // unmask timer interrupt
+        uint32_t lvtValue = kVector;
+        lvtValue |= (repeat ? 0b01 : 0b00) << 17;
+        this->parent->write(kApicRegLvtTimer, lvtValue);
 
-    // write the timer configuration
-    this->parent->write(kApicRegTimerDivide, 0b0011); // divide by 16
-    this->parent->write(kApicRegTimerInitial, ticks);
-    this->ticksForInterval = ticks;
+        // write the timer configuration
+        this->parent->write(kApicRegTimerInitial, ticks);
+        this->ticksForInterval = ticks;
 
-    // unmask timer interrupt
-    uint32_t lvtValue = kVector;
-    lvtValue |= (repeat ? 0b01 : 0b00) << 17;
-    this->parent->write(kApicRegLvtTimer, lvtValue);
+        CRITICAL_EXIT();
+    }
 
     // return what we've actually achieved
     this->intervalPs = (ticks * psPerTick * divisor);
