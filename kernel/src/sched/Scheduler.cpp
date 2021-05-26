@@ -215,7 +215,6 @@ int Scheduler::markThreadAsRunnable(const rt::SharedPtr<Thread> &t, const bool s
     // TODO: perform context switch (if requested)
     if(shouldSwitch) {
         auto next = this->findRunnableThread();
-        log("switch to %p", static_cast<void *>(next));
 
         // switch to that thread
         if(next == this->running) {
@@ -398,10 +397,6 @@ size_t Scheduler::getLevelFor(const rt::SharedPtr<Thread> &thread) {
  *             gets an extension on its quantum, for example.
  */
 void Scheduler::switchTo(const rt::SharedPtr<Thread> &thread, const bool fake) {
-    // auto &sched = thread->sched;
-    //log("switch: %p ($%p'h %s) quantum %lu/%lu", static_cast<void*>(thread), thread->handle,
-    //        thread->name, sched.quantumUsed, sched.quantumTotal);
-
     // set the timer
     this->updateTimer();
 
@@ -516,33 +511,11 @@ void Scheduler::sendIpi() {
  * @param ackCtx Arbitrary pointer passed to acknowledgement function
  */
 void Scheduler::handleIpi(void (*ackIrq)(void *), void *ackCtx) {
+    // process unblocked threads
+    this->processUnblockedThreads();
+
     // process any deadlines that expired already / expire soon
-    {
-        RW_LOCK_WRITE_GUARD(this->deadlinesLock);
-        const auto now = platform_timer_now();
-
-        bool doNext = true;
-
-        while(!this->deadlines.empty() && doNext) {
-            auto &next = this->deadlines.min();
-            const auto expires = next.expires();
-
-            // does the deadline lie in the past?
-            if(expires <= now) {
-                next();
-                this->deadlines.extract();
-            }
-            // does it expire within the fudge time?
-            else if((expires - now) <= this->deadlineSlack) {
-                next();
-                this->deadlines.extract();
-            }
-            // the deadline doesn't expire until later. chill
-            else {
-                doNext = false;
-            }
-        }
-    }
+    this->processDeadlines();
 
     // pick the next highest priority thread and switch to it
     auto next = this->findRunnableThread();
@@ -619,6 +592,32 @@ bool Scheduler::updateQuantumUsed(const rt::SharedPtr<Thread> &thread) {
 }
 
 /**
+ * A thread has been unblocked, so add it to the list of newly runnable threads.
+ *
+ * This list is consulted during each scheduler invocation, and any threads in it are tested to see
+ * if they should run again; if so, they're inserted in to the appropriate run queues.
+ */
+void Scheduler::threadUnblocked(const rt::SharedPtr<Thread> &thread) {
+    DECLARE_CRITICAL();
+
+    CRITICAL_ENTER();
+    {
+        if(!this->unblocked.insert(thread)) {
+            panic("unblock list overflow");
+        }
+    }
+    CRITICAL_EXIT();
+}
+
+/**
+ * Tests all unblocked threads (called from scheduler IPI) and places those that became runnable on
+ * the appropriate run queue.
+ */
+void Scheduler::processUnblockedThreads() {
+
+}
+
+/**
  * A thread is being context switched out. We'll stop the appropriate time counters and figure out
  * how much of the time quantum the thread spent executing.
  */
@@ -667,6 +666,37 @@ void Scheduler::willSwitchTo(const rt::SharedPtr<Thread> &to) {
 }
 
 
+/**
+ * Processes all expired deadlines, by invoking their expiration methods. These may add new threads
+ * to the run queue.
+ */
+void Scheduler::processDeadlines() {
+    RW_LOCK_WRITE_GUARD(this->deadlinesLock);
+    // XXX: do we need to resample this every loop? in case we have tons of deadlines
+    const auto now = platform_timer_now();
+
+    bool doNext = true;
+
+    while(!this->deadlines.empty() && doNext) {
+        auto &next = this->deadlines.min();
+        const auto expires = next.expires();
+
+        // does the deadline lie in the past?
+        if(expires <= now) {
+            next();
+            this->deadlines.extract();
+        }
+        // does it expire within the fudge time?
+        else if((expires - now) <= this->deadlineSlack) {
+            next();
+            this->deadlines.extract();
+        }
+        // the deadline doesn't expire until later. chill
+        else {
+            doNext = false;
+        }
+    }
+}
 
 /**
  * Adds a new deadline for the scheduler to consider.

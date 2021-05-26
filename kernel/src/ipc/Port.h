@@ -101,7 +101,9 @@ class Port: public rt::SharedFromThis<Port> {
 
                 /// Sets the receive blockable object of the port when we're validly blocked on.
                 int willBlockOn(const rt::SharedPtr<sched::Thread> &t) override {
-                    Blockable::willBlockOn(t);
+                    if(int err = Blockable::willBlockOn(t)) {
+                        return err;
+                    }
 
                     if(this->signalled || this->unblockedSignalled) {
                         return -1;

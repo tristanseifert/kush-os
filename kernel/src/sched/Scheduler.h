@@ -138,10 +138,18 @@ class Scheduler {
         /// Switch to the given thread
         void switchTo(const rt::SharedPtr<Thread> &thread, const bool fake = false);
 
-        /// updates the current CPU's running thread
+        /// updates the current CPU's running thread (from thread code)
         void setRunningThread(const rt::SharedPtr<Thread> &t) {
             this->running = t;
         }
+
+        /// The given thread was unblocked
+        void threadUnblocked(const rt::SharedPtr<Thread> &t);
+        /// Schedules all valid unblocked threads
+        void processUnblockedThreads();
+        /// Processes any expired deadlines
+        void processDeadlines();
+
 
         /// invalidates all schedulers' peer lists
         static void invalidateAllPeerList(Scheduler *skip = nullptr);
@@ -296,6 +304,9 @@ class Scheduler {
 
         /// Each of the levels that may contain a thread to run
         Level levels[kNumLevels];
+
+        /// Unblocked, potentially runnable threads
+        rt::LockFreeQueue<rt::SharedPtr<Thread>> unblocked;
 
         /**
          * Epoch for the run queues. This is incremented any time the levels' queues are modified,

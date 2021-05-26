@@ -119,6 +119,8 @@ int Port::send(const void *msgBuf, const size_t msgLen) {
  * @return Number of bytes of message data actually written, or a negative error code.
  */
 int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const uint64_t blockUntil) {
+    using BlockOnReturn = sched::Thread::BlockOnReturn;
+
     DECLARE_CRITICAL();
 
     CRITICAL_ENTER();
@@ -131,7 +133,8 @@ int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const ui
     this->receiverBlocker->reset();
     auto thread = sched::Thread::current();
 
-    int err = 0, ret = -1;
+    BlockOnReturn unblockReason;
+    int ret = -1;
 
     // pop messages off the message queue, if any
     if(!this->messages.empty()) {
@@ -156,14 +159,16 @@ int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const ui
         goto failedUnlock;
     }
 
-        RW_UNLOCK_WRITE(&this->lock);
-        CRITICAL_EXIT();
+    RW_UNLOCK_WRITE(&this->lock);
+    CRITICAL_EXIT();
 
-    // perform block
-    err = thread->blockOn(this->receiverBlocker);
-
-    // if wake-up from block was spurious, return
-    if(err) {
+    /*
+     * Block thread on the receiver. Return immediately if it timed out, otherwise we try to see if
+     * we received a message, whether that is because we actually got one or the block was
+     * aborted.
+     */
+    unblockReason = thread->blockOn(this->receiverBlocker);
+    if(unblockReason == BlockOnReturn::Error) {
         return -1;
     }
 

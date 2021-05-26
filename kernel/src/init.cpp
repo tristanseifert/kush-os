@@ -16,6 +16,7 @@
 #include <version.h>
 #include <log.h>
 
+static void PrintBanner();
 
 /// root init server
 rt::SharedPtr<sched::Task> gRootServer;
@@ -54,7 +55,7 @@ void kernel_init() {
  * takes place and we go into the scheduler.
  */
 void kernel_main() {
-    log("kush (%s) starting", gVERSION_HASH);
+    PrintBanner();
 
     // kernel is initialized. launch the root server
     gRootServer = platform_init_rootsrv();
@@ -64,3 +65,12 @@ void kernel_main() {
     panic("scheduler returned, this should never happen");
 }
 
+static void PrintBanner() {
+    // get first 8 chars of hash
+    char hash[9]{0};
+    memcpy(hash, gVERSION_HASH, 8);
+
+    // print
+    log("Starting kush-os (build %s) - "
+        "Copyright 2021 Tristan Seifert", hash);
+}

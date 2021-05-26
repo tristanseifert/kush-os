@@ -15,7 +15,7 @@
 using namespace mem;
 
 bool Heap::gLogAlloc = false;
-bool Heap::gLogMmap = true;
+bool Heap::gLogMmap = false;
 
 /// base address at which heap allocations begin
 uintptr_t Heap::gVmBase = Heap::kHeapStart;

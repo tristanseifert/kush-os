@@ -15,11 +15,11 @@ using namespace sys;
 using vm::kKernelVmBound;
 
 /// Are object allocations/deallocations logged?
-static bool gLogAlloc = true;
+static bool gLogAlloc = false;
 /// Are map/unmap requests logged?
-static bool gLogMap = true;
+static bool gLogMap = false;
 /// Are map manipulations (resize, flag changes) logged?
-static bool gLogChanges = true;
+static bool gLogChanges = false;
 
 /**
  * Info buffer written to userspace for the "get VM region info" syscall

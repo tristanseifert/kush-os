@@ -55,15 +55,15 @@ struct Thread: public rt::SharedFromThis<Thread> {
         };
         /// why a block returned
         enum class BlockState {
-            None,
+            None                        = 0,
             /// Currently blocking
-            Blocking,
+            Blocking                    = 1,
             /// The blocking condition(s) were signalled
-            Unblocked,
+            Unblocked                   = 2,
             /// The block was timed, and the timeout has expired
-            Timeout,
+            Timeout                     = 3,
             /// One of the blockables aborted the attempt to go to sleep
-            Aborted,
+            Aborted                     = 4,
         };
 
     public:
@@ -80,6 +80,18 @@ struct Thread: public rt::SharedFromThis<Thread> {
             NotifyWait                  = 4,
             /// About to be destroyed; do not schedule or access.
             Zombie                      = 5,
+        };
+
+        /// return codes for blockOn
+        enum class BlockOnReturn {
+            /// Unknown error
+            Error                       = -1,
+            /// thread unblocked
+            Unblocked                   = 0,
+            /// block timed out
+            Timeout                     = 1,
+            /// block aborted
+            Aborted                     = 2,
         };
 
         /**
@@ -242,7 +254,7 @@ struct Thread: public rt::SharedFromThis<Thread> {
         }
 
         /// Blocks the thread on the given object.
-        int blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until = 0);
+        BlockOnReturn blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until = 0);
         /// Unblocks the thread due to the given blockable
         void unblock(const rt::SharedPtr<Blockable> &b);
 

@@ -314,9 +314,10 @@ void Thread::sleep(const uint64_t nanos) {
  * @return 0 if the block completed, or an error code if the block was interrupted (because the
  * thread was woken for another reason, for example.)
  */
-int Thread::blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until) {
+Thread::BlockOnReturn Thread::blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until) {
     REQUIRE(b, "invalid blockable %p", static_cast<void *>(b));
 
+    bool yield = true;
     rt::SharedPtr<BlockWait> deadline;
 
     // create the timeout blockable
@@ -324,21 +325,103 @@ int Thread::blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until) {
         deadline = rt::SharedPtr<BlockWait>(new BlockWait(until, this->sharedFromThis()));
     }
 
+    /*
+     * Set up the thread state for blocking, then yield the remainder of the processor time
+     */
+    {
+        DECLARE_CRITICAL();
+
+        RW_LOCK_WRITE(&this->lock);
+        CRITICAL_ENTER();
+
+        // prepare for blocking
+        if(b->willBlockOn(this->sharedFromThis())) {
+            yield = false;
+            this->blockState = BlockState::Aborted;
+
+            goto beach;
+        }
+
+        // add to list
+        this->blockingOn.append(b);
+
+        // set block flag
+        this->setState(State::Blocked);
+        this->blockState = BlockState::Blocking;
+
+        // install scheduler deadline (for timed blocks)
         if(deadline){
             Scheduler::get()->addDeadline(deadline);
         }
+
+beach:;
+        RW_UNLOCK_WRITE(&this->lock);
+        CRITICAL_EXIT();
+    }
+
+    // finally, yield to scheduler if needed
+    if(yield) {
+        Scheduler::get()->yield();
+    }
+
+    /*
+     * We have returned from the block; determine if it timed out, or whether the blockable has
+     * unblocked us.
+     */
+    {
+        DECLARE_CRITICAL();
+
+        RW_LOCK_WRITE(&this->lock);
+        CRITICAL_ENTER();
+
+        // remove the old deadline
         if(deadline) {
             Scheduler::get()->removeDeadline(deadline);
         }
 
-    return -1;
+        RW_UNLOCK_WRITE(&this->lock);
+        CRITICAL_EXIT();
+    }
+
+    // return code depends on block state
+    switch(this->blockState) {
+        // object signalled
+        case BlockState::Unblocked:
+            return BlockOnReturn::Unblocked;
+
+        // timeout/deadline was hit
+        case BlockState::Timeout:
+            return BlockOnReturn::Timeout;
+        // block aborted
+        case BlockState::Aborted:
+            return BlockOnReturn::Aborted;
+
+        default:
+            panic("unhandled block state %d", static_cast<int>(this->blockState));
+    }
 }
 
 /**
  * Unblocks the thread.
  */
 void Thread::unblock(const rt::SharedPtr<Blockable> &b) {
-    
+    DECLARE_CRITICAL();
+
+    // update thread state
+    {
+        RW_LOCK_WRITE(&this->lock);
+        CRITICAL_ENTER();
+
+        this->blockState = BlockState::Unblocked;
+        this->setState(State::Runnable, false);
+
+        RW_UNLOCK_WRITE(&this->lock);
+        CRITICAL_EXIT();
+    }
+
+    // add to scheduler's "potentially runnable" queue
+    Scheduler::get()->markThreadAsRunnable(this->sharedFromThis(), true);
+    //Scheduler::get()->threadUnblocked(this->sharedFromThis());
 }
 
 /**
@@ -348,15 +431,20 @@ void Thread::blockExpired() {
     DECLARE_CRITICAL();
 
     // update thread state
-    CRITICAL_ENTER();
+    {
+        RW_LOCK_WRITE(&this->lock);
+        CRITICAL_ENTER();
 
-    this->blockState = BlockState::Timeout;
-    this->setState(State::Runnable, false);
+        this->blockState = BlockState::Timeout;
+        this->setState(State::Runnable, false);
 
-    CRITICAL_EXIT();
+        RW_UNLOCK_WRITE(&this->lock);
+        CRITICAL_EXIT();
+    }
 
     // re-enqueue into scheduler
     Scheduler::get()->markThreadAsRunnable(this->sharedFromThis(), true);
+    //Scheduler::get()->threadUnblocked(this->sharedFromThis());
 }
 
 
@@ -440,8 +528,6 @@ void Thread::runDpcs() {
  * @return 0 if the thread terminated, 1 if the wait timed out, or a negative error code.
  */
 int Thread::waitOn(const uint64_t waitUntil) {
-    int err;
-
     DECLARE_CRITICAL();
 
     // create the notification flag
@@ -460,7 +546,7 @@ int Thread::waitOn(const uint64_t waitUntil) {
     CRITICAL_EXIT();
 
     // now, block the caller on this object
-    err = sched::Thread::current()->blockOn(flag, waitUntil);
+    auto err = sched::Thread::current()->blockOn(flag, waitUntil);
 
     // remove the termination flag again
     CRITICAL_ENTER();
@@ -472,10 +558,13 @@ int Thread::waitOn(const uint64_t waitUntil) {
     CRITICAL_EXIT();
 
     // return appropriate code
-    if(!err) { // block completed
-        return 0;
-    } else { // some sort of error
-        return err;
+    switch(err) {
+        case BlockOnReturn::Unblocked:
+            return 0;
+        case BlockOnReturn::Timeout:
+            return 1;
+        default:
+            return -1;
     }
 }
 

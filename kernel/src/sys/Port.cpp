@@ -13,7 +13,7 @@
 
 using namespace sys;
 
-static const bool gLogMsg = true;
+static const bool gLogMsg = false;
 
 /**
  * Receive message buffer; these must always be 16-byte aligned. This is a header for a message
