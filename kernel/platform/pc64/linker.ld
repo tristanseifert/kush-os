@@ -7,7 +7,7 @@ OUTPUT_FORMAT(elf64-x86-64)
  */
 mmio = 0xfffffffff4000000;
 fb = 0xfffffffff8000000;
-initstack = 4096;
+initstack = 2048;
 
 /**
  * Give us just one segment to load, which is the "boot" segment containing all of the stuff

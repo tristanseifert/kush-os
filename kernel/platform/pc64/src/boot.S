@@ -18,6 +18,14 @@ _osentry:
     cli
 
     /**
+     * Enable global pages and page-size extension. (XXX: should we test whether these are
+     * supported before enabling them?)
+     */
+    mov         %cr4, %rax
+    or          $((1 << 7) | (1 << 4)), %rax
+    mov         %rax, %cr4
+
+    /**
      * Determine the CPU number; this only supports up to 256 cores, we need to support x2APIC for
      * supporting more than this
      */
@@ -29,6 +37,9 @@ _osentry:
     cmpw        %bx, bootboot + 0xC
     jne         ap_start
 
+    // switch to the bootstrap stack
+    lea         bsp_stack_bottom, %rsp
+
     // set up a NULL stack frame, so stack unwinding can stop here
     xor         %rbp, %rbp
 
@@ -37,7 +48,7 @@ _osentry:
     xor         %rax, %rax
     mov         $__kern_bss_size_dwords-1, %rcx
     cld
-    rep stosl // XXX: should be STOSL?
+    rep stosl
 
     // perform initializations
     call        arch_init
@@ -72,3 +83,10 @@ ap_start:
     cli
     hlt
     jmp         .Lyeet
+
+
+/// bootstrap processor stack
+.section .bss
+bsp_stack_top:
+.skip 0x2000
+bsp_stack_bottom:

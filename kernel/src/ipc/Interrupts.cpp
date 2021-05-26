@@ -12,10 +12,8 @@ using namespace ipc;
 /**
  * Creates a new IRQ handler object. This allocates a handle to represent it.
  */
-IrqHandler::IrqHandler(sched::Thread *_thread, const uintptr_t _bits) : thread(_thread),
-    bits(_bits) {
-    this->handle = handle::Manager::makeIrqHandle(this);
-    REQUIRE(static_cast<uintptr_t>(this->handle), "failed to make handle for irq handler");
+IrqHandler::IrqHandler(const rt::SharedPtr<sched::Thread> &_thread, const uintptr_t _bits) : 
+    thread(_thread), bits(_bits) {
 }
 
 /**
@@ -39,15 +37,19 @@ void IrqHandler::fired() {
 /**
  * Creates a new IRQ handler for the given thread and notification bits.
  */
-IrqHandler *Interrupts::create(const uintptr_t irq, sched::Thread *thread, const uintptr_t bits) {
+rt::SharedPtr<IrqHandler> Interrupts::create(const uintptr_t irq,
+        const rt::SharedPtr<sched::Thread> &thread, const uintptr_t bits) {
     // validate args
     if(!thread || !bits) {
         return nullptr;
     }
 
-    // create the info
-    auto info = new IrqHandler(thread, bits);
+    // create the object and assign a handle
+    auto info = rt::SharedPtr<IrqHandler>(new IrqHandler(thread, bits));
     info->irqNum = irq;
+
+    info->handle = handle::Manager::makeIrqHandle(info);
+    REQUIRE(static_cast<uintptr_t>(info->handle), "failed to make handle for irq handler");
 
     // register interrupt
     info->platformToken = platform_irq_register(irq, [](void *ctx, const uintptr_t) -> bool {
@@ -56,11 +58,10 @@ IrqHandler *Interrupts::create(const uintptr_t irq, sched::Thread *thread, const
 
         /// XXX: handle more than one handler
         return true;
-    }, info);
+    }, info.get());
 
     if(!info->platformToken) {
         // failed to install the handler
-        delete info;
         return nullptr;
     }
 

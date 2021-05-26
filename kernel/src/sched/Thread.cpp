@@ -5,12 +5,12 @@
 #include "Task.h"
 #include "IdleWorker.h"
 
-#include "TimerBlocker.h"
+#include "SleepDeadline.h"
 
 #include "ipc/Interrupts.h"
 #include "mem/StackPool.h"
-#include "mem/SlabAllocator.h"
 
+#include <arch.h>
 #include <arch/critical.h>
 
 #include <platform.h>
@@ -18,82 +18,90 @@
 
 using namespace sched;
 
-static char gAllocBuf[sizeof(mem::SlabAllocator<Thread>)] __attribute__((aligned(64)));
-static mem::SlabAllocator<Thread> *gThreadAllocator = nullptr;
-
 /// Thread id for the next thread
-uint32_t Thread::nextTid = 1;
+uintptr_t Thread::nextTid = 1;
+
+bool Thread::gLogLifecycle = false;
+
+
+
 
 /**
- * Initializes the task struct allocator.
+ * Scheduler deadline object that will cancel any pending blocks on the thread when it expires,
+ * allowing for blocks to time out.
  */
-void Thread::initAllocator() {
-    gThreadAllocator = reinterpret_cast<mem::SlabAllocator<Thread> *>(&gAllocBuf);
-    new(gThreadAllocator) mem::SlabAllocator<Thread>();
-}
+struct sched::BlockWait: public Deadline {
+    BlockWait(const uint64_t _when, const rt::SharedPtr<Thread> &_thread) : Deadline(_when),
+    thread(_thread) {}
 
-/**
- * Allocates a new thread.
- */
-Thread *Thread::kernelThread(Task *parent, void (*entry)(uintptr_t), const uintptr_t param) {
-    if(!gThreadAllocator) initAllocator();
-    auto thread = gThreadAllocator->alloc(parent, (uintptr_t) entry, param, true);
+    /**
+     * On expiration, call back into the blocker object
+     */
+    void operator()() override {
+        this->thread->blockExpired();
+    }
 
-    return thread;
-}
-
-/**
- * Frees a previously allocated thread.
- *
- * @note The thread MUST NOT be scheduled or running.
- */
-void Thread::free(Thread *ptr) {
-    gThreadAllocator->free(ptr);
-}
+    /// thread whose blocks time out
+    rt::SharedPtr<Thread> thread;
+};
 
 
 
 /**
  * Allocates a new thread.
  */
-Thread::Thread(Task *_parent, const uintptr_t pc, const uintptr_t param, const bool _kernel) : 
-    task(_parent), kernelMode(_kernel) {
+rt::SharedPtr<Thread> Thread::kernelThread(rt::SharedPtr<Task> &parent, void (*entry)(uintptr_t),
+        const uintptr_t param) {
+    auto ptr = rt::MakeShared<Thread>(parent, (uintptr_t) entry, param, true);
+    ptr->handle = handle::Manager::makeThreadHandle(ptr);
+
+    // add to the parent task
+    parent->addThread(ptr);
+    return ptr;
+}
+
+/**
+ * Allocates a new thread.
+ */
+rt::SharedPtr<Thread> Thread::userThread(rt::SharedPtr<Task> &parent, void (*entry)(uintptr_t),
+        const uintptr_t param) {
+    auto ptr = rt::MakeShared<Thread>(parent, (uintptr_t) entry, param, false);
+    ptr->handle = handle::Manager::makeThreadHandle(ptr);
+
+    // add to the parent task
+    parent->addThread(ptr);
+    return ptr;
+}
+
+
+/**
+ * Allocates a new thread.
+ */
+Thread::Thread(rt::SharedPtr<Task> &_parent, const uintptr_t pc, const uintptr_t param,
+        const bool _kernel) : task(_parent), kernelMode(_kernel) {
     this->tid = nextTid++;
 
     // get a kernel stack
-    this->stack = mem::StackPool::get();
+    this->stack = mem::StackPool::get(this->stackSize);
     REQUIRE(this->stack, "failed to get stack for thread %p", this);
+
+    if(gLogLifecycle) {
+        log("* alloc thread $%p'h (%lu) stack $%p parent $%p'h", this->handle, this->tid,
+                this->stack, this->task->handle);
+    }
 
     // then initialize thread state
     arch::InitThreadState(this, pc, param);
 
-    // and add to task
-    if(_parent) {
-        _parent->addThread(this);
-    }
-
-    // allocate a handle
-    this->handle = handle::Manager::makeThreadHandle(this);
+    Scheduler::threadWasCreated(*this);
 }
 
 /**
  * Destroys all resources associated with this thread.
  */
 Thread::~Thread() {
-    // remove IRQ handlers
-    for(const auto handler : this->irqHandlers) {
-        delete handler;
-    }
-
-    // invoke termination handlers
-    while(!this->terminateSignals.empty()) {
-        auto signal = this->terminateSignals.pop();
-        signal->signal();
-    }
-
-    // remove all objects we're blocking on
-    if(this->blockingOn) {
-        this->blockingOn->reset();
+    if(gLogLifecycle) {
+        log("* dealloc thread $%p'h (%lu)", this->handle, this->tid);
     }
 
     // invalidate the handle
@@ -104,9 +112,30 @@ Thread::~Thread() {
 }
 
 /**
+ * The thread is to be terminated, so invoke all termination handles and clean up some state ahead
+ * of the actual object deallocation.
+ */
+void Thread::callTerminators() {
+    RW_LOCK_WRITE_GUARD(this->lock);
+
+    // invoke termination handlers
+    for(const auto &flag : this->terminateSignals) {
+        flag->signal();
+    }
+
+    // remove IRQ handlers
+    this->irqHandlers.clear();
+
+    // remove all objects we're blocking on
+    for(auto &blocker : this->blockingOn) {
+        blocker->reset();
+    }
+}
+
+/**
  * Returns the currently executing thread.
  */
-Thread *Thread::current() {
+rt::SharedPtr<Thread> Thread::current() {
     return Scheduler::get()->runningThread();
 }
 
@@ -115,8 +144,8 @@ Thread *Thread::current() {
  */
 void Thread::switchFrom() {
     if(this->lastSwitchedTo) {
-        const auto ran = platform_timer_now() - this->lastSwitchedTo;
-        __atomic_fetch_add(&this->cpuTime, ran, __ATOMIC_RELEASE);
+        //const auto ran = platform_timer_now() - this->lastSwitchedTo;
+        //__atomic_fetch_add(&this->cpuTime, ran, __ATOMIC_RELAXED);
     }
 
     // if we've DPCs, execute them
@@ -148,9 +177,10 @@ void Thread::switchTo() {
 
     this->lastSwitchedTo = platform_timer_now();
 
+    auto to = handle::Manager::getThread(this->handle);
     //log("switching to %s (from %s)", this->name, current ? (current->name) : "<null>");
-    Scheduler::get()->setRunningThread(this);
-    arch::RestoreThreadState(current, this);
+    Scheduler::get()->setRunningThread(to);
+    arch::RestoreThreadState(current, to);
 }
 
 /**
@@ -207,31 +237,34 @@ void Thread::die() {
 void Thread::terminate(bool release) {
     DECLARE_CRITICAL();
 
+    bool no = false, yes = true;
+
+    // bail if we're already setting the needs2die flag
+    if(!__atomic_compare_exchange(&this->needsToDie, &no, &yes, false, __ATOMIC_RELEASE,
+                __ATOMIC_RELEASE)) {
+        return;
+    }
+
     // update state
     CRITICAL_ENTER();
 
+    // if not running, set to zombie state
     bool isRunning;
     __atomic_load(&this->isActive, &isRunning, __ATOMIC_ACQUIRE);
 
     if(!isRunning) {
         this->setState(State::Zombie);
-    } else {
-        bool yes = true;
-        __atomic_store(&this->needsToDie, &yes, __ATOMIC_RELEASE);
     }
 
     CRITICAL_EXIT();
-
-    // ensure it's removed from run queues
-    Scheduler::get()->removeThreadFromRunQueue(this);
 
     // if running, context switch away
     if(isRunning) {
         yield();
     } 
-    // delete it right away since the thread isn't running
+    // not running so we can enqueue deletion right away
     else {
-        if(release) Scheduler::get()->idle->queueDestroyThread(this);
+        if(release) Scheduler::get()->idle->queueDestroyThread(this->sharedFromThis());
     }
 }
 
@@ -241,7 +274,7 @@ void Thread::terminate(bool release) {
 void Thread::deferredTerminate() {
     this->setState(State::Zombie);
 
-    Scheduler::get()->idle->queueDestroyThread(this);
+    Scheduler::get()->idle->queueDestroyThread(this->sharedFromThis());
 }
 
 
@@ -253,18 +286,26 @@ void Thread::deferredTerminate() {
  * "best effort" hint to the actual sleep time.
  */
 void Thread::sleep(const uint64_t nanos) {
+    if(!nanos) return;
+
+    DECLARE_CRITICAL();
     auto thread = current();
-    int err;
 
-    // create the timer blockable
-    TimerBlocker block(nanos);
+    // create the sleep deadline
+    const auto dueAt = platform_timer_now() + nanos + 10000ULL;
+    rt::SharedPtr<SleepDeadline> deadline(new SleepDeadline(dueAt, thread->sharedFromThis()));
 
-    // wait on it
-    err = thread->blockOn(&block);
+    CRITICAL_ENTER();
 
-    if(err) {
-        log("sleep failed: %d state %d", err, (int) thread->state);
-    }
+    // mark thread as sleeping
+    thread->setState(State::Sleeping);
+    // add deadline to scheduler
+    Scheduler::get()->addDeadline(deadline);
+
+    CRITICAL_EXIT();
+
+    // give up the remaining CPU time
+    sched::Thread::yield();
 }
 
 /**
@@ -272,78 +313,138 @@ void Thread::sleep(const uint64_t nanos) {
  *
  * @return 0 if the block completed, or an error code if the block was interrupted (because the
  * thread was woken for another reason, for example.)
- *
- * Note that we raise the IRQL, but do not ever lower it; this is because when we get switched back
- * in, the IRQL will be lowered again to the Passive level, i.e. what most threads that are running
- * will be using.
- *
- * TODO: Handle the timeouts
  */
-int Thread::blockOn(Blockable *b, const uint64_t until) {
-    REQUIRE(b, "invalid blockable %p", b);
-    REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
+Thread::BlockOnReturn Thread::blockOn(const rt::SharedPtr<Blockable> &b, const uint64_t until) {
+    REQUIRE(b, "invalid blockable %p", static_cast<void *>(b));
 
-    // raise IRQL to scheduler level (to prevent being preempted)
-    platform_raise_irql(platform::Irql::Scheduler);
+    bool yield = true;
+    rt::SharedPtr<BlockWait> deadline;
 
-    // update thread state
-    RW_LOCK_WRITE(&this->lock);
+    // create the timeout blockable
+    if(until) {
+        deadline = rt::SharedPtr<BlockWait>(new BlockWait(until, this->sharedFromThis()));
+    }
 
-    REQUIRE(this->state == State::Runnable, "Cannot %s thread %p with state: %d (blockable %p)",
-            "block", this, (int) this->state, b);
-    REQUIRE(!this->blockingOn, "cannot block thread %p (object %p) while already blocking (%p)",
-            this, b, this->blockingOn);
+    /*
+     * Set up the thread state for blocking, then yield the remainder of the processor time
+     */
+    {
+        DECLARE_CRITICAL();
 
-    this->blockingOn = b;
-    this->setState(State::Blocked);
+        RW_LOCK_WRITE(&this->lock);
+        CRITICAL_ENTER();
 
-    RW_UNLOCK_WRITE(&this->lock);
+        // prepare for blocking
+        if(b->willBlockOn(this->sharedFromThis())) {
+            yield = false;
+            this->blockState = BlockState::Aborted;
 
-    // yield the rest of the CPU time
-    Scheduler::get()->yield();
+            goto beach;
+        }
 
-    // get state from the blockable
-    bool signaled = b->isSignalled();
-    b->reset();
+        // add to list
+        this->blockingOn.append(b);
 
-    // return whether the thread woke correctly or nah
-    return (signaled ? 0 : -1);
-}
+        // set block flag
+        this->setState(State::Blocked);
+        this->blockState = BlockState::Blocking;
 
-/**
- * Prepares any objects that we're blocking on.
- */
-void Thread::prepareBlocks() {
-    REQUIRE(this->blockingOn, "no blocking objects");
-    this->blockingOn->willBlockOn(this);
+        // install scheduler deadline (for timed blocks)
+        if(deadline){
+            Scheduler::get()->addDeadline(deadline);
+        }
+
+beach:;
+        RW_UNLOCK_WRITE(&this->lock);
+        CRITICAL_EXIT();
+    }
+
+    // finally, yield to scheduler if needed
+    if(yield) {
+        Scheduler::get()->yield();
+    }
+
+    /*
+     * We have returned from the block; determine if it timed out, or whether the blockable has
+     * unblocked us.
+     */
+    {
+        DECLARE_CRITICAL();
+
+        RW_LOCK_WRITE(&this->lock);
+        CRITICAL_ENTER();
+
+        // remove the old deadline
+        if(deadline) {
+            Scheduler::get()->removeDeadline(deadline);
+        }
+
+        RW_UNLOCK_WRITE(&this->lock);
+        CRITICAL_EXIT();
+    }
+
+    // return code depends on block state
+    switch(this->blockState) {
+        // object signalled
+        case BlockState::Unblocked:
+            return BlockOnReturn::Unblocked;
+
+        // timeout/deadline was hit
+        case BlockState::Timeout:
+            return BlockOnReturn::Timeout;
+        // block aborted
+        case BlockState::Aborted:
+            return BlockOnReturn::Aborted;
+
+        default:
+            panic("unhandled block state %d", static_cast<int>(this->blockState));
+    }
 }
 
 /**
  * Unblocks the thread.
  */
-void Thread::unblock(Blockable *b) {
-    REQUIRE_IRQL_LEQ(platform::Irql::Scheduler);
-    REQUIRE(this->state == State::Blocked, "Cannot %s thread %p with state: %d (blockable %p)",
-            "unblock", this, (int) this->state, b);
-
+void Thread::unblock(const rt::SharedPtr<Blockable> &b) {
     DECLARE_CRITICAL();
-    CRITICAL_ENTER();
 
-    // clear the blockable list
-    RW_LOCK_WRITE(&this->lock);
-    REQUIRE(b == this->blockingOn, "thread not blocking on %p! (is %p)", b, this->blockingOn);
+    // update thread state
+    {
+        RW_LOCK_WRITE(&this->lock);
+        CRITICAL_ENTER();
 
-    // finish setting state
-    this->blockingOn->didUnblock();
-    this->blockingOn = nullptr;
+        this->blockState = BlockState::Unblocked;
+        this->setState(State::Runnable, false);
 
-    this->setState(State::Runnable);
+        RW_UNLOCK_WRITE(&this->lock);
+        CRITICAL_EXIT();
+    }
 
-    RW_UNLOCK_WRITE(&this->lock);
-    CRITICAL_EXIT();
+    // add to scheduler's "potentially runnable" queue
+    Scheduler::get()->markThreadAsRunnable(this->sharedFromThis(), true);
+    //Scheduler::get()->threadUnblocked(this->sharedFromThis());
+}
 
-    // queue in scheduler
-    Scheduler::get()->markThreadAsRunnable(this, true);
+/**
+ * Cancels any pending blocks.
+ */
+void Thread::blockExpired() {
+    DECLARE_CRITICAL();
+
+    // update thread state
+    {
+        RW_LOCK_WRITE(&this->lock);
+        CRITICAL_ENTER();
+
+        this->blockState = BlockState::Timeout;
+        this->setState(State::Runnable, false);
+
+        RW_UNLOCK_WRITE(&this->lock);
+        CRITICAL_EXIT();
+    }
+
+    // re-enqueue into scheduler
+    Scheduler::get()->markThreadAsRunnable(this->sharedFromThis(), true);
+    //Scheduler::get()->threadUnblocked(this->sharedFromThis());
 }
 
 
@@ -424,15 +525,13 @@ void Thread::runDpcs() {
  * @param waitUntil Absolute timepoint until which to wait, 0 to poll, or the maximum value of
  * the type to wait forever.
  *
- * @return 0 if the thread terminated, 1 if the wait timed out, or a negativ error code.
+ * @return 0 if the thread terminated, 1 if the wait timed out, or a negative error code.
  */
 int Thread::waitOn(const uint64_t waitUntil) {
-    int err;
-
     DECLARE_CRITICAL();
 
     // create the notification flag
-    auto flag = new SignalFlag;
+    auto flag = SignalFlag::make();
     if(!flag) {
         return -1;
     }
@@ -441,21 +540,31 @@ int Thread::waitOn(const uint64_t waitUntil) {
     CRITICAL_ENTER();
     RW_LOCK_WRITE(&this->lock);
 
-    this->terminateSignals.push_back(flag);
+    this->terminateSignals.append(flag);
 
     RW_UNLOCK_WRITE(&this->lock);
     CRITICAL_EXIT();
 
     // now, block the caller on this object
-    err = sched::Thread::current()->blockOn(flag, waitUntil);
+    auto err = sched::Thread::current()->blockOn(flag, waitUntil);
 
-    // release the flag and interpret the block return
-    delete flag;
+    // remove the termination flag again
+    CRITICAL_ENTER();
+    RW_LOCK_WRITE(&this->lock);
 
-    if(!err) { // block completed
-        return 0;
-    } else { // some sort of error
-        return err;
+    this->terminateSignals.remove(flag);
+
+    RW_UNLOCK_WRITE(&this->lock);
+    CRITICAL_EXIT();
+
+    // return appropriate code
+    switch(err) {
+        case BlockOnReturn::Unblocked:
+            return 0;
+        case BlockOnReturn::Timeout:
+            return 1;
+        default:
+            return -1;
     }
 }
 
@@ -494,11 +603,11 @@ unhandled:;
     REQUIRE(this->task, "no task for thread %p with fault %d", this, (int) type);
 
     // print the register info
-    constexpr static const size_t kBufSize = 512;
+    constexpr static const size_t kBufSize = 1024;
     char buf[kBufSize];
     arch::PrintState(arch, buf, kBufSize);
 
-    log("Unhandled fault %d in thread $%08x'h (%s) info %08x pc %08x\n%s", (int) type, this->handle, 
+    log("Unhandled fault %d in thread $%p'h (%s) info %p pc %p\n%s", (int) type, this->handle, 
             this->name, context, pc, buf);
     this->task->terminate(-1);
 }
@@ -514,19 +623,12 @@ unhandled:;
 void Thread::notify(const uintptr_t bits) {
     uintptr_t mask;
 
-    bool no = false, yes = true;
-
     // set the bits
     const auto set = __atomic_or_fetch(&this->notifications, bits, __ATOMIC_RELEASE);
     __atomic_load(&this->notificationMask, &mask, __ATOMIC_RELAXED);
 
     if(set & mask) {
-        // unblock me boi
-        if(this->notificationsFlag &&
-                __atomic_compare_exchange(&this->notified, &no, &yes, false, __ATOMIC_RELEASE,
-                    __ATOMIC_RELAXED)) {
-            this->notificationsFlag->signal();
-        }
+        // TODO: wake up thread
     }
 }
 
@@ -559,7 +661,7 @@ uintptr_t Thread::blockNotify(const uintptr_t _mask) {
     }
 
     // prepare for blocking
-    auto flag = new SignalFlag;
+    auto flag = SignalFlag::make();
     this->notificationsFlag = flag;
 
     CRITICAL_EXIT();
@@ -570,7 +672,6 @@ uintptr_t Thread::blockNotify(const uintptr_t _mask) {
     // woke up from blocking. return the set bits
     this->notificationsFlag = nullptr;
     __atomic_clear(&this->notified, __ATOMIC_RELEASE);
-    delete flag;
 
     const auto newBits = __atomic_fetch_and(&this->notifications, ~mask, __ATOMIC_RELAXED);
     return (newBits & mask);

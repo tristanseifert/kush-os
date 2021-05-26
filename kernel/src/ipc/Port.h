@@ -5,6 +5,7 @@
 
 #include <handle/Manager.h>
 #include <runtime/List.h>
+#include <runtime/SmartPointers.h>
 #include <runtime/Queue.h>
 #include <sched/Blockable.h>
 
@@ -21,15 +22,13 @@ namespace ipc {
  * Threads may block on a port; only one thread may block for receiving, while multiple threads
  * may be blocked waiting to send on a port.
  */
-class Port {
+class Port: public rt::SharedFromThis<Port> {
     public:
         /// Allocates a new port
-        static Port *alloc();
-        /// Releases a previously allocated port
-        static void free(Port *);
+        static rt::SharedPtr<Port> alloc();
 
         // you ought to use the above functions instead
-        Port();
+        Port() = default;
         ~Port();
 
         /// Sends a message to the port
@@ -62,7 +61,18 @@ class Port {
             friend class Port;
 
             /// Construct a new blocker for the given port.
-            Blocker(Port *_port) : port(_port) {}
+            Blocker(const rt::SharedPtr<Port> &_port) : port(_port) {}
+
+            public:
+                inline static auto make(Port *port) {
+                    return make(port->sharedFromThis());
+                }
+
+                static rt::SharedPtr<Blocker> make(const rt::SharedPtr<Port> &port) {
+                    rt::SharedPtr<Blocker> ptr(new Blocker(port));
+                    ptr->us = rt::WeakPtr<Blocker>(ptr);
+                    return ptr;
+                }
 
             public:
                 /// We're signalled whenever the port's message queue is not empty.
@@ -85,21 +95,28 @@ class Port {
                     //bool yes = true, no = false;
                     //if(__atomic_compare_exchange(&this->signalled, &no, &yes, false, __ATOMIC_ACQUIRE, __ATOMIC_RELEASE)) {
                     if(!__atomic_test_and_set(&this->signalled, __ATOMIC_RELEASE)) {
-                        this->unblock();
+                        this->blocker->unblock(this->us.lock());
                     }
                 }
 
                 /// Sets the receive blockable object of the port when we're validly blocked on.
-                void willBlockOn(sched::Thread *t) override {
-                    Blockable::willBlockOn(t);
-
-                    if(this->unblockedSignalled) {
-                        this->unblock();
+                int willBlockOn(const rt::SharedPtr<sched::Thread> &t) override {
+                    if(int err = Blockable::willBlockOn(t)) {
+                        return err;
                     }
+
+                    if(this->signalled || this->unblockedSignalled) {
+                        return -1;
+                    }
+                    return 0;
                 }
 
             private:
-                Port *port = nullptr;
+                rt::WeakPtr<Blocker> us;
+
+                /// port we're gonna signal
+                rt::SharedPtr<Port> port;
+
                 bool unblockedSignalled = false;
                 bool signalled = false;
         };
@@ -146,6 +163,9 @@ class Port {
         /// maximum length of message
         constexpr static const size_t kMaxMsgLen = 4096 * 9;
 
+        /// whether dequeuing of messages is logged
+        static bool gLogQueuing;
+
         static void initAllocator();
 
     private:
@@ -155,10 +175,8 @@ class Port {
         /// kernel object handle for this port
         Handle handle;
 
-        /// thread that's waiting to receive from this port, if any
-        sched::Thread *receiver = nullptr;
         /// the blocker object for the receiver
-        Blocker *receiverBlocker = nullptr;
+        rt::SharedPtr<Blocker> receiverBlocker;
 
         /// maximum queue size (0 = unlimited)
         size_t maxMessages = 0;

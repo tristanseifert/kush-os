@@ -26,10 +26,7 @@ void *operator new(size_t size) {
 }
 /// Aligned allocation
 void *operator new(size_t size, std::align_val_t al) {
-    void *result = mem::Heap::alloc(size);
-
-    //log("requesting aligned alloc for size %zu (align %zu) %p", size, (size_t) al, result);
-    return result;
+    return mem::Heap::allocAligned(size, static_cast<size_t>(al));
 }
 /// Allocates an array
 void *operator new[](size_t size) {
@@ -51,4 +48,11 @@ void operator delete[](void *p) {
 /// release aligned memory
 void operator delete(void *p, std::align_val_t al) {
     mem::Heap::free(p);
+}
+
+/**
+ * Fake support for destructors (doesn't actually do anything)
+ */
+extern "C" int __cxa_atexit(void (*f)(void *), void *objptr, void *dso) {
+    return 0;
 }

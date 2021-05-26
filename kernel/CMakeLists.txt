@@ -28,21 +28,23 @@ add_executable(kernel
     src/c/stack_guard.c
     src/c/printf.c
     src/c/string.c
-    src/mem/AnonPool.cpp
     src/mem/PhysicalAllocator.cpp
+    src/mem/PhysRegion.cpp
     src/mem/StackPool.cpp
     src/mem/Heap.cpp
-    src/mem/liballoc/liballoc.cpp
+    src/mem/dlmalloc/dlmalloc.cpp
     src/runtime/CppRuntime.cpp
     src/runtime/log.cpp
     src/runtime/Hash.cpp
     src/vm/Mapper.cpp
     src/vm/Map.cpp
     src/vm/MapEntry.cpp
+    src/sched/GlobalState.cpp
     src/sched/Scheduler.cpp
     src/sched/Task.cpp
     src/sched/Thread.cpp
     src/sched/IdleWorker.cpp
+    src/sched/Oclock.cpp
     src/sys/Interrupts.cpp
     src/sys/Notifications.cpp
     src/sys/Port.cpp
@@ -78,7 +80,7 @@ set_target_properties(kernel PROPERTIES SUFFIX "${PLATFORM_KERNEL_EXTENSION}")
 
 # kernel is freestanding
 target_compile_options(kernel PRIVATE ${KERNEL_COMPILE_OPTS} ${ARCH_COMPILE_OPTS})
-target_compile_options(kernel PRIVATE -Os)
+#target_compile_options(kernel PRIVATE -Os)
 target_link_options(kernel PRIVATE ${KERNEL_COMPILE_OPTS} -fno-pie --static -nostartfiles)
 
 # configure the linker script

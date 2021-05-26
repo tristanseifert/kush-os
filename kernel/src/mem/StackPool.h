@@ -1,6 +1,7 @@
 #ifndef KERNEL_MEM_STACKPOOL_H
 #define KERNEL_MEM_STACKPOOL_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <arch/spinlock.h>
 
@@ -19,8 +20,13 @@ class StackPool {
 
     public:
         /// Allocates a new kernel stack, returning its bottom (base) address
+        static void *get(size_t &stackSize) {
+            return gShared->alloc(stackSize);
+        }
+        /// Allocates a new kernel stack, returning its bottom (base) address
         static void *get() {
-            return gShared->alloc();
+            size_t unused;
+            return gShared->alloc(unused);
         }
         /// Releases a previously allocated stack, given its base (bottom) address
         static void release(void *base) {
@@ -33,20 +39,30 @@ class StackPool {
         static void init();
 
         /// returns an available stack
-        void *alloc();
+        void *alloc(size_t &size);
         /// releases the given stack
         void free(void *base);
 
     private:
+#if defined(__i386__)
         /// base address of the stack pool region
-        static const uintptr_t kBaseAddr = 0xC1000000;
+        constexpr static const uintptr_t kBaseAddr = 0xC1000000;
         /// size of the stack pool region
-        static const uintptr_t kRegionLength = (0xC3000000 - kBaseAddr);
-
+        constexpr static const size_t kRegionLength = (0xC3000000 - kBaseAddr);
         /// size of a single stack region (in bytes)
-        static const uintptr_t kStackSize = 0x4000;
+        constexpr static const size_t kStackSize = 0x4000;
+#elif defined(__amd64__)
+        constexpr static const uintptr_t kBaseAddr = 0xFFFF820000000000;
+        //constexpr static const size_t kRegionLength = 0x8000000;
+        constexpr static const size_t kStackSize = 0x8000;
+        // 1G for now; 32G are reserved
+        constexpr static const size_t kRegionLength = 0x40000000;
+#else
+#error Unsupported architecture
+#endif
+
         /// total number of stacks
-        static const uintptr_t kNumStacks = kRegionLength / kStackSize;
+        constexpr static const size_t kNumStacks = kRegionLength / kStackSize;
         static_assert(!(kNumStacks & 0x1F), "Number of stacks must be a multiple of 32");
 
         /// shared anon pool instance

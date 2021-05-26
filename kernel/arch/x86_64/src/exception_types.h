@@ -43,4 +43,7 @@
 /// Virtualization exception
 #define X86_EXC_VIRT                            0x14
 
+/// Interrupt (not an exception, but used to indicate IRQ entry)
+#define X86_EXC_IRQ                             0x8000
+
 #endif

@@ -37,5 +37,5 @@ target_compile_definitions(driverman PRIVATE -DCLI11_HAS_FILESYSTEM=0)
 target_link_libraries(driverman PRIVATE CLI11::CLI11)
 
 # install it to boot directory in sysroot
-install(TARGETS driverman RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)
+install(TARGETS driverman RUNTIME DESTINATION ${SYSROOT_DIR}/boot)
 

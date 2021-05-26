@@ -127,18 +127,44 @@ class Vector {
          * Inserts a new item to the end of the vector.
          */
         void push_back(const T value) {
-            // grow the buffer if needed
-            if(!this->storage || this->numReserved == this->numAllocated) {
-                // TODO: better growing algorithm
-                const auto nItems = this->numReserved + 64;
-                const size_t newSz = nItems * sizeof(T);
+            this->ensureStorage();
 
-                this->storage = reinterpret_cast<T *>(mem::Heap::realloc(this->storage, newSz));
-                this->numReserved = nItems;
-            }
-
-            // insert at the end
+            // insert at the end (XXX: is the default allocation needed?)
+            new(&this->storage[this->numAllocated]) T();
             this->storage[this->numAllocated++] = value;
+        }
+        /**
+         * Inserts an item at the given index.
+         *
+         * @param index Index to add the item at, in the range of [0, size].
+         */
+        void insert(const size_t index, const T value) {
+            REQUIRE(index <= this->numAllocated, "vector access out of bounds: %zu", index);
+
+            // end of vector case
+            if(index == this->numAllocated) {
+                return this->push_back(value);
+            }
+            // we'll have to shift items
+            else {
+                // ensure there's space for one more item
+                this->ensureStorage();
+
+                // then shift items down and insert at desired index
+                const auto toMove = (this->numAllocated - index);
+                if(toMove) {
+                    // shift items down, but do it in reverse
+                    for(size_t j = (toMove - 1); j; j--) {
+                        this->storage[index + j + 1] = this->storage[index + j];
+                    }
+                    //memmove(&this->storage[index+1], &this->storage[index], toMove * sizeof(T));
+                }
+
+                this->storage[index] = value;
+
+                // update counts
+                this->numAllocated++;
+            }
         }
         /**
          * Removes the item at the given index.
@@ -150,11 +176,14 @@ class Vector {
             const size_t toMove = (this->numAllocated - index) - 1;
 
             if(toMove) {
-                memmove(&this->storage[index], &this->storage[index+1], toMove * sizeof(T));
+                for(size_t j = 0; j < toMove; j++) {
+                    this->storage[index + j] = this->storage[index + j + 1];
+                }
+                //memmove(&this->storage[index], &this->storage[index+1], toMove * sizeof(T));
             }
 
-            // update counts
-            this->numAllocated--;
+            // invoke destructor for last item and update counts
+            this->storage[(this->numAllocated-- - 1)].~T();
         }
         /**
          * Removes all objects from the vector.
@@ -167,6 +196,15 @@ class Vector {
             }
 
             this->numAllocated = 0;
+        }
+
+        /**
+         * Removes the last element.
+         */
+        void pop_back() {
+            REQUIRE(this->numAllocated, "cannot %s empty vector", "pop");
+
+            this->storage[(this->numAllocated-- - 1)].~T();
         }
 
         /// Gets an iterator to the start of the vector
@@ -191,6 +229,28 @@ class Vector {
             return !this->numAllocated;
         }
 
+        /// Return a reference to the last item in the vector
+        T& back() {
+            REQUIRE(this->numAllocated, "cannot %s empty vector", "get back element of");
+            return this->storage[this->numAllocated - 1];
+        }
+        /// Return a reference to the last item in the vector
+        const T& back() const {
+            REQUIRE(this->numAllocated, "cannot %s empty vector", "get back element of");
+            return this->storage[this->numAllocated - 1];
+        }
+
+        /// Return a reference to the first item in the vector
+        T& front() {
+            REQUIRE(this->numAllocated, "cannot %s empty vector", "get front element of");
+            return this->storage[0];
+        }
+        /// Return a reference to the first item in the vector
+        const T& front() const {
+            REQUIRE(this->numAllocated, "cannot %s empty vector", "get front element of");
+            return this->storage[0];
+        }
+
         /// Gets a reference to the given item
         const T& operator[](const size_t index) const {
             REQUIRE(index < this->numAllocated, "vector access out of bounds: %zu", index);
@@ -200,6 +260,27 @@ class Vector {
         T& operator[](const size_t index) {
             REQUIRE(index < this->numAllocated, "vector access out of bounds: %zu", index);
             return this->storage[index];
+        }
+
+    private:
+        /**
+         * Allocates the storage buffer or resizes it if needed.
+         */
+        void ensureStorage() {
+            if(!this->storage || this->numReserved == this->numAllocated) {
+                // TODO: better growing algorithm
+                const auto nItems = this->numReserved + 64;
+                const size_t newSz = nItems * sizeof(T);
+
+                this->storage = reinterpret_cast<T *>(mem::Heap::realloc(this->storage, newSz));
+
+                // default initialize the newly allocated objects
+                for(size_t i = this->numReserved; i < nItems; i++) {
+                    new(&this->storage[i]) T();
+                }
+
+                this->numReserved = nItems;
+            }
         }
 
     private:

@@ -40,7 +40,7 @@ typedef uintptr_t tss_t;
 typedef uintptr_t tls_key;
 typedef uintptr_t once_flag;
 
-
+#define thread_local _Thread_local
 
 /* Function return values */
 #define thrd_error    0 /**< The requested operation failed */

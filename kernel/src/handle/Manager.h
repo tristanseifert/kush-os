@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <runtime/SmartPointers.h>
 #include <runtime/Vector.h>
 
 #include <arch/rwlock.h>
@@ -11,7 +12,15 @@
 extern "C" void kernel_init();
 
 /// Handle type
-enum class Handle: uintptr_t {};
+enum class Handle: uintptr_t {
+    // invalid handle
+    Invalid                     = 0,
+};
+
+/// test whether a handle is valid: e.g. !!handle
+constexpr inline bool operator!(Handle h) {
+    return h == Handle::Invalid;
+}
 
 namespace vm {
 class MapEntry;
@@ -30,8 +39,9 @@ namespace handle {
  * Handles are opaque identifiers, which can be passed to userspace, that represent different
  * types of kernel objects.
  *
- * Note that we do not take ownership of the objects; you're responsible for getting rid of them
- * as needed, once they're released; then freeing the handle slot.
+ * Note that we do not take ownership of the objects; we store weak references to them, but it is
+ * the responsibility of the object that owns the handle to release the handle slot when it is
+ * being deallocated.
  */
 class Manager {
     friend void ::kernel_init();
@@ -48,7 +58,7 @@ class Manager {
 
     public:
         /// Allocates a new handle for the given task.
-        static Handle makeTaskHandle(sched::Task *task) {
+        static Handle makeTaskHandle(const rt::SharedPtr<sched::Task> &task) {
             RW_LOCK_WRITE_GUARD(gShared->taskHandlesLock);
             return gShared->allocate(task, gShared->taskHandles, Type::Task);
         }
@@ -65,7 +75,7 @@ class Manager {
             return gShared->release(h, gShared->taskHandles);
         }
         /// Returns the task that the given handle points to.
-        static sched::Task *getTask(const Handle h) {
+        static rt::SharedPtr<sched::Task> getTask(const Handle h) {
             // validate type
             const auto type = getType(h);
             if(type != Type::Task) {
@@ -76,8 +86,9 @@ class Manager {
             return gShared->get(h, gShared->taskHandles);
         }
 
+
         /// Allocates a new handle for the given thread.
-        static Handle makeThreadHandle(sched::Thread *thread) {
+        static Handle makeThreadHandle(const rt::SharedPtr<sched::Thread> &thread) {
             RW_LOCK_WRITE_GUARD(gShared->threadHandlesLock);
             return gShared->allocate(thread, gShared->threadHandles, Type::Thread);
         }
@@ -94,7 +105,7 @@ class Manager {
             return gShared->release(h, gShared->threadHandles);
         }
         /// Returns the thread that the given handle points to.
-        static sched::Thread *getThread(const Handle h) {
+        static rt::SharedPtr<sched::Thread> getThread(const Handle h) {
             // validate type
             const auto type = getType(h);
             if(type != Type::Thread) {
@@ -105,8 +116,9 @@ class Manager {
             return gShared->get(h, gShared->threadHandles);
         }
 
+
         /// Allocates a new handle for the given mapping object.
-        static Handle makeVmObjectHandle(vm::MapEntry *vmObject) {
+        static Handle makeVmObjectHandle(const rt::SharedPtr<vm::MapEntry> &vmObject) {
             RW_LOCK_WRITE_GUARD(gShared->vmObjectHandlesLock);
             return gShared->allocate(vmObject, gShared->vmObjectHandles, Type::VmRegion);
         }
@@ -123,7 +135,7 @@ class Manager {
             return gShared->release(h, gShared->vmObjectHandles);
         }
         /// Returns the mapping entry object that the given handle points to.
-        static vm::MapEntry *getVmObject(const Handle h) {
+        static rt::SharedPtr<vm::MapEntry> getVmObject(const Handle h) {
             // validate type
             const auto type = getType(h);
             if(type != Type::VmRegion) {
@@ -134,8 +146,9 @@ class Manager {
             return gShared->get(h, gShared->vmObjectHandles);
         }
 
+
         /// Allocates a new handle for the given port.
-        static Handle makePortHandle(ipc::Port *port) {
+        static Handle makePortHandle(const rt::SharedPtr<ipc::Port> &port) {
             RW_LOCK_WRITE_GUARD(gShared->portHandlesLock);
             return gShared->allocate(port, gShared->portHandles, Type::Port);
         }
@@ -152,7 +165,7 @@ class Manager {
             return gShared->release(h, gShared->portHandles);
         }
         /// Returns the mapping entry object that the given handle points to.
-        static ipc::Port *getPort(const Handle h) {
+        static rt::SharedPtr<ipc::Port> getPort(const Handle h) {
             // validate type
             const auto type = getType(h);
             if(type != Type::Port) {
@@ -163,8 +176,9 @@ class Manager {
             return gShared->get(h, gShared->portHandles);
         }
 
+
         /// Allocates a new handle for the given IRQ handler.
-        static Handle makeIrqHandle(ipc::IrqHandler *handler) {
+        static Handle makeIrqHandle(const rt::SharedPtr<ipc::IrqHandler> &handler) {
             RW_LOCK_WRITE_GUARD(gShared->irqHandlesLock);
             return gShared->allocate(handler, gShared->irqHandles, Type::IrqHandler);
         }
@@ -181,31 +195,32 @@ class Manager {
             return gShared->release(h, gShared->irqHandles);
         }
         /// Returns the IRQ handler object the given handle points to.
-        static ipc::IrqHandler *getIrq(const Handle h) {
+        static rt::SharedPtr<ipc::IrqHandler> getIrq(const Handle h) {
             // validate type
             const auto type = getType(h);
             if(type != Type::IrqHandler) {
                 return nullptr;
             }
 
-            RW_LOCK_READ_GUARD(gShared->portHandlesLock);
+            RW_LOCK_READ_GUARD(gShared->irqHandlesLock);
             return gShared->get(h, gShared->irqHandles);
         }
 
     private:
-        /// wraps a handle slot with an epoch counter
+        /// wraps a handle slot (with smart ptr) with an epoch counter
         template<class T>
         struct HandleInfo {
             // pointer to allocated object, or null if it's free
-            T *object = nullptr;
+            rt::WeakPtr<T> object;
             // epoch counter
             uintptr_t epoch = 0;
 
             HandleInfo() = default;
-            HandleInfo(T *_object) : object(_object) {};
+            HandleInfo(const rt::SharedPtr<T> &_object) : object(rt::WeakPtr<T>(_object)) {};
         };
 
     private:
+#if defined(__i386__)
         /// Index mask
         constexpr static const uintptr_t kIndexMask = 0xFFFFF;
         /// Epoch mask
@@ -229,6 +244,26 @@ class Manager {
         static inline uint8_t getType(const Handle h) {
             return (static_cast<uintptr_t>(h) & 0x78000000) >> kTypePos;
         }
+#elif defined(__amd64__)
+        constexpr static const uintptr_t kIndexMask = 0xFFFFFFFF;
+        constexpr static const uintptr_t kEpochMask = 0xFFFFF;
+        constexpr static const uintptr_t kEpochPos = 32;
+        constexpr static const uintptr_t kTypeMask = 0xF;
+        constexpr static const uintptr_t kTypePos = 52;
+
+        static inline uintptr_t getIndex(const Handle h) {
+            return static_cast<uintptr_t>(h) & kIndexMask;
+        }
+        static inline uintptr_t getEpoch(const Handle h) {
+            return (static_cast<uintptr_t>(h) & (kEpochMask << kEpochPos)) >> kEpochPos;
+        }
+        static inline uint8_t getType(const Handle h) {
+            return (static_cast<uintptr_t>(h) & (kTypeMask << kTypePos)) >> kTypePos;
+        }
+#else
+#error Unsupported architecture
+#endif
+
 
         /// Creates a new handle.
         static inline Handle makeHandle(const Type t, const uintptr_t index, const uintptr_t epoch) {
@@ -252,11 +287,15 @@ class Manager {
          * You must hold the appropriate write lock when calling this function.
          */
         template<class T>
-        Handle allocate(T *object, rt::Vector<HandleInfo<T>> &handles, const Type type) {
+        Handle allocate(const rt::SharedPtr<T> &object, rt::Vector<HandleInfo<T>> &handles,
+                const Type type) {
             // try to find a free slot
             for(size_t i = 0; i < handles.size(); i++) {
                 auto &slot = handles[i];
-                if(slot.object) continue;
+                if(slot.object && !slot.object.expired()) continue;
+
+                // we don't know when the object expired so increment epoch to be safe
+                if(slot.object.expired()) slot.epoch++;
 
                 slot.object = object;
                 return makeHandle(type, i, slot.epoch);
@@ -275,7 +314,7 @@ class Manager {
          * Gets the object value of the given handle.
          */
         template<class T>
-        T *get(const Handle h, const rt::Vector<HandleInfo<T>> &handles) {
+        rt::SharedPtr<T> get(const Handle h, const rt::Vector<HandleInfo<T>> &handles) {
             // validate index
             const auto index = getIndex(h);
             if(index >= handles.size()) {
@@ -290,10 +329,9 @@ class Manager {
                 return nullptr;
             }
 
-            // the handle checked out; return the value
-            return info.object;
+            // the handle is valid, so try to return the object
+            return info.object.lock();
         }
-
 
         /**
          * Releases the given handle slot, and increments its epoch counter so a stale handle can
@@ -321,9 +359,7 @@ class Manager {
             }
 
             // it's valid, so clear the pointer and increment the epoch
-            T *null = nullptr;
-
-            __atomic_store(&info.object, &null, __ATOMIC_RELEASE);
+            info.object = nullptr;
             __atomic_add_fetch(&info.epoch, 1, __ATOMIC_RELEASE);
 
             // we get here, it's gone :D

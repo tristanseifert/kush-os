@@ -154,6 +154,27 @@ class List {
         }
 
         /**
+         * Removes all objects from the list.
+         */
+        void clear() {
+            auto ptr = this->head;
+            this->head = nullptr;
+
+            while(ptr) {
+                auto old = ptr;
+
+                // advance to next element
+                ptr = ptr->next;
+
+                // delete this element
+                this->numElements--;
+                delete old;
+            }
+
+            this->tail = nullptr;
+        }
+
+        /**
          * Iterates all items in the list, removing those that match certain criteria.
          *
          * The parameters to the callback function are a specified context value, the value in the
@@ -206,6 +227,23 @@ class List {
             return _removeMatching(callback, ctx);
         }
 
+        /**
+         * Removes the given item.
+         */
+        void remove(const T &item) {
+            struct Info {
+                const T &item;
+                Info(const T& ref) : item(ref) {}
+            };
+
+            Info i(item);
+
+            this->removeMatching([](void *ctx, T &item) -> bool {
+                auto info = reinterpret_cast<Info *>(ctx);
+                return (item == info->item);
+            }, &i);
+        }
+
         /// Gets a reference to the given item
         const T& operator[](const size_t index) const {
             REQUIRE(index < this->numElements, "list access out of bounds: %zu (%zu %p %p)",
@@ -229,7 +267,7 @@ class List {
 
         /// Is the list empty?
         const bool empty() const {
-            return (this->head == nullptr);
+            return !this->numElements;
         }
         /// Number of items in the list
         const size_t size() const {

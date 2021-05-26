@@ -1,8 +1,10 @@
 #ifndef KERN_PLATFORM_H
 #define KERN_PLATFORM_H
 
-#include <stdint.h>
-#include <stddef.h>
+#include <cstdint>
+#include <cstddef>
+
+#include <runtime/SmartPointers.h>
 
 namespace sched {
 struct Task;
@@ -44,6 +46,28 @@ enum class Irql {
      */
     Passive                             = 0,
 };
+
+/// Invoked immediately after the kernel VM map is activated the first time
+void KernelMapEarlyInit();
+
+/// Read the current value of the core local timestamp counter (in nanoseconds)
+uint64_t GetLocalTsc();
+
+/// Sets the core local timer to fire in the given number of nanoseconds
+void SetLocalTimer(const uint64_t interval);
+/// Stops the core local timer
+void StopLocalTimer();
+
+/// Sends a scheduler self IPI
+void RequestSchedulerIpi();
+/// Sends a scheduler IPI to the given core
+void RequestSchedulerIpi(const uintptr_t coreId);
+
+/**
+ * Called by the idle task when there is no other work to be performed on this processor core. The
+ * platform code can use this to place the processor in a low power state.
+ */
+void Idle();
 }
 
 /**
@@ -177,45 +201,27 @@ void platform_request_dispatch();
 uint64_t platform_timer_now();
 
 /**
- * Registers a new timer callback.
+ * Returns a core local timestamp.
  *
- * The given function is invoked at (or after -- there is no guarantee made as to the resolution of
- * the underlying hardware timers) the given time, in nanoseconds since system boot.
- *
- * Returned is an opaque token that can be used to cancel the timer before it fires. Timers are
- * always one shot.
- *
- * @note The callbacks may be invoked in an interrupt context; you should do as little work as
- * possible there.
- *
- * @return An opaque timer token, or 0 in case an error occurs.
+ * There is no guarantee that the values returned by this function on separate core have any sort
+ * of correlation, or that they start at a particular value at reset. It is only guaranteed that
+ * the values returned will be increasing, e.g. that two successive invocations on the same core
+ * will ALWAYS result in the second call's result being greater than the first.
  */
-uintptr_t platform_timer_add(const uint64_t at, void (*callback)(const uintptr_t, void *), void *ctx);
+uint64_t platform_local_timer_now();
 
 /**
- * Removes a previously created timer, if it has not fired yet.
+ * Determines a relative cost value between two cores, as identified by their IDs.
+ *
+ * @return Negative if error, or a cost value [0, INT_MAX).
  */
-void platform_timer_remove(const uintptr_t token);
+int platform_core_distance(const uintptr_t a, const uintptr_t b);
 
-
-/**
- * Called by the idle task when there is no other work to be performed on this processor core. The
- * platform code can use this to place the processor in a low power state.
- */
-void platform_idle();
 
 /**
  * Initializes the root server task.
  */
-sched::Task *platform_init_rootsrv();
+rt::SharedPtr<sched::Task> platform_init_rootsrv();
 
-
-////////////////////////////////////////////////////////////////////////////////
-/// Functions below are defined by the kernel.
-
-/// Indicates to the kernel a time tick has taken place.
-extern void platform_kern_tick(const uintptr_t irqToken);
-/// Invokes the scheduler, in response to a scheduler IPI.
-extern void platform_kern_scheduler_update(const uintptr_t irqToken);
 
 #endif

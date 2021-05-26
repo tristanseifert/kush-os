@@ -38,7 +38,7 @@ BundleFileRpcHandler::BundleFileRpcHandler(std::shared_ptr<Bundle> &_bundle) : b
         throw std::system_error(err, std::generic_category(), "PortCreate");
     }
 
-    LOG("Bundle file IO port: $%08x'h", this->portHandle);
+    LOG("Bundle file IO port: $%p'h", this->portHandle);
 
     // create the thread next
     this->run = true;

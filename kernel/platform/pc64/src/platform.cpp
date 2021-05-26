@@ -2,48 +2,38 @@
 #include <log.h>
 
 #include "physmap.h"
+#include "acpi/Parser.h"
 #include "io/spew.h"
-#include "irq/pic.h"
+#include "irq/Manager.h"
+#include "timer/Hpet.h"
 #include "timer/pit.h"
+#include "timer/Tsc.h"
 
 #include <bootboot.h>
 #include <stdint.h>
+#include <x86intrin.h>
 
 using namespace platform;
 
 /// bootloader info
 extern "C" BOOTBOOT bootboot;
-extern "C" uint8_t fb;
 
 /**
  * Initializes the platform code.
- *
- * At this point, we disable a bunch of legacy stuff that may be enabled.
  */
 void platform_init() {
     // configure debug printing
     Spew::Init();
 
-    // sex
-    int x, y, s=bootboot.fb_scanline, w=bootboot.fb_width, h=bootboot.fb_height;
-
-    for(y=0;y<h;y++) { *((uint32_t*)(&fb + s*y + (w*2)))=0x00FFFFFF;  }
-    for(x=0;x<w;x++) { *((uint32_t*)(&fb + s*(h/2)+x*4))=0x00FFFFFF;  }
-
-    for(y=0;y<20;y++) { for(x=0;x<20;x++) { *((uint32_t*)(&fb + s*(y+20) + (x+20)*4))=0x00FF0000;  }  }
-    for(y=0;y<20;y++) { for(x=0;x<20;x++) { *((uint32_t*)(&fb + s*(y+20) + (x+50)*4))=0x0000FF00;  }  }
-    for(y=0;y<20;y++) { for(x=0;x<20;x++) { *((uint32_t*)(&fb + s*(y+20) + (x+80)*4))=0x000000FF;  }  }
-
     // parse phys mapping
-    log("BootBoot info: %p (protocol %u, %u cores)", &bootboot, bootboot.protocol, bootboot.numcores);
+    Physmap::Init();
+    Physmap::DetectKernelPhys();
 
-    const auto &ar = bootboot.arch.x86_64;
-    log("ACPI %p SMBI %p EFI %p MB %p", ar.acpi_ptr, ar.smbi_ptr, ar.efi_ptr, ar.mp_ptr);
-    physmap_parse_bootboot(&bootboot);
+    // disable legacy stuff
+    LegacyPIT::disable();
 
-    // set up and remap the PICs and other interrupt controllers
-    irq::LegacyPic::disable();
-    timer::LegacyPIT::disable();
+    // set up interrupt manager
+    IrqManager::Init();
 }
 
 /**
@@ -51,5 +41,34 @@ void platform_init() {
  * to set up interrupts.
  */
 void platform_vm_available() {
+    AcpiParser::Init();
 
+    // set up the system timer and BSP TSC
+    Hpet::Init();
+    Tsc::InitCoreLocal();
+
+    // then, set up the interrupt controllers (both system and BSP local)
+    IrqManager::InitSystemControllers();
+    IrqManager::InitCoreLocalController();
+
+    // prepare stacks, per core info, etc. for all APs
+
+    // signal APs to start and wait
 }
+
+/**
+ * Read out the TSC of the processor for the core local timestamp.
+ */
+uint64_t platform_local_timer_now() {
+    return __rdtsc();
+}
+
+
+
+/**
+ * TODO: implement this
+ */
+int platform_core_distance(const uintptr_t a, const uintptr_t b) {
+    return 0;
+}
+

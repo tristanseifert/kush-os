@@ -20,12 +20,12 @@ using namespace task::loader;
  *
  * @throws An exception is thrown if the ELF header is invalid.
  */
-Elf32::Elf32(FILE *file) : Loader(file) {
+Elf32::Elf32(FILE *file) : ElfCommon(file) {
     // get the header
     Elf32_Ehdr hdr;
-    memset(&hdr, 0, sizeof(Elf32_Ehdr));
+    memset(&hdr, 0, sizeof hdr);
 
-    this->read(sizeof(Elf32_Ehdr), &hdr, 0);
+    this->read(sizeof hdr, &hdr, 0);
 
     // ensure the ELF is little endian, the correct version, and has an entry
     if(hdr.e_ident[EI_DATA] != ELFDATA2LSB) {
@@ -50,7 +50,7 @@ Elf32::Elf32(FILE *file) : Loader(file) {
     }
 
     // ensure CPU architecture
-#if defined(__i386__)
+#if defined(__i386__) || defined(__amd64__)
     if(hdr.e_machine != EM_386) {
         throw LoaderError(fmt::format("Invalid ELF machine type {:08x}", hdr.e_type));
     }
@@ -67,6 +67,7 @@ Elf32::Elf32(FILE *file) : Loader(file) {
     }
 
     this->phdrOff = hdr.e_phoff;
+    this->phdrSize = hdr.e_phentsize;
     this->numPhdr = hdr.e_phnum;
 }
 
@@ -75,7 +76,7 @@ Elf32::Elf32(FILE *file) : Loader(file) {
 /**
  * Maps all sections defined by the program headers into the task.
  */
-void Elf32::mapInto(Task *task) {
+void Elf32::mapInto(const std::shared_ptr<Task> &task) {
     // read program headers 
     std::vector<Elf32_Phdr> phdrs;
     phdrs.resize(this->numPhdr);
@@ -91,7 +92,7 @@ void Elf32::mapInto(Task *task) {
 /**
  * Processes a loaded program header.
  */
-void Elf32::processProgHdr(Task *task, const Elf32_Phdr &phdr) {
+void Elf32::processProgHdr(const std::shared_ptr<Task> &task, const Elf32_Phdr &phdr) {
     switch(phdr.p_type) {
         // load from file
         case PT_LOAD:
@@ -115,8 +116,8 @@ void Elf32::processProgHdr(Task *task, const Elf32_Phdr &phdr) {
 
         // unhandled program header type
         default:
-            LOG("Unhandled phdr type %08x offset %08x vaddr %08x filesz %08x memsz %08x"
-                " flags %08x align %08x", phdr.p_type, phdr.p_offset, phdr.p_vaddr, phdr.p_filesz,
+            LOG("Unhandled phdr type %u offset %p vaddr $%p filesz %u memsz %u"
+                " flags $%08x align %u", phdr.p_type, phdr.p_offset, phdr.p_vaddr, phdr.p_filesz,
                 phdr.p_memsz, phdr.p_flags, phdr.p_align);
             break;
     }
@@ -128,7 +129,7 @@ void Elf32::processProgHdr(Task *task, const Elf32_Phdr &phdr) {
  * This will allocate an anonymous memory region, and copy from the file buffer. It will be mapped
  * in virtual address space at the location specified.
  */
-void Elf32::phdrLoad(Task *task, const Elf32_Phdr &hdr) {
+void Elf32::phdrLoad(const std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
     int err;
     uintptr_t vmHandle, taskHandle, regionBase;
     void *vmBase;
@@ -149,14 +150,15 @@ void Elf32::phdrLoad(Task *task, const Elf32_Phdr &hdr) {
     // LOG("Alloc size %08x (orig %08x)", allocSize, hdr.p_memsz);
 
     // allocate an anonymous region (RW for now) and get its base address in our vm map
-    err = AllocVirtualAnonRegion(0, allocSize, VM_REGION_RW, &vmHandle);
+    err = AllocVirtualAnonRegion(allocSize, VM_REGION_RW, &vmHandle);
     if(err) {
         throw std::system_error(err, std::generic_category(), "AllocVirtualAnonRegion");
     }
 
-    err = VirtualRegionGetInfo(vmHandle, &regionBase, nullptr, nullptr);
+    err = MapVirtualRegionRange(vmHandle, ElfCommon::kTempMappingRange, allocSize, 0, &regionBase);
+
     if(err) {
-        throw std::system_error(err, std::generic_category(), "VirtualRegionGetInfo");
+        throw std::system_error(err, std::generic_category(), "MapVirtualRegionRange");
     }
 
     // set up to write to it
@@ -199,9 +201,9 @@ void Elf32::phdrLoad(Task *task, const Elf32_Phdr &hdr) {
 
     // place the mapping into the task
     taskHandle = task->getHandle();
-    err = MapVirtualRegionAtTo(vmHandle, taskHandle, virtBase);
+    err = MapVirtualRegionRemote(taskHandle, vmHandle, virtBase, allocSize, 0);
     if(err) {
-        throw std::system_error(err, std::generic_category(), "MapVirtualRegionAtTo");
+        throw std::system_error(err, std::generic_category(), "MapVirtualRegionRemote");
     }
 
     // then unmap it from our task
@@ -216,7 +218,7 @@ void Elf32::phdrLoad(Task *task, const Elf32_Phdr &hdr) {
  *
  * This just asserts that the flag is only RW; we do not support executable stack segments.
  */
-void Elf32::phdrGnuStack(Task *, const Elf32_Phdr &hdr) {
+void Elf32::phdrGnuStack(const std::shared_ptr<Task> &, const Elf32_Phdr &hdr) {
     const auto flags = hdr.p_flags & ~(PF_MASKOS | PF_MASKPROC);
     if(flags & PF_X) {
         throw LoaderError(fmt::format("Unsupported stack flags {:08x}", hdr.p_flags));
@@ -231,7 +233,7 @@ void Elf32::phdrGnuStack(Task *, const Elf32_Phdr &hdr) {
  * Per the ELF specification, the string always has a NULL terminator byte. SInce we're going to
  * store this as a C++ string, we chop that off.
  */
-void Elf32::phdrInterp(Task *task, const Elf32_Phdr &hdr) {
+void Elf32::phdrInterp(const std::shared_ptr<Task> &task, const Elf32_Phdr &hdr) {
     std::string path;
 
     // read zero terminated string
@@ -242,52 +244,3 @@ void Elf32::phdrInterp(Task *task, const Elf32_Phdr &hdr) {
     this->dynLdPath = path.substr(0, path.length() - 1);
 }
 
-/**
- * Sets up the stack memory pages.
- */
-void Elf32::setUpStack(Task *task, const uintptr_t infoStructAddr) {
-    int err;
-    uintptr_t vmHandle;
-    uintptr_t base, len;
-
-    // TODO: get from sysconf
-    const auto pageSz = sysconf(_SC_PAGESIZE);
-    if(pageSz <= 0) {
-        throw std::system_error(errno, std::generic_category(), "Failed to determine page size");
-    }
-
-    // allocate the anonymous region
-    err = AllocVirtualAnonRegion(0, kDefaultStackSz, VM_REGION_RW, &vmHandle);
-    if(err) {
-        throw std::system_error(err, std::generic_category(), "AllocVirtualAnonRegion");
-    }
-
-    //LOG("Stack region: $%08x'h", vmHandle);
-
-    // fault in the last page of the region
-    err = VirtualRegionGetInfo(vmHandle, &base, &len, nullptr);
-    if(err) {
-        throw std::system_error(err, std::generic_category(), "VirtualRegionGetInfo");
-    }
-
-    auto lastPage = reinterpret_cast<std::byte *>(base + len - pageSz);
-    memset(lastPage, 0, pageSz);
-
-    // build the stack frame
-    this->stackBottom = (kDefaultStackAddr + kDefaultStackSz) - sizeof(uintptr_t);
-
-    auto argPtr = reinterpret_cast<uintptr_t *>(base + len);
-    argPtr[-1] = infoStructAddr;
-
-    // place the mapping into the task
-    err = MapVirtualRegionAtTo(vmHandle, task->getHandle(), kDefaultStackAddr);
-    if(err) {
-        throw std::system_error(err, std::generic_category(), "MapVirtualRegionAtTo");
-    }
-
-    // then unmap it from our task
-    err = UnmapVirtualRegion(vmHandle);
-    if(err) {
-        throw std::system_error(err, std::generic_category(), "UnmapVirtualRegion");
-    }
-}

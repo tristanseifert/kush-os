@@ -28,7 +28,7 @@ struct Thread;
 /**
  * Tasks are the basic 
  */
-struct Task {
+struct Task: public rt::SharedFromThis<Task> {
     friend class Scheduler;
 
     /// Length of process names
@@ -65,9 +65,7 @@ struct Task {
         Task *parent = nullptr;
 
         /// virtual memory mappings for this task
-        vm::Map *vm = nullptr;
-        /// whether we own the VM maps
-        bool ownsVm = false;
+        rt::SharedPtr<vm::Map> vm = nullptr;
 
         /// handle to the task
         Handle handle;
@@ -84,50 +82,56 @@ struct Task {
         DECLARE_RWLOCK(lock);
 
         /// List of threads belonging to this task; must have at least one
-        rt::Vector<Thread *> threads;
+        rt::Vector<rt::SharedPtr<Thread>> threads;
         /// ports owned by this task
-        rt::List<ipc::Port *> ports;
+        rt::List<rt::SharedPtr<ipc::Port>> ports;
         /// VM objects we own
-        rt::List<vm::MapEntry *> ownedRegions;
+        rt::List<rt::SharedPtr<vm::MapEntry>> ownedRegions;
 
         /// architecture-specific task state
         arch::TaskState archState __attribute__((aligned(16)));
 
+    private:
+        Task(rt::SharedPtr<vm::Map> &map, const bool writeVm);
+
     public:
         /// Allocates a new task from the task struct pool
-        static Task *alloc(vm::Map *map = nullptr);
-        /// Releases a previously allocated task struct
-        static void free(Task *);
+        static rt::SharedPtr<Task> alloc(rt::SharedPtr<vm::Map> map = rt::SharedPtr<vm::Map>(),
+                const bool writeVm = true);
 
-        Task(vm::Map *map);
         ~Task();
 
         /// Adds the given VM map object to the list
-        void addOwnedVmRegion(vm::MapEntry *region);
+        void addVmRegion(const rt::SharedPtr<vm::MapEntry> &region);
+        /// Removes a VM region we own
+        bool removeVmRegion(const rt::SharedPtr<vm::MapEntry> &region);
 
         /// Sets the task's name.
         void setName(const char *name, const size_t length = 0);
         /// Adds a thread to the task.
-        void addThread(Thread *t);
+        void addThread(const rt::SharedPtr<Thread> &t);
         /// Detaches the given thread from the task.
-        void detachThread(Thread *t);
+        void detachThread(const rt::SharedPtr<Thread> &t);
 
         /// Registers a new port to the task.
-        void addPort(ipc::Port *port);
+        void addPort(const rt::SharedPtr<ipc::Port> &port);
         /// Removes a port from the task.
-        bool removePort(ipc::Port *port);
+        bool removePort(const rt::SharedPtr<ipc::Port> &port);
         /// Do we own the given port?
-        bool ownsPort(ipc::Port *port);
+        bool ownsPort(const rt::SharedPtr<ipc::Port> &port);
 
         /// Terminates this task with the given return code
         int terminate(int status);
 
         /// Returns a handle to the currently executing task.
-        static Task *current();
+        static rt::SharedPtr<Task> current();
+        /// Returns the kernel task handle.
+        inline static auto kern() {
+            extern rt::SharedPtr<Task> gKernelTask;
+            return gKernelTask;
+        }
 
     private:
-        static void initAllocator();
-
         void notifyExit(int);
 
         static uint32_t nextPid;

@@ -15,8 +15,8 @@ user_syscall_stub:
     push        %rbp
 
     // the kernel will restore stack from %ebp
-    mov         %esp, %ebp
-    sysenter
+    mov         %rsp, %rbp
+    syscall
 
 user_syscall_stub_return:
     pop         %rbp

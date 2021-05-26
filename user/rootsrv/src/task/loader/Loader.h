@@ -59,17 +59,10 @@ class Loader {
         virtual const std::string &getDyldPath() const = 0;
 
         /// Maps the loadable sections of the ELF into the task.
-        virtual void mapInto(std::shared_ptr<Task> &task) {
-            this->mapInto(task.get());
-        }
-        /// Maps the loadable sections of the ELF into the task.
-        virtual void mapInto(Task *task) = 0;
+        virtual void mapInto(const std::shared_ptr<Task> &task) = 0;
 
         /// Sets up the entry point stack in the given task.
-        void setUpStack(std::shared_ptr<Task> &task, const uintptr_t arg = 0) {
-            this->setUpStack(task.get(), arg);
-        }
-        virtual void setUpStack(Task *task, const uintptr_t arg) = 0;
+        virtual void setUpStack(const std::shared_ptr<Task> &task, const uintptr_t arg = 0) = 0;
 
     protected:
         /**

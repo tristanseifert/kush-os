@@ -11,7 +11,16 @@ static char gAllocBuf[sizeof(mem::SlabAllocator<Port>)] __attribute__((aligned(6
 static mem::SlabAllocator<Port> *gPortAllocator = nullptr;
 
 // set to log adding and removing items from queue
-#define LOG_QUEUING                     0
+bool Port::gLogQueuing = false;
+
+/**
+ * Deleter that will release a port back to the appropriate allocation pool
+ */
+struct PortDeleter {
+    void operator()(Port *obj) const {
+        gPortAllocator->free(obj);
+    }
+};
 
 /**
  * Initializes the port allocator.
@@ -24,29 +33,23 @@ void Port::initAllocator() {
 /**
  * Allocates a new port.
  */
-Port *Port::alloc() {
+rt::SharedPtr<Port> Port::alloc() {
+    // allocate the port
     if(!gPortAllocator) initAllocator();
     auto port = gPortAllocator->alloc();
 
-    return port;
+    // create owning ptr and allocate handle
+    rt::SharedPtr<Port> ptr(port, PortDeleter());
+
+    port->handle = handle::Manager::makePortHandle(ptr);
+    REQUIRE(((uintptr_t) port->handle), "failed to create port handle for %p", port);
+
+    port->receiverBlocker = Blocker::make(port);
+
+    return ptr;
 }
 
-/**
- * Frees a previously allocated port.
- */
-void Port::free(Port *ptr) {
-    gPortAllocator->free(ptr);
-}
 
-
-
-/**
- * Initializes a new message port.
- */
-Port::Port() {
-    this->handle = handle::Manager::makePortHandle(this);
-    REQUIRE(((uintptr_t) this->handle), "failed to create port handle for %p", this);
-}
 
 /**
  * Releases the message port's resources.
@@ -67,16 +70,15 @@ Port::~Port() {
  */
 int Port::send(const void *msgBuf, const size_t msgLen) {
     DECLARE_CRITICAL();
-    Blocker *blocker = nullptr;
 
     // ensure message isn't too long
     if(!msgBuf || msgLen > kMaxMsgLen) {
         return -2;
     }
 
-#if LOG_QUEUING
-    log("sending %p (%d bytes) to %08x'h", msgBuf, msgLen, this->handle);
-#endif
+    if(gLogQueuing) {
+        log("sending %p (%d bytes) to $%p'h", msgBuf, msgLen, this->handle);
+    }
 
     // validate we won't insert too many items
     CRITICAL_ENTER();
@@ -90,19 +92,16 @@ int Port::send(const void *msgBuf, const size_t msgLen) {
 
     // insert the message
     this->messages.push_back(Message(msgBuf, msgLen));
-    blocker = this->receiverBlocker;
 
-#if LOG_QUEUING
-    log("enqueued %d %p", this->messages.size(), blocker);
-#endif
+    if(gLogQueuing) {
+        log("P%p enqueued %d", this->handle, this->messages.size());
+    }
 
     RW_UNLOCK_WRITE(&this->lock);
     CRITICAL_EXIT();
 
     // wake any pending task
-    if(blocker) {
-        blocker->messageQueued();
-    }
+    this->receiverBlocker->messageQueued();
 
     return 0;
 
@@ -120,12 +119,22 @@ int Port::send(const void *msgBuf, const size_t msgLen) {
  * @return Number of bytes of message data actually written, or a negative error code.
  */
 int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const uint64_t blockUntil) {
+    using BlockOnReturn = sched::Thread::BlockOnReturn;
+
     DECLARE_CRITICAL();
 
     CRITICAL_ENTER();
     RW_LOCK_WRITE(&this->lock);
 
-    int err = 0, ret = -1;
+    /*
+     * Reset the block flag; this way if we receive a message at some point while we're in the
+     * process of setting up for blocking we'll be able to detect it.
+     */
+    this->receiverBlocker->reset();
+    auto thread = sched::Thread::current();
+
+    BlockOnReturn unblockReason;
+    int ret = -1;
 
     // pop messages off the message queue, if any
     if(!this->messages.empty()) {
@@ -136,9 +145,9 @@ int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const ui
         sender = msg.sender;
         msg.done();
 
-#if LOG_QUEUING
-        log("dequeued (ts %llu pending %u)", msg.timestamp, this->messages.size());
-#endif
+        if(gLogQueuing) {
+            log("P%p dequeued (ts %llu pending %u)", this->handle, msg.timestamp, this->messages.size());
+        }
 
         RW_UNLOCK_WRITE(&this->lock);
         CRITICAL_EXIT();
@@ -150,40 +159,22 @@ int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const ui
         goto failedUnlock;
     }
 
-    // otherwise, block waiting for a message to be received
-    if(this->receiver || this->receiverBlocker) {
-        // cannot block if someone else is! (XXX: fix this later)
-        log("refusing to block on port %p", this);
-        goto failedUnlock;
-    } else {
-        // set up the blocker and store it, then release the lock
-        auto thread = sched::Thread::current();
+    RW_UNLOCK_WRITE(&this->lock);
+    CRITICAL_EXIT();
 
-        this->receiver = thread;
-        this->receiverBlocker = new Blocker(this);
-
-        RW_UNLOCK_WRITE(&this->lock);
-        CRITICAL_EXIT();
-
-        // perform block
-        //log("blocking on: %p", this->receiverBlocker);
-        err = thread->blockOn(this->receiverBlocker);
-    }
-
-    // if wake-up from block was spurious, return
-    if(err) {
+    /*
+     * Block thread on the receiver. Return immediately if it timed out, otherwise we try to see if
+     * we received a message, whether that is because we actually got one or the block was
+     * aborted.
+     */
+    unblockReason = thread->blockOn(this->receiverBlocker);
+    if(unblockReason == BlockOnReturn::Error) {
         return -1;
     }
 
     // after wake-up, see if we have a message to copy out
     CRITICAL_ENTER();
     RW_LOCK_WRITE(&this->lock);
-
-    this->receiver = nullptr;
-    if(this->receiverBlocker) {
-        delete this->receiverBlocker;
-        this->receiverBlocker = nullptr;
-    }
 
     if(!this->messages.empty()) {
         // copy out the message at the head of the queue

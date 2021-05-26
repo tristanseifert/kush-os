@@ -1,18 +1,22 @@
 .global __ThreadTrampoline
+.hidden __ThreadTrampoline
 .type __ThreadTrampoline, function
 
 __ThreadTrampoline:
-    # set up stack
+    // clear registers
     xor         %rbp, %rbp
 
-    # read out the args
-    mov         -8(%rsp), %rax
+    // get destination pc...
     mov         -16(%rsp), %rbx
+    // ...and the initial argument
+    mov         -8(%rsp), %rdi
 
-    mov         %rax, %rdi
+    // then jump to the destination routine
     call        *%rbx
 
-    # destroy thread
-    # TODO: this should be done from C
-    #pushl   $0
-    #call    ThreadDestroy
+    // exit thread
+    call        Amd64ThreadExit
+
+    // we should never get here!
+    ud2
+

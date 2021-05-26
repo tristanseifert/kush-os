@@ -1,7 +1,11 @@
 #include <stddef.h>
+#include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <dlfcn.h>
 #include <link.h>
+
+#include <sys/elf.h>
 
 /**
  * Iterates the list of shared objects, invoking the user-specified callback for each of them.
@@ -12,6 +16,6 @@ int dl_iterate_phdr(int (*callback) (struct dl_phdr_info *info, const size_t siz
         void *data) {
     fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
 
-    // TODO: implement
     return 0;
 }
+

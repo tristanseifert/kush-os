@@ -34,11 +34,50 @@ struct InitThreadInfo {
 
 static void CreateThreadEntryStub(uintptr_t arg);
 
+/**
+ * Return the current thread's handle.
+ */
+intptr_t sys::ThreadGetHandle() {
+    auto thread = sched::Thread::current();
+    if(!thread) {
+        return Errors::GeneralError;
+    }
+    return static_cast<intptr_t>(thread->handle);
+}
+
+/**
+ * Gives up the remainder of the thread's time quantum, allowing other threads a chance to run.
+ */
+intptr_t sys::ThreadYield() {
+    sched::Thread::yield();
+    return Errors::Success;
+}
+
+/**
+ * Sleeps the calling thread for the given number of microseconds.
+ */
+intptr_t sys::ThreadUsleep(const uintptr_t usecs) {
+    // validate args
+    const uint64_t sleepNs = 1000ULL * usecs;
+    if(!sleepNs) return Errors::InvalidArgument;
+
+    // call sleep handler
+    sched::Thread::sleep(sleepNs);
+    return Errors::Success;
+}
 
 /**
  * Creates a new userspace thread.
+ *
+ * @param entryPtr Userspace entry point address
+ * @param entryParam Parameter to pass as an argument to the entry point
+ * @param stackPtr Userspace stack pointer
+ * @param flags Thread creation flags
+ *
+ * @return Valid thread handle for newly created thread or negative error code
  */
-int sys::ThreadCreate(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::ThreadCreate(const uintptr_t entryPtr, const uintptr_t entryParam,
+        const uintptr_t stackPtr, const uintptr_t rawFlags) {
     // get running task
     auto running = sched::Thread::current();
     if(!running || !running->task) {
@@ -46,24 +85,21 @@ int sys::ThreadCreate(const Syscall::Args *args, const uintptr_t number) {
     }
 
     // validate the stack and entry point addresses
-    auto stackPtr = reinterpret_cast<const char *>(args->args[2]);
     if(!Syscall::validateUserPtr(stackPtr)) {
         return Errors::InvalidPointer;
     }
 
-    auto entryPtr = reinterpret_cast<const char *>(args->args[0]);
     if(!Syscall::validateUserPtr(entryPtr)) {
         return Errors::InvalidPointer;
     }
 
     // convert the flags
-    const auto rawFlags = (number & 0xFFFF0000) >> 16;
     const auto flags = ConvertFlags(rawFlags);
 
     // create a new thread
-    auto info = new InitThreadInfo(args->args[0], args->args[1], args->args[2]);
+    auto info = new InitThreadInfo(entryPtr, entryParam, stackPtr);
 
-    auto thread = sched::Thread::kernelThread(running->task, &CreateThreadEntryStub,
+    auto thread = sched::Thread::userThread(running->task, &CreateThreadEntryStub,
             (uintptr_t) info);
     thread->kernelMode = false;
 
@@ -76,26 +112,30 @@ int sys::ThreadCreate(const Syscall::Args *args, const uintptr_t number) {
     }
 
     // return handle of newly created thread
-    return static_cast<int>(thread->handle);
+    return static_cast<intptr_t>(thread->handle);
 }
 
 /**
  * Destroys an userspace thread.
  *
+ * @param threadHandle Handle to the thread to destroy
+ *
+ * @return 0 on success or a negative error code
+ *
  * @note To guard against mis-use, you cannot use the shorthand of the thread handle 0 = current
  * thread.
  */
-int sys::ThreadDestroy(const Syscall::Args *args, const uintptr_t number) {
-    sched::Thread *thread = nullptr;
+intptr_t sys::ThreadDestroy(const Handle threadHandle) {
+    rt::SharedPtr<sched::Thread> thread = nullptr;
+
+    if(!threadHandle) {
+        return Errors::InvalidHandle;
+    }
 
     // get the thread
-    if(!args->args[0]) {
+    thread = handle::Manager::getThread(threadHandle);
+    if(!thread) {
         return Errors::InvalidHandle;
-    } else {
-        thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
-        if(!thread) {
-            return Errors::InvalidHandle;
-        }
     }
 
     // terminate it
@@ -105,25 +145,27 @@ int sys::ThreadDestroy(const Syscall::Args *args, const uintptr_t number) {
 }
 
 /**
- * Sets the priority of the thread in the first argument to the value in the second. It must be a
- * value on [-100, 100].
+ * Sets a thread's priority modifier, which is an integer in the range [-100, 100].
+ *
+ * @param threadHandle Handle to thread whose priority to change, or 0 for current thread
+ * @param priority Priority modifier to apply
+ *
+ * @return 0 on success or negative error code
  */
-int sys::ThreadSetPriority(const Syscall::Args *args, const uintptr_t number) {
-    sched::Thread *thread = nullptr;
+intptr_t sys::ThreadSetPriority(const Handle threadHandle, const intptr_t priority) {
+    rt::SharedPtr<sched::Thread> thread = nullptr;
 
     // get the thread
-    if(!args->args[0]) {
+    if(!threadHandle) {
         thread = sched::Thread::current();
     } else {
-        thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
+        thread = handle::Manager::getThread(threadHandle);
         if(!thread) {
             return Errors::InvalidHandle;
         }
     }
 
     // validate priority and set it
-    int priority = static_cast<int>(args->args[1]);
-
     if(priority < -100 || priority > 100) {
         return Errors::InvalidArgument;
     }
@@ -134,59 +176,71 @@ int sys::ThreadSetPriority(const Syscall::Args *args, const uintptr_t number) {
 
 /**
  * Sets the notification mask of the specified thread.
+ *
+ * @param threadHandle Handle to thread whose notification mask is to be updated (or 0 for current)
+ * @param newMask New value for the thread's notification mask
+ *
+ * @return 0 on success, or negative error code
  */
-int sys::ThreadSetNoteMask(const Syscall::Args *args, const uintptr_t number) {
-    sched::Thread *thread = nullptr;
+intptr_t sys::ThreadSetNoteMask(const Handle threadHandle, const uintptr_t newMask) {
+    rt::SharedPtr<sched::Thread> thread = nullptr;
 
     // get the thread
-    if(!args->args[0]) {
+    if(!threadHandle) {
         thread = sched::Thread::current();
     } else {
-        thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
+        thread = handle::Manager::getThread(threadHandle);
         if(!thread) {
             return Errors::InvalidHandle;
         }
     }
 
     // validate priority and set it
-    thread->setNotificationMask(args->args[1]);
+    thread->setNotificationMask(newMask);
     return Errors::Success;
 }
 /**
  * Sets the thread's new name.
+ *
+ * @param threadHandle Handle of thread to rename, or 0 for current thread
+ * @param namePtr Pointer to name string
+ * @param nameLen Number of characters in name string to copy
+ *
+ * @return 0 on success, or negative error code
  */
-int sys::ThreadSetName(const Syscall::Args *args, const uintptr_t number) {
-    sched::Thread *thread = nullptr;
+intptr_t sys::ThreadSetName(const Handle threadHandle, const char *namePtr, const size_t nameLen) {
+    rt::SharedPtr<sched::Thread> thread = nullptr;
 
     // get the thread
-    if(!args->args[0]) {
+    if(!threadHandle) {
         thread = sched::Thread::current();
     } else {
-        thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
+        thread = handle::Manager::getThread(threadHandle);
         if(!thread) {
             return Errors::InvalidHandle;
         }
     }
 
     // validate the user pointer
-    auto namePtr = reinterpret_cast<const char *>(args->args[1]);
-    const auto nameLen = args->args[2];
     if(!Syscall::validateUserPtr(namePtr, nameLen)) {
         return Errors::InvalidPointer;
     }
 
     // set it
     thread->setName(namePtr, nameLen);
-
     return Errors::Success;
 }
 
 /**
  * Resumes a currently paused thread.
+ *
+ * @param threadHandle Handle of thread to resume; it must be in the paused state
+ *
+ * @return 0 on success, or negative error code
  */
-int sys::ThreadResume(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::ThreadResume(const Handle threadHandle) {
     // look up the thread
-    auto thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
+    auto thread = handle::Manager::getThread(threadHandle);
     if(!thread) {
         return Errors::InvalidHandle;
     }
@@ -198,19 +252,24 @@ int sys::ThreadResume(const Syscall::Args *args, const uintptr_t number) {
 
     // go ahead and resume it
     thread->setState(sched::Thread::State::Runnable);
-    sched::Scheduler::get()->markThreadAsRunnable(thread);
+    sched::Scheduler::get()->markThreadAsRunnable(thread, false);
 
     return Errors::Success;
 }
 
 /**
  * Waits for the given thread to terminate.
+ *
+ * @param threadHandle Thread to wait on
+ * @param timeout How long to block (in nsec); 0 to poll, or UINTPTR_MAX to wait forever
+ *
+ * @return 0 if thread terminated, or an appropriate error code.
  */
-int sys::ThreadJoin(const Syscall::Args *args, const uintptr_t number) {
+intptr_t sys::ThreadJoin(const Handle threadHandle, const uintptr_t timeout) {
     int err;
 
     // look up the thread; reject if it's the currently running thread
-    auto thread = handle::Manager::getThread(static_cast<Handle>(args->args[0]));
+    auto thread = handle::Manager::getThread(threadHandle);
     if(!thread) {
         return Errors::InvalidHandle;
     }
@@ -219,11 +278,16 @@ int sys::ThreadJoin(const Syscall::Args *args, const uintptr_t number) {
         return Errors::DeadlockPrevented;
     }
 
+    // has the thread already terminated?
+    if(thread->needsToDie) {
+        return Errors::Success;
+    }
+
     // get the time to wait
     uint64_t nanos = 0;
 
-    if(args->args[1] != UINTPTR_MAX) {
-        nanos = platform_timer_now() + (args->args[1] * 1000ULL);
+    if(timeout != UINTPTR_MAX) {
+        nanos = platform_timer_now() + (timeout * 1000ULL);
     }
 
     // wait for thread termination
@@ -255,6 +319,8 @@ static void CreateThreadEntryStub(uintptr_t _ctx) {
 
     const auto [pc, arg, sp] = *info;
     delete info;
+
+    //log("entry stub %p ($%p'h): pc %p sp %p arg %p", _ctx, thread->handle, pc, sp, arg);
 
     // perform return to userspace
     thread->returnToUser(pc, sp, arg);

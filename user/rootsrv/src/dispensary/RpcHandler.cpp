@@ -37,7 +37,7 @@ RpcHandler::RpcHandler() {
 
     task::InfoPage::gShared->info->dispensaryPort = this->portHandle;
 
-    LOG("Dispensary port: $%08x'h", this->portHandle);
+    LOG("Dispensary port: $%p'h", this->portHandle);
 
     // create the thread next
     this->run = true;
@@ -125,7 +125,7 @@ void RpcHandler::handleLookup(const struct MessageHeader *msg, const rpc::RpcPac
     uintptr_t handle = 0;
     bool found = Registry::gShared->lookupPort(name, handle);
 
-    LOG("Request for port '%s': resolved %d ($%08x'h)", name.c_str(), found, handle);
+    LOG("Request for port '%s': resolved %d ($%p'h)", name.c_str(), found, handle);
 
     // build response
     std::vector<uint8_t> replyBuf;

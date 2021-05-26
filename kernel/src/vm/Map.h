@@ -1,6 +1,7 @@
 #ifndef KERNEL_VM_MAP_H
 #define KERNEL_VM_MAP_H
 
+#include "MapTree.h"
 #include "MapEntry.h"
 
 #include <stdint.h>
@@ -8,17 +9,29 @@
 #include <bitflags.h>
 #include <arch/rwlock.h>
 #include <arch/PTEHandler.h>
+#include <arch/PerCpuInfo.h>
 
 #include <handle/Manager.h>
+#include <runtime/SmartPointers.h>
 #include <runtime/Vector.h>
 #include <runtime/Queue.h>
 
 namespace vm {
 class Mapper;
 
+/// Cutoff for the user/kernel boundary
+#if defined(__i386__)
+constexpr static const uintptr_t kKernelVmBound = 0xC0000000;
+#elif defined(__amd64__)
+constexpr static const uintptr_t kKernelVmBound = (1ULL << 63);
+#endif
+
 /// modifier flags for mappings, defining its protection level
 ENUM_FLAGS(MapMode)
 enum class MapMode {
+    /// No flags set
+    None                = 0,
+    
     /// Allow reading from the page
     READ                = (1 << 0),
     /// Allow writing to the page
@@ -60,9 +73,7 @@ class Map {
 
     public:
         /// Allocates a new VM map.
-        static Map *alloc();
-        /// Releases a previously allocated mapping struct.
-        static void free(Map *);
+        static rt::SharedPtr<Map> alloc();
 
     public:
         Map(const bool copyKernelMaps);
@@ -71,10 +82,12 @@ class Map {
         const bool isActive() const;
         void activate();
 
-        int add(MapEntry *entry, sched::Task *task, const uintptr_t base = 0,
-                const vm::MappingFlags flagMask = vm::MappingFlags::None);
-        int remove(MapEntry *entry, sched::Task *);
-        const bool contains(MapEntry *entry);
+        int add(const rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task,
+                const uintptr_t base = 0, const vm::MappingFlags flagMask = vm::MappingFlags::None,
+                const size_t viewSize = 0, const uintptr_t searchStart = kVmSearchBase,
+                const uintptr_t searchEnd = kVmMaxAddr);
+        int remove(const rt::SharedPtr<MapEntry> &entry, const rt::SharedPtr<sched::Task> &task);
+        const bool contains(const rt::SharedPtr<MapEntry> &entry);
 
         int add(const uint64_t physAddr, const uintptr_t length, const uintptr_t vmAddr, 
                 const MapMode mode);
@@ -91,12 +104,13 @@ class Map {
         /// Page fault handler
         bool handlePagefault(const uintptr_t virtAddr, const bool present, const bool write);
 
-        /// Tests whether the given map entry can be expanded in this map without causing conflicts
-        bool canResize(MapEntry *entry, const uintptr_t base, const size_t oldSize,
-                const size_t newSize);
-
         /// Searches mappings to find one containing the given address.
         bool findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &outOffset);
+        /// Determines the base address of a particular mapping
+        const uintptr_t getRegionBase(const rt::SharedPtr<MapEntry> entry);
+        /// Gets information about a VM region.
+        int getRegionInfo(rt::SharedPtr<MapEntry> region, uintptr_t &outBase, size_t &outSize,
+                MappingFlags &outFlags);
 
         /// Returns the number of installed mappings.
         const size_t numMappings() const {
@@ -105,35 +119,32 @@ class Map {
 
         /// Returns the global kernel map
         static Map *kern();
-        /// Returns the currently activated map
-        static Map *current() {
-            return gCurrentMap;
+        /**
+         * Returns a pointer to the VM object active on the current core. You should not cache the
+         * pointer returned, as it will become invalid if the task exits.
+         */
+        static inline Map *current() {
+            return arch::PerCpuInfo::get()->activeMap;
         }
-
-    private:
-        /// Represents a mapping that was deferred
-        struct DeferredMapping {
-            /// physical address backing this mapping
-            uint64_t physAddr;
-            /// virtual address at which to set the map
-            uintptr_t vmAddr;
-            /// flags for the mapping
-            MapMode mode;
-
-            DeferredMapping() = default;
-            DeferredMapping(const uint64_t _pa, const uintptr_t _va, const MapMode _flags) :
-                physAddr(_pa), vmAddr(_va), mode(_flags) {}
-        };
 
     private:
         static Map *gCurrentMap;
 
         static void initAllocator();
 
+#if defined(__i386__)
         /// VM address at which we test for free VM space
         constexpr static const uintptr_t kVmSearchBase = 0x10000000;
         /// maximum address that can be mapped
         constexpr static const uintptr_t kVmMaxAddr = 0xBF800000;
+#elif defined(__amd64__)
+        constexpr static const uintptr_t kVmSearchBase = 0x400000000000;
+        constexpr static const uintptr_t kVmMaxAddr =    0x7E0000000000;
+#endif
+
+    private:
+        /// whether additions to the page table are logged
+        static bool gLogAdd;
 
     private:
         friend class arch::vm::PTEHandler;
@@ -141,13 +152,8 @@ class Map {
         /// protecting modifications of the table
         DECLARE_RWLOCK(lock);
 
-        /// deferred mapping requests
-        rt::Queue<DeferredMapping> deferredMaps;
-        /// when set, there are deferred mappings
-        size_t numDeferredMaps = 0;
-
-        /// all VM map entries
-        rt::Vector<MapEntry *> entries;
+        // VM map entries
+        MapTree entries;
         /// architecture-specific page table handling
         arch::vm::PTEHandler table;
 };

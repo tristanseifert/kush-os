@@ -3,12 +3,26 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <bitflags.h>
 
 #include <log.h>
 #include <arch/spinlock.h>
 
-namespace mem {
+#include "PhysRegion.h"
 
+namespace mem {
+/**
+ * Flags for allocations
+ */
+ENUM_FLAGS(PhysFlags)
+enum class PhysFlags {
+    None                                = 0,
+};
+
+
+/**
+ * Provides an interface for allocating contiguous chunks of physical memory.
+ */
 class PhysicalAllocator {
     public:
         static void init();
@@ -25,12 +39,6 @@ class PhysicalAllocator {
         static void free(const uint64_t physicalAddr) {
             REQUIRE(gShared, "invalid allocator");
             gShared->freePage(physicalAddr);
-        }
-
-        /// Reserves the page at the given physical address.
-        static void reserve(const uint64_t physicalAddr) {
-            REQUIRE(gShared, "invalid allocator");
-            gShared->reservePage(physicalAddr);
         }
 
         /// Returns the total number of pages
@@ -57,64 +65,47 @@ class PhysicalAllocator {
 
         void mapRegionUsageBitmaps();
 
-        uint64_t allocPage();
-        void freePage(const uint64_t physicalAddr);
-        void reservePage(const uint64_t physicalAddr);
+        uint64_t allocPage(const PhysFlags flags = PhysFlags::None) {
+            return this->alloc(1, flags);
+        }
+        uint64_t alloc(const size_t numPages, const PhysFlags flags = PhysFlags::None);
 
-    private:
-        struct Region {
-            /// base address (physical) of this memory allocation region
-            uint64_t base = 0;
-            /// size (in bytes) of this memory region
-            uint64_t length = 0;
 
-            /// number of allocatable pages (e.g. not used for accounting/metadata)
-            size_t totalPages = 0;
+        void freePage(const uint64_t physicalAddr) {
+            this->free(1, physicalAddr);
+        }
+        void free(const size_t numPages, const uint64_t physicalAddr);
 
-            /// size of the free map, in pages (also: offset into region to allocation region)
-            size_t freeMapPages = 0;
-            /// pointer to the virtual address of the free map
-            uint32_t *freeMap = nullptr;
-            /// index of the next free page (used to optimize allocation)
-            size_t nextFree = 0;
-
-            Region() = default;
-            Region(const uint64_t _base, const uint64_t _length) : base(_base), length(_length) {}
-
-            /// Whether this region contains the given address
-            bool contains(uint64_t address) const {
-                return (address >= this->base) && (address <= (this->base + this->length));
-            }
-
-            /// returns the index of the next available page, and marks it allocated
-            int alloc(uintptr_t *freeIdx);
-            /// frees a page with the given index
-            void free(const uintptr_t index);
-
-            /// reserves the page at the given index
-            void reserve(const uintptr_t index) {
-                this->freeMap[index / 32] &= ~(1 << (index % 32));
-            }
-        };
-
-    private:
+    public:
         /// maximum number of physical regions to store info for
         constexpr static const size_t kMaxRegions = 10;
+        /// total number of pages to cache before mapping physical regions
+        constexpr static const size_t kNumVmPagesCached = 10;
+
+        // TODO: this should be retrieved from the arch/platform code
+        /// virtual address to map the next physical region allocation bitmap in
+#if defined(__amd64__)
+        constexpr static const uintptr_t kRegionInfoBase = 0xffff82ff00000000;
+        constexpr static const size_t kRegionInfoEntryLength = 0x10000000; // up to 16x
+#endif
 
     private:
         static PhysicalAllocator *gShared;
 
+        /// do we log all physical regions that are skipped?
+        static bool gLogSkipped;
+        /// do we log all newly allocated regions?
+        static bool gLogRegions;
+        /// are allocations logged?
+        static bool gLogAlloc;
+
     private:
         size_t numRegions = 0;
-        Region regions[kMaxRegions];
+        /// regions from which ~ memory ~ can be acquired
+        PhysRegion *regions[kMaxRegions];
 
-        // TODO: this should be retrieved from the arch/platform code
-        /// virtual address to map the next physical region allocation bitmap in
-#if defined(__i386__)
-        uintptr_t nextBitmapVmAddr = 0xC0400000;
-#elif defined(__amd64__)
-        uintptr_t nextBitmapVmAddr = 0xFFFF820000000000;
-#endif
+        /// addresses of pages to be used to satisfy early VM requests
+        uint64_t vmPageCache[kNumVmPagesCached];
 
         /// total number of available pages
         size_t totalPages = 0;
@@ -122,6 +113,9 @@ class PhysicalAllocator {
         size_t allocatedPages = 0;
         /// number of reserved pages
         size_t reservedPages = 0;
+
+        /// flag indicating that VM relocation has begun
+        bool vmRelocating = false;
 
         /// lock to protect the alloc bitmaps
         DECLARE_SPINLOCK(bitmapLock);

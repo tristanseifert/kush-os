@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <bitflags.h>
+#include <runtime/SmartPointers.h>
 #include <runtime/List.h>
 #include <runtime/Vector.h>
 #include <handle/Manager.h>
@@ -54,110 +55,14 @@ class MapEntry {
     friend class Map;
     friend class Mapper;
 
+    private:
+
     public:
         // you prob shouldn't really use these
-        MapEntry(const uintptr_t base, const size_t length, const MappingFlags flags);
+        MapEntry(const size_t length, const MappingFlags flags);
         ~MapEntry();
 
     public:
-        /**
-         * Increments the reference count.
-         */
-        auto retain() {
-            __atomic_add_fetch(&this->refCount, 1, __ATOMIC_RELEASE);
-            return this;
-        }
-
-        /**
-         * Decrements the reference count. If we reach zero, the object is deleted.
-         */
-        MapEntry *release() {
-            REQUIRE(this->refCount, "attempt to release %p with zero refcount", this);
-
-            const auto count = __atomic_sub_fetch(&this->refCount, 1, __ATOMIC_RELEASE);
-            if(!count) {
-                free(this);
-                return nullptr;
-            }
-
-            return this;
-        }
-
-        /**
-         * Return the base address of the entry for the given map.
-         *
-         * @return Base address, or 0 if error.
-         */
-        const uintptr_t getBaseAddressIn(const Map *map) {
-            RW_LOCK_READ_GUARD(this->lock);
-
-            for(auto &info : this->maps) {
-                if(info.mapPtr == map) {
-                    return (info.base ? info.base : this->base);
-                }
-            }
-
-            return 0;
-        }
-
-        /**
-         * Tests whether the given address is within the range, when the region is mapped in the
-         * specified map.
-         */
-        bool contains(const Map *map, const uintptr_t address) {
-            // find the map info
-            for(auto &info : this->maps) {
-                if(info.mapPtr == map) {
-                    const auto b = (info.base ? info.base : this->base);
-                    return (address >= b) && (address < (b + this->length));
-                }
-            }
-
-            // not in the map???
-            return false;
-        }
-        /**
-         * Tests whether the given address range overlaps with this entry.
-         */
-        bool contains(const Map *map, const uintptr_t address, const size_t length) {
-            // find the map info
-            for(auto &info : this->maps) {
-                if(info.mapPtr == map) {
-                    const auto x1 = (info.base ? info.base : this->base);
-                    const auto x2 = (x1 + this->length - 1);
-                    const auto y1 = address;
-                    const auto y2 = (address + length);
-
-                    return (x1 >= y1 && x1 <= y2) ||
-                           (x2 >= y1 && x2 <= y2) ||
-                           (y1 >= x1 && y1 <= x2) ||
-                           (y2 >= x1 && y2 <= x2);
-                }
-            }
-
-            // not in the map???
-            return false;
-        }
-        bool contains(const uintptr_t address, const size_t length) {
-            const auto x1 = this->base;
-            const auto x2 = (this->base + this->length - 1);
-            const auto y1 = address;
-            const auto y2 = (address + length);
-
-            return (x1 >= y1 && x1 <= y2) ||
-                   (x2 >= y1 && x2 <= y2) ||
-                   (y1 >= x1 && y1 <= x2) ||
-                   (y2 >= x1 && y2 <= x2);
-        }
-        /**
-         * Tests whether the given mappings overlap.
-         */
-        inline bool intersects(const Map *map, const MapEntry *entry) {
-            RW_LOCK_READ_GUARD(this->lock);
-
-            return this->contains(entry->base, entry->length);
-        }
-
         /// Returns the handle for the object
         const Handle getHandle() const {
             return this->handle;
@@ -168,27 +73,29 @@ class MapEntry {
             __atomic_load(&this->length, &temp, __ATOMIC_RELAXED);
             return temp;
         }
+        /// Returns the flags defining this VM object's mappings (by default)
+        const MappingFlags getFlags() const {
+            MappingFlags flags;
+            __atomic_load(&this->flags, &flags, __ATOMIC_RELAXED);
+            return flags;
+        }
 
         /// whether we're backed by anonymous memory or not
-        inline bool backedByAnonymousMem() const {
+        inline const bool backedByAnonymousMem() const {
             return this->isAnon;
         }
 
         /// Updates the flags of the map. Only the RWX and cacheability flags are updated.
         int updateFlags(const MappingFlags newFlags);
-
         /// Attempts to resize the VM object
         int resize(const size_t newSize);
 
-        /// Gets info about the VM object in a particular map
-        int getInfo(Map *map, uintptr_t &base, uintptr_t &length, MappingFlags &flags);
-
         /// Allocates a VM object backed by a region of contiguous physical pages
-        static MapEntry *makePhys(const uint64_t physAddr, const uintptr_t address,
-                const size_t length, const MappingFlags flags);
+        static rt::SharedPtr<MapEntry> makePhys(const uint64_t physAddr, const size_t length,
+                const MappingFlags flags, const bool kernel = false);
         /// Allocates an anonymous VM object
-        static MapEntry *makeAnon(const uintptr_t address, const size_t length,
-                const MappingFlags flags);
+        static rt::SharedPtr<MapEntry> makeAnon(const size_t length, const MappingFlags flags,
+                const bool kernel = false);
         /// Releases a VM object
         static void free(MapEntry *entry);
 
@@ -200,39 +107,20 @@ class MapEntry {
             /// physical address of page
             uint64_t physAddr = 0;
 
-            /// task that originally allocated this
-            sched::Task *task = nullptr;
-        };
-
-        /// Reference to a map in which we're mapped
-        struct MapInfo {
-            /// Pointer to the map
-            Map *mapPtr = nullptr;
-            /// Task this map was added to
-            sched::Task *task = nullptr;
-            /// Virtual base address in that map; if 0, we use the base value in the map entry
-            uintptr_t base = 0;
-
-            /// If any bits are set, this is applied as a mask to the flags when mapping pages
-            MappingFlags flagsMask = MappingFlags::None;
-
-            uint32_t reserved = 0;
-
-            MapInfo() = default;
-            MapInfo(Map *map, sched::Task *_task, const uintptr_t _base, const MappingFlags _mask):
-                mapPtr(map), task(_task), base(_base), flagsMask(_mask) {};
+            /// task that originally allocated this page
+            rt::WeakPtr<sched::Task> task;
         };
 
     private:
         /// Attempt to handle a page fault for the virtual address
-        bool handlePagefault(Map *map, const uintptr_t address, const bool present,
-                const bool write);
+        bool handlePagefault(Map *map, const uintptr_t base, const uintptr_t offset, 
+                const bool present, const bool write);
 
     private:
         static void initAllocator();
 
         /// The entry was added to a mapping.
-        void addedToMap(Map *, sched::Task *, const uintptr_t base = 0,
+        void addedToMap(Map *, const rt::SharedPtr<sched::Task> &, const uintptr_t base,
                 const MappingFlags flagsMask = MappingFlags::None);
         /// Maps all physical pages we've allocated (for anonymous mappings)
         void mapAnonPages(Map *, const uintptr_t, const MappingFlags);
@@ -240,10 +128,11 @@ class MapEntry {
         void mapPhysMem(Map *, const uintptr_t, const MappingFlags);
 
         /// The entry was removed from a mapping.
-        void removedFromMap(Map *, sched::Task *);
+        void removedFromMap(Map *, const rt::SharedPtr<sched::Task> &, const uintptr_t,
+                const size_t);
 
         /// Faults in an anonymous memory page.
-        void faultInPage(const uintptr_t address, Map *map);
+        void faultInPage(const uintptr_t base, const uintptr_t offset, Map *map);
         /// Frees a physical page and updates the caller's "pages owned" counter
         void freePage(const uintptr_t page);
 
@@ -254,18 +143,13 @@ class MapEntry {
         /// handle referencing this map entry
         Handle handle;
 
-        /// number of references held to the entry
-        uintptr_t refCount = 0;
-
-        /// base virtual address
-        uintptr_t base = 0;
         /// length (in bytes)
         size_t length = 0;
 
         /// physical pages we own
         rt::Vector<AnonPageInfo> physOwned;
         /// all maps that we exist in
-        rt::Vector<MapInfo> maps;
+        rt::Vector<Map *> maps;
 
         /// flags for the mapping
         MappingFlags flags;
@@ -274,6 +158,9 @@ class MapEntry {
         bool isAnon = false;
         /// if not an anonymous map, the physical address base
         uint64_t physBase = 0;
+
+        /// whether the map entry belongs to the kernel
+        bool isKernel = false;
 };
 }
 

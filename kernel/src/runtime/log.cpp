@@ -49,7 +49,8 @@ void panic(const char *format, ...) {
     platform_raise_irql(platform::Irql::CriticalSection, false);
 
     // get current thread
-    auto thread = sched::Scheduler::get()->runningThread();
+    auto sched = sched::Scheduler::get();
+    auto thread = sched ? sched->runningThread() : nullptr;
     auto task = (thread ? thread->task : nullptr);
 
     // set up panic buffer
@@ -67,12 +68,12 @@ void panic(const char *format, ...) {
     fctprintf(_outchar, NULL, "panic: %s\npc: $%p\n", panicBuf, pc);
 
     if(thread) {
-        fctprintf(_outchar, NULL, "  Active thread: %p (tid %u) '%s'\n", thread, thread->tid,
-                thread->name);
+        fctprintf(_outchar, NULL, "  Active thread: %p (tid %u) '%s'\n",
+                static_cast<void *>(thread), thread->tid, thread->name);
     }
     if(task) {
-        fctprintf(_outchar, NULL, "    Active task: %p (pid %u) '%s'\n", task, task->pid,
-                task->name);
+        fctprintf(_outchar, NULL, "    Active task: %p (pid %u) '%s'\n", static_cast<void *>(task),
+                task->pid, task->name);
     }
 
     fctprintf(_outchar, NULL, "Time since boot: %llu ns\n", platform_timer_now());

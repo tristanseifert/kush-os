@@ -1,4 +1,5 @@
 #include "syscall.h"
+#include "helpers.h"
 #include <sys/syscalls.h>
 #include <stdint.h>
 #include <string.h>
@@ -15,6 +16,18 @@ struct VmInfoStruct {
     uint16_t reserved;
     // region flags: this is the same flags as passed to the syscall
     uint16_t flags;
+};
+
+/**
+ * Structure for the SYS_VM_MAP_EX syscall
+ */
+struct VmMapRequest {
+    /// start and end of the range to search for mapping. start is written with actual address
+    uintptr_t start, end;
+    /// length of the view
+    size_t length;
+    /// any mapping flags (standard syscall flag meaning)
+    uintptr_t flags;
 };
 
 /**
@@ -44,9 +57,6 @@ static uintptr_t BuildSyscallFlags(const uintptr_t inFlags, int create) {
     }
     if(inFlags & VM_REGION_WRITETHRU) {
         temp |= (1 << 14);
-    }
-    if(create && inFlags & VM_REGION_NOMAP) {
-        temp |= (1 << 15);
     }
 
     return temp;
@@ -84,19 +94,19 @@ static uintptr_t ConvertSyscallFlags(const uintptr_t inFlags) {
 /**
  * Creates a new virtual memory mapping backed by anonymous memory.
  */
-int AllocVirtualAnonRegion(const uintptr_t virtualAddr, const uintptr_t size,
-        const uintptr_t inFlags, uintptr_t *outHandle) {
-    int err;
+int AllocVirtualAnonRegion(const uintptr_t size, const uintptr_t inFlags, uintptr_t *outHandle) {
+    intptr_t err;
+    if(!outHandle) return -1;
 
     // build flags
     uintptr_t flags = 0;
     flags = BuildSyscallFlags(inFlags, 1);
 
     // perform syscall
-    err = __do_syscall2(SYS_VM_CREATE_ANON | (flags << 16), virtualAddr, size);
+    err = __do_syscall2(size, flags, SYS_VM_CREATE_ANON);
 
-    // extract handle if desired; return 0 for success, syscall error otherwise
-    if(outHandle && err > 0) {
+    // return 0 for success, syscall error otherwise
+    if(err > 0) {
         *outHandle = err;
     }
 
@@ -106,19 +116,20 @@ int AllocVirtualAnonRegion(const uintptr_t virtualAddr, const uintptr_t size,
 /**
  * Creates a new virtual memory mapping backed by a contiguous range of physical addresses.
  */
-int AllocVirtualRegion(const uint64_t physAddr, const uintptr_t virtualAddr, const uintptr_t size,
-        const uintptr_t inFlags, uintptr_t *outHandle) {
-    int err;
+int AllocVirtualPhysRegion(const uint64_t physAddr, const uintptr_t size, const uintptr_t inFlags,
+        uintptr_t *outHandle) {
+    intptr_t err;
+    if(!outHandle) return -1;
 
     // build flags
     uintptr_t flags = 0;
     flags = BuildSyscallFlags(inFlags, 1);
 
     // perform syscall
-    err = __do_syscall3(SYS_VM_CREATE | (flags << 16), physAddr, virtualAddr, size);
+    err = __do_syscall3(physAddr, size, flags, SYS_VM_CREATE);
 
-    // extract handle if desired; return 0 for success, syscall error otherwise
-    if(outHandle && err > 0) {
+    // return 0 for success, syscall error otherwise
+    if(err > 0) {
         *outHandle = err;
     }
 
@@ -126,62 +137,147 @@ int AllocVirtualRegion(const uint64_t physAddr, const uintptr_t virtualAddr, con
 }
 
 /**
+ * Deallocates a virtual memory object.
+ */
+int DeallocVirtualRegion(const uintptr_t handle) {
+    return __do_syscall1(handle, SYS_VM_DEALLOC);
+}
+
+/**
  * Resizes the provided VM region.
  */
 int ResizeVirtualRegion(const uintptr_t regionHandle, const uintptr_t newSize) {
-    return __do_syscall2(SYS_VM_RESIZE, regionHandle, newSize);
+    return __do_syscall3(regionHandle, newSize, 0, SYS_VM_RESIZE);
 }
 
 /**
  * Unmaps a virtual memory region from the current task.
  */
 int UnmapVirtualRegion(const uintptr_t handle) {
-    return __do_syscall2(SYS_VM_UNMAP, handle, 0);
+    return __do_syscall2(handle, 0, SYS_VM_UNMAP);
 }
 
 /**
  * Unmaps a virtual memory region from the specified task.
  */
 int UnmapVirtualRegionFrom(const uintptr_t regionHandle, const uintptr_t taskHandle) {
-    return __do_syscall2(SYS_VM_UNMAP, regionHandle, taskHandle);
+    return __do_syscall2(regionHandle, taskHandle, SYS_VM_UNMAP);
 }
 
 /**
- * Maps a virtual memory region from the current task.
+ * Maps a virtual memory region in the current task.
  */
-int MapVirtualRegion(const uintptr_t handle) {
-    return __do_syscall3(SYS_VM_MAP, handle, 0, 0);
+int MapVirtualRegion(const uintptr_t regionHandle, const uintptr_t base, const size_t length,
+        const uintptr_t inFlags) {
+    // validate args
+    if(!regionHandle || !base) return -1;
+
+    // perform the syscall
+    const uintptr_t flags = BuildSyscallFlags(inFlags, 0);
+    return __do_syscall5(regionHandle, 0, base, length, flags, SYS_VM_MAP);
 }
 
 /**
- * Maps a virtual memory region from the current task.
+ * Maps a virtual memory region in another task.
+ *
+ * @param taskHandle Task to map the object into; passing 0 here is a library use error
  */
-int MapVirtualRegionAt(const uintptr_t handle, const uintptr_t baseAddr) {
-    return __do_syscall3(SYS_VM_MAP, handle, 0, baseAddr);
+int MapVirtualRegionRemote(const uintptr_t taskHandle, const uintptr_t regionHandle,
+        const uintptr_t base, const size_t length, const uintptr_t inFlags) {
+    // validate args
+    if(!taskHandle || !regionHandle || !base) return -1;
+
+    // perform the syscall
+    const uintptr_t flags = BuildSyscallFlags(inFlags, 0);
+    return __do_syscall5(regionHandle, taskHandle, base, length, flags, SYS_VM_MAP);
 }
 
 /**
- * Maps a virtual memory region from the specified task.
+ * Searches for a free space of virtual memory big enough to fit a view of the specified length,
+ * which maps the given VM region.
+ *
+ * @param range An array containing the starting and ending addresses of the range
+ * @param outBase If non-null, a location into which the base address of the mapping is written
  */
-int MapVirtualRegionTo(const uintptr_t regionHandle, const uintptr_t taskHandle) {
-    return __do_syscall3(SYS_VM_MAP, regionHandle, taskHandle, 0);
-}
-/**
- * Maps a virtual memory region from the specified task, with a specified flags mask.
- */
-int MapVirtualRegionToFlags(const uintptr_t regionHandle, const uintptr_t taskHandle, const uintptr_t flagsMask) {
+int MapVirtualRegionRange(const uintptr_t regionHandle, const uintptr_t range[2],
+        const size_t length, const uintptr_t inFlags, uintptr_t *outBase) {
+    int err;
+
+    // validate args
+    if(!regionHandle || !range || !length) return -1;
+    else if(!range[0]) return -1;
+
+    // build the request
     uintptr_t flags = 0;
-    flags = BuildSyscallFlags(flagsMask, 0);
+    if(inFlags) {
+        flags = BuildSyscallFlags(inFlags, 0);
+    }
 
-    return __do_syscall3(SYS_VM_MAP | ((flags & 0xFFFF) << 16), regionHandle, taskHandle, 0);
+    struct VmMapRequest req = {
+        .start  = range[0],
+        .end    = range[1],
+        .length = length,
+        .flags = flags
+    };
+
+    // invoke method
+    err = __do_syscall4(regionHandle, 0, (const uintptr_t) &req, sizeof(req), SYS_VM_MAP_EX);
+
+    if(!err) {
+        // the kernel will write the actual base address into `start`
+        if(outBase) *outBase = req.start;
+    } else {
+        // clear the address, as we can't have a mapping at address 0
+        if(outBase) *outBase = 0;
+    }
+
+    return err;
 }
 
 /**
- * Maps a virtual memory region into the specified task.
+ * Searches for a free space of virtual memory big enough to fit a view of the specified length,
+ * which maps the given VM region in a remote task.
+ *
+ * @param taskHandle Task into which the object is mapped
+ * @param range An array containing the starting and ending addresses of the range, in the remote
+ *        task's address space
+ * @param outBase If non-null, a location into which the base address of the mapping is written
  */
-int MapVirtualRegionAtTo(const uintptr_t regionHandle, const uintptr_t taskHandle,
-        const uintptr_t baseAddr) {
-    return __do_syscall3(SYS_VM_MAP, regionHandle, taskHandle, baseAddr);
+int MapVirtualRegionRangeRemote(const uintptr_t taskHandle, const uintptr_t regionHandle,
+        const uintptr_t range[2], const size_t length, const uintptr_t inFlags,
+        uintptr_t *outBase) {
+    int err;
+
+    // validate args
+    if(!taskHandle || !regionHandle || !range || !length) return -1;
+    else if(!range[0]) return -1;
+
+    // build the request
+    uintptr_t flags = 0;
+    if(inFlags) {
+        flags = BuildSyscallFlags(inFlags, 0);
+    }
+
+    struct VmMapRequest req = {
+        .start  = range[0],
+        .end    = range[1],
+        .length = length,
+        .flags = flags
+    };
+
+    // invoke method
+    err = __do_syscall4(regionHandle, taskHandle, (const uintptr_t) &req, sizeof(req),
+            SYS_VM_MAP_EX);
+
+    if(!err) {
+        // the kernel will write the actual base address into `start`
+        if(outBase) *outBase = req.start;
+    } else {
+        // clear the address, as we can't have a mapping at address 0
+        if(outBase) *outBase = 0;
+    }
+
+    return err;
 }
 
 
@@ -203,14 +299,14 @@ int VirtualRegionGetInfo(const uintptr_t regionHandle, uintptr_t *baseAddr, uint
  */
 int VirtualRegionGetInfoFor(const uintptr_t regionHandle, const uintptr_t taskHandle,
         uintptr_t *baseAddr, uintptr_t *length, uintptr_t *flags) {
-    int err;
+    intptr_t err;
 
     // make the call to populate temporary struct
     struct VmInfoStruct info;
-    memset(&info, 0, sizeof(info));
+    InternalMemset(&info, 0, sizeof(info));
 
-    err = __do_syscall4(SYS_VM_GET_INFO, regionHandle, taskHandle, (uintptr_t) &info,
-            sizeof(info));
+    err = __do_syscall4(regionHandle, taskHandle, (uintptr_t) &info, sizeof(info),
+            SYS_VM_GET_INFO);
 
     // bail immediately if error
     if(err != 0) {
@@ -231,7 +327,8 @@ int VirtualRegionGetInfoFor(const uintptr_t regionHandle, const uintptr_t taskHa
  * Gets information about a task's virtual memory environment.
  */
 int VirtualGetTaskInfo(const uintptr_t taskHandle, TaskVmInfo_t *info, const size_t infoSz) {
-    return __do_syscall3(SYS_VM_GET_TASK_INFO, taskHandle, (uintptr_t) info, infoSz);
+    return __do_syscall3(taskHandle, (uintptr_t) info, infoSz, 
+            SYS_VM_GET_TASK_INFO);
 }
 
 /**
@@ -254,10 +351,10 @@ int VirtualGetHandleForAddr(const uintptr_t address, uintptr_t *regionHandle) {
  */
 int VirtualGetHandleForAddrInTask(const uintptr_t taskHandle, const uintptr_t address,
         uintptr_t *regionHandle) {
-    int err;
+    intptr_t err;
 
     // handle the error or non-existent mapping cases of the syscall
-    err = __do_syscall2(SYS_VM_ADDR_TO_HANDLE, taskHandle, address);
+    err = __do_syscall2(taskHandle, address, SYS_VM_ADDR_TO_HANDLE);
     if(err < 0) {
         return err;
     } else if(!err) {
@@ -277,5 +374,5 @@ int VirtualGetHandleForAddrInTask(const uintptr_t taskHandle, const uintptr_t ad
  */
 int VirtualRegionSetFlags(const uintptr_t regionHandle, const uintptr_t newFlags) {
     const uintptr_t flags = BuildSyscallFlags(newFlags, 0);
-    return __do_syscall1(SYS_VM_UPDATE_FLAGS | ((flags & 0xFFFF) << 16), regionHandle);
+    return __do_syscall2(regionHandle, flags, SYS_VM_UPDATE_FLAGS);
 }

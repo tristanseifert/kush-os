@@ -6,6 +6,7 @@
 #include "LaunchInfo.h"
 #include "loader/Loader.h"
 #include "loader/Elf32.h"
+#include "loader/Elf64.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -46,10 +47,12 @@ uintptr_t Task::createFromFile(const std::string &elfPath, const std::vector<std
 
     // load the binary into the task's VM map
     auto loader = task->getLoaderFor(elfPath, fp);
-    LOG("Loader for %s: %p (id '%s'); task $%08x'h", elfPath.c_str(), loader.get(),
+    LOG("Loader for %s: %p (id '%s'); task $%p'h", elfPath.c_str(), loader.get(),
             loader->getLoaderId().data(), task->getHandle());
 
     loader->mapInto(task);
+
+    LOG("loading complete. binary is %s", loader->needsDyld() ? "dynamic" : "static");
 
     // load dynamic linker as well if needed
     if(loader->needsDyld()) {
@@ -120,34 +123,17 @@ std::shared_ptr<loader::Loader> Task::getLoaderFor(const std::string &path, FILE
 
     using namespace loader;
 
-    // check 64-bit ELF header if on a 64-bit platform
-#if defined(__amd64__)
-    Elf64_Ehdr hdr;
-    memset(&hdr, 0, sizeof(Elf64_Ehdr));
+    // read the ELF header for the current architecture
+    Elf_Ehdr hdr;
+    memset(&hdr, 0, sizeof hdr);
 
     err = fseek(fp, 0, SEEK_SET);
     if(err) {
         throw std::system_error(err, std::generic_category(), "Failed to read ELF header");
     }
 
-    err = fread(&hdr, 1, sizeof(Elf64_Ehdr), fp);
-    if(err != sizeof(Elf64_Ehdr)) {
-        throw std::system_error(err, std::generic_category(), "Failed to read ELF header");
-    }
-
-    // TODO: implement the rest of this
-#else   // otherwise, read a 32-bit header
-    // read out the header
-    Elf32_Ehdr hdr;
-    memset(&hdr, 0, sizeof(Elf32_Ehdr));
-
-    err = fseek(fp, 0, SEEK_SET);
-    if(err) {
-        throw std::system_error(err, std::generic_category(), "Failed to read ELF header");
-    }
-
-    err = fread(&hdr, 1, sizeof(Elf32_Ehdr), fp);
-    if(err != sizeof(Elf32_Ehdr)) {
+    err = fread(&hdr, 1, sizeof hdr, fp);
+    if(err != sizeof hdr) {
         throw std::system_error(err, std::generic_category(), "Failed to read ELF header");
     }
 
@@ -159,15 +145,19 @@ std::shared_ptr<loader::Loader> Task::getLoaderFor(const std::string &path, FILE
     }
 
     // use the class value to pick a reader (32 vs 64 bits)
-    if(hdr.e_ident[EI_CLASS] == ELFCLASS32) {
-        return std::make_shared<Elf32>(fp);
-    } else {
-        throw LoaderError(fmt::format("Invalid ELF class: {:02x}", hdr.e_ident[EI_CLASS]));
-    }
-#endif
+    switch(hdr.e_ident[EI_CLASS]) {
+        case ELFCLASS32:
+            return std::dynamic_pointer_cast<loader::Loader>(std::make_shared<Elf32>(fp));
+            break;
 
-    // we should not get here
-    return nullptr;
+        case ELFCLASS64:
+            return std::dynamic_pointer_cast<loader::Loader>(std::make_shared<Elf64>(fp));
+            break;
+
+        default:
+            LOG("unsupported ELF class $%02x", hdr.e_ident[EI_CLASS]);
+            throw LoaderError(fmt::format("Invalid ELF class: {:02x}", hdr.e_ident[EI_CLASS]));
+    }
 }
 
 /**
@@ -202,7 +192,7 @@ void Task::loadDyld(const std::string &dyldPath, uintptr_t &pcOut) {
                         dyldPath));
         }
 
-        loader->mapInto(this);
+        loader->mapInto(this->shared_from_this());
 
         pcOut = loader->getEntryAddress();
     } catch(std::exception &) {
@@ -266,7 +256,7 @@ uintptr_t Task::buildInfoStruct(const std::vector<std::string> &args) {
         std::copy(argPtrsBytes, argPtrsBytes + argPtrsLen, std::back_inserter(buf));
     }
 
-    // allocate a memory region for it
+    // allocate a memory region for it and map it somewhere
     const auto pageSz = sysconf(_SC_PAGESIZE);
     if(pageSz <= 0) {
         throw std::system_error(errno, std::generic_category(), "Failed to determine page size");
@@ -275,9 +265,14 @@ uintptr_t Task::buildInfoStruct(const std::vector<std::string> &args) {
     const auto totalInfoBytes = sizeof(kush_task_launchinfo_t) + buf.size();
     const auto vmAllocSize = ((totalInfoBytes + pageSz - 1) / pageSz) * pageSz;
 
-    err = AllocVirtualAnonRegion(0, vmAllocSize, VM_REGION_RW, &vmHandle);
+    err = AllocVirtualAnonRegion(vmAllocSize, VM_REGION_RW, &vmHandle);
     if(err) {
         throw std::system_error(err, std::generic_category(), "AllocVirtualAnonRegion");
+    }
+
+    err = MapVirtualRegion(vmHandle, 0, vmAllocSize, 0);
+    if(err) {
+        throw std::system_error(err, std::generic_category(), "MapVirtualRegion");
     }
 
     // get its base and copy the data into it
@@ -299,9 +294,9 @@ uintptr_t Task::buildInfoStruct(const std::vector<std::string> &args) {
     }
 
     // map the page into destination task's address space
-    err = MapVirtualRegionAtTo(vmHandle, this->taskHandle, kVmBase);
+    err = MapVirtualRegionRemote(this->taskHandle, vmHandle, kVmBase, vmAllocSize, VM_REGION_READ);
     if(err) {
-        throw std::system_error(err, std::generic_category(), "MapVirtualRegionAtTo");
+        throw std::system_error(err, std::generic_category(), "MapVirtualRegionRemote");
     }
 
     // unmap the page from our address space

@@ -15,6 +15,7 @@ add_library(system_objs OBJECT
     src/sys/infopage.c
     # stack stuff
     src/stack/stack_guard.c
+    src/helpers.c
 )
 target_compile_options(system_objs PRIVATE -fPIC)
 
@@ -61,7 +62,7 @@ elseif(${KERNEL_ARCH} STREQUAL "x86_64")
         src/x86_64/threads.c
         src/x86_64/thread_start.S
         src/x86_64/syscall_arch.c
-        src/x86_64/syscall_impl.c
+        src/x86_64/syscall_impl.S
     )
 
     target_compile_definitions(system_objs PRIVATE LIBC_ARCH_X86_64=1)

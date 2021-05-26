@@ -370,7 +370,8 @@ uintptr_t Manager::addExtHandler(const uint32_t irq, bool (*callback)(void *, co
     info->irqNum = irq;
     info->vector = vector;
 
-    info->vecToken = this->addHandler(vector, [](void *ctx, const uint32_t) {
+    info->vecToken = this->addHandler(vector, [](void *ctx, const uint32_t irq) {
+        // log("irq %u", irq);
         auto info = reinterpret_cast<ExtHandler *>(ctx);
         info->callback(info->callbackCtx, info->irqNum);
         return true;

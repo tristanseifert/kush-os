@@ -29,28 +29,22 @@
 	\memsection{ffff ffff ffff ffff}{ffff ffff fffe 0000}{2}{\sc -- reseved --}\\
 	\memsection{ffff ffff ffdf ffff}{ffff ffff ff00 0000}{3}{Kernel \texttt{.text}/\texttt{.data}} \\
 	\memsection{ffff ffff feff ffff}{ffff ffff fe00 0000}{2}{Bootloader env/info}\\
-	\memsection{ffff ffff fdff ffff}{ffff ffff f800 0000}{2}{Bootup framebuffer}\\
-	%\memsection{ffff ffff ffff ffff}{ffff ff80 0000 0000}{4}{Recursive page table mapping}\\
+	\memsection{ffff ffff fdff ffff}{ffff ffff f800 0000}{2}{Bootup framebuffer}\\	
 	
-	
-	\memsection{ffff ffff}{f800 0000}{4}{-- reseved --}\\
+	\memsection{ffff ffff f7ff ffff}{ffff ff80 0000 0000}{4}{\sc -- reseved --}\\
 		
 	\begin{rightwordgroup}{Platform}
-%		\memsection{f7ff ffff}{f400 0000}{3}{-- reseved --}\\
-%		\memsection{f3ff ffff}{f300 0000}{2}{Arch temp mappings}\\
-%		\memsection{f2ff ffff}{f200 0000}{2}{Temporary paging mapping area}\\
-%		\memsection{f1ff ffff}{f100 0000}{2}{MMIO (\textsc{apic}, \textsc{hpet}, etc.)}\\
-%		\memsection{f0ff ffff}{f000 0000}{2}{ACPI Tables}
+		\memsection{ffff ffff f7ff ffff}{ffff ff02 0000 0000}{2}{\sc -- reseved --}\\
+		\memsection{ffff ff02 ffff ffff}{ffff ff02 0000 0000}{2}{ACPI} \\
+		\memsection{ffff ff01 ffff ffff}{ffff ff01 0000 0000}{2}{Platform devices} \\
 		\memsection{ffff ff00 ffff ffff}{ffff ff00 0000 0000}{2}{Arch mappings}
 	\end{rightwordgroup}\\
 	
-	\memsection{ffff 82ff ffff ffff}{ffff 8210 0000 0000}{8}{Anonymous memory pool}\\
-	
-	\memsection{ffff 820f ffff ffff}{ffff 8208 0000 0000}{2}{\sc -- reseved --}\\
-	
-	\memsection{ffff 8208 ffff ffff}{ffff 8201 0000 0000}{3}{Kernel stacks\\512K x 64K stacks} \\
-	\memsection{ffff 8200 ffff ffff}{ffff 8200 4000 0000}{2}{\sc -- reseved --}\\
-	\memsection{ffff 8200 3fff ffff}{ffff 8200 0000 0000}{2}{Physical memory alloc bitmaps} \\
+	\memsection{ffff feff ffff ffff}{ffff 8400 0000 0000}{2}{\sc -- reseved --}\\
+	\memsection{ffff 83ff ffff ffff}{ffff 8300 0000 0000}{8}{Kernel Heap}\\
+	\memsection{ffff 82ff ffff ffff}{ffff 82ff 0000 0000}{2}{Physical memory alloc structures} \\
+	\memsection{ffff 82ff ffff ffff}{ffff 8208 0000 0000}{2}{\sc -- reseved --}\\
+	\memsection{ffff 8207 ffff ffff}{ffff 8200 0000 0000}{3}{Kernel stacks\\512K x 64K stacks} \\
 	
 	\memsection{ffff 81ff ffff ffff}{ffff 8000 0000 0000}{4}{Physical identity map (2TB)}\\
 	

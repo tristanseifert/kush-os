@@ -4,114 +4,110 @@
 #ifndef KERNEL_SYS_HANDLERS_H
 #define KERNEL_SYS_HANDLERS_H
 
+#include <cstddef>
+
 #include "Syscall.h"
 #include "Errors.h"
+#include "handle/Manager.h"
+#include "runtime/SmartPointers.h"
 
 namespace sys {
 
+struct RecvInfo;
+
 /// Sends a message to the given port.
-int PortSend(const Syscall::Args *args, const uintptr_t number);
+intptr_t PortSend(const Handle portHandle, const void *msgPtr, const size_t msgLen);
 /// Waits to receive a message on a port.
-int PortReceive(const Syscall::Args *args, const uintptr_t number);
+intptr_t PortReceive(const Handle portHandle, RecvInfo *recvPtr, const size_t recvLen,
+        const size_t timeout);
 /// Updates a port's queue size
-int PortSetParams(const Syscall::Args *args, const uintptr_t number);
+intptr_t PortSetParams(const Handle portHandle, const uintptr_t queueDepth);
 /// Allocates a new port.
-int PortAlloc(const Syscall::Args *args, const uintptr_t number);
+intptr_t PortAlloc();
 /// Releases a previously allocated port.
-int PortDealloc(const Syscall::Args *args, const uintptr_t number);
+intptr_t PortDealloc(const Handle portHandle);
 
 /// Sets the given notification bits in the thread.
-int NotifySend(const Syscall::Args *args, const uintptr_t number);
+intptr_t NotifySend(const Handle threadHandle, const uintptr_t bits);
 /// Blocks waiting to receive a notification.
-int NotifyReceive(const Syscall::Args *args, const uintptr_t number);
+intptr_t NotifyReceive(uintptr_t mask);
+
+
+struct VmInfo;
+struct VmTaskInfo;
+struct VmMapRequest;
+enum VmFlags: uintptr_t;
 
 /// Allocates a virtual memory region backed by physical memory
-int VmAlloc(const Syscall::Args *args, const uintptr_t number);
+intptr_t VmAllocPhysRegion(const uintptr_t physAddr, const size_t length, const VmFlags flags);
 /// Allocate a virtual memory region backed by anonymous memory
-int VmAllocAnon(const Syscall::Args *args, const uintptr_t number);
+intptr_t VmAllocAnonRegion(const uintptr_t length, const VmFlags flags);
+/// Releases a previously allocated VM region
+intptr_t VmDealloc(const Handle vmHandle);
 /// Update permissions (R/W/X flags) of a VM region
-int VmRegionUpdatePermissions(const Syscall::Args *args, const uintptr_t number);
+intptr_t VmRegionUpdatePermissions(const Handle vmHandle, const VmFlags newFlags);
 /// Resizes a VM region
-int VmRegionResize(const Syscall::Args *args, const uintptr_t number);
-/// Maps a VM region into a task.
-int VmRegionMap(const Syscall::Args *args, const uintptr_t number);
-/// Unmaps a VM region.
-int VmRegionUnmap(const Syscall::Args *args, const uintptr_t number);
+intptr_t VmRegionResize(const Handle vmHandle, const size_t newSize, const VmFlags flags);
+/// Maps a VM region into a task
+intptr_t VmRegionMap(const Handle vmHandle, const Handle taskHandle, const uintptr_t base,
+        const size_t length, const VmFlags flags);
+/// Maps a VM region into a task optionally searching for an address
+intptr_t VmRegionMapEx(const Handle vmHandle, const Handle taskHandle, VmMapRequest *req,
+        const size_t reqLen);
+/// Unmaps a VM region
+intptr_t VmRegionUnmap(const Handle vmHandle, const Handle taskHandle);
 /// Gets information about a VM region
-int VmRegionGetInfo(const Syscall::Args *args, const uintptr_t number);
+intptr_t VmRegionGetInfo(const Handle vmHandle, const Handle taskHandle, VmInfo *infoPtr,
+        const size_t infoLen);
 /// Gets information on a task's virtual memory environment
-int VmTaskGetInfo(const Syscall::Args *args, const uintptr_t number);
+intptr_t VmTaskGetInfo(const Handle taskHandle, VmTaskInfo *infoPtr, const size_t infoLen);
 /// Returns the handle for the region containing an address.
-int VmAddrToRegion(const Syscall::Args *args, const uintptr_t number);
-
-/**
- * Creates a new userspace thread.
- */
-int ThreadCreate(const Syscall::Args *args, const uintptr_t number);
-/**
- * Destroys an userspace thread.
- */
-int ThreadDestroy(const Syscall::Args *args, const uintptr_t number);
-
-/**
- * Sets the thread priority.
- */
-int ThreadSetPriority(const Syscall::Args *args, const uintptr_t number);
-
-/**
- * Sets the thread's notification mask.
- */
-int ThreadSetNoteMask(const Syscall::Args *args, const uintptr_t number);
-
-/**
- * Sets the descriptive name of the thread.
- *
- * The first argument is a thread handle (or zero for current thread,) followed by the userspace
- * address of the name and its length, in bytes.
- */
-int ThreadSetName(const Syscall::Args *args, const uintptr_t number);
-/// Resumes the given paused thread.
-int ThreadResume(const Syscall::Args *args, const uintptr_t number);
-/// Waits for the specified thread to terminate.
-int ThreadJoin(const Syscall::Args *args, const uintptr_t number);
+intptr_t VmAddrToRegion(const Handle taskHandle, const uintptr_t vmAddr);
 
 
-/**
- * Implements the create task syscall.
- */
-int TaskCreate(const Syscall::Args *args, const uintptr_t number);
+/// Get thread handle of currently executing thread.
+intptr_t ThreadGetHandle();
+/// Yield the thread's time slice allowing higher priority threads to run
+intptr_t ThreadYield();
+/// Microsecond sleep
+intptr_t ThreadUsleep(const uintptr_t usecs);
+/// Creates a new userspace thread
+intptr_t ThreadCreate(const uintptr_t entryPtr, const uintptr_t entryParam,
+        const uintptr_t stackPtr, const uintptr_t rawFlags);
+/// Destroys an userspace thread
+intptr_t ThreadDestroy(const Handle threadHandle);
+/// Sets the thread priority
+intptr_t ThreadSetPriority(const Handle threadHandle, const intptr_t priority);
+/// Sets the thread's notification mask
+intptr_t ThreadSetNoteMask(const Handle threadHandle, const uintptr_t newMask);
+/// Sets the descriptive name of the thread
+intptr_t ThreadSetName(const Handle threadHandle, const char *namePtr, const size_t nameLen);
+/// Resumes the given paused thread
+intptr_t ThreadResume(const Handle threadHandle);
+/// Waits for the specified thread to terminate
+intptr_t ThreadJoin(const Handle threadHandle, const uintptr_t timeout);
 
-/**
- * Terminates a task, setting its exit code.
- *
- * The first argument is the task handle; if zero, the current task is terminated. The second
- * argument specifies the return code.
- */
-int TaskTerminate(const Syscall::Args *args, const uintptr_t number);
 
-/**
- * Implements the "initialize task" syscall.
- *
- * This will invoke all kernel handlers that are interested in new tasks being created, finish
- * setting up some kernel structures, then perform a return to userspace to the specified address
- * and stack.
- */
-int TaskInitialize(const Syscall::Args *args, const uintptr_t number);
+/// Returns the currently executing task's handle
+intptr_t TaskGetHandle();
+/// Create a new task
+intptr_t TaskCreate(const Handle parentTaskHandle);
+/// Terminate an existing task
+intptr_t TaskTerminate(const Handle taskHandle, const intptr_t code);
+/// Completes task initialization and begins its main thread execution
+intptr_t TaskInitialize(const Handle taskHandle, const uintptr_t userPc,
+        const uintptr_t userStack);
+/// Set the descriptive name of a task
+intptr_t TaskSetName(const Handle taskHandle, const char *namePtr, const size_t nameLen);
+/// Debug output to kernel log console
+intptr_t TaskDbgOut(const char *msgPtr, const size_t msgLen);
 
-/**
- * Sets the descriptive name of the task.
- *
- * The first argument is a task handle (or zero for current task,) followed by the userspace
- * address of the name and its length, in bytes.
- */
-int TaskSetName(const Syscall::Args *args, const uintptr_t number);
-
-int TaskDbgOut(const Syscall::Args *args, const uintptr_t number);
 
 /// Installs an IRQ handler
-int IrqHandlerInstall(const Syscall::Args *args, const uintptr_t number);
+intptr_t IrqHandlerInstall(const uintptr_t irqNum, const Handle threadHandle,
+        const uintptr_t bits);
 /// Removes an IRQ handler
-int IrqHandlerRemove(const Syscall::Args *args, const uintptr_t number);
+intptr_t IrqHandlerRemove(const Handle irqHandle);
 
 }
 

@@ -3,8 +3,9 @@
 
 #include <stdint.h>
 
-#include <arch/spinlock.h>
-#include <runtime/Queue.h>
+#include <log.h>
+#include <runtime/SmartPointers.h>
+#include <runtime/LockFreeQueue.h>
 
 namespace sched {
 void IdleEntry(uintptr_t arg);
@@ -47,35 +48,60 @@ class IdleWorker {
         struct WorkItem {
             /// Type of work
             Type type = Type::Unknown;
-            /// pointer to payload
-            void *payload = nullptr;
 
             WorkItem() = default;
-            WorkItem(Type _type) : type(_type), payload(nullptr) {}
-            WorkItem(Type _type, void *_payload) : type(_type), payload(_payload) {}
+            WorkItem(Type _type) : type(_type) {}
+            virtual ~WorkItem() = default;
 
-            static WorkItem destroyThread(Thread *t) {
-                return WorkItem(Type::DestroyThread, t);
-            }
-            static WorkItem destroyTask(Task *t) {
-                return WorkItem(Type::DestroyTask, t);
-            }
+            /// invoked to actually do the task
+            virtual void operator()() = 0;
+        };
+
+        /// Work item for deleting a thread
+        struct DeleteThreadItem: public WorkItem {
+            DeleteThreadItem(const rt::SharedPtr<Thread> &_thread) : WorkItem(Type::DestroyThread),
+                thread(_thread) {}
+
+            void operator()() override;
+
+            /// thread to be destroyed
+            rt::SharedPtr<Thread> thread;
+            /// whether thread deletion is logged
+            static const bool gLog = true;
+        };
+        /// Work item for deleting a task
+        struct DeleteTaskItem: public WorkItem {
+            DeleteTaskItem(const rt::SharedPtr<Task> &_task) : WorkItem(Type::DestroyTask),
+                task(_task) {}
+
+            void operator()() override;
+
+            /// thread to be destroyed
+            rt::SharedPtr<Task> task;
+            /// whether task deletion is logged
+            static const bool gLog = true;
         };
 
     public:
         IdleWorker(Scheduler *);
-        ~IdleWorker();
+        ~IdleWorker() = default;
 
         /// Queues the given thread for deletion
-        void queueDestroyThread(Thread *thread) {
-            SPIN_LOCK_GUARD(this->workLock);
-            this->work.push_back(WorkItem::destroyThread(thread));
+        void queueDestroyThread(const rt::SharedPtr<Thread> &thread) {
+            auto info = new DeleteThreadItem(thread);
+            REQUIRE(info, "failed to allocate %s", "destroy thread message");
+
+            const auto inserted = this->work.insert(info);
+            REQUIRE(inserted, "failed to insert %s", "destroy thread message");
         }
 
         /// Queues the given task for deletion
-        void queueDestroyTask(Task *task) {
-            SPIN_LOCK_GUARD(this->workLock);
-            this->work.push_back(WorkItem::destroyTask(task));
+        void queueDestroyTask(const rt::SharedPtr<Task> &task) {
+            auto info = new DeleteTaskItem(task);
+            REQUIRE(info, "failed to allocate %s", "destroy task message");
+
+            const auto inserted = this->work.insert(info);
+            REQUIRE(inserted, "failed to insert %s", "destroy task message");
         }
 
     private:
@@ -90,12 +116,10 @@ class IdleWorker {
         /// scheduler that owns us
         Scheduler *sched = nullptr;
         /// actual worker thread
-        Thread *thread = nullptr;
+        rt::SharedPtr<Thread> thread;
 
         /// work queue
-        rt::Queue<WorkItem> work;
-        /// lock protecting the queue
-        DECLARE_SPINLOCK(workLock);
+        rt::LockFreeQueue<WorkItem *> work;
 };
 }
 

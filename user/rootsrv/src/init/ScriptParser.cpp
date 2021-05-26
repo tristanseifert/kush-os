@@ -48,18 +48,27 @@ void ScriptParser::parse(std::shared_ptr<Bundle::File> file) {
             continue;
         }
 
+        // get the keyword
+        auto firstSpace = line.find_first_of(' ');
+        std::string keyword = line;
+        if(firstSpace != std::string::npos) {
+            keyword = line.substr(0, firstSpace);
+        }
+
+        std::transform(keyword.begin(), keyword.end(), keyword.begin(), ::tolower);
+
         // is this a line giving info about a server to start?
-        if(line.starts_with("SERVER ")) {
+        if(!keyword.find("server")) {
             auto args = std::string_view(line.data() + 7, line.length() - 7);
             this->processServer(args);
         }
         // ignore file directives
-        else if(line.starts_with("FILE ")) {
+        else if(!keyword.find("file")) {
             // nothing
         }
         // unknown line
         else {
-            LOG("Unhandled line: '%s'", line.c_str());
+            LOG("Unhandled keyword '%s': '%s'", keyword.c_str(), line.c_str());
         }
     }
 }

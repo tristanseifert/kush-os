@@ -31,7 +31,7 @@ void StackPool::init() {
  */
 StackPool::StackPool() {
     // mark all stacks as available
-    memset(&this->freeMap, 0, sizeof(uint32_t) * (kNumStacks / 4));
+    memset(&this->freeMap, 0, sizeof(uint32_t) * (kNumStacks / 4 / 8));
 
     for(size_t i = 0; i < kNumStacks; i++) {
         this->freeMap[i / 32] |= (1 << (i % 32));
@@ -43,11 +43,11 @@ StackPool::StackPool() {
  *
  * The topmost page of the kStackSize region is not mapped; it's a guard page between stacks.
  */
-void *StackPool::alloc() {
+void *StackPool::alloc(size_t &outSize) {
     int err;
     const auto pageSz = arch_page_size();
 
-    vm::Map *m = vm::Map::current();;
+    vm::Map *m = vm::Map::current();
     if(!m) {
         m = vm::Map::kern();
     }
@@ -99,6 +99,7 @@ void *StackPool::alloc() {
 
         // clear the entire allocated stack region and return it
         memset((void *) (start + pageSz), 0, (kStackSize - pageSz));
+        outSize = (kStackSize - pageSz); // one page used for guard page
         return (void *) (start + kStackSize);
 
 failure:;

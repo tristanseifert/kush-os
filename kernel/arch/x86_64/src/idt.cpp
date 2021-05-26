@@ -2,28 +2,40 @@
 #include "gdt.h"
 #include "exceptions.h"
 
+#include <new>
 #include <log.h>
 #include <string.h>
 
 using namespace arch;
 
-// the descriptor table is allocated in BSS
-idt_entry64_t Idt::gIdts[Idt::kNumIdt] __attribute__((aligned((64))));
+// storage for BSP IDT
+static uint8_t gSharedBuf[sizeof(Idt)] __attribute__((aligned(64)));
+Idt *arch::gBspIdt = nullptr;
 
 bool Idt::gLogLoad = false;
 bool Idt::gLogSet = false;
 
 /*
- * Builds the Interrupt Descriptor Table at a fixed location in memory.
+ * Set up the IDT for the bootstrap processor.
  */
 void Idt::Init() {
-    memset(&gIdts, 0, sizeof(idt_entry64_t)*kNumIdt);
+    gBspIdt = reinterpret_cast<Idt *>(&gSharedBuf);
+    new(gBspIdt) Idt;
+}
 
-    // install CPU exception handlers
-    exception_install_handlers();
+
+
+/**
+ * Sets up an interrupt descriptor table; it will contain handlers for the common x86 exceptions,
+ * but nothing else.
+ */
+Idt::Idt() {
+    // set up default handlers
+    memset(this->storage, 0, sizeof(idt_entry64_t) * kNumIdt);
+    InstallExceptionHandlers(this);
 
     // load the IDT into the processor
-    Load();
+    this->load();
 }
 
 
@@ -40,31 +52,32 @@ void Idt::Init() {
  * uses the legacy TSS lookup, which we don't support. There are a total of 7 stack slots in the
  * TSS, which are all allocated for each core.
  */
-void Idt::Set(const size_t entry, const uintptr_t function, const uintptr_t segment, const uintptr_t flags, const Stack stack) {
+void Idt::set(const size_t entry, const uintptr_t function, const uintptr_t segment, const uintptr_t flags, const Stack stack) {
     REQUIRE(entry < kNumIdt, "IDT index out of bounds: %u", entry);
 
-    if(gLogSet) log("IDT index %2u: addr %016llx segment %04x flags %08x stack %u", entry, 
+    if(gLogSet) log("IDT %p index %3u: addr $%016llx segment %04x flags %02x stack %u", this, entry,
             function, segment, flags, (uint8_t) stack);
 
-    gIdts[entry].offset1 = function & 0xFFFF;
-    gIdts[entry].offset2 = function >> 16;
-    gIdts[entry].selector = segment;
-    gIdts[entry].ist = static_cast<uint8_t>(stack);
-    gIdts[entry].flags = flags; // OR with 0x60 for user level
-    gIdts[entry].offset3 = function >> 32ULL;
+    this->storage[entry].offset1 = function & 0xFFFF;
+    this->storage[entry].offset2 = function >> 16;
+    this->storage[entry].selector = segment;
+    this->storage[entry].ist = static_cast<uint8_t>(stack);
+    this->storage[entry].flags = flags; // OR with 0x60 for user level
+    this->storage[entry].offset3 = function >> 32ULL;
 }
 
 /**
  * Loads the IDT.
  */
-void Idt::Load() {
+void Idt::load() {
     struct {
         uint16_t length;
         uint64_t base;
     } __attribute__((__packed__)) IDTR;
 
     IDTR.length = (sizeof(idt_entry64_t) * kNumIdt) - 1;
-    IDTR.base = reinterpret_cast<uintptr_t>(&gIdts);
+    IDTR.base = reinterpret_cast<uintptr_t>(&this->storage);
+
     asm volatile("lidt (%0)": : "r"(&IDTR));
 
     if(gLogLoad) log("Loaded IDT %p len %u", IDTR.base, IDTR.length);

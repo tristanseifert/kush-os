@@ -122,7 +122,6 @@ add_library(c_objs OBJECT
     src/dylink/dlopen.c
     src/dylink/dlsym.c
     src/dylink/dlerror.c
-    src/dylink/dl_iterate_phdr.c
     # file IO
     src/file/default_streams.c
     src/file/rpc_file_streams.c
@@ -206,6 +205,7 @@ target_include_directories(c_objs PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 
 # set up the static and dynamic targets
 add_library(c_static STATIC $<TARGET_OBJECTS:c_objs> $<TARGET_OBJECTS:c_gdtoa>
+    src/dylink/dl_iterate_phdr_static.c
     src/threads/tls_static.c
 )
 target_compile_definitions(c_static PRIVATE BUILDING_LIBC=1)
@@ -214,6 +214,7 @@ target_include_directories(c_static PUBLIC include)
 target_link_libraries(c_static PUBLIC system_static)
 
 add_library(c_dynamic SHARED $<TARGET_OBJECTS:c_objs> $<TARGET_OBJECTS:c_gdtoa>
+    src/dylink/dl_iterate_phdr_dynamic.c
     src/threads/tls_dynamic.c
 )
 target_compile_definitions(c_dynamic PRIVATE BUILDING_LIBC=1)

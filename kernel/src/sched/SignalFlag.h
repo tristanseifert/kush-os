@@ -11,6 +11,16 @@ namespace sched {
  */
 class SignalFlag: public Blockable {
     public:
+        static rt::SharedPtr<SignalFlag> make() {
+            rt::SharedPtr<SignalFlag> ptr(new SignalFlag);
+            ptr->us = rt::WeakPtr<SignalFlag>(ptr);
+            return ptr;
+        }
+
+    private:
+        SignalFlag() = default;
+
+    public:
         /// We're signalled if the signal flag is set.
         bool isSignalled() override {
             return this->signalled;
@@ -26,15 +36,18 @@ class SignalFlag: public Blockable {
          * Signals the flag, waking any threads that are pending on it.
          */
         void signal() {
-            // set flag
-            bool yes = true;
-            __atomic_store(&this->signalled, &yes, __ATOMIC_RELEASE);
-
-            // unblock the waiting threads
-            this->unblock();
+            // set flag and unblock if this is the first time we're to unblock
+            bool no = false, yes = true;
+            if(__atomic_compare_exchange(&this->signalled, &no, &yes, false, __ATOMIC_RELEASE,
+                        __ATOMIC_RELAXED)) {
+                // unblock the task
+                this->blocker->unblock(this->us.lock());
+            }
         }
 
     private:
+        rt::WeakPtr<SignalFlag> us;
+
         /// signal flag
         bool signalled = false;
 };

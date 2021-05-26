@@ -18,7 +18,7 @@ extern "C" {
  */
 typedef struct amd64_exception_info {
     // SSE registers
-    __m128i xmm[8];
+    // __m128i xmm[8];
 
     // registers added for 64-bit mode
     uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
@@ -37,19 +37,6 @@ typedef struct amd64_exception_info {
 } __attribute__((packed)) amd64_exception_info_t;
 
 
-
-/**
- * Installs the standard exception handlers.
- */
-void exception_install_handlers();
-
-/**
- * Formats an x86_64 exception info blob.
- */
-int amd64_exception_format_info(char *outBuf, const size_t outBufLen, 
-        const amd64_exception_info_t *info);
-
-
 /**
  * Handles a page fault exception.
  */
@@ -63,4 +50,21 @@ void amd64_handle_exception(amd64_exception_info_t *info);
 #ifdef __cplusplus
 }
 #endif
+
+/**
+ * Formats an x86_64 exception info blob.
+ */
+int amd64_exception_format_info(char *outBuf, const size_t outBufLen, 
+        const amd64_exception_info_t *info);
+
+
+namespace arch {
+class Idt;
+
+/**
+ * Installs the default exception handlers into the given IDT.
+ */
+void InstallExceptionHandlers(Idt *idt);
+}
+
 #endif

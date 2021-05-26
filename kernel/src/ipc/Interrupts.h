@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include <handle/Manager.h>
+#include <runtime/SmartPointers.h>
 
 namespace sched {
 struct Thread;
@@ -17,6 +18,7 @@ namespace ipc {
  */
 class IrqHandler {
     friend class Interrupts;
+    friend class rt::SharedPtr<IrqHandler>;
 
     public:
         /// Return the handle for this irq handler.
@@ -24,14 +26,14 @@ class IrqHandler {
             return this->handle;
         }
         /// Return the thread to which this irq handler delivers notifications
-        sched::Thread *getThread() const {
+        auto getThread() const {
             return this->thread;
         }
 
         ~IrqHandler();
 
     private:
-        IrqHandler(sched::Thread *_thread, const uintptr_t _bits);
+        IrqHandler(const rt::SharedPtr<sched::Thread> &_thread, const uintptr_t _bits);
 
         /// the IRQ has fired
         void fired();
@@ -45,7 +47,7 @@ class IrqHandler {
         uintptr_t irqNum = 0;
 
         /// thread to notify when the irq fires
-        sched::Thread *thread = nullptr;
+        rt::SharedPtr<sched::Thread> thread = nullptr;
         /// notification bits to yeet on the thread
         uintptr_t bits = 0;
 };
@@ -56,8 +58,8 @@ class IrqHandler {
  */
 class Interrupts {
     public:
-        static IrqHandler *create(const uintptr_t irqNum, sched::Thread *thread,
-                const uintptr_t noteBits);
+        static rt::SharedPtr<IrqHandler> create(const uintptr_t irqNum,
+                const rt::SharedPtr<sched::Thread> &thread, const uintptr_t noteBits);
 };
 };
 

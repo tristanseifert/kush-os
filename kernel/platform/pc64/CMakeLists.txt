@@ -13,19 +13,27 @@ add_library(kernel_platform_pc64 OBJECT
     src/platform.cpp
     src/physmap.cpp
     src/io/spew.cpp
+    src/irq/Manager.cpp
+    src/irq/LocalApic.cpp
+    src/irq/IoApic.cpp
     src/irq/Irql.cpp
     src/irq/Ipi.cpp
     src/irq/Registry.cpp
     src/irq/pic.cpp
     src/irq/Idle.cpp
+    src/timer/ApicTimer.cpp
+    src/timer/Hpet.cpp
+    src/timer/Tsc.cpp
     src/timer/Registry.cpp
     src/timer/pit.cpp
     src/init/LoadRootsrv.cpp
+    src/acpi/Parser.cpp
 )
 
 target_include_directories(kernel_platform_pc64 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../src)
 target_include_directories(kernel_platform_pc64 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../include)
 target_include_directories(kernel_platform_pc64 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
+target_include_directories(kernel_platform_pc64 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
 
 target_include_directories(kernel_platform_pc64 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/bootboot/dist)
 

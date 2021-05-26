@@ -13,6 +13,9 @@ add_executable(rootsrv
     src/task/RpcHandler.cpp
     src/task/InfoPage.cpp
     src/task/DyldoPipe.cpp
+    src/task/loader/ElfCommon.cpp
+    src/task/loader/Elf32.cpp
+    src/task/loader/Elf64.cpp
     src/dispensary/Dispensary.cpp
     src/dispensary/Registry.cpp
     src/dispensary/RpcHandler.cpp
@@ -20,11 +23,13 @@ add_executable(rootsrv
 
 #### arch specific ELF loader code
 if(${KERNEL_ARCH} STREQUAL "x86")
-target_sources(rootsrv
-    src/task/loader/Elf32.cpp
-)
+    # install the boot config
+    install(FILES ${CMAKE_CURRENT_LIST_DIR}/data/x86_pc.init DESTINATION ${SYSROOT_DIR}/boot
+        RENAME default.init)
 elseif(${KERNEL_ARCH} STREQUAL "x86_64")
-
+    # install the boot config
+    install(FILES ${CMAKE_CURRENT_LIST_DIR}/data/amd64_pc.init DESTINATION ${SYSROOT_DIR}/boot
+        RENAME default.init)
 else()
     message(FATAL_ERROR "rootsrv does not have binary loader for arch '${KERNEL_ARCH}'")
 endif()

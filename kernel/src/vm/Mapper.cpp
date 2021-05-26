@@ -74,6 +74,7 @@ void Mapper::loadMap(Map *map) {
  */
 void Mapper::loadKernelMap() {
     loadMap(gKernelMap);
+    arch::vm::PTEHandler::InitialKernelMapLoad();
 }
 
 /**

@@ -32,19 +32,24 @@ typedef struct TaskVmInfo {
 
 
 
-LIBSYSTEM_EXPORT int AllocVirtualAnonRegion(const uintptr_t virtualAddr, const uintptr_t size,
+LIBSYSTEM_EXPORT int AllocVirtualAnonRegion(const uintptr_t size, const uintptr_t inFlags,
+        uintptr_t *outHandle);
+LIBSYSTEM_EXPORT int AllocVirtualPhysRegion(const uint64_t physAddr, const uintptr_t size,
         const uintptr_t inFlags, uintptr_t *outHandle);
-LIBSYSTEM_EXPORT int AllocVirtualRegion(const uint64_t physAddr, const uintptr_t virtualAddr,
-        const uintptr_t size, const uintptr_t inFlags, uintptr_t *outHandle);
+LIBSYSTEM_EXPORT int DeallocVirtualRegion(const uintptr_t regionHandle);
 
 LIBSYSTEM_EXPORT int ResizeVirtualRegion(const uintptr_t regionHandle, const uintptr_t newSize);
 
-LIBSYSTEM_EXPORT int MapVirtualRegion(const uintptr_t regionHandle);
-LIBSYSTEM_EXPORT int MapVirtualRegionAt(const uintptr_t regionHandle, const uintptr_t baseAddr);
-LIBSYSTEM_EXPORT int MapVirtualRegionTo(const uintptr_t regionHandle, const uintptr_t taskHandle);
-LIBSYSTEM_EXPORT int MapVirtualRegionToFlags(const uintptr_t regionHandle, const uintptr_t taskHandle, const uintptr_t flags);
-LIBSYSTEM_EXPORT int MapVirtualRegionAtTo(const uintptr_t regionHandle, const uintptr_t taskHandle,
-        const uintptr_t baseAddr);
+LIBSYSTEM_EXPORT int MapVirtualRegion(const uintptr_t regionHandle, const uintptr_t baseAddr,
+        const size_t length, const uintptr_t flags);
+LIBSYSTEM_EXPORT int MapVirtualRegionRemote(const uintptr_t taskHandle,
+        const uintptr_t regionHandle, const uintptr_t base, const size_t length,
+        const uintptr_t flags);
+LIBSYSTEM_EXPORT int MapVirtualRegionRange(const uintptr_t regionHandle, const uintptr_t range[2],
+        const size_t length, const uintptr_t flags, uintptr_t *outBase);
+LIBSYSTEM_EXPORT int MapVirtualRegionRangeRemote(const uintptr_t taskHandle, 
+        const uintptr_t regionHandle, const uintptr_t range[2], const size_t length,
+        const uintptr_t flags, uintptr_t *outBase);
 
 LIBSYSTEM_EXPORT int UnmapVirtualRegion(const uintptr_t regionHandle);
 LIBSYSTEM_EXPORT int UnmapVirtualRegionFrom(const uintptr_t regionHandle, const uintptr_t taskHandle);

@@ -57,8 +57,9 @@ static void __ThreadEntry(uintptr_t arg) {
     assert(info);
 
     // extract the entry point and release the info structure
-    uintptr_t yes = 1;
-    __atomic_store(&info->thrd->isRunning, &yes, __ATOMIC_RELEASE);
+    bool yes = true, no = false;
+    __atomic_store(&info->thrd->isRunning, &yes, __ATOMIC_RELAXED);
+    __atomic_store(&info->thrd->isLaunching, &no, __ATOMIC_RELEASE);
 
     // initialize thread-locals
     __libc_tls_init();
@@ -105,6 +106,8 @@ int thrd_create(thrd_t *outThread, thrd_start_t entry, void *arg) {
     // create the thread, but paused
     uintptr_t stackBot = ((uintptr_t) stack) + stackBytes;
 
+    // XXX: do we need to compensate for the amd64 red zone?
+
     err = ThreadCreateFlags(__ThreadEntry, (uintptr_t) info, stackBot, &handle, THREAD_PAUSED);
     if(err) {
         free(info);
@@ -124,12 +127,13 @@ int thrd_create(thrd_t *outThread, thrd_start_t entry, void *arg) {
     info->thrd = thread;
 
     // resume the thread and write its identifier out
+    thread->isLaunching = 1;
     *outThread = thread;
 
     err = ThreadResume(handle);
     if(err) {
         // XXX: is there anything we can do here? the thread might run at some point later...
-        fprintf(stderr, "failed to resume thread $%08x'h (%d)\n", handle, err);
+        fprintf(stderr, "failed to resume thread $%p'h (%d)\n", handle, err);
     }
 
     return thrd_success;
@@ -180,7 +184,7 @@ void thrd_exit(int res) {
     // store exit code and clear the running flag
     thread->exitCode = res;
 
-    uintptr_t no = 0;
+    bool no = false;
     __atomic_store(&thread->isRunning, &no, __ATOMIC_RELEASE);
 
     // release TIB ref
@@ -274,7 +278,7 @@ int thrd_join_np(thrd_t _thread, int *outRes, const struct timespec *howLong) {
     uintptr_t wait = UINTPTR_MAX;
 
     // ensure we haven't been detached
-    uintptr_t detached;
+    bool detached;
     __atomic_load(&_thread->detached, &detached, __ATOMIC_CONSUME);
     if(detached) {
         return thrd_error;
@@ -307,10 +311,11 @@ int thrd_join_np(thrd_t _thread, int *outRes, const struct timespec *howLong) {
     }
 
     // handle the instance in which the thread has already exited
-    uintptr_t isRunning;
+    bool isRunning, isLaunching;
+    __atomic_load(&_thread->isLaunching, &isLaunching, __ATOMIC_CONSUME);
     __atomic_load(&_thread->isRunning, &isRunning, __ATOMIC_CONSUME);
 
-    if(!isRunning) {
+    if(!isRunning && !isLaunching) {
         if(outRes) {
             *outRes = _thread->exitCode;
         }
@@ -381,9 +386,10 @@ int thrd_detach(thrd_t thread) {
         return thrd_error;
     }
 
-    uintptr_t no = 0, yes = 1;
+    bool no = false, yes = true;
 
-    if(!__atomic_compare_exchange(&thread->detached, &no, &yes, 0, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
+    if(!__atomic_compare_exchange(&thread->detached, &no, &yes, 0, __ATOMIC_RELEASE,
+                __ATOMIC_RELAXED)) {
         // already detached!
         return thrd_error;
     }

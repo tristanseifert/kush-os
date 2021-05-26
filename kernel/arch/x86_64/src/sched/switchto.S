@@ -17,23 +17,22 @@ amd64_switchto:
     // set up stack frame and get parameter
     push        %rbp
     mov         %rsp, %rbp
-    mov         %rdi, %rax
 
 /**
- * Common context switch restoration function; %rax should point to a ThreadState struct, with a
+ * Common context switch restoration function; %rdi should point to a ThreadState struct, with a
  * correctly formed stack frame that we can return to.
  */
 amd64_switchto_common:
     // restore FPU state
-    mov         TS_OFF_FPU_ENABLED(%rax), %rbx
-    test        %rbx, %rbx
+    mov         TS_OFF_FPU_ENABLED(%rdi), %rax
+    test        %rax, %rax
     jz          1f
 
-    fxrstor     TS_OFF_FXSAVE(%rax)
+    fxrstor     TS_OFF_FXSAVE(%rdi)
 
 1:
     // switch back to the appropriate stack
-    mov         TS_OFF_STACKTOP(%rax), %rsp
+    mov         TS_OFF_STACKTOP(%rdi), %rsp
 
 amd64_switchto_common_stacked:
     // restore registers and CPU state
@@ -96,20 +95,19 @@ amd64_switchto_save:
     push        %r15
 
     // store the stack pointer to restore to in the struct
-    mov         %rdi, %rax
-    mov         %rsp, TS_OFF_STACKTOP(%rax)
+    mov         %rsp, TS_OFF_STACKTOP(%rdi)
 
     // save FPU state, if required
-    mov         TS_OFF_FPU_ENABLED(%rax), %rbx
-    test        %rbx, %rbx
+    mov         TS_OFF_FPU_ENABLED(%rdi), %rax
+    test        %rax, %rax
     jz          2f
 
-    mov         TS_OFF_FXSAVE(%rax), %rbx
-    fxsave      (%rbx)
+    mov         TS_OFF_FXSAVE(%rdi), %rax
+    fxsave      (%rax)
 
 2:
     // the previous thread's state has been saved. switch to the next thread
-    mov         %rsi, %rax
+    mov         %rsi, %rdi
 
     // restoring the thread state is the exact same as normal
     jmp         amd64_switchto_common
@@ -127,7 +125,7 @@ amd64_switchto_swap_stub:
  * general purpose registers are cleared.
  *
  * %rdi: Program counter
- * %rsi: Stack
+ * %rsi: Stack pointer
  * %rdx: Argument
  */
 amd64_ring3_return:
@@ -162,9 +160,18 @@ amd64_ring3_return:
     xor         %rdx, %rdx
     xor         %rbp, %rbp
     xor         %rsi, %rsi
+    xor         %r8, %r8
+    xor         %r9, %r9
+    xor         %r10, %r10
+    xor         %r11, %r11
+    xor         %r12, %r12
+    xor         %r13, %r13
+    xor         %r14, %r14
+    xor         %r15, %r15
 
-    // and finally do the return
-    iret
+    // return, and ensure we swap back to the userspace %gs base
+    swapgs
+    iretq
 
 /**
  * Invokes the DPC handler, then does a context switch to the thread state currently on the stack.

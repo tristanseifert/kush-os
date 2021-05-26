@@ -32,7 +32,6 @@ using namespace arch;
  */
 void arch::InitThreadState(sched::Thread *thread, const uintptr_t pc, const uintptr_t arg) {
     // make space for the exception frame and initialize it
-    /// XXX: the +8 allows us to build a stack frame to enter the main function
     const auto frameSz = sizeof(CpuRegs);
     uintptr_t *params = reinterpret_cast<uintptr_t *>((uintptr_t) thread->stack - 20);
     auto frame = reinterpret_cast<CpuRegs *>((uintptr_t) thread->stack - frameSz - 20);
@@ -60,7 +59,8 @@ void arch::InitThreadState(sched::Thread *thread, const uintptr_t pc, const uint
  * Restores the thread's state. We'll restore the FPU state, then execute the context switch by
  * switching to the correct stack, restoring registers and performing an iret.
  */
-void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
+void arch::RestoreThreadState(const rt::SharedPtr<sched::Thread> &from,
+        const rt::SharedPtr<sched::Thread> &to) {
     bool yes = true, no = false;
 
     /*
@@ -86,30 +86,47 @@ void arch::RestoreThreadState(sched::Thread *from, sched::Thread *to) {
          * page table. Since kernel mappings are always shared, this saves us a pretty expensive
          * TLB flush the MOV to CR3 operation causes.
          */
-        //if(::vm::Mapper::getKernelMap() != destVm) {
+        if(::vm::Mapper::getKernelMap() != destVm.get()) {
             destVm->activate();
-        //}
+        }
     }
 
-    // update thread-local
+    // update thread-local address (%gs and %fs)
+    x86_msr_write(X86_MSR_KERNEL_GSBASE, (to->regs.gsBase), (to->regs.gsBase) >> 32ULL);
+    x86_msr_write(X86_MSR_FSBASE, (to->regs.fsBase), (to->regs.fsBase) >> 32ULL);
 
-    // update syscall handler state
+    // update syscall handler and kernel stack in TSS
     syscall::Handler::handleCtxSwitch(to);
+
+    // TSS stack is kernel stack of thread (for scheduler IPI)
+    const auto toStackAddr = reinterpret_cast<uintptr_t>(to->stack);
+    auto tss = PerCpuInfo::get()->tss;
+    REQUIRE(tss, "failed to get tss ptr");
+
+    tss->rsp[0].low =  (toStackAddr & 0xFFFFFFFF);
+    tss->rsp[0].high = (toStackAddr >> 32ULL);
 
     // save state into current thread and switch to next
     if(from) {
+        // stop the task timer
+        sched::Scheduler::get()->willSwitchFrom(from);
+
         //log("old task %%esp = %p, new task %%esp = %p (stack %p)", from->regs.stackTop, to->regs.stackTop, to->stack);
         // set the running flags
-        __atomic_store(&from->isActive, &no, __ATOMIC_RELEASE);
-        __atomic_store(&to->isActive, &yes, __ATOMIC_RELEASE);
+        __atomic_store(&from->isActive, &no, __ATOMIC_RELAXED);
+        __atomic_store(&to->isActive, &yes, __ATOMIC_RELAXED);
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
 
+        sched::Scheduler::get()->willSwitchTo(to);
         amd64_switchto_save(&from->regs, &to->regs);
     }
     // no thread context to save; just switch
     else {
         // log("new task %%esp = %p (stack %p)", to->regs.stackTop, to->stack);
-        __atomic_store(&to->isActive, &yes, __ATOMIC_RELEASE);
+        __atomic_store(&to->isActive, &yes, __ATOMIC_RELAXED);
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
 
+        sched::Scheduler::get()->willSwitchTo(to);
         amd64_switchto(&to->regs);
     }
 }

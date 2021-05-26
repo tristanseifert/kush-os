@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-namespace platform { namespace timer {
+namespace platform {
 /**
  * Provides a very basic intercace to the legacy PIT on the PC platform.
  *
@@ -26,13 +26,13 @@ class LegacyPIT {
         /// Bit for the channel 2 gate output
         constexpr static const uint8_t kCh2GateBit = (1 << 0);
 
+    private:
+        /// whether re-configurations of the PIT are logged
+        static bool gLogConfig;
+
     public:
         static void disable();
-
-        /// Returns the number of picoseconds the actual wait was for
-        static uint64_t configBusyWait(const uint32_t micros);
-        static void busyWait();
 };
-}}
+}
 
 #endif
