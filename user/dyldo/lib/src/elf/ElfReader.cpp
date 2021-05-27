@@ -81,9 +81,9 @@ void ElfReader::validateHeader() {
     int err;
 
     // read out the header
-    Elf32_Ehdr hdr;
-    memset(&hdr, 0, sizeof(Elf32_Ehdr));
-    this->read(sizeof(Elf32_Ehdr), &hdr, 0);
+    Elf_Ehdr hdr;
+    memset(&hdr, 0, sizeof hdr);
+    this->read(sizeof hdr, &hdr, 0);
 
     // ensure magic is correct, before we try and instantiate an ELF reader
     err = strncmp(reinterpret_cast<const char *>(hdr.e_ident), ELFMAG, SELFMAG);
@@ -113,12 +113,16 @@ void ElfReader::validateHeader() {
     if(hdr.e_machine != EM_386) {
         Linker::Abort("Invalid ELF machine type %08x", hdr.e_type);
     }
+#elif defined(__amd64__)
+    if(hdr.e_machine != EM_X86_64) {
+        Linker::Abort("Invalid ELF machine type %08x", hdr.e_type);
+    }
 #else
 #error Update library loader to handle the current arch
 #endif
 
     // read section header info
-    if(hdr.e_shentsize != sizeof(Elf32_Shdr)) {
+    if(hdr.e_shentsize != sizeof(Elf_Shdr)) {
         Linker::Abort("Invalid %s header size %u", "section", hdr.e_shentsize);
     }
 
@@ -126,7 +130,7 @@ void ElfReader::validateHeader() {
     this->shdrNum = hdr.e_shnum;
 
     // read program header info
-    if(hdr.e_phentsize != sizeof(Elf32_Phdr)) {
+    if(hdr.e_phentsize != sizeof(Elf_Phdr)) {
         Linker::Abort("Invalid %s header size %u", "program", hdr.e_phentsize);
     }
 
@@ -219,8 +223,8 @@ void ElfReader::parseDynamicInfo() {
     this->strtab = std::span<char>(reinterpret_cast<char *>(strtabAddr), strtabLen);
 
     // parse section headers for the other stufs
-    const auto shdrBytes = (sizeof(Elf32_Shdr) * this->shdrNum);
-    auto shdrs = reinterpret_cast<Elf32_Shdr *>(malloc(shdrBytes));
+    const auto shdrBytes = (sizeof(Elf_Shdr) * this->shdrNum);
+    auto shdrs = reinterpret_cast<Elf_Shdr *>(malloc(shdrBytes));
     if(!shdrs) Linker::Abort("out of memory");
 
     this->read(shdrBytes, shdrs, this->shdrOff);
@@ -233,7 +237,7 @@ void ElfReader::parseDynamicInfo() {
             // dynamic symbol table
             case SHT_DYNSYM: {
                 const auto nSyms = hdr.sh_size / symtabItemLen;
-                this->symtab = std::span<Elf32_Sym>(reinterpret_cast<Elf32_Sym *>(symtabAddr), nSyms);
+                this->symtab = std::span<Elf_Sym>(reinterpret_cast<Elf_Sym *>(symtabAddr), nSyms);
                 break;
             }
 
@@ -256,7 +260,7 @@ void ElfReader::parseDynamicInfo() {
  * @param outRels If data relocations exist, set to the span encompassing all of them.
  * @return Whether there are relocations to process.
  */
-bool ElfReader::getDynRels(std::span<Elf32_Rel> &outRels) {
+bool ElfReader::getDynRels(std::span<Elf_Rel> &outRels) {
     // get the extents of the region
     uintptr_t relAddr = 0;
     size_t relEntBytes = 0, relBytes = 0;
@@ -285,13 +289,13 @@ bool ElfReader::getDynRels(std::span<Elf32_Rel> &outRels) {
         Linker::Abort("failed to read %s relocs: REL %u ENT %u SZ %u", "data", relAddr,
                 relEntBytes, relBytes);
     }
-    else if(relEntBytes != sizeof(Elf32_Rel)) {
+    else if(relEntBytes != sizeof(Elf_Rel)) {
         Linker::Abort("unsupported relent size %u", relEntBytes);
     }
 
     // process each relocation
     const auto numRels = relBytes / relEntBytes;
-    outRels = std::span<Elf32_Rel>(reinterpret_cast<Elf32_Rel *>(relAddr), numRels);
+    outRels = std::span<Elf_Rel>(reinterpret_cast<Elf_Rel *>(relAddr), numRels);
 
     return true;
 }
@@ -302,7 +306,7 @@ bool ElfReader::getDynRels(std::span<Elf32_Rel> &outRels) {
  * @param outRels If relocations exist, set to the span encompassing all of them.
  * @return Whether there are PLT relocations to process.
  */
-bool ElfReader::getPltRels(std::span<Elf32_Rel> &outRels) {
+bool ElfReader::getPltRels(std::span<Elf_Rel> &outRels) {
     // get the extents of the region
     uintptr_t relAddr = 0;
     size_t relEntBytes = 0, relBytes = 0;
@@ -313,7 +317,7 @@ bool ElfReader::getPltRels(std::span<Elf32_Rel> &outRels) {
                 relAddr = this->rebaseVmAddr(entry.d_un.d_ptr);
                 break;
             case DT_PLTREL:
-                relEntBytes = (entry.d_un.d_val == DT_REL) ? sizeof(Elf32_Rel) : sizeof(Elf32_Rela);
+                relEntBytes = (entry.d_un.d_val == DT_REL) ? sizeof(Elf_Rel) : sizeof(Elf_Rela);
                 break;
             case DT_PLTRELSZ:
                 relBytes = entry.d_un.d_val;
@@ -331,13 +335,13 @@ bool ElfReader::getPltRels(std::span<Elf32_Rel> &outRels) {
         Linker::Abort("failed to read %s relocs: REL %u ENT %u SZ %u", "PLT", relAddr, relEntBytes,
                 relBytes);
     }
-    else if(relEntBytes != sizeof(Elf32_Rel)) {
+    else if(relEntBytes != sizeof(Elf_Rel)) {
         Linker::Abort("unsupported relent size %u", relEntBytes);
     }
 
     // process each relocation
     const auto numRels = relBytes / relEntBytes;
-    outRels = std::span<Elf32_Rel>(reinterpret_cast<Elf32_Rel *>(relAddr), numRels);
+    outRels = std::span<Elf_Rel>(reinterpret_cast<Elf_Rel *>(relAddr), numRels);
 
     return true;
 }
@@ -347,12 +351,12 @@ bool ElfReader::getPltRels(std::span<Elf32_Rel> &outRels) {
  *
  * @param base An offset to add to virtual addresses of symbols to turn them into absolute addresses.
  */
-void ElfReader::patchRelocs(const std::span<Elf32_Rel> &rels, const uintptr_t base) {
+void ElfReader::patchRelocs(const std::span<Elf_Rel> &rels, const uintptr_t base) {
     const SymbolMap::Symbol *symbol;
 
     // process each relocation
     for(const auto &rel : rels) {
-        const auto type = ELF32_R_TYPE(rel.r_info);
+        const auto type = ELF_R_TYPE(rel.r_info);
 
         // resolve symbol if needed
         switch(type) {
@@ -550,7 +554,7 @@ void ElfReader::readDeps() {
  * @param base An offset to add to all virtual address offsets in the file. Should be 0 if the file
  * is an executable, otherwise the load address of the dynamic library.
  */
-void ElfReader::loadSegment(const Elf32_Phdr &phdr, const uintptr_t base) {
+void ElfReader::loadSegment(const Elf_Phdr &phdr, const uintptr_t base) {
     int err;
     uintptr_t vmRegion;
 
@@ -581,17 +585,24 @@ void ElfReader::loadSegment(const Elf32_Phdr &phdr, const uintptr_t base) {
     seg.vmEnd = ((((vmBase + phdr.p_memsz) + pageSz - 1) / pageSz) * pageSz) - 1;
 
     if(gLogSegments) {
-        Linker::Trace("Segment off %08x length %08x va %08x: %08x - %08x", seg.offset, seg.length,
+        Linker::Trace("Segment off $%x length $%x va %p: %p - %p", seg.offset, seg.length,
                 phdr.p_vaddr, seg.vmStart, seg.vmEnd);
     }
 
-    // allocate the page
-    err = AllocVirtualAnonRegion(seg.vmStart, (seg.vmEnd - seg.vmStart) + 1, VM_REGION_RW,
-            &vmRegion);
+    // allocate the region
+    const size_t regionLen = (seg.vmEnd - seg.vmStart) + 1;
+
+    err = AllocVirtualAnonRegion(regionLen, VM_REGION_RW, &vmRegion);
     if(err) {
-        Linker::Abort("failed to allocate anon region: %d", err);
+        Linker::Abort("failed to %s anon region: %d", "allocate", err);
     }
     seg.vmRegion = vmRegion;
+
+    // map region
+    err = MapVirtualRegion(vmRegion, seg.vmStart, regionLen, 0);
+    if(err) {
+        Linker::Abort("failed to %s anon region: %d", "map", err);
+    }
 
     // copy into the page
     if(phdr.p_filesz) {
@@ -604,7 +615,7 @@ void ElfReader::loadSegment(const Elf32_Phdr &phdr, const uintptr_t base) {
         const auto numZeroBytes = phdr.p_memsz - phdr.p_filesz;
 
         if(gLogSegments) {
-            Linker::Trace("Zeroing %u bytes at %p", numZeroBytes, zeroStart);
+            Linker::Trace("Zeroing %lu bytes at %p", numZeroBytes, zeroStart);
         }
 
         memset(zeroStart, 0, numZeroBytes);
@@ -633,7 +644,7 @@ void ElfReader::applyProtection() {
 
         // warn if WX
         if((flags & VM_REGION_EXEC) && (flags & VM_REGION_WRITE)) {
-            Linker::Info("W+X mapping at %08x for %p", seg.vmStart, this);
+            Linker::Info("W+X mapping at %p for %p", seg.vmStart, this);
         }
 
         err = VirtualRegionSetFlags(seg.vmRegion, flags);
@@ -650,7 +661,7 @@ void ElfReader::applyProtection() {
  *
  * @param base Offset to add to the offset field in the relocation to get an absolute address.
  */
-void ElfReader::relocCopyFromShlib(const Elf32_Rel &rel, const SymbolMap::Symbol *sym,
+void ElfReader::relocCopyFromShlib(const Elf_Rel &rel, const SymbolMap::Symbol *sym,
         const uintptr_t base) {
     auto dest = reinterpret_cast<void *>(rel.r_offset + base);
     auto from = reinterpret_cast<const void *>(sym->address);

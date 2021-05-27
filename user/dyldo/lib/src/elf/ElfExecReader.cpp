@@ -43,9 +43,9 @@ ElfExecReader::~ElfExecReader() {
  */
 void ElfExecReader::ensureExec() {
     // read the header to extract some info
-    Elf32_Ehdr hdr;
-    memset(&hdr, 0, sizeof(Elf32_Ehdr));
-    this->read(sizeof(Elf32_Ehdr), &hdr, 0);
+    Elf_Ehdr hdr;
+    memset(&hdr, 0, sizeof hdr);
+    this->read(sizeof hdr, &hdr, 0);
 
     // ensure it's an executable. also extract the offsets to program headers
     if(hdr.e_type != ET_EXEC) {
@@ -62,12 +62,12 @@ void ElfExecReader::ensureExec() {
  */
 void ElfExecReader::loadDynamicInfo() {
     // read program headers
-    auto phdrs = reinterpret_cast<Elf32_Phdr *>(malloc(sizeof(Elf32_Phdr) * this->phdrNum));
+    auto phdrs = reinterpret_cast<Elf_Phdr *>(malloc(sizeof(Elf_Phdr) * this->phdrNum));
     if(!phdrs) {
         Linker::Abort("out of memory");
     }
 
-    this->read(sizeof(Elf32_Phdr) * this->phdrNum, phdrs, this->phdrOff);
+    this->read(sizeof(Elf_Phdr) * this->phdrNum, phdrs, this->phdrOff);
 
     // try to find the dynamic header
     for(size_t i = 0; i < this->phdrNum; i++) {
@@ -76,9 +76,9 @@ void ElfExecReader::loadDynamicInfo() {
         switch(phdr.p_type) {
             // found the dynamic info so read it out
             case PT_DYNAMIC: {
-                const auto num = (phdr.p_filesz / sizeof(Elf32_Dyn));
-                const auto base = reinterpret_cast<Elf32_Dyn *>(phdr.p_vaddr);
-                this->dynInfo = std::span<Elf32_Dyn>(base, num);
+                const auto num = (phdr.p_filesz / sizeof(Elf_Dyn));
+                const auto base = reinterpret_cast<Elf_Dyn *>(phdr.p_vaddr);
+                this->dynInfo = std::span<Elf_Dyn>(base, num);
                 break;
             }
 
@@ -89,8 +89,8 @@ void ElfExecReader::loadDynamicInfo() {
 
             // program headers in memory
             case PT_PHDR: {
-                auto ptr = reinterpret_cast<Elf32_Phdr *>(phdr.p_vaddr);
-                this->phdrs = std::span<Elf32_Phdr>(ptr, this->phdrNum);
+                auto ptr = reinterpret_cast<Elf_Phdr *>(phdr.p_vaddr);
+                this->phdrs = std::span<Elf_Phdr>(ptr, this->phdrNum);
                 break;
             }
 
@@ -116,7 +116,7 @@ void ElfExecReader::loadDynamicInfo() {
  * It's assumed that all of the template data (i.e. what's not in the .tbss) is mapped into the
  * address space of the process.
  */
-void ElfExecReader::loadTlsTemplate(const Elf32_Phdr &hdr) {
+void ElfExecReader::loadTlsTemplate(const Elf_Phdr &hdr) {
     // get the .tdata (initialized) TLS info
     std::span<std::byte> tdata;
 

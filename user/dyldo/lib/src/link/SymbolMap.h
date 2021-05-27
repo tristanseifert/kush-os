@@ -80,7 +80,7 @@ class SymbolMap {
         SymbolMap();
 
         /// Adds a new symbol.
-        void add(const char * _Nonnull name, const Elf32_Sym &sym, Library * _Nonnull library);
+        void add(const char * _Nonnull name, const Elf_Sym &sym, Library * _Nonnull library);
         /// Registers a symbol override.
         void addOverride(const Symbol * _Nonnull inSym, const uintptr_t newAddr);
         /// Adds a new linker exported symbol in the form of a function.

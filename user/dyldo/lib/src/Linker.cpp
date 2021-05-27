@@ -103,7 +103,7 @@ void Linker::cleanUp() {
  */
 void Linker::doFixups() {
     // first, fix up the executable (data and PLT)
-    std::span<Elf32_Rel> rels;
+    std::span<Elf_Rel> rels;
 
     if(this->exec->getDynRels(rels)) {
         this->exec->processRelocs(rels);
@@ -115,7 +115,7 @@ void Linker::doFixups() {
     // then, ALL loaded libraries
     hashmap_iterate(&this->loaded, [](void *ctx, void *value) {
         auto lib = reinterpret_cast<Library *>(value);
-        std::span<Elf32_Rel> rels;
+        std::span<Elf_Rel> rels;
 
         // update its dynamic relocs
         if(lib->reader->getDynRels(rels)) {
@@ -317,7 +317,7 @@ const SymbolMap::Symbol *Linker::resolveSymbol(const char *name, Library *inLibr
 /**
  * Registers a symbol in the symbol map.
  */
-void Linker::exportSymbol(const char * _Nonnull name, const Elf32_Sym &sym,
+void Linker::exportSymbol(const char * _Nonnull name, const Elf_Sym &sym,
         Library * _Nonnull library) {
     this->map->add(name, sym, library);
 }

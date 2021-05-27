@@ -114,6 +114,10 @@ void Elf32::processProgHdr(const std::shared_ptr<Task> &task, const Elf32_Phdr &
         case PT_TLS:
             break;
 
+            // points back to location of program headers in executable image
+        case PT_PHDR:
+            break;
+
         // unhandled program header type
         default:
             LOG("Unhandled phdr type %u offset %p vaddr $%p filesz %u memsz %u"

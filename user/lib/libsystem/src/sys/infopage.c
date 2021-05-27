@@ -9,9 +9,9 @@
  * startup, so we cannot rely on the page existing at startup unless we test for it.
  */
 #if defined(__i386__)
-const kush_sysinfo_page_t *__kush_infopg LIBSYSTEM_INTERNAL = (const kush_sysinfo_page_t *) 0xBF5FE000;
+const kush_sysinfo_page_t *__kush_infopg LIBSYSTEM_EXPORT = (const kush_sysinfo_page_t *) 0xBF5FE000;
 #elif defined(__amd64__)
-const kush_sysinfo_page_t *__kush_infopg LIBSYSTEM_INTERNAL = (const kush_sysinfo_page_t *) 0x7FFF00200000;
+const kush_sysinfo_page_t *__kush_infopg LIBSYSTEM_EXPORT = (const kush_sysinfo_page_t *) 0x7FFF00200000;
 
 #else
 #error Define sysinfo page address for current arch

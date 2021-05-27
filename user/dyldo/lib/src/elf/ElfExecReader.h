@@ -24,7 +24,7 @@ class ElfExecReader: public ElfReader {
         }
 
         /// Processes the given relocations.
-        void processRelocs(const std::span<Elf32_Rel> &rels) override {
+        void processRelocs(const std::span<Elf_Rel> &rels) override {
             this->patchRelocs(rels, 0);
         }
         /// Finds all initialization and termination functions and registers them.
@@ -40,7 +40,7 @@ class ElfExecReader: public ElfReader {
         void init();
 
         void loadDynamicInfo();
-        void loadTlsTemplate(const Elf32_Phdr &);
+        void loadTlsTemplate(const Elf_Phdr &);
 
     private:
         /// entry point of the binary

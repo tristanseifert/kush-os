@@ -33,7 +33,7 @@ SymbolMap::SymbolMap() {
  * It's an error if the symbol is already globally defined; weak symbols can always be overridden
  * by global symbols, however.
  */
-void SymbolMap::add(const char *name, const Elf32_Sym &sym, Library *library) {
+void SymbolMap::add(const char *name, const Elf_Sym &sym, Library *library) {
     int err;
     const auto keyLen = strlen(name);
 

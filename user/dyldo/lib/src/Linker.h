@@ -86,7 +86,7 @@ class Linker {
         const SymbolMap::Symbol* _Nullable resolveSymbol(const char *_Nonnull name,
                 Library * _Nullable inLibrary = nullptr);
         /// Registers a symbol exported from a library
-        void exportSymbol(const char * _Nonnull name, const Elf32_Sym &sym, Library *_Nonnull lib);
+        void exportSymbol(const char * _Nonnull name, const Elf_Sym &sym, Library *_Nonnull lib);
         /// Overrides a symbol's address.
         void overrideSymbol(const SymbolMap::Symbol * _Nonnull inSym, const uintptr_t newAddr);
 

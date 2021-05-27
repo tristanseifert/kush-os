@@ -47,14 +47,14 @@ class ElfReader {
         }
 
         /// Applies the given relocations.
-        virtual void processRelocs(const std::span<Elf32_Rel> &rels) = 0;
+        virtual void processRelocs(const std::span<Elf_Rel> &rels) = 0;
         /// Gets the dynamic (data) relocation entries
-        bool getDynRels(std::span<Elf32_Rel> &outRels);
+        bool getDynRels(std::span<Elf_Rel> &outRels);
         /// Gets the jump table (PLT) relocations
-        bool getPltRels(std::span<Elf32_Rel> &outRels);
+        bool getPltRels(std::span<Elf_Rel> &outRels);
 
         /// Gets an in-memory copy of the program headers.
-        virtual bool getVmPhdrs(std::span<Elf32_Phdr> &outPhdrs) {
+        virtual bool getVmPhdrs(std::span<Elf_Phdr> &outPhdrs) {
             outPhdrs = this->phdrs;
             return !(this->phdrs.empty());
         }
@@ -64,7 +64,7 @@ class ElfReader {
 
     protected:
         /// Loads a segment described by a program header into memory.
-        void loadSegment(const Elf32_Phdr &phdr, const uintptr_t base = 0);
+        void loadSegment(const Elf_Phdr &phdr, const uintptr_t base = 0);
 
         /// Reads the given number of bytes from the file at the specified offset.
         void read(const size_t nBytes, void * _Nonnull out, const uintptr_t offset);
@@ -72,7 +72,7 @@ class ElfReader {
         void parseDynamicInfo();
 
         /// Processes relocations.
-        void patchRelocs(const std::span<Elf32_Rel> &rels, const uintptr_t base);
+        void patchRelocs(const std::span<Elf_Rel> &rels, const uintptr_t base);
 
         /// Reads a string out of the string table at the given index.
         virtual const char * _Nullable readStrtab(const size_t i);
@@ -86,7 +86,7 @@ class ElfReader {
         }
 
         /// Processes a relocation indicating a copy from a shared object's data.
-        void relocCopyFromShlib(const Elf32_Rel &rel, const SymbolMap::Symbol * _Nonnull sym,
+        void relocCopyFromShlib(const Elf_Rel &rel, const SymbolMap::Symbol * _Nonnull sym,
                 const uintptr_t base = 0);
 
     private:
@@ -147,7 +147,7 @@ class ElfReader {
         /// string table
         std::span<char> strtab;
         /// symbol table
-        std::span<Elf32_Sym> symtab;
+        std::span<Elf_Sym> symtab;
 
         /// file offset to get to section headers
         uintptr_t shdrOff = 0;
@@ -159,9 +159,9 @@ class ElfReader {
         size_t shdrNum = 0;
 
         /// dynamic linker info
-        std::span<Elf32_Dyn> dynInfo;
+        std::span<Elf_Dyn> dynInfo;
         /// program headers
-        std::span<Elf32_Phdr> phdrs;
+        std::span<Elf_Phdr> phdrs;
 
         /// list head of dependent libraries
         std::list<DependentLibrary> deps;

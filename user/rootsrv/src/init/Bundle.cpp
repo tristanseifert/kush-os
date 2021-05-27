@@ -62,6 +62,11 @@ std::shared_ptr<Bundle::File> Bundle::open(const std::string &_name) {
     auto name = _name;
     name = trim(name);
 
+    // remove leading slash, if there is one
+    if(name[0] == '/') {
+        name.erase(0, 1);
+    }
+
     // return immediately if it's in the cache
     if(this->fileCache.contains(name)) {
         auto ptr = this->fileCache.at(name).lock();

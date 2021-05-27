@@ -40,7 +40,7 @@ class DlInfo {
             /// path name from which object was loaded from
             const char * _Nonnull path;
             /// program headers of the object
-            std::span<Elf32_Phdr> phdrs;
+            std::span<Elf_Phdr> phdrs;
 
             /// if it's a library, pointer to the library structure
             Library * _Nullable library = nullptr;

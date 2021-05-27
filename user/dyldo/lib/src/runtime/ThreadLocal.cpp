@@ -11,6 +11,8 @@
 #include <sys/syscalls.h>
 #if defined(__i386__)
 #include <sys/x86/syscalls.h>
+#elif defined(__amd64__)
+#include <sys/amd64/syscalls.h>
 #endif
 
 using namespace dyldo;
@@ -62,6 +64,8 @@ __attribute__ ((__regparm__ (1))) void *__dyldo_tls_get_addr(tls_index_t *ctx) {
     uintptr_t tlsBlockBase = 0;
 #if defined(__i386__)
     asm volatile("mov   %%gs:0x00, %0" : "=r" (tlsBlockBase));
+#elif defined(__amd64__)
+    asm volatile("mov   %%fs:0x00, %0" : "=r" (tlsBlockBase));
 #else
 #error Update ThreadLocal for current arch
 #endif
@@ -234,6 +238,8 @@ void ThreadLocal::tearDown() {
     uintptr_t tlsBlockBase = 0;
 #if defined(__i386__)
     asm volatile("mov   %%gs:0x00, %0" : "=r" (tlsBlockBase));
+#elif defined(__amd64__)
+    asm volatile("mov   %%fs:0x00, %0" : "=r" (tlsBlockBase));
 #else
 #error Update ThreadLocal for current arch
 #endif
@@ -257,7 +263,14 @@ void ThreadLocal::updateThreadArchState(TlsBlock *tls) {
     if(err) {
         Linker::Abort("%s failed: %d", "X86SetThreadLocalBase", err);
     }
+#elif defined(__amd64__)
+    int err = Amd64SetThreadLocalBase(SYS_ARCH_AMD64_TLS_FS, reinterpret_cast<uintptr_t>(tls));
+    if(err) {
+        Linker::Abort("%s failed: %d", "Amd64SetThreadLocalBase", err);
+    }
 #else
 #error Update ThreadLocal for current arch
 #endif
 }
+
+

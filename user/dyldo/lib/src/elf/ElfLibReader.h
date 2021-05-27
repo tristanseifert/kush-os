@@ -29,7 +29,7 @@ class ElfLibReader: public ElfReader {
         /// Defines the library's thread-local storage requirements.
         void exportThreadLocals(Library * _Nonnull lib);
 
-        void processRelocs(const std::span<Elf32_Rel> &rels) override {
+        void processRelocs(const std::span<Elf_Rel> &rels) override {
             this->patchRelocs(rels, this->base);
         }
 
