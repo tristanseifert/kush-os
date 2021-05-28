@@ -9,7 +9,6 @@
 # disabled. Any errors will _always_ be fatal and cause the task to terminate.
 ###############################################################################
 add_executable(dyldo
-    src/init/entry.S
     src/init/lib_init.cpp
     src/init/CppRuntime.cpp
     src/elf/ElfReader.cpp
@@ -23,6 +22,7 @@ add_executable(dyldo
 
 if(${KERNEL_ARCH} STREQUAL "x86")
     target_sources(dyldo PRIVATE
+        src/init/entry_x86.S
         src/init/jmp_to_x86.S
     )
 
@@ -30,6 +30,7 @@ if(${KERNEL_ARCH} STREQUAL "x86")
     target_link_options(dyldo PUBLIC "-Wl,-T${CMAKE_CURRENT_LIST_DIR}/src/linker_x86.ld")
 elseif(${KERNEL_ARCH} STREQUAL "x86_64")
     target_sources(dyldo PRIVATE
+        src/init/entry_amd64.S
         src/init/jmp_to_amd64.S
     )
 
@@ -47,6 +48,7 @@ target_link_libraries(dyldo PRIVATE c_static system_static rpc_static)
 target_compile_definitions(dyldo PRIVATE BUILDING_LIBDYLDO=1)
 
 # optimize for size
+target_compile_options(dyldo PRIVATE -mcmodel=large)
 target_link_options(dyldo PRIVATE -s)
 
 # specify the include directories

@@ -154,7 +154,7 @@ void Elf64::phdrLoad(const std::shared_ptr<Task> &task, const Elf64_Phdr &hdr) {
     }
 
     // allocate an anonymous region (RW for now) and get its base address in our vm map
-    err = AllocVirtualAnonRegion(allocSize, VM_REGION_RW, &vmHandle);
+    err = AllocVirtualAnonRegion(allocSize, VM_REGION_RW | VM_REGION_FORCE_ALLOC, &vmHandle);
     if(err) {
         throw std::system_error(err, std::generic_category(), "AllocVirtualAnonRegion");
     }
@@ -165,10 +165,9 @@ void Elf64::phdrLoad(const std::shared_ptr<Task> &task, const Elf64_Phdr &hdr) {
         throw std::system_error(err, std::generic_category(), "MapVirtualRegionRange");
     }
 
-    // set up to write to it
+    // set up to write to it, and copy the corresponding file region into it
     vmBase = reinterpret_cast<void *>(regionBase + inPageOff);
 
-    // get the corresponding file region and copy it
     if(hdr.p_filesz) {
         this->read(hdr.p_filesz, vmBase, hdr.p_offset);
     }

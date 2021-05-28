@@ -40,7 +40,7 @@ void ElfCommon::setUpStack(const std::shared_ptr<Task> &task, const uintptr_t in
 
     uintptr_t stackAddr = this->getDefaultStackAddr();
 
-    err = AllocVirtualAnonRegion(stackSize, VM_REGION_RW, &vmHandle);
+    err = AllocVirtualAnonRegion(stackSize, VM_REGION_RW | VM_REGION_FORCE_ALLOC, &vmHandle);
     if(err) {
         throw std::system_error(err, std::generic_category(), "AllocVirtualAnonRegion");
     }

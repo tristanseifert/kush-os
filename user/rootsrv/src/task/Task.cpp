@@ -23,6 +23,13 @@ using namespace task;
 std::once_flag Task::gDyldoPipeFlag;
 DyldoPipe *Task::gDyldoPipe = nullptr;
 
+const uintptr_t Task::kTempMappingRange[2] = {
+    // start
+    0x10000000000,
+    // end
+    0x20000000000,
+};
+
 /**
  * Creates a new task, loading the specified file from disk.
  *
@@ -206,16 +213,14 @@ void Task::loadDyld(const std::string &dyldPath, uintptr_t &pcOut) {
 }
 
 /**
- * Allocates a task information structure. We'll place this in an anonymous page somewhere around
- * 0xBE000000.
+ * Allocates a task information structure.
  */
 uintptr_t Task::buildInfoStruct(const std::vector<std::string> &args) {
     int err;
     uintptr_t vmHandle, base;
     std::vector<char> buf;
 
-    static const uintptr_t kVmBase = 0xBE000000;
-    static const auto kStrStart = (kVmBase + sizeof(kush_task_launchinfo_t));
+    static const auto kStrStart = (kLaunchInfoBase + sizeof(kush_task_launchinfo_t));
 
     // build the header
     kush_task_launchinfo_t info;
@@ -270,17 +275,12 @@ uintptr_t Task::buildInfoStruct(const std::vector<std::string> &args) {
         throw std::system_error(err, std::generic_category(), "AllocVirtualAnonRegion");
     }
 
-    err = MapVirtualRegion(vmHandle, 0, vmAllocSize, 0);
+    err = MapVirtualRegionRange(vmHandle, Task::kTempMappingRange, vmAllocSize, 0, &base);
     if(err) {
         throw std::system_error(err, std::generic_category(), "MapVirtualRegion");
     }
 
-    // get its base and copy the data into it
-    err = VirtualRegionGetInfo(vmHandle, &base, nullptr, nullptr);
-    if(err) {
-        throw std::system_error(err, std::generic_category(), "VirtualRegionGetInfo");
-    }
-
+    // copy data into it
     auto writePtr = reinterpret_cast<std::byte *>(base);
 
     memcpy(writePtr, &info, sizeof(kush_task_launchinfo_t));
@@ -294,7 +294,8 @@ uintptr_t Task::buildInfoStruct(const std::vector<std::string> &args) {
     }
 
     // map the page into destination task's address space
-    err = MapVirtualRegionRemote(this->taskHandle, vmHandle, kVmBase, vmAllocSize, VM_REGION_READ);
+    err = MapVirtualRegionRemote(this->taskHandle, vmHandle, kLaunchInfoBase, vmAllocSize,
+            VM_REGION_READ);
     if(err) {
         throw std::system_error(err, std::generic_category(), "MapVirtualRegionRemote");
     }
@@ -305,5 +306,5 @@ uintptr_t Task::buildInfoStruct(const std::vector<std::string> &args) {
         throw std::system_error(err, std::generic_category(), "UnmapVirtualRegion");
     }
 
-    return kVmBase;
+    return kLaunchInfoBase;
 }

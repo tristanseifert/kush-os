@@ -236,6 +236,6 @@ static void UserspaceThreadStub(uintptr_t arg) {
     delete info;
 
     // execute return to userspace
-    log("return to userspace for %p: pc %08x sp %08x", static_cast<void *>(thread), pc, sp);
+    log("return to userspace for $%p'h: pc %p sp %p", static_cast<void *>(thread), pc, sp);
     thread->returnToUser(pc, sp);
 }

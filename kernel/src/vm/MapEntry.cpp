@@ -91,10 +91,8 @@ rt::SharedPtr<MapEntry> MapEntry::makeAnon(const size_t length, const MappingFla
     auto entry = gMapEntryAllocator->alloc(length, flags);
     entry->isKernel = kernel;
 
-    // set it up and fault in all pages if needed
+    // set it up
     entry->isAnon = true;
-
-    // TODO: map pages
 
     // create a shared ptr
     auto ptr = rt::SharedPtr<MapEntry>(entry, MapEntryDeleter());
@@ -258,7 +256,49 @@ void MapEntry::faultInPage(const uintptr_t base, const uintptr_t offset, Map *ma
     arch::InvalidateTlb(destAddr);
 
     // zero it (XXX: this should be done BEFORE it's mapped!)
-    memset(reinterpret_cast<void *>(destAddr), 0, pageSz);
+    //memset(reinterpret_cast<void *>(destAddr), 0, pageSz);
+}
+
+/**
+ * Allocates physical memory for all pages this anonymous memory object maps.
+ *
+ * @note This will allocate physical memory for ALL pages, but won't actually map them yet. This
+ * will overwrite any existing physical allocations.
+ *
+ * @return 0 if all pages were faulted in, a negative error code otherwise.
+ */
+int MapEntry::faultInAllPages() {
+    REQUIRE(this->isAnon, "cannot fault in pages for non-anonymous memory");
+    REQUIRE(this->physOwned.empty(), "can't fault in all pages, as there are already some allocated");
+
+    // calculate how many pages to fault in
+    const auto pageSz = arch_page_size();
+    const auto numPages = this->length / pageSz;
+
+    log("allocating %lu pages for $%p'h", numPages, this->handle);
+
+    // allocate all the pages and insert the appropriate info structs
+    for(size_t i = 0; i < numPages; i++) {
+        const auto page = mem::PhysicalAllocator::alloc();
+        if(!page) return -1;
+
+        /*auto task = sched::Task::current();
+        if(task) {
+            __atomic_add_fetch(&task->physPagesOwned, 1, __ATOMIC_RELEASE);
+        }*/
+
+        // TODO: zero page?
+
+        // create the info struct
+        AnonPageInfo info;
+        info.physAddr = page;
+        info.pageOff = i;
+        info.task = sched::Task::current();
+
+        this->physOwned.push_back(info);
+    }
+
+    return 0;
 }
 
 /**

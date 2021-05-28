@@ -54,7 +54,7 @@ void KernelMapEarlyInit();
 uint64_t GetLocalTsc();
 
 /// Sets the core local timer to fire in the given number of nanoseconds
-void SetLocalTimer(const uint64_t interval);
+void SetLocalTimer(const uint64_t interval, const bool repeat = false);
 /// Stops the core local timer
 void StopLocalTimer();
 

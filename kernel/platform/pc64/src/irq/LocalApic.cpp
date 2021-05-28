@@ -286,11 +286,11 @@ void LocalApic::remoteIpi(const uintptr_t coreId, const uint8_t vector) {
 /**
  * Configure the core local timer, used by the scheduler code.
  */
-void platform::SetLocalTimer(const uint64_t interval) {
+void platform::SetLocalTimer(const uint64_t interval, const bool repeat) {
     auto timer = LocalApic::theTimer();
     REQUIRE(timer, "invalid %s", "LAPIC timer");
 
-    timer->setInterval(interval, false);
+    timer->setInterval(interval, repeat);
 }
 
 /**

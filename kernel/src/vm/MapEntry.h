@@ -86,9 +86,12 @@ class MapEntry {
         }
 
         /// Updates the flags of the map. Only the RWX and cacheability flags are updated.
-        int updateFlags(const MappingFlags newFlags);
+        [[nodiscard]] int updateFlags(const MappingFlags newFlags);
         /// Attempts to resize the VM object
-        int resize(const size_t newSize);
+        [[nodiscard]] int resize(const size_t newSize);
+
+        /// Force all pages to be faulted in
+        [[nodiscard]] int faultInAllPages();
 
         /// Allocates a VM object backed by a region of contiguous physical pages
         static rt::SharedPtr<MapEntry> makePhys(const uint64_t physAddr, const size_t length,

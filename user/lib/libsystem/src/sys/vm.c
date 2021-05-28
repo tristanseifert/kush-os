@@ -1,6 +1,7 @@
 #include "syscall.h"
 #include "helpers.h"
 #include <sys/syscalls.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -40,8 +41,12 @@ struct VmMapRequest {
  * @param create When set, extra flags allowed only for VM region creation are produced. Otherwise,
  * they are simply ignored.
  */
-static uintptr_t BuildSyscallFlags(const uintptr_t inFlags, int create) {
+static uintptr_t BuildSyscallFlags(const uintptr_t inFlags, bool create) {
     uintptr_t temp = 0;
+
+    if(create && inFlags & VM_REGION_FORCE_ALLOC) {
+        temp |= (1 << 0);
+    }
 
     if(inFlags & VM_REGION_READ) {
         temp |= (1 << 10);
@@ -100,7 +105,7 @@ int AllocVirtualAnonRegion(const uintptr_t size, const uintptr_t inFlags, uintpt
 
     // build flags
     uintptr_t flags = 0;
-    flags = BuildSyscallFlags(inFlags, 1);
+    flags = BuildSyscallFlags(inFlags, true);
 
     // perform syscall
     err = __do_syscall2(size, flags, SYS_VM_CREATE_ANON);
@@ -123,7 +128,7 @@ int AllocVirtualPhysRegion(const uint64_t physAddr, const uintptr_t size, const 
 
     // build flags
     uintptr_t flags = 0;
-    flags = BuildSyscallFlags(inFlags, 1);
+    flags = BuildSyscallFlags(inFlags, true);
 
     // perform syscall
     err = __do_syscall3(physAddr, size, flags, SYS_VM_CREATE);
@@ -173,7 +178,7 @@ int MapVirtualRegion(const uintptr_t regionHandle, const uintptr_t base, const s
     if(!regionHandle || !base) return -1;
 
     // perform the syscall
-    const uintptr_t flags = BuildSyscallFlags(inFlags, 0);
+    const uintptr_t flags = BuildSyscallFlags(inFlags, false);
     return __do_syscall5(regionHandle, 0, base, length, flags, SYS_VM_MAP);
 }
 
@@ -188,7 +193,7 @@ int MapVirtualRegionRemote(const uintptr_t taskHandle, const uintptr_t regionHan
     if(!taskHandle || !regionHandle || !base) return -1;
 
     // perform the syscall
-    const uintptr_t flags = BuildSyscallFlags(inFlags, 0);
+    const uintptr_t flags = BuildSyscallFlags(inFlags, false);
     return __do_syscall5(regionHandle, taskHandle, base, length, flags, SYS_VM_MAP);
 }
 
@@ -210,7 +215,7 @@ int MapVirtualRegionRange(const uintptr_t regionHandle, const uintptr_t range[2]
     // build the request
     uintptr_t flags = 0;
     if(inFlags) {
-        flags = BuildSyscallFlags(inFlags, 0);
+        flags = BuildSyscallFlags(inFlags, false);
     }
 
     struct VmMapRequest req = {
@@ -255,7 +260,7 @@ int MapVirtualRegionRangeRemote(const uintptr_t taskHandle, const uintptr_t regi
     // build the request
     uintptr_t flags = 0;
     if(inFlags) {
-        flags = BuildSyscallFlags(inFlags, 0);
+        flags = BuildSyscallFlags(inFlags, false);
     }
 
     struct VmMapRequest req = {
@@ -373,6 +378,6 @@ int VirtualGetHandleForAddrInTask(const uintptr_t taskHandle, const uintptr_t ad
  * VM_REGION_WRITETHRU or a combination thereof.
  */
 int VirtualRegionSetFlags(const uintptr_t regionHandle, const uintptr_t newFlags) {
-    const uintptr_t flags = BuildSyscallFlags(newFlags, 0);
+    const uintptr_t flags = BuildSyscallFlags(newFlags, false);
     return __do_syscall2(regionHandle, flags, SYS_VM_UPDATE_FLAGS);
 }

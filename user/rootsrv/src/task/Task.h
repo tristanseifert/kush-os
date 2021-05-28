@@ -63,6 +63,17 @@ class Task: public std::enable_shared_from_this<Task> {
         static std::once_flag gDyldoPipeFlag;
         static DyldoPipe *gDyldoPipe;
 
+        /// address for the info page
+#if defined(__i386__)
+        constexpr static const uintptr_t kLaunchInfoBase = 0xBE000000;
+#elif defined(__amd64__)
+        constexpr static const uintptr_t kLaunchInfoBase = 0x7FFFFD000000;
+#else
+#error Please set kLaunchInfoBase for current arch
+#endif
+        /// address range for temporary mappings
+        static const uintptr_t kTempMappingRange[2];
+
     private:
         /// path from which the binary was loaded
         std::string binaryPath;

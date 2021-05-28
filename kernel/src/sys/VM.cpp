@@ -63,6 +63,9 @@ enum sys::VmFlags: uintptr_t {
     kMapTypeMmio                        = (1 << 13),
     /// Allow write through caching when in MMIO mode.
     kCacheWriteThru                     = (1 << 14),
+
+    /// permission flags
+    kPermissionFlags                    = (kPermissionRead | kPermissionWrite | kPermissionExecute)
 };
 
 /**
@@ -169,6 +172,12 @@ intptr_t sys::VmAllocAnonRegion(const uintptr_t length, const VmFlags flags) {
     region = vm::MapEntry::makeAnon(length, mapFlags);
     if(!region) {
         return Errors::GeneralError;
+    }
+
+    if(flags & kNoLazyAlloc) {
+        if(int err = region->faultInAllPages()) {
+            return Errors::NoMemory;
+        }
     }
 
     // associate it with the task and return its handle
@@ -644,7 +653,7 @@ intptr_t sys::VmAddrToRegion(const Handle taskHandle, const uintptr_t vmAddr) {
  * Converts the syscall VM flags to those required to create an anonymous mapping.
  */
 static vm::MappingFlags ConvertFlags(const uintptr_t f) {
-    vm::MappingFlags flags;
+    vm::MappingFlags flags = vm::MappingFlags::None;
 
     if(f & kPermissionRead) {
         flags |= vm::MappingFlags::Read;

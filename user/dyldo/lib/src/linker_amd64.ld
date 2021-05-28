@@ -6,7 +6,7 @@ OUTPUT_FORMAT(elf64-x86-64)
 
 SECTIONS {
     /* default load address */
-    . = 0x100000;
+    . = 0x7FFFF8000000;
     __elf_base = .;
 
     /* skip past ELF headers */
@@ -15,7 +15,7 @@ SECTIONS {
     __elf_headers_end = .;
 
     /* code (immutable) section */
-    .text ALIGN(4K) : {
+    .text : {
         *(.text)
         *(.text*)
     }:text

@@ -240,7 +240,7 @@ struct Thread: public rt::SharedFromThis<Thread> {
         }
         /// Sets the thread's state.
         void setState(State newState) {
-            if(newState == State::Runnable) {
+            if(this->state == State::Blocked && newState == State::Runnable) {
                 REQUIRE(this->blockingOn.empty(), "cannot be runnable while blocking");
             }
 

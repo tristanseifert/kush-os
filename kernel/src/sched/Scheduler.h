@@ -78,6 +78,9 @@ class Scheduler {
         /// Default positive slack for deadlines
         constexpr static const uint64_t kDeadlineSlack = 500;
 
+        /// Default tick rate (in Hz)
+        constexpr static const uint64_t kTickRate = 1000;
+
     public:
         // return the scheduler for the current core
         static Scheduler *get();
@@ -133,8 +136,6 @@ class Scheduler {
         /// Updates the time quantum used by the given thread
         bool updateQuantumUsed(const rt::SharedPtr<Thread> &thread);
 
-        /// Updates the scheduler timer for the next deadline
-        void updateTimer();
         /// Switch to the given thread
         void switchTo(const rt::SharedPtr<Thread> &thread, const bool fake = false);
 
@@ -148,7 +149,7 @@ class Scheduler {
         /// Schedules all valid unblocked threads
         void processUnblockedThreads();
         /// Processes any expired deadlines
-        void processDeadlines();
+        bool processDeadlines();
 
 
         /// invalidates all schedulers' peer lists
@@ -342,6 +343,12 @@ class Scheduler {
          * that cause a lost timer interrupt.
          */
         uint64_t timerMinInterval = 50000;
+
+        /**
+         * Scheduler ticks are processed repeatedly at the given interval, in Hz. This is the
+         * minimum granularity on quantum length and preemption.
+         */
+        uint64_t tickRate = kTickRate;
 
         /**
          * Level from which the currently executing thread was pulled, or `kNumLevels` if we're

@@ -159,6 +159,9 @@ void Scheduler::threadWasCreated(Thread &t) {
  * runnable thread and switch to it.
  */
 void Scheduler::run() {
+    // set up the timer
+    platform::SetLocalTimer(1000000000ULL / this->tickRate, true);
+
     // pick the first thread...
     auto thread = this->findRunnableThread();
     REQUIRE(thread, "no runnable threads");
@@ -397,65 +400,11 @@ size_t Scheduler::getLevelFor(const rt::SharedPtr<Thread> &thread) {
  *             gets an extension on its quantum, for example.
  */
 void Scheduler::switchTo(const rt::SharedPtr<Thread> &thread, const bool fake) {
-    // set the timer
-    this->updateTimer();
-
     // finally, perform context switch
     if(!fake) thread->switchTo();
 }
 
 
-
-/**
- * Updates the timer interval. It will select either the end of the current thread's time quantum,
- * or the nearest deadline.
- */
-void Scheduler::updateTimer() {
-    uint64_t quantumRemaining;
-
-    // calculate remaining quantum
-    if(this->running) [[likely]] {
-        auto &sched = this->running->sched;
-
-        if(TestFlags(sched.flags & SchedulerThreadDataFlags::Idle)) [[unlikely]] {
-            quantumRemaining = kIdleWakeupInterval;
-        } else {
-            quantumRemaining = sched.quantumTotal - sched.quantumUsed;
-        }
-    } else {
-        quantumRemaining = kIdleWakeupInterval;
-    }
-
-    // find the nearest deadline
-    auto deadline = UINTPTR_MAX;
-    const auto now = platform_timer_now();
-
-    {
-        RW_LOCK_READ_GUARD(this->deadlinesLock);
-
-        if(!this->deadlines.empty()) {
-            // is the front deadline expired/close to expiring?
-            const auto &next = this->deadlines.min();
-            const auto expires = next.expires();
-
-            if(expires <= now) { // already expired
-                deadline = 0;
-            } else { // expires in the future
-                deadline = expires - now;
-            }
-        }
-    }
-
-    // whichever is sooner, set a timer for it
-    uint64_t interval = (deadline < quantumRemaining) ? deadline : quantumRemaining;
-
-    // take an IPI directly if below fudge factor
-    if(interval >= this->timerMinInterval) {
-        platform::SetLocalTimer(interval);
-    } else {
-        this->sendIpi();
-    }
-}
 
 /**
  * Scheduler specific timer has expired; handle deadlines or figure out if the current thread can
@@ -464,15 +413,22 @@ void Scheduler::updateTimer() {
  * @note This is invoked from an interrupt context; it is not allowed to block.
  */
 void Scheduler::timerFired() {
+    bool needsIpi = false;
+
     // update running thread's quantum
     if(this->updateQuantumUsed(this->running)) {
         // entire quantum used so preempt it
         this->running->sched.preempted = true;
+        needsIpi = true;
     }
 
-    // stop timer and request scheduler invocation
-    platform::StopLocalTimer();
-    this->sendIpi();
+    // process any deadlines that expired already / expire soon
+    needsIpi = this->processDeadlines() ? true : needsIpi;
+
+    // send IPI if needed
+    if(needsIpi) {
+        this->sendIpi();
+    }
 }
 
 /**
@@ -513,9 +469,6 @@ void Scheduler::sendIpi() {
 void Scheduler::handleIpi(void (*ackIrq)(void *), void *ackCtx) {
     // process unblocked threads
     this->processUnblockedThreads();
-
-    // process any deadlines that expired already / expire soon
-    this->processDeadlines();
 
     // pick the next highest priority thread and switch to it
     auto next = this->findRunnableThread();
@@ -669,8 +622,12 @@ void Scheduler::willSwitchTo(const rt::SharedPtr<Thread> &to) {
 /**
  * Processes all expired deadlines, by invoking their expiration methods. These may add new threads
  * to the run queue.
+ *
+ * @return Whether any deadline expired during this invocation
  */
-void Scheduler::processDeadlines() {
+bool Scheduler::processDeadlines() {
+    bool expired = false;
+
     RW_LOCK_WRITE_GUARD(this->deadlinesLock);
     // XXX: do we need to resample this every loop? in case we have tons of deadlines
     const auto now = platform_timer_now();
@@ -682,20 +639,20 @@ void Scheduler::processDeadlines() {
         const auto expires = next.expires();
 
         // does the deadline lie in the past?
-        if(expires <= now) {
-            next();
-            this->deadlines.extract();
-        }
+        if(expires <= now ||
         // does it expire within the fudge time?
-        else if((expires - now) <= this->deadlineSlack) {
+          (expires - now) <= this->deadlineSlack) {
             next();
             this->deadlines.extract();
+            expired = true;
         }
         // the deadline doesn't expire until later. chill
         else {
             doNext = false;
         }
     }
+
+    return expired;
 }
 
 /**
