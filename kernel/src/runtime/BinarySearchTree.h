@@ -36,6 +36,82 @@ concept BSTNode = requires(T a) {
 template<BSTNode Leaf, typename KeyType = uintptr_t>
 class BinarySearchTree {
     public:
+        struct TreeIterator {
+            friend class BinarySearchTree<Leaf, KeyType>;
+
+            private:
+                /**
+                 * Create an iterator from a tree node.
+                 */
+                TreeIterator(BinarySearchTree<Leaf, KeyType> *_tree, Leaf *_node = nullptr) : 
+                    tree(_tree), node(_node) {}
+
+                /**
+                 * Find the next node.
+                 */
+                void increment() {
+                    if(!this->node) return;
+
+                    // go to the right child's leftmost node
+                    if(this->node->right) {
+                        this->node = this->node->right;
+                        while(this->node->left) {
+                            this->node = this->node->left;
+                        }
+                    } 
+                    // find left parent of the rightmost parent node
+                    else {
+                        auto y = this->node->parent;
+                        if(!y) goto beach;
+
+                        while(this->node == y->right) {
+                            this->node = y;
+                            y = y->parent;
+
+                            // we've reached the end
+                            if(!y) { beach:;
+                                this->node = nullptr;
+                                return;
+                            }
+                        }
+
+                        if(this->node->right != y) {
+                            this->node = y;
+                        }
+                    }
+                }
+
+            public:
+                /**
+                 * Advance to the next position and return it.
+                 */
+                TreeIterator &operator++() {
+                    this->increment();
+                    return *this;
+                }
+
+                /**
+                 * Test if two iterators point to the same node.
+                 */
+                bool operator==(const TreeIterator &in) const {
+                    return this->node == in.node;
+                }
+
+                /**
+                 * Return the pointed to object
+                 */
+                Leaf *operator*() {
+                    return this->node;
+                }
+
+            private:
+                BinarySearchTree<Leaf, KeyType> *tree;
+
+                // current node we're pointing to
+                Leaf *node = nullptr;
+        };
+
+    public:
         /**
          * Delete all tree nodes when the tree is deallocated.
          */
@@ -77,12 +153,32 @@ class BinarySearchTree {
         }
 
         /**
+         * Inserts a leaf into the tree. The key is extracted from the leaf.
+         */
+        inline void insert(Leaf *leaf) {
+            this->insert(leaf->getKey(), leaf, this->root);
+        }
+
+        /**
          * Removes an object with a particular key.
          *
          * @return Whether the object was found and removed from the tree.
          */
         inline const bool remove(const KeyType key) {
             return this->remove(key, this->root);
+        }
+
+        /**
+         * Iterator to the start of the tree
+         */
+        auto begin() {
+            return TreeIterator(this, this->findMin(this->root));
+        }
+        /**
+         * Special iterator pointing to the end of the tree
+         */
+        auto end() {
+            return TreeIterator(this);
         }
 
     protected:
@@ -112,12 +208,16 @@ class BinarySearchTree {
          * @param leaf Tree node to insert
          * @param root Current node to process
          * @param parent Leaf immediately above the current level, or nullptr at root
+         *
+         * @return Whether the item was inserted on this invocation of the method
          */
-        void insert(const KeyType key, Leaf *leaf, Leaf* &root, Leaf *parent = nullptr) {
+        virtual bool insert(const KeyType key, Leaf *leaf, Leaf* &root, Leaf *parent = nullptr) {
             // subtree is null
             if(!root) {
                 leaf->parent = parent;
                 root = leaf;
+
+                return true;
             }
             // key is equal (replace node)
             else if(root->getKey() == key) {
@@ -127,11 +227,13 @@ class BinarySearchTree {
             }
             // go down left subtree
             else if(root->getKey() > key) {
-                return this->insert(key, leaf, root->left, root);
+                this->insert(key, leaf, root->left, root);
+                return false;
             }
             // go down right subtree
             else {
-                return this->insert(key, leaf, root->right, root);
+                this->insert(key, leaf, root->right, root);
+                return false;
             }
         }
 
@@ -145,7 +247,7 @@ class BinarySearchTree {
          * 
          * @return Whether an object with the key found and removed.
          */
-        bool remove(const KeyType key, Leaf *node, Leaf *parent = nullptr) {
+        virtual bool remove(const KeyType key, Leaf *node, Leaf *parent = nullptr) {
             // have we reached the end of the subtree?
             if(!node) return false;
 

@@ -6,6 +6,7 @@
 #include <bitflags.h>
 #include <runtime/SmartPointers.h>
 #include <runtime/List.h>
+#include <runtime/RedBlackTree.h>
 #include <runtime/Vector.h>
 #include <handle/Manager.h>
 
@@ -35,10 +36,17 @@ enum class MappingFlags {
     Execute                             = (1 << 2),
 
     /// Memory mapped IO mode (caching disabled entirely)
-    MMIO                                = (1 << 7),
+    MMIO                                = (1 << 8),
+    /// Write combining cache mode
+    WriteCombine                        = (1 << 9),
+
+    /// Whether the object is mapped copy-on-write in non-owner tasks
+    CopyOnWrite                         = (1 << 16),
 
     /// Mask including all permission bits
     PermissionsMask                     = (Read | Write | Execute),
+    /// Mask including all cacheability bits
+    CacheabilityMask                    = (MMIO | WriteCombine),
 };
 
 /*
@@ -64,25 +72,29 @@ class MapEntry {
 
     public:
         /// Returns the handle for the object
-        const Handle getHandle() const {
+        constexpr inline Handle getHandle() const {
             return this->handle;
         }
         /// Returns the length of the region
-        const uintptr_t getLength() const {
+        inline uintptr_t getLength() const {
             uintptr_t temp;
             __atomic_load(&this->length, &temp, __ATOMIC_RELAXED);
             return temp;
         }
         /// Returns the flags defining this VM object's mappings (by default)
-        const MappingFlags getFlags() const {
+        inline MappingFlags getFlags() const {
             MappingFlags flags;
             __atomic_load(&this->flags, &flags, __ATOMIC_RELAXED);
             return flags;
         }
 
         /// whether we're backed by anonymous memory or not
-        inline const bool backedByAnonymousMem() const {
+        constexpr inline bool backedByAnonymousMem() const {
             return this->isAnon;
+        }
+        /// whether the object is copy on write or not
+        inline bool isCoW() const {
+            return TestFlags(this->getFlags() & MappingFlags::CopyOnWrite);
         }
 
         /// Updates the flags of the map. Only the RWX and cacheability flags are updated.
@@ -92,6 +104,17 @@ class MapEntry {
 
         /// Force all pages to be faulted in
         [[nodiscard]] int faultInAllPages();
+
+        /**
+         * Sets the owning task for the map.
+         *
+         * The owning task can modify the original pages (rather than the copy-on-write pages) and
+         * can also resize the region.
+         */
+        void setOwner(const rt::SharedPtr<sched::Task> &newOwner) {
+            RW_LOCK_WRITE_GUARD(this->lock);
+            this->owner = newOwner;
+        }
 
         /// Allocates a VM object backed by a region of contiguous physical pages
         static rt::SharedPtr<MapEntry> makePhys(const uint64_t physAddr, const size_t length,
@@ -112,6 +135,37 @@ class MapEntry {
 
             /// task that originally allocated this page
             rt::WeakPtr<sched::Task> task;
+        };
+
+        /**
+         * Tree node representing a single physical page backing some page of this mapping.
+         */
+        struct AnonInfoLeaf {
+            /// offset of this page from start of region
+            uintptr_t pageOff = 0;
+            /// physical address of page
+            uint64_t physAddr = 0;
+
+            // tree stuff
+            AnonInfoLeaf *left = nullptr;
+            AnonInfoLeaf *right = nullptr;
+            AnonInfoLeaf *parent = nullptr;
+
+            rt::RBTNodeColor color = rt::RBTNodeColor::None;
+
+            constexpr inline uintptr_t getKey() const {
+                return this->pageOff;
+            }
+            constexpr inline rt::RBTNodeColor getColor() const {
+                return this->color;
+            }
+            inline void setColor(const rt::RBTNodeColor newColor) {
+                this->color = newColor;
+            }
+
+            AnonInfoLeaf() = default;
+            AnonInfoLeaf(const uintptr_t offset, const uint64_t phys) : pageOff(offset),
+                physAddr(phys) {}
         };
 
     private:
@@ -137,7 +191,7 @@ class MapEntry {
         /// Faults in an anonymous memory page.
         void faultInPage(const uintptr_t base, const uintptr_t offset, Map *map);
         /// Frees a physical page and updates the caller's "pages owned" counter
-        void freePage(const uintptr_t page);
+        static void freePage(const AnonInfoLeaf &info);
 
     private:
         /// modification lock
@@ -149,10 +203,23 @@ class MapEntry {
         /// length (in bytes)
         size_t length = 0;
 
-        /// physical pages we own
-        rt::Vector<AnonPageInfo> physOwned;
         /// all maps that we exist in
         rt::Vector<Map *> maps;
+
+        /**
+         * All physical memory pages owned by this map
+         */
+        rt::RedBlackTree<AnonInfoLeaf> pages;
+
+        /**
+         * Task that originally created this mapping, and is considered as the "owner" of the
+         * mapping.
+         *
+         * This is used primarily for copy-on-write mappings; the owning task will _not_ go through
+         * the code path for creating copies of the original pages, but will rather modify the
+         * underlying mapping.
+         */
+        rt::WeakPtr<sched::Task> owner;
 
         /// flags for the mapping
         MappingFlags flags;

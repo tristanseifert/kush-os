@@ -381,7 +381,7 @@ const bool Map::contains(const rt::SharedPtr<MapEntry> &entry) {
  * Any other type of fault will cause a signal to be sent to the process.
  */
 bool Map::handlePagefault(const uintptr_t virtAddr, const bool present, const bool write) {
-    uintptr_t base, offset;
+    uintptr_t base = 0, offset = 0;
 
     // is there a VM mapping to handle this pagefault?
     RW_LOCK_READ(&this->lock);

@@ -42,6 +42,9 @@ void MapEntry::initAllocator() {
 MapEntry::MapEntry(const size_t _length, const MappingFlags _flags) : length(_length),
     flags(_flags) {
     // XXX: the allocator (which makes the shared ptr) is responsible for allocating handle
+
+    // default owner is current task
+    this->owner = sched::Task::current();
 }
 
 /**
@@ -52,12 +55,8 @@ MapEntry::~MapEntry() {
     handle::Manager::releaseVmObjectHandle(this->handle);
 
     // release physical pages
-    for(const auto &page : this->physOwned) {
-        if(auto task = page.task.lock()) {
-            __atomic_sub_fetch(&task->physPagesOwned, 1, __ATOMIC_RELAXED);
-        }
-
-        this->freePage(page.physAddr);
+    for(const auto info : this->pages) {
+        this->freePage(*info);
     }
 }
 
@@ -138,24 +137,7 @@ int MapEntry::resize(const size_t newSize) {
         this->length = newSize;
         const auto endPageOff = newSize / pageSz;
 
-        size_t i = 0;
-        while(i < this->physOwned.size()) {
-            const auto &info = this->physOwned[i];
-
-            // if it lies beyond the end, release it
-            if(info.pageOff >= endPageOff) {
-                if(auto task = info.task.lock()) {
-                    __atomic_sub_fetch(&task->physPagesOwned, 1, __ATOMIC_RELAXED);
-                }
-
-                this->freePage(info.physAddr);
-                this->physOwned.remove(i);
-            } 
-            // otherwise, check next entry
-            else {
-                i++;
-            }
-        }
+        log("releasing all pages above offset %lu (new size %lu)", endPageOff, newSize);
 
         // we've successfully resized the region
         return 0;
@@ -215,17 +197,15 @@ void MapEntry::faultInPage(const uintptr_t base, const uintptr_t offset, Map *ma
     }*/
 
     // check if we already own such a physical page (shared memory case)
-    for(auto &physPage : this->physOwned) {
-        if(physPage.pageOff == pageOff) {
-            const auto destAddr = base + (pageOff * pageSz);
-            const auto mode = ConvertVmMode(flg, !this->isKernel);
+    if(auto page = this->pages.findKey(pageOff)) {
+        const auto destAddr = base + (pageOff * pageSz);
+        const auto mode = ConvertVmMode(flg, !this->isKernel);
 
-            err = map->add(physPage.physAddr, pageSz, destAddr, mode);
-            REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", pageOff, this, this->handle);
+        err = map->add(page->physAddr, pageSz, destAddr, mode);
+        REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", pageOff, this, this->handle);
 
-            arch::InvalidateTlb(destAddr);
-            return;
-        }
+        arch::InvalidateTlb(destAddr);
+        return;
     }
 
     // allocate physical memory and map it in
@@ -238,19 +218,15 @@ void MapEntry::faultInPage(const uintptr_t base, const uintptr_t offset, Map *ma
     }
 
     // insert page info
-    AnonPageInfo info;
-    info.physAddr = page;
-    info.pageOff = pageOff;
-    info.task = sched::Task::current();
-
-    this->physOwned.push_back(info);
+    auto info = new AnonInfoLeaf(pageOff, page);
+    this->pages.insert(info);
 
     // map it
     const auto destAddr = base + (pageOff * pageSz);
     const auto mode = ConvertVmMode(flg, !this->isKernel);
 
     err = map->add(page, pageSz, destAddr, mode);
-    REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", info.pageOff, this, this->handle);
+    REQUIRE(!err, "failed to map page %d for map %p ($%08x'h)", info->pageOff, this, this->handle);
 
     // invalidate TLB entry
     arch::InvalidateTlb(destAddr);
@@ -269,7 +245,7 @@ void MapEntry::faultInPage(const uintptr_t base, const uintptr_t offset, Map *ma
  */
 int MapEntry::faultInAllPages() {
     REQUIRE(this->isAnon, "cannot fault in pages for non-anonymous memory");
-    REQUIRE(this->physOwned.empty(), "can't fault in all pages, as there are already some allocated");
+    REQUIRE(this->pages.empty(), "can't fault in all pages, as there are already some allocated");
 
     // calculate how many pages to fault in
     const auto pageSz = arch_page_size();
@@ -278,7 +254,7 @@ int MapEntry::faultInAllPages() {
     log("allocating %lu pages for $%p'h", numPages, this->handle);
 
     // allocate all the pages and insert the appropriate info structs
-    for(size_t i = 0; i < numPages; i++) {
+    for(size_t pageOff = 0; pageOff < numPages; pageOff++) {
         const auto page = mem::PhysicalAllocator::alloc();
         if(!page) return -1;
 
@@ -290,12 +266,8 @@ int MapEntry::faultInAllPages() {
         // TODO: zero page?
 
         // create the info struct
-        AnonPageInfo info;
-        info.physAddr = page;
-        info.pageOff = i;
-        info.task = sched::Task::current();
-
-        this->physOwned.push_back(info);
+        auto info = new AnonInfoLeaf(pageOff, page);
+        this->pages.insert(info);
     }
 
     return 0;
@@ -304,8 +276,8 @@ int MapEntry::faultInAllPages() {
 /**
  * Frees a memory page belonging to this map.
  */
-void MapEntry::freePage(const uintptr_t page) {
-    mem::PhysicalAllocator::free(page);
+void MapEntry::freePage(const AnonInfoLeaf &info) {
+    mem::PhysicalAllocator::free(info.physAddr);
 
     /*
      * Decrement the task's owned pages counter.
@@ -333,8 +305,8 @@ int MapEntry::updateFlags(const MappingFlags newFlags) {
     RW_LOCK_WRITE_GUARD(this->lock);
 
     auto oldFlags = this->flags;
-    oldFlags &= ~(MappingFlags::Read | MappingFlags::Write | MappingFlags::Execute);
-    oldFlags &= ~(MappingFlags::MMIO);
+    oldFlags &= ~MappingFlags::PermissionsMask;
+    oldFlags &= ~MappingFlags::CacheabilityMask;
 
     oldFlags |= newFlags;
 
@@ -390,12 +362,12 @@ void MapEntry::mapAnonPages(Map *map, const uintptr_t base, const MappingFlags m
     const auto mode = ConvertVmMode(flg, !this->isKernel);
 
     // map the pages
-    for(const auto &page : this->physOwned) {
+    for(const auto info : this->pages) {
         // calculate the address
-        const auto vmAddr = base + (page.pageOff * pageSz);
+        const auto vmAddr = base + (info->pageOff * pageSz);
 
         // map it
-        err = map->add(page.physAddr, pageSz, vmAddr, mode);
+        err = map->add(info->physAddr, pageSz, vmAddr, mode);
         REQUIRE(!err, "failed to map vm object %p ($%08x'h) addr $%08x %d", this, this->handle,
                 vmAddr, err);
     }
