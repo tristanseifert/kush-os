@@ -15,13 +15,11 @@
 
 using namespace mem;
 
-bool PhysicalAllocator::gLogSkipped = false;
-bool PhysicalAllocator::gLogRegions = true;
-bool PhysicalAllocator::gLogAlloc = true;
+bool PhysicalAllocator::gLogSkipped     = false;
+bool PhysicalAllocator::gLogRegions     = false;
 
 // static memory for phys regions
-static uint8_t gPhysRegionBuf[sizeof(PhysRegion) * PhysicalAllocator::kMaxRegions] 
-    __attribute__((aligned(64)));
+static PhysRegion gPhysRegionBuf[PhysicalAllocator::kMaxRegions];
 
 // static memory for physical allocator
 static uint8_t gAllocatorBuf[sizeof(PhysicalAllocator)] __attribute__((aligned(64)));
@@ -47,14 +45,17 @@ PhysicalAllocator::PhysicalAllocator() {
         this->regions[i] = nullptr;
     }
 
-    // iterate over each of the entries
+    // create physical region structs for all allocatable memory
     const auto numEntries = platform_phys_num_regions();
 
     for(int i = 0; i < numEntries; i++) {
-        // get info on this region
         uint64_t baseAddr, length;
         err = platform_phys_get_info(i, &baseAddr, &length);
         REQUIRE(!err, "failed to get info for physical region %d: %d", i, err);
+
+        if(gLogRegions) {
+            log("Region %lu: base $%p length $%x", i, baseAddr, length);
+        }
 
         // skip if not suitable
         if(!PhysRegion::CanAllocate(baseAddr, length)) {
@@ -68,119 +69,79 @@ PhysicalAllocator::PhysicalAllocator() {
         REQUIRE(this->numRegions < kMaxRegions, "too many phys regions");
 
         // allocate the phys region object
-        void *regionPtr = gPhysRegionBuf + (this->numRegions * sizeof(PhysRegion));
+        void *regionPtr = &gPhysRegionBuf[this->numRegions];
         auto region = new(regionPtr) PhysRegion(baseAddr, length);
 
         this->regions[this->numRegions++] = region;
-        //this->totalPages += pages;
     }
 
     REQUIRE(this->numRegions, "failed to allocate phys regions");
 }
 
 /**
- * Maps the usage bitmaps for each of the physical regions into virtual memory.
- *
- * This should be called immediately after virtual memory becomes available.
+ * Notifies all allocated physical memory regions that the virtual memory system has been fully set
+ * up, and any additional memory (which wasn't mapped during bootstrap) can now be managed.
  */
-void PhysicalAllocator::mapRegionUsageBitmaps() {
-    // before we begin, acquire a bunch of pages to satisfy allocations for paging structures later
-    for(size_t i = 0; i < kNumVmPagesCached; i++) {
-        auto page = this->allocPage();
-        REQUIRE(page, "VM fixup pre-allocation failed (%u)", i);
-
-        this->vmPageCache[i] = page;
-    }
-
-    this->vmRelocating = true;
-
-    // perform the relocations
+void PhysicalAllocator::notifyRegionsVm() {
     for(size_t i = 0; i < kMaxRegions; i++) {
         if(!this->regions[i]) break;
 
-        const auto base = kRegionInfoBase + (i * kRegionInfoEntryLength);
-        this->regions[i]->vmAvailable(base, kRegionInfoEntryLength);
+        this->regions[i]->initNextIfNeeded();
     }
-
-    // release any pages we didn't end up using
-    size_t leftover = 0;
-    for(size_t i = 0; i < kNumVmPagesCached; i++) {
-        if(!this->vmPageCache[i]) continue;
-
-        this->freePage(this->vmPageCache[i]);
-        this->vmPageCache[i] = 0;
-
-        leftover++;
-    }
-
-    if(gLogRegions) {
-        log("%u pages of VM init cache unused", leftover);
-    }
-
-    this->vmRelocating = false;
 }
 
 
 
 /**
- * Attempts to satisfy an allocation request for contiguous physical memory.
+ * Attempts to allocate a single page of physical memory.
  *
- * @param numPages Total number of contiguous pages to allocate
- * @param flags Flags to change the allocator behavior
- * @return Physical page address, or 0 if no page is available
+ * @return Physical address of an allocated page, or 0 if allocation failed
  */
-uint64_t PhysicalAllocator::alloc(const size_t numPages, const PhysFlags flags) {
-    // perform normal allocation flow
-    if(!this->vmRelocating) [[likely]] {
-        // XXX: this is stupid
-        for(size_t i = 0; i < this->numRegions; i++) {
-            // if in VM mode, but this region hasn't been updated yet, bail
-            if(this->vmRelocating) continue;
+uint64_t PhysicalAllocator::allocPage(const PhysFlags flags) {
+    // TODO: check per-CPU free list cache
 
-            // try allocating from this region
-            const auto page = this->regions[i]->alloc(numPages);
-            if(page) {
+    // ask each region
+    for(size_t i = 0; i < this->numRegions; i++) {
+        auto region = this->regions[i];
+
+        while(region) {
+            // try to allocate a page
+            if(auto page = region->alloc()) {
+                __atomic_fetch_add(&this->allocatedPages, 1, __ATOMIC_RELAXED);
                 return page;
             }
+
+            // test additional chunks in this region
+            region = region->next;
         }
     }
 
-    /*
-     * During the VM fixup stage, we may need to allocate memory for stuff like paging structures,
-     * but the physical allocator is in an inconsistent state. So, because we can't call into any
-     * regions, try to satisfy the request from a small cache we populate before the process
-     * begins.
-     */
-    for(size_t i = 0; i < kNumVmPagesCached; i++) {
-        auto entry = this->vmPageCache[i];
-        if(!entry) continue;
-
-        this->vmPageCache[i] = 0;
-        return entry;
-    }
-
-    // if we get here, no regions have available memory
+    // no region had available memory
     return 0;
 }
 
-
 /**
- * Frees a previously allocated set of contiguous physical pages.
+ * Frees a single page.
  */
-void PhysicalAllocator::free(const size_t numPages, const uint64_t physAddr) {
+void PhysicalAllocator::freePage(const uint64_t physAddr) {
     // test which region it came from
     for(size_t i = 0; i < this->numRegions; i++) {
         auto region = this->regions[i];
 
-        if(!region->checkAddress(physAddr)) {
-            continue;
-        }
+        while(region) {
+            // the region contains this address! free it
+            if(region->checkAddress(physAddr)) {
+                region->free(physAddr);
+                __atomic_fetch_sub(&this->allocatedPages, 1, __ATOMIC_RELAXED);
+                return;
+            }
 
-        // found the region, free it
-        return;
+            // test additional chunks in this region
+            region = region->next;
+        }
     }
 
-    // failed to free this phys address range
-    panic("failed to free phys range $%p (%u pages)", physAddr, numPages);
+    // failed to free this page
+    panic("failed to free phys page $%p", physAddr);
 }
 

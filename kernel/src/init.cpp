@@ -29,13 +29,17 @@ void kernel_init() {
     mem::PhysicalAllocator::init();
 
     vm::Mapper::init();
-    mem::PhysicalAllocator::vmAvailable();
 
     vm::Mapper::loadKernelMap();
     vm::Mapper::lateInit();
 
+    log("VM: activated kernel map");
+
+    // set up heap and expand physical allocator pool, as well as other runtime stuff
     mem::Heap::init();
     mem::StackPool::init();
+
+    mem::PhysicalAllocator::vmAvailable();
 
     handle::Manager::init();
     sys::Syscall::init();

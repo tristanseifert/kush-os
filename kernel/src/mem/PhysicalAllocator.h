@@ -27,7 +27,7 @@ class PhysicalAllocator {
     public:
         static void init();
         static void vmAvailable() {
-            gShared->mapRegionUsageBitmaps();
+            gShared->notifyRegionsVm();
         }
 
         /// Returns the physical address of a newly allocated page, or 0 if no memory available
@@ -63,24 +63,14 @@ class PhysicalAllocator {
     private:
         PhysicalAllocator();
 
-        void mapRegionUsageBitmaps();
+        void notifyRegionsVm();
 
-        uint64_t allocPage(const PhysFlags flags = PhysFlags::None) {
-            return this->alloc(1, flags);
-        }
-        uint64_t alloc(const size_t numPages, const PhysFlags flags = PhysFlags::None);
-
-
-        void freePage(const uint64_t physicalAddr) {
-            this->free(1, physicalAddr);
-        }
-        void free(const size_t numPages, const uint64_t physicalAddr);
+        uint64_t allocPage(const PhysFlags flags = PhysFlags::None);
+        void freePage(const uint64_t physicalAddr);
 
     public:
         /// maximum number of physical regions to store info for
         constexpr static const size_t kMaxRegions = 10;
-        /// total number of pages to cache before mapping physical regions
-        constexpr static const size_t kNumVmPagesCached = 10;
 
         // TODO: this should be retrieved from the arch/platform code
         /// virtual address to map the next physical region allocation bitmap in
@@ -96,16 +86,11 @@ class PhysicalAllocator {
         static bool gLogSkipped;
         /// do we log all newly allocated regions?
         static bool gLogRegions;
-        /// are allocations logged?
-        static bool gLogAlloc;
 
     private:
         size_t numRegions = 0;
         /// regions from which ~ memory ~ can be acquired
         PhysRegion *regions[kMaxRegions];
-
-        /// addresses of pages to be used to satisfy early VM requests
-        uint64_t vmPageCache[kNumVmPagesCached];
 
         /// total number of available pages
         size_t totalPages = 0;
@@ -113,12 +98,6 @@ class PhysicalAllocator {
         size_t allocatedPages = 0;
         /// number of reserved pages
         size_t reservedPages = 0;
-
-        /// flag indicating that VM relocation has begun
-        bool vmRelocating = false;
-
-        /// lock to protect the alloc bitmaps
-        DECLARE_SPINLOCK(bitmapLock);
 };
 
 };
