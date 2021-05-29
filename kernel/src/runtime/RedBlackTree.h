@@ -49,10 +49,6 @@ class RedBlackTree: public BinarySearchTree<Leaf, KeyType> {
         using BST::insert;
         using BST::remove;
 
-        void iterate(void (*callback)(const Leaf &)) {
-            this->iterateInOrder(this->root, callback);
-        }
-
     private:
         /// Returns the color of the node, or black if the node is a null pointer
         constexpr static auto Color(Leaf *leaf) {

@@ -15,9 +15,9 @@ using namespace task::loader;
 
 const uintptr_t ElfCommon::kTempMappingRange[2] = {
     // start
-    0x10000000000,
+    0x11000000000,
     // end
-    0x20000000000,
+    0x14000000000,
 };
 
 /**

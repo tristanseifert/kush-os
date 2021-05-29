@@ -230,9 +230,6 @@ void MapEntry::faultInPage(const uintptr_t base, const uintptr_t offset, Map *ma
 
     // invalidate TLB entry
     arch::InvalidateTlb(destAddr);
-
-    // zero it (XXX: this should be done BEFORE it's mapped!)
-    //memset(reinterpret_cast<void *>(destAddr), 0, pageSz);
 }
 
 /**
@@ -250,8 +247,6 @@ int MapEntry::faultInAllPages() {
     // calculate how many pages to fault in
     const auto pageSz = arch_page_size();
     const auto numPages = this->length / pageSz;
-
-    log("allocating %lu pages for $%p'h", numPages, this->handle);
 
     // allocate all the pages and insert the appropriate info structs
     for(size_t pageOff = 0; pageOff < numPages; pageOff++) {
@@ -417,39 +412,25 @@ void MapEntry::removedFromMap(Map *map, const rt::SharedPtr<sched::Task> &task,
         const uintptr_t base, const size_t length) {
     RemoveCtxInfo info(this, map);
 
-    // iterate the maps info dict to get our true base address
-    RW_LOCK_WRITE(&this->lock);
-    size_t i = 0;
-    while(i < this->maps.size()) {
-        // ensure it's the map we're after
-        if(this->maps[i] != map) {
-            i++;
-            continue;
+    // remove it from the provided map
+    int err = map->remove(base, length);
+    REQUIRE(!err, "failed to unmap vm object: %d", err);
+
+    // TODO: find new task to transfer ownership of pages to
+    /*sched::Task *newOwner = nullptr;
+
+    uintptr_t owned = 0;
+    for(auto &physPage : this->physOwned) {
+        if(physPage.task == task) {
+            physPage.task = newOwner;
+            owned++;
         }
-
-        // unmap the range
-        int err = map->remove(base, length);
-        REQUIRE(!err, "failed to unmap vm object: %d", err);
-
-        // remove it
-        this->maps.remove(i);
-
-        // TODO: find new task to transfer ownership of pages to
-        /*sched::Task *newOwner = nullptr;
-
-        uintptr_t owned = 0;
-        for(auto &physPage : this->physOwned) {
-            if(physPage.task == task) {
-                physPage.task = newOwner;
-                owned++;
-            }
-        }
-
-        __atomic_sub_fetch(&task->physPagesOwned, owned, __ATOMIC_RELAXED);
-        if(newOwner) {
-            __atomic_add_fetch(&newOwner->physPagesOwned, owned, __ATOMIC_RELAXED);
-        }*/
     }
+
+    __atomic_sub_fetch(&task->physPagesOwned, owned, __ATOMIC_RELAXED);
+    if(newOwner) {
+        __atomic_add_fetch(&newOwner->physPagesOwned, owned, __ATOMIC_RELAXED);
+    }*/
 
     RW_UNLOCK_WRITE(&this->lock);
 }

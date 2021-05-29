@@ -71,10 +71,10 @@ rt::SharedPtr<Map> Map::alloc() {
  */
 void Map::activate() {
     // avoid activating map if not necessary
-    if(arch::PerCpuInfo::get()->activeMap != this) {
+    if(!this->table.isActive()) {
         this->table.activate();
-        arch::PerCpuInfo::get()->activeMap = this;
     }
+    arch::PerCpuInfo::get()->activeMap = this;
 }
 
 /**
@@ -151,7 +151,7 @@ int Map::remove(const uintptr_t vmAddr, const uintptr_t _length) {
 
         // ignore the case where there's no mapping at the address
         if(err && err != 1) {
-            return err;
+            continue;
         }
     }
 

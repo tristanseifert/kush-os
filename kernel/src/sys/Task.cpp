@@ -13,6 +13,8 @@ using namespace sys;
 
 static void UserspaceThreadStub(uintptr_t arg);
 
+static const bool gLogTerminate = false;
+
 /**
  * Info structure for the "init task" DPC.
  */
@@ -102,7 +104,8 @@ intptr_t sys::TaskTerminate(const Handle taskHandle, const intptr_t code) {
     }
 
     // terminate it aye
-    log("Terminating task %p (code %d)", static_cast<void *>(task), code);
+    if(gLogTerminate) log("User requested task ($%p'h) termination (code %d)",
+            static_cast<uintptr_t>(task->handle), code);
     err = task->terminate(code);
 
     return (err ? Errors::GeneralError : Errors::Success);

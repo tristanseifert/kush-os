@@ -99,8 +99,9 @@ void *memcpy(void *destination, const void *source, const size_t num) {
  * Fills a given segment of memory with a specified value.
  */
 void *memset(void *ptr, const uint8_t value, const size_t num) {
-    if(value == 0x00) {
-        return memclr(ptr, num);
+    if(!value) {
+        memclr(ptr, num);
+        return ptr;
     }
 
     uint8_t *write = (uint8_t *) ptr;
@@ -119,8 +120,10 @@ void* memclr(void *start, const size_t count) {
     // Programmer is an idiot
     if(!count) return start;
 
-    __asm__("rep stosl;"::"a"(0),"D"((size_t) start),"c"(count / 4));
-    __asm__("rep stosb;"::"a"(0),"D"(((size_t) start) + ((count / 4) * 4)),"c"(count - ((count / 4) * 4)));
+    uint8_t *ptr = (uint8_t *) start;
+    for(size_t i = 0; i < count; i++) {
+        *ptr++ = 0;
+    }
 
     return (void *) ((size_t) start + count);
 }

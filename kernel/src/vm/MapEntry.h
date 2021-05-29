@@ -5,9 +5,7 @@
 #include <stdint.h>
 #include <bitflags.h>
 #include <runtime/SmartPointers.h>
-#include <runtime/List.h>
 #include <runtime/RedBlackTree.h>
-#include <runtime/Vector.h>
 #include <handle/Manager.h>
 
 #include <arch/rwlock.h>
@@ -126,17 +124,6 @@ class MapEntry {
         static void free(MapEntry *entry);
 
     private:
-        /// Info on a physical page we own
-        struct AnonPageInfo {
-            /// offset of this page from start of region
-            uintptr_t pageOff = 0;
-            /// physical address of page
-            uint64_t physAddr = 0;
-
-            /// task that originally allocated this page
-            rt::WeakPtr<sched::Task> task;
-        };
-
         /**
          * Tree node representing a single physical page backing some page of this mapping.
          */
@@ -199,12 +186,18 @@ class MapEntry {
 
         /// handle referencing this map entry
         Handle handle;
-
-        /// length (in bytes)
+        /// allocated length (in bytes)
         size_t length = 0;
 
-        /// all maps that we exist in
-        rt::Vector<Map *> maps;
+        /// flags for the mapping
+        MappingFlags flags;
+
+        /// whether the map entry belongs to the kernel
+        bool isKernel = false;
+        /// when set, this is an anonymous mapping and is backed by anonymous phys mem
+        bool isAnon = false;
+        /// if not an anonymous map, the physical address base
+        uint64_t physBase = 0;
 
         /**
          * All physical memory pages owned by this map
@@ -220,17 +213,6 @@ class MapEntry {
          * underlying mapping.
          */
         rt::WeakPtr<sched::Task> owner;
-
-        /// flags for the mapping
-        MappingFlags flags;
-
-        /// when set, this is an anonymous mapping and is backed by anonymous phys mem
-        bool isAnon = false;
-        /// if not an anonymous map, the physical address base
-        uint64_t physBase = 0;
-
-        /// whether the map entry belongs to the kernel
-        bool isKernel = false;
 };
 }
 

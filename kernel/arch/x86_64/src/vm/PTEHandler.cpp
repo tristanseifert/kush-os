@@ -369,6 +369,9 @@ int PTEHandler::unmapPage(const uintptr_t _virt) {
 
     writeTable(ptAddr, (virt >> 12) & 0x1FF, 0);
 
+    // invalidate TLB entry
+    asm volatile("invlpg (%0)" ::"r" (_virt) : "memory");
+
     // TODO: release paging structures that became zeroed
     return Status::PageUnmapped;
 }
