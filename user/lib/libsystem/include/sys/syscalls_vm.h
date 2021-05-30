@@ -16,7 +16,7 @@ typedef struct TaskVmInfo {
 } TaskVmInfo_t;
 
 /**
- * Flags for AllocVirtualRegion
+ * Flags for AllocVirtual*Region
  */
 #define VM_REGION_FORCE_ALLOC           (1 << 0)
 #define VM_REGION_USE_LARGEPAGE         (1 << 1)
@@ -30,6 +30,14 @@ typedef struct TaskVmInfo {
 
 #define VM_REGION_RW                    (VM_REGION_READ | VM_REGION_WRITE)
 
+/**
+ * Flags for MapVirtualRegion*Remote
+ */
+#define VM_MAP_READ                     VM_REGION_READ
+#define VM_MAP_WRITE                    VM_REGION_WRITE
+#define VM_MAP_EXEC                     VM_REGION_EXEC
+
+#define VM_MAP_ADOPT                    (1 << 24)
 
 
 LIBSYSTEM_EXPORT int AllocVirtualAnonRegion(const uintptr_t size, const uintptr_t inFlags,

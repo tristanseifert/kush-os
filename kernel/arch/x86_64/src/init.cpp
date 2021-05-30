@@ -189,7 +189,9 @@ static void TestCpuSupport() {
     auto feature = &kCpuFeatures[0];
     while(feature->name) {
         // perform CPUID
-        __get_cpuid(feature->leaf, &eax, &ebx, &ecx, &edx);
+        if(!__get_cpuid(feature->leaf, &eax, &ebx, &ecx, &edx)) {
+            panic("cpuid leaf $%08x not supported", feature->leaf);
+        }
 
         if((eax & feature->eax) != feature->eax || (ebx & feature->ebx) != feature->ebx ||
             (ecx & feature->ecx) != feature->ecx || (edx & feature->edx) != feature->edx) {

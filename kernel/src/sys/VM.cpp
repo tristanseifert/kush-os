@@ -64,6 +64,9 @@ enum sys::VmFlags: uintptr_t {
     /// Allow write through caching when in MMIO mode.
     kCacheWriteThru                     = (1 << 14),
 
+    /// Make the destination of the mapping the new owner of the object
+    kTransferOwnership                  = (1 << 24),
+
     /// permission flags
     kPermissionFlags                    = (kPermissionRead | kPermissionWrite | kPermissionExecute)
 };
@@ -228,6 +231,8 @@ intptr_t sys::VmDealloc(const Handle vmHandle) {
  *
  * This takes the same flags as the creation functions, but only the RWX flags are considered.
  *
+ * @note The calling task must own the VM object.
+ *
  * @param vmHandle Handle to the VM object whose permissions will be updated
  * @param newFlags New permission flags to apply to VM object
  *
@@ -244,6 +249,11 @@ intptr_t sys::VmRegionUpdatePermissions(const Handle vmHandle, const VmFlags new
     auto map = handle::Manager::getVmObject(vmHandle);
     if(!map) {
         return Errors::InvalidHandle;
+    }
+
+    // ensure we own the VM object
+    if(sched::Task::current() != map->getOwner().lock()) {
+        return Errors::PermissionDenied;
     }
 
     // convert the flags
@@ -263,6 +273,8 @@ intptr_t sys::VmRegionUpdatePermissions(const Handle vmHandle, const VmFlags new
 
 /**
  * Resizes a VM region.
+ *
+ * @note The calling task must own the VM object.
  *
  * @param vmHandle Handle to the region to resize
  * @param newSize New size for the region, in bytes. Must be page aligned
@@ -286,6 +298,11 @@ intptr_t sys::VmRegionResize(const Handle vmHandle, const size_t newSize, const 
     auto map = handle::Manager::getVmObject(vmHandle);
     if(!map) {
         return Errors::InvalidHandle;
+    }
+
+    // ensure we own the VM object
+    if(sched::Task::current() != map->getOwner().lock()) {
+        return Errors::PermissionDenied;
     }
 
     // resize it
@@ -314,6 +331,15 @@ static intptr_t VmRegionMapInternal(const rt::SharedPtr<vm::MapEntry> &region,
 
     auto vm = task->vm;
 
+    // validate some permissions
+    if(req.flags & VmFlags::kTransferOwnership) {
+        auto owner = region->getOwner().lock();
+        // XXX: what to do if the owner is nil? it was either never assigned or terminated
+        if(sched::Task::current() != owner) {
+            return Errors::PermissionDenied;
+        }
+    }
+
     // build flags mask
     auto flagMask = vm::MappingFlags::None;
 
@@ -333,6 +359,13 @@ static intptr_t VmRegionMapInternal(const rt::SharedPtr<vm::MapEntry> &region,
 
     // get the address at which it was actually mapped
     req.start = vm->getRegionBase(region);
+
+    // perform postprocessing
+    if(!err) {
+        if((req.flags & VmFlags::kTransferOwnership)) {
+            region->setOwner(task);
+        }
+    }
 
     return (!err ? Errors::Success : Errors::GeneralError);
 }

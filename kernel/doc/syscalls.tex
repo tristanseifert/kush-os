@@ -228,6 +228,8 @@ Allocates a virtual memory region backed by physical memory, starting with the g
 
 This call will fail if the length and base address are not a multiple of the platform-specific minimum page size.
 
+The VM object will be owned by the calling task. Ownership can be transferred when the object is mapped into another task.
+
 \paragraph{Flags}
 \begin{itemize}
 \item \texttt{1 << 1}: Use large pages, if supported, to satisfy this virtual memory mapping. The kernel will attempt to map as much of the physical memory region as possible with large pages, and use regular pages to map the remainder.
@@ -244,6 +246,8 @@ This call will fail if the length and base address are not a multiple of the pla
 \textbf{Returns:} VM object handle ($>0$) or error code ($\leq0$) \\
 
 Allocates a virtual memory region backed by anonymous memory. Allocation size must be a multiple of the platform-specific minimum page size, or the call will fail; the platform is free to use pages larger than this, if supported, to satisfy the allocation.
+
+The VM object will be owned by the calling task. Ownership can be transferred when the object is mapped into another task.
 
 \paragraph{Flags}
 \begin{itemize}
@@ -269,7 +273,7 @@ This means it's safe to make this call against a region that's shared with other
 
 Changes the access permissions and specifiers of the specified virtual memory region.
 
-Only the task that created a VM object can change its permissions. (More concretely, this means you cannot adjust the permissions of a shared memory object you received from another task.)
+\textit{Note:} Only the task that created a VM object can change its permissions. (More concretely, this means you cannot adjust the permissions of a shared memory object you received from another task.)
 
 \paragraph{Flags}
 \begin{itemize}
@@ -288,6 +292,8 @@ Only the task that created a VM object can change its permissions. (More concret
 Resizes a previously allocated virtual memory region. The new size may be larger or smaller than the current size, but it must be a multiple of the platform's page size. Only the task that created a VM object can resize it.
 
 When a VM region is resized, none of the mappings in tasks are updated as a result. So, if the region shrank, accesses beyond its new ending address will cause a page fault. If it grows, tasks will not be able to access any additional pages beyond its old length until their map is updated.
+
+\textit{Note:} The calling task must be the owner of the VM object.
 
 \paragraph{Flags}
 \begin{itemize}
@@ -312,6 +318,7 @@ If any flags are specified at all, they are interpreted as a mask to be applied 
 \item \texttt{1 << 10}: Allow read access to the memory region.
 \item \texttt{1 << 11}: Allow write access to the memory region.
 \item \texttt{1 << 12}: Allow code execution from the memory region.
+\item \texttt{1 << 24}: Transfer ownership of the VM region to the destination task (allowed only if calling task is current owner)
 \end{itemize}
 
 %%%%%
@@ -342,6 +349,7 @@ If any flags are specified, they are interpreted as a mask to be applied against
 \item \texttt{1 << 10}: Allow read access to the memory region.
 \item \texttt{1 << 11}: Allow write access to the memory region.
 \item \texttt{1 << 12}: Allow code execution from the memory region.
+\item \texttt{1 << 24}: Transfer ownership of the VM region to the destination task (allowed only if calling task is current owner)
 \end{itemize}
 
 %%%%%

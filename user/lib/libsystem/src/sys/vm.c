@@ -67,6 +67,40 @@ static uintptr_t BuildSyscallFlags(const uintptr_t inFlags, bool create) {
     return temp;
 }
 /**
+ * Builds the flag value to be provided to the various system calls to map a virtual memory object
+ * into memory.
+ *
+ * @note If _any_ of the permission (RWX) flags are specified, the combination of these flags is
+ *       used as a mask on the VM object's base permission flags. This means that it's never
+ *       possible to make an explicitly read-only object writeable.
+ *
+ * @param inFlags User provided flags (from the VM_MAP_* constants)
+ * @param remote When set, flags relating to remote mappings are allowed
+ */
+static uintptr_t BuildSyscallMapFlags(const uintptr_t inFlags, bool remote) {
+    uintptr_t temp = 0;
+
+    // permissions for new mapping
+    if(inFlags & VM_MAP_READ) {
+        temp |= (1 << 10);
+    }
+    if(inFlags & VM_MAP_WRITE) {
+        temp |= (1 << 11);
+    }
+    if(inFlags & VM_MAP_EXEC) {
+        temp |= (1 << 12);
+    }
+
+    // remote flags
+    if(remote) {
+        if(inFlags & VM_MAP_ADOPT) {
+            temp |= (1 << 24);
+        }
+    }
+
+    return temp;
+}
+/**
  * Converts syscall flags back into our flag values.
  */
 static uintptr_t ConvertSyscallFlags(const uintptr_t inFlags) {
@@ -178,7 +212,7 @@ int MapVirtualRegion(const uintptr_t regionHandle, const uintptr_t base, const s
     if(!regionHandle || !base) return -1;
 
     // perform the syscall
-    const uintptr_t flags = BuildSyscallFlags(inFlags, false);
+    const uintptr_t flags = BuildSyscallMapFlags(inFlags, false);
     return __do_syscall5(regionHandle, 0, base, length, flags, SYS_VM_MAP);
 }
 
@@ -193,7 +227,7 @@ int MapVirtualRegionRemote(const uintptr_t taskHandle, const uintptr_t regionHan
     if(!taskHandle || !regionHandle || !base) return -1;
 
     // perform the syscall
-    const uintptr_t flags = BuildSyscallFlags(inFlags, false);
+    const uintptr_t flags = BuildSyscallMapFlags(inFlags, true);
     return __do_syscall5(regionHandle, taskHandle, base, length, flags, SYS_VM_MAP);
 }
 
@@ -213,16 +247,11 @@ int MapVirtualRegionRange(const uintptr_t regionHandle, const uintptr_t range[2]
     else if(!range[0]) return -1;
 
     // build the request
-    uintptr_t flags = 0;
-    if(inFlags) {
-        flags = BuildSyscallFlags(inFlags, false);
-    }
-
     struct VmMapRequest req = {
         .start  = range[0],
         .end    = range[1],
         .length = length,
-        .flags = flags
+        .flags  = BuildSyscallMapFlags(inFlags, false)
     };
 
     // invoke method
@@ -258,16 +287,11 @@ int MapVirtualRegionRangeRemote(const uintptr_t taskHandle, const uintptr_t regi
     else if(!range[0]) return -1;
 
     // build the request
-    uintptr_t flags = 0;
-    if(inFlags) {
-        flags = BuildSyscallFlags(inFlags, false);
-    }
-
     struct VmMapRequest req = {
         .start  = range[0],
         .end    = range[1],
         .length = length,
-        .flags = flags
+        .flags  = BuildSyscallMapFlags(inFlags, true)
     };
 
     // invoke method

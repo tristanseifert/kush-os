@@ -113,6 +113,9 @@ class MapEntry {
             RW_LOCK_WRITE_GUARD(this->lock);
             this->owner = newOwner;
         }
+        constexpr inline rt::WeakPtr<sched::Task> &getOwner() {
+            return this->owner;
+        }
 
         /// Allocates a VM object backed by a region of contiguous physical pages
         static rt::SharedPtr<MapEntry> makePhys(const uint64_t physAddr, const size_t length,
