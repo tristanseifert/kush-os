@@ -74,7 +74,7 @@ struct MapTreeLeaf {
             const auto x1 = this->address;
             const auto x2 = (this->address + this->size - 1);
             const auto y1 = address;
-            const auto y2 = (address + length);
+            const auto y2 = (address + length - 1);
 
             return (x1 >= y1 && x1 <= y2) ||
                    (x2 >= y1 && x2 <= y2) ||

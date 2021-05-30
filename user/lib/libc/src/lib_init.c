@@ -12,7 +12,9 @@ kush_task_launchinfo_t *__libc_task_info = NULL;
  */
 void __libc_init() {
     __libc_thread_init();
+#ifndef LIBC_NOTLS
     __libc_tss_init();
+#endif
 
     // set up input/output streams
     __stdstream_init();

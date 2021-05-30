@@ -53,15 +53,6 @@ SECTIONS {
      * Set up sections for thread local data, but we won't actually be using it as the task loader
      * will not bother with setting up the thread-locals for us.
      */
-    .tdata : {
-        __tls_data_start = .;
-        *(.tdata);
-        *(.tdata*);
-    }:data
-    .tbss : {
-        *(.tbss);
-        *(.tbss*);
-    }:tls
 
     /* garbage we want to discard */
     /DISCARD/ : {
@@ -82,12 +73,5 @@ PHDRS {
     headers PT_PHDR PHDRS ;
     rodata PT_LOAD ;
     data PT_LOAD ;
-    tls PT_TLS ;
 }
-/*
- * Since we use the static C library, define some stub symbols so the static TLS support will
- * link without complaining, even though we won't be using it.
- */
-__tls_size = 0;
-__tls_data_size = 0;
-__tls_data_start = 0;
+

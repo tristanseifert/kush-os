@@ -114,8 +114,10 @@ LIBC_INTERNAL void __libc_tss_init() {
             _HashmapTlsSlotHash, _HashmapTlsSlotCompare, NULL);
     if(!gState.entries) abort();
 
+#ifndef LIBC_NOTLS
     // create TSS storage for the current (main) thread
     __libc_tls_main_init();
+#endif
 }
 
 

@@ -2,7 +2,7 @@
 # Userspace C library
 ###############################################################################
 
-add_library(c_objs OBJECT
+list(APPEND c_objs_files
     src/lib_init.c
     # time functions
     src/time/gettimeofday.c
@@ -145,8 +145,13 @@ add_library(c_objs OBJECT
     # internal data structures
     src/struct/hashmap.c
 )
-target_compile_options(c_objs PRIVATE -flto)
-target_compile_options(c_objs PRIVATE -fno-exceptions -fno-rtti)
+
+# compile all libc files into an object library (shared for static/dynamic)
+add_library(c_objs OBJECT
+    ${c_objs_files}
+)
+
+target_compile_options(c_objs PRIVATE -flto -fno-exceptions -fno-rtti)
 target_compile_definitions(c_objs PRIVATE BUILDING_LIBC=1)
 
 # gdtoa: for floating point conversions
@@ -223,14 +228,21 @@ target_include_directories(c_dynamic PUBLIC include)
 target_link_libraries(c_dynamic PUBLIC system_dynamic rpc_dynamic)
 target_compile_options(c_objs PRIVATE -fPIC)
 
+# build the static non-TLS libc (used for dynamic linker)
+add_library(c_static_notls STATIC ${c_objs_files} $<TARGET_OBJECTS:c_gdtoa>)
+
+target_include_directories(c_static_notls PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
+target_include_directories(c_static_notls PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
+
+target_compile_options(c_static_notls PRIVATE -flto -fno-exceptions -fno-rtti)
+target_compile_definitions(c_static_notls PRIVATE BUILDING_LIBC=1 LIBC_NOTLS=1)
+target_compile_definitions(c_static_notls PUBLIC LIBC_NOTLS=1)
+set_target_properties(c_static_notls PROPERTIES OUTPUT_NAME "c_notls")
+target_include_directories(c_static_notls PUBLIC include)
+target_link_libraries(c_static_notls PUBLIC system_static)
+
 # build the correct platform-specific code
 if(${KERNEL_ARCH} STREQUAL "x86")
-    #    target_sources(c_objs PRIVATE
-#        src/x86/crt0.S
-        # this is useful for x86
-        # src/gdtoa/strtodnrp.c
-        # )
-
     target_compile_definitions(c_objs PRIVATE LIBC_ARCH_X86=1)
 
     # compile the C library entry point (for static executables)
