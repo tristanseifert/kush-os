@@ -111,7 +111,6 @@ void arch::RestoreThreadState(const rt::SharedPtr<sched::Thread> &from,
         // stop the task timer
         sched::Scheduler::get()->willSwitchFrom(from);
 
-        //log("old task %%esp = %p, new task %%esp = %p (stack %p)", from->regs.stackTop, to->regs.stackTop, to->stack);
         // set the running flags
         __atomic_store(&from->isActive, &no, __ATOMIC_RELAXED);
         __atomic_store(&to->isActive, &yes, __ATOMIC_RELAXED);

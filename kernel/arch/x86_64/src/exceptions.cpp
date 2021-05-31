@@ -116,6 +116,7 @@ void arch::InstallExceptionHandlers(Idt *idt) {
  */
 int amd64_exception_format_info(char *outBuf, const size_t outBufLen,
         const amd64_exception_info_t *info) {
+    int err;
     uint64_t cr0, cr2, cr3;
     asm volatile("mov %%cr0, %0" : "=r" (cr0));
     asm volatile("mov %%cr2, %0" : "=r" (cr2));
@@ -139,7 +140,7 @@ int amd64_exception_format_info(char *outBuf, const size_t outBufLen,
     gsKernBase = (tempLo) | (static_cast<uint64_t>(tempHi) << 32);
 
     // format
-    return snprintf(outBuf, outBufLen, "Exception %3llu ($%016llx)\n"
+    err = snprintf(outBuf, outBufLen, "Exception %3llu ($%016llx)\n"
             "CR0 $%016llx CR2 $%016llx CR3 $%016llx\n"
             " CS $%04x SS $%04x RFLAGS $%016llx\n"
             " FS $%016llx  GS $%016llx KGS $%016llx\n"
@@ -171,6 +172,18 @@ int amd64_exception_format_info(char *outBuf, const size_t outBufLen,
             xmm[4][1], xmm[4][0], xmm[5][1], xmm[5][0],
             xmm[6][1], xmm[6][0], xmm[7][1], xmm[7][0]*/
     );
+
+    // specicial cases
+    switch(info->intNo) {
+        case X86_EXC_SIMD_FP:
+            uint32_t mxcsr;
+            asm volatile("stmxcsr %0" : "=m"(mxcsr));
+
+            err += snprintf(outBuf+err, outBufLen-err, "MXCSR: $%08x", mxcsr);
+            break;
+    }
+
+    return err;
 }
 
 /**

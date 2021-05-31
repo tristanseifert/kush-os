@@ -78,6 +78,9 @@ endif()
 install(TARGETS system_static LIBRARY)
 install(TARGETS system_dynamic LIBRARY)
 
+add_custom_command(TARGET system_dynamic POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/libsystem.so ${SYSROOT_DIR}/boot/lib/libsystem.so)
+
 FILE(GLOB LIBSYSTEM_PUB_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
 install(FILES ${LIBSYSTEM_PUB_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include)
 FILE(GLOB LIBSYSTEM_PUB_SYS_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/sys/*.h*")

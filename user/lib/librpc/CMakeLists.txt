@@ -42,6 +42,9 @@ target_include_directories(rpc_dynamic PUBLIC include)
 install(TARGETS rpc_static LIBRARY)
 install(TARGETS rpc_dynamic LIBRARY)
 
+add_custom_command(TARGET rpc_dynamic POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/librpc.so ${SYSROOT_DIR}/boot/lib/librpc.so)
+
 # copy the rpc headers
 FILE(GLOB LIBRPC_RPC_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/rpc/*.h*")
 install(FILES ${LIBRPC_RPC_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/rpc)

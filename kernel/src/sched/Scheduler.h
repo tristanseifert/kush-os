@@ -125,7 +125,7 @@ class Scheduler {
         /// Finds the highest priority runnable thread on this core
         rt::SharedPtr<Thread> findRunnableThread();
         /// Inserts the given thread into the appropriate run queue
-        int schedule(const rt::SharedPtr<Thread> &thread);
+        int schedule(const rt::SharedPtr<Thread> &thread, const bool updateQuantum = true);
         /// Returns the run queue level to which the given thread belongs
         size_t getLevelFor(const rt::SharedPtr<Thread> &thread);
         /// Calculate the total quantum length for a given thread

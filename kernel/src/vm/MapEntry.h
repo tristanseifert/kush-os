@@ -32,6 +32,8 @@ enum class MappingFlags {
     Write                               = (1 << 1),
     /// The mapping can be executed from
     Execute                             = (1 << 2),
+    /// Mapping is read/write
+    RW                                  = (Read | Write),
 
     /// Memory mapped IO mode (caching disabled entirely)
     MMIO                                = (1 << 8),

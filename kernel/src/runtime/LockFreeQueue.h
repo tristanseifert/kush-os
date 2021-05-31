@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <new>
 
 #include <bitflags.h>
 #include <log.h>
@@ -219,7 +220,8 @@ class LockFreeQueue {
             // store it
             for(size_t i = 0; i < n; i++) {
                 //memcpy(&this->storage[(oldProdHead + i) & mask], &inData[i], sizeof(T));
-                this->storage[(oldProdHead + i) & mask] = inData[i];
+                //this->storage[(oldProdHead + i) & mask] = inData[i];
+                new(&this->storage[(oldProdHead + i) & mask]) T(inData[i]);
             }
 
             // wait for any other threads to finish
@@ -316,6 +318,7 @@ class LockFreeQueue {
             for(size_t i = 0; i < n; i++) {
                 //memcpy(&outData[i], &this->storage[(oldConsHead + i) & mask], sizeof(T));
                 outData[i] = this->storage[(oldConsHead + i) & mask];
+                this->storage[(oldConsHead + i) & mask].~T(); 
             }
 
             // update tail ptr after all other threads are done

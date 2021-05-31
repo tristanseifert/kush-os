@@ -55,6 +55,8 @@ add_executable(kernel
     src/handle/Manager.cpp
     src/ipc/Interrupts.cpp
     src/ipc/Port.cpp
+    src/debug/FramebufferConsole.cpp
+    src/debug/BitmapFonts.cpp
     ${version_file}
 )
 

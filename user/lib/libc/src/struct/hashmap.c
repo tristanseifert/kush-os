@@ -124,8 +124,8 @@ struct hashmap *hashmap_new(size_t elsize, size_t cap,
         return NULL;
     }
     memset(map->buckets, 0, map->bucketsz*map->nbuckets);
-    map->growat = map->nbuckets*0.75;
-    map->shrinkat = map->nbuckets*0.10;
+    map->growat = map->nbuckets / 2;
+    map->shrinkat = map->nbuckets / 10;
     return map;    
 }
 

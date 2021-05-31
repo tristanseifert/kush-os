@@ -54,6 +54,9 @@ target_include_directories(mpack_dynamic PUBLIC mpack/src/)
 install(TARGETS mpack_static LIBRARY)
 install(TARGETS mpack_dynamic LIBRARY)
 
+add_custom_command(TARGET mpack_dynamic POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/libmpack.so ${SYSROOT_DIR}/boot/lib/libmpack.so)
+
 FILE(GLOB MPACK_PUB_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/mpack/src/mpack/mpack.h")
 install(FILES ${MPACK_PUB_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/mpack)
 

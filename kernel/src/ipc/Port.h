@@ -92,11 +92,18 @@ class Port: public rt::SharedFromThis<Port> {
                         this->unblockedSignalled = true;
                         return;
                     }
-                    //bool yes = true, no = false;
-                    //if(__atomic_compare_exchange(&this->signalled, &no, &yes, false, __ATOMIC_ACQUIRE, __ATOMIC_RELEASE)) {
-                    if(!__atomic_test_and_set(&this->signalled, __ATOMIC_RELEASE)) {
+
+                    // perform unblock if we are blocking AND haven't signalled
+                    if( __atomic_load_n(&this->isBlocking, __ATOMIC_RELAXED) &&
+                       !__atomic_test_and_set(&this->signalled, __ATOMIC_RELEASE)) {
                         this->blocker->unblock(this->us.lock());
                     }
+                }
+
+                /// Clear the "is blocking" flag
+                void didUnblock() override {
+                    Blockable::didUnblock();
+                    __atomic_store_n(&this->isBlocking, false, __ATOMIC_RELAXED);
                 }
 
                 /// Sets the receive blockable object of the port when we're validly blocked on.
@@ -108,6 +115,8 @@ class Port: public rt::SharedFromThis<Port> {
                     if(this->signalled || this->unblockedSignalled) {
                         return -1;
                     }
+                    // set blocking flag
+                    __atomic_store_n(&this->isBlocking, true, __ATOMIC_RELAXED);
                     return 0;
                 }
 
@@ -119,6 +128,7 @@ class Port: public rt::SharedFromThis<Port> {
 
                 bool unblockedSignalled = false;
                 bool signalled = false;
+                bool isBlocking = false;
         };
 
         // Message info
@@ -162,6 +172,8 @@ class Port: public rt::SharedFromThis<Port> {
     private:
         /// maximum length of message
         constexpr static const size_t kMaxMsgLen = 4096 * 9;
+        /// Maximum number of messages that may be queued at once
+        constexpr static const size_t kDefaultMaxMessages = 100;
 
         /// whether dequeuing of messages is logged
         static bool gLogQueuing;
@@ -179,7 +191,7 @@ class Port: public rt::SharedFromThis<Port> {
         rt::SharedPtr<Blocker> receiverBlocker;
 
         /// maximum queue size (0 = unlimited)
-        size_t maxMessages = 0;
+        size_t maxMessages = kDefaultMaxMessages;
         /// pending messages
         rt::Queue<Message> messages;
 };

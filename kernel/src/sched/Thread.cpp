@@ -379,6 +379,12 @@ beach:;
             Scheduler::get()->removeDeadline(deadline);
         }
 
+        // process each blockable
+        for(const auto &blockable : this->blockingOn) {
+            blockable->didUnblock();
+        }
+        this->blockingOn.clear();
+
         RW_UNLOCK_WRITE(&this->lock);
         CRITICAL_EXIT();
     }
@@ -413,15 +419,13 @@ void Thread::unblock(const rt::SharedPtr<Blockable> &b) {
         CRITICAL_ENTER();
 
         this->blockState = BlockState::Unblocked;
-        this->setState(State::Runnable, false);
 
         RW_UNLOCK_WRITE(&this->lock);
         CRITICAL_EXIT();
     }
 
     // add to scheduler's "potentially runnable" queue
-    Scheduler::get()->markThreadAsRunnable(this->sharedFromThis(), true);
-    //Scheduler::get()->threadUnblocked(this->sharedFromThis());
+    Scheduler::get()->threadUnblocked(this->sharedFromThis());
 }
 
 /**
@@ -436,15 +440,38 @@ void Thread::blockExpired() {
         CRITICAL_ENTER();
 
         this->blockState = BlockState::Timeout;
-        this->setState(State::Runnable, false);
 
         RW_UNLOCK_WRITE(&this->lock);
         CRITICAL_EXIT();
     }
 
     // re-enqueue into scheduler
-    Scheduler::get()->markThreadAsRunnable(this->sharedFromThis(), true);
-    //Scheduler::get()->threadUnblocked(this->sharedFromThis());
+    Scheduler::get()->threadUnblocked(this->sharedFromThis());
+}
+
+/**
+ * Callback from the scheduler invoked when a thread is pulled off the "unblocked" queue. It may
+ * either become runnable, or continue blocking (if the wake-up was spurious, for example)
+ */
+void Thread::schedTestUnblock() {
+    switch(this->blockState) {
+        // if unblocked or timeout, become runnable
+        case BlockState::Unblocked:
+        case BlockState::Timeout:
+        case BlockState::Aborted:
+            this->setState(State::Runnable, false);
+            break;
+
+        // spurious wakeup
+        case BlockState::Blocking:
+            log("Spurious unblock for thread $%p'h", this->handle);
+            break;
+
+        // invalid states
+        case BlockState::None:
+            panic("Invalid block state %d for $%p'h", static_cast<int>(this->blockState),
+                    this->handle);
+    }
 }
 
 

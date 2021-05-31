@@ -6,9 +6,15 @@
 #include <arch/critical.h>
 #include <arch/spinlock.h>
 
+#include "debug/FramebufferConsole.h"
 #include "sched/Scheduler.h"
 #include "sched/Task.h"
 #include "sched/Thread.h"
+
+/// Framebuffer console which we can use to print to
+namespace platform {
+    extern debug::FramebufferConsole *gConsole;
+};
 
 /// Panic lock; this ensures we can only ever have one CPU core in the panic code at once
 DECLARE_SPINLOCK_S(gPanicLock);
@@ -19,6 +25,19 @@ DECLARE_SPINLOCK_S(gPanicLock);
 static void _outchar(char ch, void *ctx) {
     platform_debug_spew(ch);
 }
+
+/**
+ * printf wrapper to send a character to the debug spew port and framebuffer console
+ */
+static void _outchar_panic(char ch, void *ctx) {
+    using namespace platform;
+    platform_debug_spew(ch);
+
+    if(gConsole) {
+        gConsole->write(ch);
+    }
+}
+
 
 /**
  * Writes the message to the kernel log.
@@ -65,23 +84,23 @@ void panic(const char *format, ...) {
 
     va_end(va);
 
-    fctprintf(_outchar, NULL, "panic: %s\npc: $%p\n", panicBuf, pc);
+    fctprintf(_outchar_panic, NULL, "\033[;Hpanic: %s\npc: $%p\n", panicBuf, pc);
 
     if(thread) {
-        fctprintf(_outchar, NULL, "  Active thread: %p (tid %u) '%s'\n",
+        fctprintf(_outchar_panic, NULL, "  Active thread: %p (tid %u) '%s'\n",
                 static_cast<void *>(thread), thread->tid, thread->name);
     }
     if(task) {
-        fctprintf(_outchar, NULL, "    Active task: %p (pid %u) '%s'\n", static_cast<void *>(task),
+        fctprintf(_outchar_panic, NULL, "    Active task: %p (pid %u) '%s'\n", static_cast<void *>(task),
                 task->pid, task->name);
     }
 
-    fctprintf(_outchar, NULL, "Time since boot: %llu ns\n", platform_timer_now());
+    fctprintf(_outchar_panic, NULL, "Time since boot: %llu ns\n", platform_timer_now());
 
     // try to get a backtrace as well
     int err = arch_backtrace(NULL, panicBuf, kPanicBufSz);
     if(err) {
-        fctprintf(_outchar, NULL, "Backtrace:\n%s", panicBuf);
+        fctprintf(_outchar_panic, NULL, "Backtrace:\n%s", panicBuf);
     }
 
     // then jump to the platform panic handler

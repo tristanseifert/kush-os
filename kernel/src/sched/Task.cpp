@@ -243,7 +243,7 @@ int Task::terminate(int status) {
  * Notifies all interested parties that we've exited.
  */
 void Task::notifyExit(int status) {
-    log("Task $%08x'h (%s) exited: %d", this->handle, this->name, status);
+    log("Task $%p'h (%s) exited: %d", this->handle, this->name, status);
 }
 
 /**

@@ -102,7 +102,6 @@ int Port::send(const void *msgBuf, const size_t msgLen) {
 
     // wake any pending task
     this->receiverBlocker->messageQueued();
-
     return 0;
 
 }

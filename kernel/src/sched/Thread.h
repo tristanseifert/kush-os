@@ -232,6 +232,11 @@ struct Thread: public rt::SharedFromThis<Thread> {
             __atomic_store(&this->notificationMask, &newMask, __ATOMIC_RELEASE);
         }
 
+        /// Return thread handle
+        constexpr auto getHandle() const {
+            return this->handle;
+        }
+
         /// Sets the thread's name.
         void setName(const char *name, const size_t length = 0);
         /// Sets the thread's scheduling priority
@@ -301,6 +306,8 @@ struct Thread: public rt::SharedFromThis<Thread> {
         /// Invoke all termination handlers
         void callTerminators();
 
+        /// scheduler is attempting to determine if thread should be runnable again
+        void schedTestUnblock();
         /// any pending blocks should be cancelled
         void blockExpired();
         /// set thread state with optionally idsabling validation

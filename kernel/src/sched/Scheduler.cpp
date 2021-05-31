@@ -270,7 +270,7 @@ rt::SharedPtr<Thread> Scheduler::findRunnableThread() {
     size_t tries = 0;
     uint64_t epoch, newEpoch;
     bool epochChanged;
-    rt::SharedPtr<Thread> thread = nullptr;
+    rt::SharedPtr<Thread> thread;
 
 beach:;
     // read the current epoch and check each run queue
@@ -282,6 +282,8 @@ beach:;
 
 again:;
         if(level.storage.pop(thread, rt::LockFreeQueueFlags::kPartialPop)) {
+            REQUIRE(thread, "invalid thread in level %lu run queue", i);
+
             /**
              * If the thread was supposed to previously terminate, but it's still in the run queue,
              * make sure that the deferred handlers are invoked and we pick another thread to
@@ -341,18 +343,21 @@ again:;
  * Additionally, if the thread's quantum has fully expired or it moved levels since it was last
  * executed, it will be updated with the level's quantum value, plus or minus any adjustments due
  * to the thread's priority.
+ *
+ * @param updateQuantum Whether we bother updating the thread's time quantum
  */
-int Scheduler::schedule(const rt::SharedPtr<Thread> &thread) {
+int Scheduler::schedule(const rt::SharedPtr<Thread> &thread, const bool updateQuantum) {
     auto &sched = thread->sched;
-
-    // get level
     const auto levelNum = this->getLevelFor(thread);
     auto &level = this->levels[levelNum];
 
-    // update its quantum (if level changed)
-    if(levelNum != sched.lastLevel || !sched.quantumTotal) {
-        this->updateQuantumLength(thread);
-        sched.lastLevel = levelNum;
+    // we may need to update the thread's time quantum
+    if(updateQuantum) {
+        // the level had to have changed
+        if(levelNum != sched.lastLevel || !sched.quantumTotal) {
+            this->updateQuantumLength(thread);
+            sched.lastLevel = levelNum;
+        }
     }
 
     // do not actually push it on the run queue if not schedulable
@@ -553,6 +558,20 @@ bool Scheduler::updateQuantumUsed(const rt::SharedPtr<Thread> &thread) {
 void Scheduler::threadUnblocked(const rt::SharedPtr<Thread> &thread) {
     DECLARE_CRITICAL();
 
+    // ensure it's in a valid state
+    switch(thread->state) {
+        case Thread::State::Sleeping:
+        case Thread::State::Blocked:
+        case Thread::State::NotifyWait:
+            break;
+
+        case Thread::State::Paused:
+        case Thread::State::Runnable:
+        case Thread::State::Zombie:
+            panic("thread $%p'h (%lu) unblocked, but has invalid state %d",
+                    thread->getHandle(), thread->tid, static_cast<int>(thread->state));
+    }
+
     CRITICAL_ENTER();
     {
         if(!this->unblocked.insert(thread)) {
@@ -560,6 +579,9 @@ void Scheduler::threadUnblocked(const rt::SharedPtr<Thread> &thread) {
         }
     }
     CRITICAL_EXIT();
+
+    // request IPI
+    this->sendIpi();
 }
 
 /**
@@ -567,7 +589,30 @@ void Scheduler::threadUnblocked(const rt::SharedPtr<Thread> &thread) {
  * the appropriate run queue.
  */
 void Scheduler::processUnblockedThreads() {
+    // pop the unblocked threads
+    rt::SharedPtr<Thread> thread;
+    while(this->unblocked.pop(thread, rt::LockFreeQueueFlags::kPartialPop)) {
+        // ensure it's in a valid state
+        switch(thread->state) {
+            case Thread::State::Sleeping:
+            case Thread::State::Blocked:
+            case Thread::State::NotifyWait:
+                break;
 
+            case Thread::State::Paused:
+            case Thread::State::Runnable:
+            case Thread::State::Zombie:
+                panic("thread $%p'h (%lu) in unblocked list, but has invalid state %d",
+                        thread->getHandle(), thread->tid, static_cast<int>(thread->state));
+        }
+
+        // test thread state and place back on run queue if desired
+        thread->schedTestUnblock();
+
+        if(thread->getState() == Thread::State::Runnable) {
+            this->schedule(thread);
+        }
+    }
 }
 
 /**
@@ -575,22 +620,20 @@ void Scheduler::processUnblockedThreads() {
  * how much of the time quantum the thread spent executing.
  */
 void Scheduler::willSwitchFrom(const rt::SharedPtr<Thread> &from) {
-    // skip time accounting if this thread was preempted
     auto &sched = from->sched;
 
     if(sched.preempted) {
         sched.preempted = false;
-    } else {
-        this->updateQuantumUsed(from);
     }
-
-    if(kLogQuantum) {
-        log("executed '%s' for %lu/%lu nsec", from->name, sched.quantumUsed, sched.quantumTotal);
-    }
+    this->updateQuantumUsed(from);
 
     // place this back on the run queue (if still runnable)
     if(from->state == Thread::State::Runnable && !from->needsToDie) {
         this->schedule(from);
+    }
+
+    if(kLogQuantum) {
+        log("executed '%s' for %lu/%lu nsec", from->name, sched.quantumUsed, sched.quantumTotal);
     }
 }
 

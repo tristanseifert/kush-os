@@ -92,9 +92,17 @@ void ElfReader::validateHeader() {
                 hdr.e_ident[2], hdr.e_ident[3]);
     }
 
-    // We currently only handle 32-bit ELF
-    if(hdr.e_ident[EI_CLASS] != ELFCLASS32) {
-        Linker::Abort("Unsupported ELF class: %u", hdr.e_ident[EI_CLASS]);
+    // validate ELF class based on current architecture
+    switch(hdr.e_ident[EI_CLASS]) {
+#if defined(__i386__)
+        case ELFCLASS32: break;
+#elif defined(__amd64__)
+        case ELFCLASS64: break;
+#endif
+
+        // unsupported ELF class
+        default:
+            Linker::Abort("Unsupported ELF class: %u", hdr.e_ident[EI_CLASS]);
     }
 
     // ensure the ELF is little endian, the correct version
@@ -109,17 +117,15 @@ void ElfReader::validateHeader() {
     }
 
     // ensure CPU architecture
+    switch(hdr.e_machine) {
 #if defined(__i386__)
-    if(hdr.e_machine != EM_386) {
-        Linker::Abort("Invalid ELF machine type %08x", hdr.e_type);
-    }
+        case EM_386: break;
 #elif defined(__amd64__)
-    if(hdr.e_machine != EM_X86_64) {
-        Linker::Abort("Invalid ELF machine type %08x", hdr.e_type);
-    }
-#else
-#error Update library loader to handle the current arch
+        case EM_X86_64: break;
 #endif
+        default:
+            Linker::Abort("Invalid ELF machine type %08x", hdr.e_type);
+    }
 
     // read section header info
     if(hdr.e_shentsize != sizeof(Elf_Shdr)) {
