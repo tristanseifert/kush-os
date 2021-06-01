@@ -57,6 +57,7 @@ add_executable(kernel
     src/ipc/Port.cpp
     src/debug/FramebufferConsole.cpp
     src/debug/BitmapFonts.cpp
+    src/debug/SchedulerState.cpp
     ${version_file}
 )
 

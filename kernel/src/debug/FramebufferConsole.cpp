@@ -224,11 +224,11 @@ void FramebufferConsole::processAnsiSgr(const char *str, const size_t strLen) {
     }
     // fg color (second set)
     if(cmd >= 90 && cmd <= 97) {
-        this->colorIndices[ColorIndex::Foreground] = cmd - 90;
+        this->colorIndices[ColorIndex::Foreground] = cmd - 90 + 8;
     }
     // bg color (second set)
     else if(cmd >= 100 && cmd <= 107) {
-        this->colorIndices[ColorIndex::Background] = cmd - 100;
+        this->colorIndices[ColorIndex::Background] = cmd - 100 + 8;
     }
 }
 
@@ -267,8 +267,6 @@ void FramebufferConsole::processAnsiCup() {
     // handle leftover
     auto val = StrToInt(number);
     this->cursorPos[isRow ? 1 : 0] = val ? (val - 1) : 0;
-
-    log("New cursor pos: %lu %lu", this->cursorPos[0], this->cursorPos[1]);
 }
 
 

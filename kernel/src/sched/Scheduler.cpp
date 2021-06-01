@@ -62,6 +62,8 @@ void Scheduler::Init() {
 
     gKernelTask->setName("kernel_task");
 
+    GlobalState::the()->registerTask(gKernelTask);
+
     // then, initialize the per-core scheduler the same as for all APs
     InitAp();
 }
@@ -179,7 +181,7 @@ void Scheduler::run() {
  * Schedules all threads in the given task that aren't already scheduled. Any threads that are in
  * the paused state will become runnable. (Other states aren't changed.)
  */
-void Scheduler::scheduleRunnable(rt::SharedPtr<Task> &task) {
+void Scheduler::scheduleRunnable(const rt::SharedPtr<Task> &task) {
     // TODO: check which threas are scheduled already
 
     RW_LOCK_READ_GUARD(task->lock);
@@ -283,6 +285,7 @@ beach:;
 again:;
         if(level.storage.pop(thread, rt::LockFreeQueueFlags::kPartialPop)) {
             REQUIRE(thread, "invalid thread in level %lu run queue", i);
+            thread->sched.queuePopped++;
 
             /**
              * If the thread was supposed to previously terminate, but it's still in the run queue,
@@ -358,6 +361,11 @@ int Scheduler::schedule(const rt::SharedPtr<Thread> &thread, const bool updateQu
             this->updateQuantumLength(thread);
             sched.lastLevel = levelNum;
         }
+    }
+
+    // do not schedule the idle thread
+    if(TestFlags(sched.flags & SchedulerThreadDataFlags::Idle)) {
+        return 1;
     }
 
     // do not actually push it on the run queue if not schedulable

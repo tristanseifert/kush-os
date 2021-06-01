@@ -1,4 +1,5 @@
 #include "GlobalState.h"
+#include "Task.h"
 
 #include <log.h>
 

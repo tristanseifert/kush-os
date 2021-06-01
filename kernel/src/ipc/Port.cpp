@@ -92,6 +92,7 @@ int Port::send(const void *msgBuf, const size_t msgLen) {
 
     // insert the message
     this->messages.push_back(Message(msgBuf, msgLen));
+    __atomic_fetch_add(&this->totalSent, 1, __ATOMIC_RELAXED);
 
     if(gLogQueuing) {
         log("P%p enqueued %d", this->handle, this->messages.size());
@@ -138,6 +139,8 @@ int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const ui
     // pop messages off the message queue, if any
     if(!this->messages.empty()) {
         auto msg = this->messages.pop();
+        __atomic_fetch_add(&this->totalReceived, 1, __ATOMIC_RELAXED);
+
         const auto toCopy = (msg.contentLen > msgBufLen) ? msgBufLen : msg.contentLen;
 
         memcpy(msgBuf, msg.content, toCopy);
@@ -168,7 +171,7 @@ int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const ui
      */
     unblockReason = thread->blockOn(this->receiverBlocker);
     if(unblockReason == BlockOnReturn::Error) {
-        return -1;
+        return -2;
     }
 
     // after wake-up, see if we have a message to copy out
@@ -178,6 +181,8 @@ int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const ui
     if(!this->messages.empty()) {
         // copy out the message at the head of the queue
         auto msg = this->messages.pop();
+        __atomic_fetch_add(&this->totalReceived, 1, __ATOMIC_RELAXED);
+
         const auto toCopy = (msg.contentLen > msgBufLen) ? msgBufLen : msg.contentLen;
 
         memcpy(msgBuf, msg.content, toCopy);
@@ -188,6 +193,7 @@ int Port::receive(Handle &sender, void *msgBuf, const size_t msgBufLen, const ui
         return toCopy;
     } 
     // if we get here and the queue is empty, the wakeup was spurious
+    ret = -1;
 
 failedUnlock:;
     // failure return

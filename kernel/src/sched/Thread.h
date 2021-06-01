@@ -212,13 +212,13 @@ struct Thread: public rt::SharedFromThis<Thread> {
 
     public:
         /// Allocates a new kernel thread
-        static rt::SharedPtr<Thread> kernelThread(rt::SharedPtr<Task> &task,
+        static rt::SharedPtr<Thread> kernelThread(const rt::SharedPtr<Task> &task,
                 void (*entry)(uintptr_t), const uintptr_t param = 0);
         /// Allocates a new userspace thread
-        static rt::SharedPtr<Thread> userThread(rt::SharedPtr<Task> &task,
+        static rt::SharedPtr<Thread> userThread(const rt::SharedPtr<Task> &task,
                 void (*entry)(uintptr_t), const uintptr_t param = 0);
 
-        Thread(rt::SharedPtr<Task> &task, const uintptr_t pc, const uintptr_t param,
+        Thread(const rt::SharedPtr<Task> &task, const uintptr_t pc, const uintptr_t param,
                 const bool kernelThread = false);
         ~Thread();
 

@@ -126,7 +126,7 @@ struct Task: public rt::SharedFromThis<Task> {
         /// Returns a handle to the currently executing task.
         static rt::SharedPtr<Task> current();
         /// Returns the kernel task handle.
-        inline static auto kern() {
+        inline static const rt::SharedPtr<Task> &kern() {
             extern rt::SharedPtr<Task> gKernelTask;
             return gKernelTask;
         }

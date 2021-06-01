@@ -141,7 +141,6 @@ intptr_t sys::PortReceive(const Handle portHandle, RecvInfo *recvPtr, const size
     if(err < 0) {
         // receive timed out
         if(err == -1) {
-            // memset(recvPtr, 0, sizeof(RecvInfo));
             return Errors::Timeout;
         }
         // other receive error

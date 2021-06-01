@@ -5,6 +5,7 @@
 
 #include <platform.h>
 #include <log.h>
+#include <printf.h>
 
 using namespace sched;
 
@@ -20,7 +21,10 @@ IdleWorker::IdleWorker(Scheduler *_sched) : sched(_sched) {
     REQUIRE(this->thread, "failed to create idle worker");
 
     this->thread->priority = kThreadPriority;
-    this->thread->setName("Idle worker");
+
+    char buf[32]{0};
+    snprintf(buf, sizeof(buf), "Idle (core %x)", _sched->getCoreId());
+    this->thread->setName(buf);
 
     this->thread->setState(Thread::State::Runnable);
 
@@ -47,8 +51,6 @@ void sched::IdleEntry(uintptr_t arg) {
  * we'll just get the CPU back.
  */
 void IdleWorker::main() {
-    log("idle worker :)");
-
     while(1) {
         this->checkWork();
         platform::Idle();

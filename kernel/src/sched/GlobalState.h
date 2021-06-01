@@ -27,6 +27,10 @@ class GlobalState {
         void unregisterTask(const rt::SharedPtr<Task> &task);
         void iterateTasks(void (*callback)(rt::SharedPtr<Task> &));
 
+        inline const auto &getTasks() {
+            return this->tasks;
+        }
+
     private:
         /// global (shared between processors) global state instance
         static GlobalState *gShared;

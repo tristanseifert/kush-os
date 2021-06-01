@@ -38,7 +38,7 @@ class Port: public rt::SharedFromThis<Port> {
 
     public:
         /// Returns the port's kernel handle.
-        const inline Handle getHandle() const {
+        constexpr inline Handle getHandle() const {
             // TODO: does this need locking?
             return this->handle;
         }
@@ -47,6 +47,15 @@ class Port: public rt::SharedFromThis<Port> {
         const inline bool messagesPending() {
             RW_LOCK_READ_GUARD(this->lock);
             return !this->messages.empty();
+        }
+
+        /// Returns the total number of messages transmitted
+        constexpr inline auto getTotalSent() const {
+            return this->totalSent;
+        }
+        /// Returns the total number of messages received
+        constexpr inline auto getTotalReceived() const {
+            return this->totalReceived;
         }
 
         /// Sets the queue depth
@@ -194,6 +203,11 @@ class Port: public rt::SharedFromThis<Port> {
         size_t maxMessages = kDefaultMaxMessages;
         /// pending messages
         rt::Queue<Message> messages;
+
+        /// total messages received
+        size_t totalReceived = 0;
+        /// total messages sent
+        size_t totalSent = 0;
 };
 }
 

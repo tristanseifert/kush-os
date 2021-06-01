@@ -50,8 +50,8 @@ struct sched::BlockWait: public Deadline {
 /**
  * Allocates a new thread.
  */
-rt::SharedPtr<Thread> Thread::kernelThread(rt::SharedPtr<Task> &parent, void (*entry)(uintptr_t),
-        const uintptr_t param) {
+rt::SharedPtr<Thread> Thread::kernelThread(const rt::SharedPtr<Task> &parent,
+        void (*entry)(uintptr_t), const uintptr_t param) {
     auto ptr = rt::MakeShared<Thread>(parent, (uintptr_t) entry, param, true);
     ptr->handle = handle::Manager::makeThreadHandle(ptr);
 
@@ -63,8 +63,8 @@ rt::SharedPtr<Thread> Thread::kernelThread(rt::SharedPtr<Task> &parent, void (*e
 /**
  * Allocates a new thread.
  */
-rt::SharedPtr<Thread> Thread::userThread(rt::SharedPtr<Task> &parent, void (*entry)(uintptr_t),
-        const uintptr_t param) {
+rt::SharedPtr<Thread> Thread::userThread(const rt::SharedPtr<Task> &parent,
+        void (*entry)(uintptr_t), const uintptr_t param) {
     auto ptr = rt::MakeShared<Thread>(parent, (uintptr_t) entry, param, false);
     ptr->handle = handle::Manager::makeThreadHandle(ptr);
 
@@ -77,7 +77,7 @@ rt::SharedPtr<Thread> Thread::userThread(rt::SharedPtr<Task> &parent, void (*ent
 /**
  * Allocates a new thread.
  */
-Thread::Thread(rt::SharedPtr<Task> &_parent, const uintptr_t pc, const uintptr_t param,
+Thread::Thread(const rt::SharedPtr<Task> &_parent, const uintptr_t pc, const uintptr_t param,
         const bool _kernel) : task(_parent), kernelMode(_kernel) {
     this->tid = nextTid++;
 
@@ -143,11 +143,6 @@ rt::SharedPtr<Thread> Thread::current() {
  * Updates internal tracking structures when the thread is context switched out.
  */
 void Thread::switchFrom() {
-    if(this->lastSwitchedTo) {
-        //const auto ran = platform_timer_now() - this->lastSwitchedTo;
-        //__atomic_fetch_add(&this->cpuTime, ran, __ATOMIC_RELAXED);
-    }
-
     // if we've DPCs, execute them
     bool haveDpcs;
     __atomic_load(&this->dpcsPending, &haveDpcs, __ATOMIC_CONSUME);
@@ -331,8 +326,8 @@ Thread::BlockOnReturn Thread::blockOn(const rt::SharedPtr<Blockable> &b, const u
     {
         DECLARE_CRITICAL();
 
-        RW_LOCK_WRITE(&this->lock);
         CRITICAL_ENTER();
+        RW_LOCK_WRITE(&this->lock);
 
         // prepare for blocking
         if(b->willBlockOn(this->sharedFromThis())) {
@@ -371,8 +366,8 @@ beach:;
     {
         DECLARE_CRITICAL();
 
-        RW_LOCK_WRITE(&this->lock);
         CRITICAL_ENTER();
+        RW_LOCK_WRITE(&this->lock);
 
         // remove the old deadline
         if(deadline) {

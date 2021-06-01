@@ -47,6 +47,11 @@ struct SchedulerThreadData {
     /// Number of nanoseconds of time quantum used at this level
     uint64_t quantumUsed = 0;
 
+    /// number of times the thread has been inserted to a run queue
+    size_t queuePushed = 0;
+    /// number of times the thread has been popped from a run queue
+    size_t queuePopped = 0;
+
     /// flags defining the thread's state and scheduler beahvior
     SchedulerThreadDataFlags flags;
 

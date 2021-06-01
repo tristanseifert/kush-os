@@ -60,6 +60,8 @@ class FramebufferConsole {
         void write(const char ch);
         /// Writes the given string to the console
         void write(const char *str, const size_t length = 0);
+        /// Clears the entire screen to the current background color
+        void clear();
 
     private:
         /// Indices into buffer size array
@@ -112,8 +114,6 @@ class FramebufferConsole {
         void drawChar(const char ch, const size_t x, const size_t y);
         /// Advances to the next line, optionally scrolling the screen if required
         void newLine();
-        /// Clears the entire screen to the current background color
-        void clear();
 
     private:
         /// number of entries in color palette

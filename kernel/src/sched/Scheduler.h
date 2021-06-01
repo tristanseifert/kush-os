@@ -87,13 +87,17 @@ class Scheduler {
         // initializes the scheduler data in the given thread object
         static void threadWasCreated(Thread &t);
 
+        /// Returns this scheduler's core ID
+        constexpr auto getCoreId() const {
+            return this->coreId;
+        }
         // return the thread running on the calling processor
         rt::SharedPtr<Thread> runningThread() const {
             return this->running;
         }
 
         /// schedules all runnable threads in the given task
-        void scheduleRunnable(rt::SharedPtr<Task> &task);
+        void scheduleRunnable(const rt::SharedPtr<Task> &task);
         /// adds the given thread to the runnable queue
         int markThreadAsRunnable(const rt::SharedPtr<Thread> &thread,
                 const bool shouldSwitch = true);
@@ -184,6 +188,7 @@ class Scheduler {
             public:
                 /// Push a new thread into the run queue
                 bool push(const rt::SharedPtr<Thread> &thread) {
+                    thread->sched.queuePushed++;
                     return (this->storage.insert(thread) != 0);
                 }
         };
