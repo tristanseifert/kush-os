@@ -5,6 +5,7 @@
 #include "runtime/ThreadLocal.h"
 #include "elf/ElfExecReader.h"
 #include "elf/ElfLibReader.h"
+#include "struct/PaddedArray.h"
 
 using namespace dyldo;
 
@@ -103,19 +104,19 @@ void Linker::cleanUp() {
  */
 void Linker::doFixups() {
     // first, fix up the executable (data and PLT)
-    std::span<Elf_Rel> rels;
+    PaddedArray<Elf_Rel> execRels;
 
-    if(this->exec->getDynRels(rels)) {
-        this->exec->processRelocs(rels);
+    if(this->exec->getDynRels(execRels)) {
+        this->exec->processRelocs(execRels);
     }
-    if(this->exec->getPltRels(rels)) {
-        this->exec->processRelocs(rels);
+    if(this->exec->getPltRels(execRels)) {
+        this->exec->processRelocs(execRels);
     }
 
     // then, ALL loaded libraries
     hashmap_iterate(&this->loaded, [](void *ctx, void *value) {
         auto lib = reinterpret_cast<Library *>(value);
-        std::span<Elf_Rel> rels;
+        PaddedArray<Elf_Rel> rels;
 
         // update its dynamic relocs
         if(lib->reader->getDynRels(rels)) {
@@ -139,7 +140,7 @@ void Linker::jumpToEntry(const kush_task_launchinfo_t *info) {
     // round up stack address
     const auto stack = ((__dyldo_stack_start + 256 - 1) / 256) * 256;
 
-    Trace("Entry point: %p sp %08x", this->entryAddr, stack);
+    Trace("Entry point: %p sp %p", this->entryAddr, stack);
     __dyldo_jmp_to(this->entryAddr, stack, info);
 
     // should really never get here...
@@ -343,6 +344,22 @@ void Linker::setExecTlsRequirements(const size_t totalLen, const std::span<std::
 void Linker::setLibTlsRequirements(const size_t totalLen, const std::span<std::byte> &tdata,
         Library * _Nonnull library) {
     this->tls->setLibTlsInfo(totalLen, tdata, library);
+}
+
+/**
+ * Prints the base addresses of all loaded images.
+ */
+void Linker::printImageBases() {
+    // executable info
+    Info("Entry point: %p", this->entryAddr);
+
+    // all libraries
+    hashmap_iterate(&this->loaded, [](void *ctx, void * _lib) -> int {
+        auto lib = reinterpret_cast<Library *>(_lib);
+
+        Info("%p: vm <%p, %8lu> %s", lib->base, lib->vmBase, lib->vmLength, lib->soname);
+        return 1;
+    }, this);
 }
 
 #pragma clang diagnostic push

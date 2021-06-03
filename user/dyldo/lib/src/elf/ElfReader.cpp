@@ -104,6 +104,7 @@ void ElfReader::validateHeader() {
         default:
             Linker::Abort("Unsupported ELF class: %u", hdr.e_ident[EI_CLASS]);
     }
+    this->elfClass = hdr.e_ident[EI_CLASS];
 
     // ensure the ELF is little endian, the correct version
     if(hdr.e_ident[EI_DATA] != ELFDATA2LSB) {
@@ -126,6 +127,7 @@ void ElfReader::validateHeader() {
         default:
             Linker::Abort("Invalid ELF machine type %08x", hdr.e_type);
     }
+    this->elfMachine = hdr.e_machine;
 
     // read section header info
     if(hdr.e_shentsize != sizeof(Elf_Shdr)) {
@@ -263,10 +265,10 @@ void ElfReader::parseDynamicInfo() {
 /**
  * From the dynamic information, extract the location of the relocation table and outputs it.
  *
- * @param outRels If data relocations exist, set to the span encompassing all of them.
+ * @param outRels If data relocations exist, set to a padded array encompassing all of them.
  * @return Whether there are relocations to process.
  */
-bool ElfReader::getDynRels(std::span<Elf_Rel> &outRels) {
+bool ElfReader::getDynRels(PaddedArray<Elf_Rel> &outRels) {
     // get the extents of the region
     uintptr_t relAddr = 0;
     size_t relEntBytes = 0, relBytes = 0;
@@ -295,13 +297,14 @@ bool ElfReader::getDynRels(std::span<Elf_Rel> &outRels) {
         Linker::Abort("failed to read %s relocs: REL %u ENT %u SZ %u", "data", relAddr,
                 relEntBytes, relBytes);
     }
-    else if(relEntBytes != sizeof(Elf_Rel)) {
-        Linker::Abort("unsupported relent size %u", relEntBytes);
+    else if(relEntBytes < sizeof(Elf_Rel)) {
+        Linker::Abort("unsupported %s relent size %u (expected %lu)", "dynamic", relEntBytes,
+                sizeof(Elf_Rel));
     }
 
     // process each relocation
     const auto numRels = relBytes / relEntBytes;
-    outRels = std::span<Elf_Rel>(reinterpret_cast<Elf_Rel *>(relAddr), numRels);
+    outRels = PaddedArray<Elf_Rel>(reinterpret_cast<Elf_Rel *>(relAddr), numRels, relEntBytes);
 
     return true;
 }
@@ -312,7 +315,7 @@ bool ElfReader::getDynRels(std::span<Elf_Rel> &outRels) {
  * @param outRels If relocations exist, set to the span encompassing all of them.
  * @return Whether there are PLT relocations to process.
  */
-bool ElfReader::getPltRels(std::span<Elf_Rel> &outRels) {
+bool ElfReader::getPltRels(PaddedArray<Elf_Rel> &outRels) {
     // get the extents of the region
     uintptr_t relAddr = 0;
     size_t relEntBytes = 0, relBytes = 0;
@@ -341,194 +344,43 @@ bool ElfReader::getPltRels(std::span<Elf_Rel> &outRels) {
         Linker::Abort("failed to read %s relocs: REL %u ENT %u SZ %u", "PLT", relAddr, relEntBytes,
                 relBytes);
     }
-    else if(relEntBytes != sizeof(Elf_Rel)) {
-        Linker::Abort("unsupported relent size %u", relEntBytes);
+    else if(relEntBytes < sizeof(Elf_Rel)) {
+        Linker::Abort("unsupported %s relent size %u (expected %lu)", "PLT", relEntBytes,
+                sizeof(Elf_Rel));
     }
 
     // process each relocation
     const auto numRels = relBytes / relEntBytes;
-    outRels = std::span<Elf_Rel>(reinterpret_cast<Elf_Rel *>(relAddr), numRels);
+    outRels = PaddedArray<Elf_Rel>(reinterpret_cast<Elf_Rel *>(relAddr), numRels, relEntBytes);
 
     return true;
 }
 
 /**
- * Processes relocations in the object.
+ * Processes relocations in the object, invoking the correct architecture's code.
  *
  * @param base An offset to add to virtual addresses of symbols to turn them into absolute addresses.
+ *
+ * @note This will need to be updated any time additional architectures are to be supported.
  */
-void ElfReader::patchRelocs(const std::span<Elf_Rel> &rels, const uintptr_t base) {
-    const SymbolMap::Symbol *symbol;
-
-    // process each relocation
-    for(const auto &rel : rels) {
-        const auto type = ELF_R_TYPE(rel.r_info);
-
-        // resolve symbol if needed
-        switch(type) {
-            // all these require symbol resolution
-            case R_386_COPY:
-            case R_386_GLOB_DAT:
-            case R_386_JMP_SLOT:
-            case R_386_32:
-            case R_386_TLS_TPOFF:
-            case R_386_TLS_DTPMOD32:
-            case R_386_TLS_DTPOFF32:
-            {
-                // translate the symbol index into a name
-                const auto symIdx = ELF32_R_SYM(rel.r_info);
-                const auto sym = this->symtab[symIdx];
-                const auto name = this->readStrtab(sym.st_name);
-                if(!name) {
-                    Linker::Abort("failed to resolve name for symbol %u (off %08x inf %08x base %08x)", symIdx,
-                            rel.r_offset, rel.r_info, base);
-                }
-
-                // resolve to symbol
-                symbol = Linker::the()->resolveSymbol(name);
-                if(!symbol) {
-                    Linker::Abort("failed to resolve symbol '%s'", name);
-                }
-                break;
-            }
-
-            // no symbol
-            default:
-                symbol = nullptr;
-                break;
-        }
-
-        // invoke the processing routine
-        switch(type) {
-            /**
-             * Reads a dword at the specified offset, and add to it our load address, then write
-             * it back.
-             *
-             * This only makes sense in shared libraries.
-             */
-            case R_386_RELATIVE: {
-                uintptr_t value = 0;
-                auto from = reinterpret_cast<void *>(base + rel.r_offset);
-                memcpy(&value, from, sizeof(uintptr_t));
-                value += base;
-                memcpy(from, &value, sizeof(uintptr_t));
-                break;
-            }
-
-            /*
-             * Copy data from the named symbol, located in a shared library, into our data segment
-             * somewhere.
-             *
-             * After the copy is completed, we override the symbol with the address of the copied
-             * data in our data segment. This way, when we perform relocations on shared objects
-             * next, they reference this one copy of the symbols, rather than the read-only
-             * 'template' of them in the library
-             */
-            case R_386_COPY: {
-                this->relocCopyFromShlib(rel, symbol);
-                Linker::the()->overrideSymbol(symbol, rel.r_offset);
-                break;
-            }
-
-            /**
-             * References global data that was previously copied into the app's data segment.
-             *
-             * This is the complement to the R_386_COPY relocation type.
-             */
-            case R_386_GLOB_DAT: {
-                auto from = reinterpret_cast<void *>(base + rel.r_offset);
-                memcpy(from, &symbol->address, sizeof(uintptr_t));
-                break;
-            }
-
-            /**
-             * Updates an entry in the PLT (jump slot) with the address of a symbol.
-             */
-            case R_386_JMP_SLOT: {
-                auto from = reinterpret_cast<void *>(base + rel.r_offset);
-                memcpy(from, &symbol->address, sizeof(uintptr_t));
-                break;
-            }
-
-            /**
-             * Write the absolute address of a resolved symbol into the offset specified.
-             */
-            case R_386_32: {
-                uintptr_t value = 0;
-                auto from = reinterpret_cast<void *>(base + rel.r_offset);
-                memcpy(&value, from, sizeof(uintptr_t));
-                value += symbol->address;
-                memcpy(from, &value, sizeof(uintptr_t));
-                break;
-            }
-
-            /**
-             * Thread-local offset for an object. When we look up the symbol, we must add to it the
-             * TLS offset for the object, which we acquire from the thread-local handler. This will
-             * produce a negative value.
-             */
-            case R_386_TLS_TPOFF: {
-                // read current TLS value
-                uintptr_t value = 0;
-                auto from = reinterpret_cast<void *>(base + rel.r_offset);
-                memcpy(&value, from, sizeof(uintptr_t));
-
-                // add to it the library's TLS offset
-                auto tls = Linker::the()->getTls();
-                auto off = tls->getLibTlsOffset(symbol->library);
-                if(!off) {
-                    Linker::Abort("Invalid TLS offset for '%s' in %s: %d", symbol->name,
-                            symbol->library->soname, off);
-                }
-
-                // XXX: do we need to subtract the exec size?
-                //Linker::Trace("Original value: %08x sym %s addr %08x", value, symbol->name, symbol->address);
-                value += off - tls->getExecSize() + symbol->address;
-                //Linker::Trace("Relocation for '%s': off %d -> %08x", symbol->name, off, value);
-
-                // write it back
-                memcpy(from, &value, sizeof(uintptr_t));
-                break;
-            }
-
-            /**
-             * Reference to a thread-local value in another object
-             *
-             * This writes the module index in which this thread-local object is defined.
-             */
-            case R_386_TLS_DTPMOD32: {
-                // get module id (in this case, the TLS offset)
-                uintptr_t value = 0;
-                auto tls = Linker::the()->getTls();
-                value = tls->getLibTlsOffset(symbol->library);
-
-                // write the value
-                auto from = reinterpret_cast<void *>(base + rel.r_offset);
-                memcpy(from, &value, sizeof(uintptr_t));
-                break;
-            }
-            /**
-             * Reference to a thread-local value in another object
-             *
-             * Writes the per-module index of a thread-local variable into the given GOT entry. In
-             * this case, it's the raw "address" of the symbol.
-             */
-            case R_386_TLS_DTPOFF32: {
-                uintptr_t value = symbol->address;
-
-                // write the value
-                auto from = reinterpret_cast<void *>(base + rel.r_offset);
-                memcpy(from, &value, sizeof(uintptr_t));
-                break;
-            }
-
-            /// unknown relocation type
-            default:
-                Linker::Abort("unsupported relocation: type %u (off %08x info %08x)",
-                        ELF32_R_TYPE(rel.r_info), rel.r_offset, rel.r_info);
-        }
+void ElfReader::patchRelocs(const PaddedArray<Elf_Rel> &rels, const uintptr_t base) {
+    switch(this->elfMachine) {
+#if defined(__i386__)
+        case EM_386:
+            return this->patchRelocsi386(rels, base);
+#endif
+#if defined(__amd64__)
+        case EM_386:
+            return this->patchRelocsi386(rels, base);
+        case EM_X86_64:
+            return this->patchRelocsAmd64(rels, base);
+#endif
+        default:
+            Linker::Abort("don't know how to patch relocations for machine $%x", this->elfMachine);
     }
 }
+
+
 /**
  * Parses all of the DT_NEEDED entries out of the provided dynamic table, and creates an entry for
  * the associated library.
@@ -615,7 +467,7 @@ void ElfReader::loadSegment(const Elf_Phdr &phdr, const uintptr_t base) {
         auto copyTo = reinterpret_cast<void *>(seg.vmStart + (phdr.p_offset % pageSz));
         this->read(phdr.p_filesz, copyTo, phdr.p_offset);
     }
-    // zero remaining area
+    // zero remaining area (XXX: technically, we can skip this as anon pages are faulted in zeroed)
     if(phdr.p_memsz > phdr.p_filesz) {
         auto zeroStart = reinterpret_cast<void *>(seg.vmStart + (phdr.p_offset % pageSz) + phdr.p_filesz);
         const auto numZeroBytes = phdr.p_memsz - phdr.p_filesz;

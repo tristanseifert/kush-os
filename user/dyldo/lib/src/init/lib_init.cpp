@@ -22,10 +22,13 @@ extern "C" void dyldo_start(const kush_task_launchinfo_t *info) {
     // handle the linking process
     Linker::init(info->loadPath);
 
+    Linker::Trace("Loading libraries");
     Linker::the()->loadLibs();
+    Linker::Trace("Fixing up segments");
     Linker::the()->doFixups();
 
     // clean up and prepare to jump to program entrypoint
+    Linker::Trace("Cleaning up");
     Linker::the()->cleanUp();
     malloc_trim(0);
 
@@ -34,7 +37,9 @@ extern "C" void dyldo_start(const kush_task_launchinfo_t *info) {
     Linker::Trace("Max alloc: %u bytes", maxAlloc);
 
     // invoke initializers, then invoke entry point
+    Linker::Trace("Invoking initializers");
     Linker::the()->runInit();
+    Linker::Trace("Jump to program entry point (info %p)", info);
     Linker::the()->jumpToEntry(info);
 }
 

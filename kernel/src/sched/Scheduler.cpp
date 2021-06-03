@@ -174,7 +174,7 @@ void Scheduler::yield() {
     const bool expired = this->updateQuantumUsed(this->running);
 
     // if thread is still runnable...
-    if(this->running->getState() == Thread::State::Runnable) {
+    if(this->running->getState() == Thread::State::Runnable && !this->running->needsToDie) {
         // adjust level if its quantum expired
         auto maxLevel = this->currentLevel;
         if(expired) maxLevel = getLevelFor(this->running);

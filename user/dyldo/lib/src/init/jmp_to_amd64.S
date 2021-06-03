@@ -1,12 +1,10 @@
 /**
- * Trampoline to jump to the program's entry point.
- *
- * This resets the registers, sets the stack back to the base, and pushes some arguments onto the
- * stack:
+ * Trampoline to jump to the program's entry point. The function is called with the standard amd64
+ * System V call semantics.
  *
  * 1. LaunchInfo struct ptr
  *
- * We're called like "void dyldo_jmp_to(uintptr_t pc, uintptr_t sp, uintptr_t arg)"
+ * We're called like "void __dyldo_jmp_to(uintptr_t pc, uintptr_t sp, uintptr_t arg)"
  */
 .globl __dyldo_jmp_to
 __dyldo_jmp_to:

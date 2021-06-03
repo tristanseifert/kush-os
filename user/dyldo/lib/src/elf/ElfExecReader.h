@@ -24,7 +24,7 @@ class ElfExecReader: public ElfReader {
         }
 
         /// Processes the given relocations.
-        void processRelocs(const std::span<Elf_Rel> &rels) override {
+        void processRelocs(const PaddedArray<Elf_Rel> &rels) override {
             this->patchRelocs(rels, 0);
         }
         /// Finds all initialization and termination functions and registers them.

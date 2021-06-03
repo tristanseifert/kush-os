@@ -60,22 +60,38 @@ Task::Task(rt::SharedPtr<vm::Map> &_map, const bool writeVm) {
  * spectacularly
  */
 Task::~Task() {
-    RW_LOCK_WRITE_GUARD(this->lock);
+    bool callerNeedsTerminate = false;
+    auto caller = Thread::current();
 
-    // remove from scheduler
-    auto ptr =  handle::Manager::getTask(this->handle);
-    GlobalState::the()->unregisterTask(ptr);
+    {
+        RW_LOCK_WRITE_GUARD(this->lock);
 
-    // terminate all remaining threads
-    for(auto thread : this->threads) {
-        thread->terminate();
+        // remove from scheduler
+        auto ptr =  handle::Manager::getTask(this->handle);
+        GlobalState::the()->unregisterTask(ptr);
+
+        // terminate all remaining threads
+        for(auto thread : this->threads) {
+            // do not terminate us just yet
+            if(thread == caller) {
+                callerNeedsTerminate = true;
+                continue;
+            }
+
+            thread->terminate();
+        }
+
+        // release the ports
+        this->ports.clear();
+
+        // invalidate the handle
+        handle::Manager::releaseTaskHandle(this->handle);
     }
 
-    // release the ports
-    this->ports.clear();
-
-    // invalidate the handle
-    handle::Manager::releaseTaskHandle(this->handle);
+    // terminate the calling thread, if needed
+    if(callerNeedsTerminate) {
+        caller->terminate();
+    }
 }
 
 /**

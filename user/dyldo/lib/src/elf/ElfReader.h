@@ -2,6 +2,7 @@
 #define DYLDO_ELF_ELFREADER_H
 
 #include "Linker.h"
+#include "struct/PaddedArray.h"
 
 #include <cstdarg>
 #include <cstdio>
@@ -47,11 +48,11 @@ class ElfReader {
         }
 
         /// Applies the given relocations.
-        virtual void processRelocs(const std::span<Elf_Rel> &rels) = 0;
+        virtual void processRelocs(const PaddedArray<Elf_Rel> &rels) = 0;
         /// Gets the dynamic (data) relocation entries
-        bool getDynRels(std::span<Elf_Rel> &outRels);
+        bool getDynRels(PaddedArray<Elf_Rel> &outRels);
         /// Gets the jump table (PLT) relocations
-        bool getPltRels(std::span<Elf_Rel> &outRels);
+        bool getPltRels(PaddedArray<Elf_Rel> &outRels);
 
         /// Gets an in-memory copy of the program headers.
         virtual bool getVmPhdrs(std::span<Elf_Phdr> &outPhdrs) {
@@ -72,7 +73,15 @@ class ElfReader {
         void parseDynamicInfo();
 
         /// Processes relocations.
-        void patchRelocs(const std::span<Elf_Rel> &rels, const uintptr_t base);
+        void patchRelocs(const PaddedArray<Elf_Rel> &rels, const uintptr_t base);
+
+#if defined(__i386__) || defined(__amd64__)
+        void patchRelocsi386(const PaddedArray<Elf_Rel> &rels, const uintptr_t base);
+#endif
+#if defined(__amd64__)
+        void patchRelocsAmd64(const PaddedArray<Elf_Rel> &rels, const uintptr_t base);
+#endif
+
 
         /// Reads a string out of the string table at the given index.
         virtual const char * _Nullable readStrtab(const size_t i);
@@ -137,6 +146,11 @@ class ElfReader {
         };
 
     protected:
+        /// ELF class
+        uint8_t elfClass = 0;
+        /// ELF machine type
+        Elf_Half elfMachine = 0;
+
         /// whether we're responsible for closing the file on dealloc
         bool ownsFile = false;
         /// file that we read from

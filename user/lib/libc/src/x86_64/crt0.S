@@ -12,14 +12,12 @@
  * We don't have a whole lot to do, since the loader has already ran all initializers and cleared
  * the .bss section. We'll simply go ahead and initialize the C library.
  *
- * When invoked, we expect a single argument on the stack: the task info structure.
+ * The address of the task info structure is passed in %rdi like a traditional function argument.
  */
 _start:
     # set up stack
-    pop         %rbx
     xor         %rbp, %rbp
-
-    mov         %rbx, __libc_task_info
+    mov         %rdi, __libc_task_info
 
     // set up the initializers and the C library
     call        __libc_init

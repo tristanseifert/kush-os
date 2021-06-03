@@ -35,10 +35,19 @@ class Linker {
     friend class ThreadLocal;
 
     public:
+#if defined(__i386__)
         /// base address for shared libraries
         constexpr static const uintptr_t kSharedLibBase = 0xA0000000;
         /// desired alignment for shared libraries
         constexpr static const uintptr_t kLibAlignment = 0x100000;
+#elif defined(__amd64__)
+        /// base address for shared libraries
+        constexpr static const uintptr_t kSharedLibBase = 0xA0000000;
+        /// desired alignment for shared libraries
+        constexpr static const uintptr_t kLibAlignment = 0x200000;
+#else
+#error Please define shared library base address for current architecture
+#endif
 
         /// system search paths
         constexpr static const std::array<const char *, 3> kDefaultSearchPaths = {
@@ -81,6 +90,9 @@ class Linker {
         void runInit();
         /// Transfers control to the entry point of the loaded program.
         [[noreturn]] void jumpToEntry(const kush_task_launchinfo_t * _Nonnull);
+
+        /// Prints all loaded libraries and their base addresses
+        void printImageBases();
 
         /// Resolves a symbol.
         const SymbolMap::Symbol* _Nullable resolveSymbol(const char *_Nonnull name,

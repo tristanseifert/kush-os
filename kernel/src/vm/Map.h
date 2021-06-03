@@ -112,6 +112,9 @@ class Map {
         int getRegionInfo(rt::SharedPtr<MapEntry> region, uintptr_t &outBase, size_t &outSize,
                 MappingFlags &outFlags);
 
+        /// Prints to the kernel debug output all entries in this mapping
+        void printMappings();
+
         /// Returns the number of installed mappings.
         const size_t numMappings() const {
             return this->entries.size();

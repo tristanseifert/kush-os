@@ -181,6 +181,11 @@ void ElfExecReader::exportInitFiniFuncs() {
             // read the value and add it to init func list
             uintptr_t addr = 0;
             memcpy(&addr, read, sizeof(uintptr_t));
+
+            // valuse of 0 or -1 are ignored
+            if(!addr || addr == -1) continue;
+
+            // otherwise, store it
             addr = this->rebaseVmAddr(addr);
 
             auto func = reinterpret_cast<void(*)(void)>(addr);

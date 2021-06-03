@@ -9,6 +9,7 @@
 
 #include "ipc/Interrupts.h"
 #include "mem/StackPool.h"
+#include "vm/Map.h"
 
 #include <arch.h>
 #include <arch/critical.h>
@@ -554,6 +555,14 @@ unhandled:;
 
     log("Unhandled fault %d in thread $%p'h (%s) info %p pc %p\n%s", (int) type, this->handle, 
             this->name, context, pc, buf);
+
+#ifndef NDEBUG
+    // page fault debugging
+    if(type == FaultType::UnhandledPagefault) {
+        this->task->vm->printMappings();
+    }
+#endif
+
     this->task->terminate(-1);
 }
 

@@ -12,6 +12,7 @@ add_executable(dyldo
     src/init/lib_init.cpp
     src/init/CppRuntime.cpp
     src/elf/ElfReader.cpp
+    src/elf/ElfReader+IntelRelocs.cpp
     src/elf/ElfExecReader.cpp
     src/elf/ElfLibReader.cpp
     src/link/SymbolMap.cpp

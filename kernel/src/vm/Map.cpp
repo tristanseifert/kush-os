@@ -396,3 +396,16 @@ bool Map::handlePagefault(const uintptr_t virtAddr, const bool present, const bo
     return region->handlePagefault(this, base, offset, present, write);
 }
 
+/**
+ * Prints all mappings in this map
+ */
+void Map::printMappings() {
+    RW_LOCK_READ_GUARD(this->lock);
+
+    log("Active mappings for map %p:", this);
+    for(const auto &leaf : this->entries) {
+        log("%p - %p: %04x object $%p'h (%04x)", leaf->address, (leaf->address + leaf->size - 1),
+                static_cast<uintptr_t>(leaf->flags), leaf->entry->getHandle(),
+                static_cast<uintptr_t>(leaf->entry->flags));
+    }
+}

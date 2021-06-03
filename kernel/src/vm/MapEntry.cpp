@@ -299,18 +299,43 @@ void MapEntry::freePage(const AnonInfoLeaf &info) {
 int MapEntry::updateFlags(const MappingFlags newFlags) {
     RW_LOCK_WRITE_GUARD(this->lock);
 
-    auto oldFlags = this->flags;
-    oldFlags &= ~MappingFlags::PermissionsMask;
-    oldFlags &= ~MappingFlags::CacheabilityMask;
+    const auto oldFlags = this->flags;
 
-    oldFlags |= newFlags;
+    // ensure we only update the permissions and cacheability fields
+    auto flags = this->flags;
+    flags &= ~MappingFlags::PermissionsMask;
+    flags &= ~MappingFlags::CacheabilityMask;
 
-    this->flags = oldFlags;
+    flags |= newFlags;
+
+    this->flags = flags;
+
+    // update mappings if flags actually changed
+    if(oldFlags != flags) {
+        this->updateExistingMappingFlags();
+    }
 
     return 0;
 }
 
 
+
+/**
+ * Updates the flags for any existing mappings.
+ *
+ * @note You must hold the lock to this entry when calling the function.
+ */
+void MapEntry::updateExistingMappingFlags() {
+    for(const auto &view : this->mappedIn) {
+        auto map = view.task->vm.get();
+
+        if(this->isAnon) {
+            this->mapAnonPages(map, view.base, view.flags, true);
+        } else {
+            this->mapPhysMem(map, view.base, view.flags, true);
+        }
+    }
+}
 
 /**
  * Callback invoked when this entry is added to a VM map.
@@ -325,24 +350,29 @@ int MapEntry::updateFlags(const MappingFlags newFlags) {
  */
 void MapEntry::addedToMap(Map *map, const rt::SharedPtr<sched::Task> &task, const uintptr_t baseAddr,
         const MappingFlags flagsMask) {
-    RW_LOCK_READ(&this->lock);
     REQUIRE(baseAddr, "failed to get base address for map entry %p", this);
 
+    // store the mapping info
+    this->mappedIn.append(ViewInfo(task, baseAddr, flagsMask));
+
     // map all allocated physical anon pages
+    RW_LOCK_WRITE_GUARD(this->lock);
     if(this->isAnon) {
-        this->mapAnonPages(map, baseAddr, flagsMask);
+        this->mapAnonPages(map, baseAddr, flagsMask, false);
     }
     // otherwise, map the whole thing
     else {
-        this->mapPhysMem(map, baseAddr, flagsMask);
+        this->mapPhysMem(map, baseAddr, flagsMask, false);
     }
-    RW_UNLOCK_READ(&this->lock);
 }
 
 /**
  * Maps all allocated physical pages.
+ *
+ * @param update Whether we're updating an existing mapping, or performing the initial mapping
  */
-void MapEntry::mapAnonPages(Map *map, const uintptr_t base, const MappingFlags mask) {
+void MapEntry::mapAnonPages(Map *map, const uintptr_t base, const MappingFlags mask,
+        const bool update) {
     int err;
 
     const auto pageSz = arch_page_size();
@@ -365,13 +395,21 @@ void MapEntry::mapAnonPages(Map *map, const uintptr_t base, const MappingFlags m
         err = map->add(info->physAddr, pageSz, vmAddr, mode);
         REQUIRE(!err, "failed to map vm object %p ($%08x'h) addr $%08x %d", this, this->handle,
                 vmAddr, err);
+
+        // flush TLB if not initial mapping
+        if(update) {
+            arch::InvalidateTlb(vmAddr);
+        }
     }
 }
 
 /**
  * Maps the entire underlying physical memory range.
+ *
+ * @param update Whether we're updating an existing mapping, or performing the initial mapping
  */
-void MapEntry::mapPhysMem(Map *map, const uintptr_t base, const MappingFlags mask) {
+void MapEntry::mapPhysMem(Map *map, const uintptr_t base, const MappingFlags mask,
+        const bool update) {
     int err;
 
     // determine flags
@@ -389,13 +427,6 @@ void MapEntry::mapPhysMem(Map *map, const uintptr_t base, const MappingFlags mas
     REQUIRE(!err, "failed to map vm object %p ($%p'h) %d", this, this->handle, err);
 }
 
-struct RemoveCtxInfo {
-    MapEntry *entry;
-    Map *map;
-
-    RemoveCtxInfo(MapEntry *_entry, Map *_map) : entry(_entry), map(_map) {};
-};
-
 
 
 /**
@@ -410,11 +441,16 @@ struct RemoveCtxInfo {
  */
 void MapEntry::removedFromMap(Map *map, const rt::SharedPtr<sched::Task> &task,
         const uintptr_t base, const size_t length) {
-    RemoveCtxInfo info(this, map);
+    RW_LOCK_WRITE_GUARD(this->lock);
 
     // remove it from the provided map
     int err = map->remove(base, length);
     REQUIRE(!err, "failed to unmap vm object: %d", err);
+
+    // remove the view info object
+    this->mappedIn.removeMatching([](void *task, ViewInfo &view) -> bool {
+        return (view.task.get() == task);
+    }, task.get());
 
     // TODO: find new task to transfer ownership of pages to
     /*sched::Task *newOwner = nullptr;
@@ -431,8 +467,6 @@ void MapEntry::removedFromMap(Map *map, const rt::SharedPtr<sched::Task> &task,
     if(newOwner) {
         __atomic_add_fetch(&newOwner->physPagesOwned, owned, __ATOMIC_RELAXED);
     }*/
-
-    RW_UNLOCK_WRITE(&this->lock);
 }
 
 

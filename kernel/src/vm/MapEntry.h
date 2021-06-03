@@ -6,6 +6,7 @@
 #include <bitflags.h>
 #include <runtime/SmartPointers.h>
 #include <runtime/RedBlackTree.h>
+#include <runtime/List.h>
 #include <handle/Manager.h>
 
 #include <arch/rwlock.h>
@@ -160,6 +161,19 @@ class MapEntry {
                 physAddr(phys) {}
         };
 
+        /**
+         * Information on a view that's added to a virtual memory map.
+         */
+        struct ViewInfo {
+            rt::SharedPtr<sched::Task> task;
+            uintptr_t base = 0;
+            const MappingFlags flags = MappingFlags::None;
+
+            ViewInfo() = default;
+            ViewInfo(const rt::SharedPtr<sched::Task> &_task, const uintptr_t _base,
+                    const MappingFlags _flags) : task(_task), base(_base), flags(_flags) {}
+        };
+
     private:
         /// Attempt to handle a page fault for the virtual address
         bool handlePagefault(Map *map, const uintptr_t base, const uintptr_t offset, 
@@ -168,13 +182,16 @@ class MapEntry {
     private:
         static void initAllocator();
 
+        /// Updates the flags of any pages that have already been mapped.
+        void updateExistingMappingFlags();
+
         /// The entry was added to a mapping.
         void addedToMap(Map *, const rt::SharedPtr<sched::Task> &, const uintptr_t base,
                 const MappingFlags flagsMask = MappingFlags::None);
         /// Maps all physical pages we've allocated (for anonymous mappings)
-        void mapAnonPages(Map *, const uintptr_t, const MappingFlags);
+        void mapAnonPages(Map *, const uintptr_t, const MappingFlags, const bool);
         /// Directly maps the underlying physical page.
-        void mapPhysMem(Map *, const uintptr_t, const MappingFlags);
+        void mapPhysMem(Map *, const uintptr_t, const MappingFlags, const bool);
 
         /// The entry was removed from a mapping.
         void removedFromMap(Map *, const rt::SharedPtr<sched::Task> &, const uintptr_t,
@@ -208,6 +225,11 @@ class MapEntry {
          * All physical memory pages owned by this map
          */
         rt::RedBlackTree<AnonInfoLeaf> pages;
+
+        /**
+         * Listing of all virtual memory maps that have a view into this entry.
+         */
+        rt::List<ViewInfo> mappedIn;
 
         /**
          * Task that originally created this mapping, and is considered as the "owner" of the
