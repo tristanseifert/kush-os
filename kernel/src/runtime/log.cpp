@@ -47,6 +47,8 @@ static void _outchar_panic(char ch, void *ctx) {
  * platform code.
  */
 void log(const char *format, ...) {
+    const auto lastIrql = platform_raise_irql(platform::Irql::CriticalSection, false);
+
     va_list va;
     va_start(va, format);
 
@@ -56,6 +58,8 @@ void log(const char *format, ...) {
     va_end(va);
 
     platform_debug_spew('\n');
+
+    platform_lower_irql(lastIrql);
 }
 
 /**

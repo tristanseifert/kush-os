@@ -39,7 +39,7 @@ IrqRegistry::IrqRegistry(Idt *_idt) : idt(_idt) {
 
         // determine what IRQ stack to use
         auto stack = Idt::Stack::Stack6;
-        if(vec == 0x20) { // IPIs in range of [0x20, 0x27]
+        if(vec >= 0x20 && vec < kSchedulerVectorMax) { // IPIs in range of [0x20, 0x27]
             stack = Idt::Stack::None;
         }
 
@@ -54,6 +54,9 @@ void IrqRegistry::handle(const uintptr_t vector) {
     // ensure it's in bounds
     REQUIRE(vector >= kVectorMin && vector <= kVectorMax, "invalid vector number: %3u", vector);
 
+    // select irql
+    const auto oldIrql = platform_raise_irql((vector <= kSchedulerVectorMax) ? platform::Irql::Scheduler : platform::Irql::DeviceIrq);
+
     // find and execute handler if installed
     const auto &handler = this->registrations[vector - kVectorMin];
     if(handler.function) {
@@ -63,6 +66,9 @@ void IrqRegistry::handle(const uintptr_t vector) {
     else {
         log("got irq %3u, but no handlers installed!", vector);
     }
+
+    // restore irql
+    platform_lower_irql(oldIrql);
 }
 
 /**

@@ -7,7 +7,6 @@
 #include "IdleWorker.h"
 
 #include "vm/Map.h"
-#include "mem/SlabAllocator.h"
 
 #include <arch/critical.h>
 #include <arch/rwlock.h>
@@ -20,11 +19,6 @@
 using namespace sched;
 
 rt::SharedPtr<Task> sched::gKernelTask = nullptr;
-
-/// rwlock for the global list of scheduler instances (across all cores)
-DECLARE_RWLOCK_S(gSchedulersLock);
-/// list of all scheduler instances
-rt::Vector<Scheduler::InstanceInfo> *Scheduler::gSchedulers = nullptr;
 
 /**
  * Default configuration for the 32 levels the scheduler is currently configured with. The top
@@ -86,56 +80,19 @@ Scheduler *Scheduler::get() {
     // return arch::PerCpuInfo::scheduler();
 }
 
-
 /**
  * Sets up the scheduler.
  */
-Scheduler::Scheduler() {
-    this->ipi = new IpiInfo;
-    this->coreId = arch::GetProcLocal()->getCoreId();
-
+Scheduler::Scheduler() : coreId(arch::GetProcLocal()->getCoreId()), peers(PeerList(this)) {
     this->idle = new IdleWorker(this);
-
-    // insert into the global list of schedulers
-    InstanceInfo info(this);
-    info.coreId = arch::GetProcLocal()->getCoreId();
-
-    RW_LOCK_WRITE(&gSchedulersLock);
-    if(!gSchedulers) {
-        gSchedulers = new rt::Vector<InstanceInfo>;
-    }
-
-    gSchedulers->push_back(info);
-    RW_UNLOCK_WRITE(&gSchedulersLock);
-
-    // initialization is done. ensure other schedulers update their peer lists
-    invalidateAllPeerList(this);
 }
 
 /**
  * Tears down the idle worker.
  */
 Scheduler::~Scheduler() {
-    // remove the scheduler from the global list
-    RW_LOCK_WRITE(&gSchedulersLock);
-
-    for(size_t i = 0; i < gSchedulers->size(); i++) {
-        const auto &info = (*gSchedulers)[i];
-        if(info.instance != this) continue;
-
-        gSchedulers->remove(i);
-        break;
-    }
-
-    RW_UNLOCK_WRITE(&gSchedulersLock);
-
     // clean up any worker threads we've spawned
     delete this->idle;
-
-    // clean up some other resources
-    invalidateAllPeerList(this);
-
-    delete this->ipi;
 }
 
 
@@ -161,45 +118,22 @@ void Scheduler::threadWasCreated(Thread &t) {
  * runnable thread and switch to it.
  */
 void Scheduler::run() {
-    // set up the timer
-    platform::SetLocalTimer(1000000000ULL / this->tickRate, true);
+    rt::SharedPtr<Thread> thread;
 
-    // pick the first thread...
-    auto thread = this->findRunnableThread();
-    REQUIRE(thread, "no runnable threads");
+    // configure the scheduler timer
+    platform_raise_irql(platform::Irql::Scheduler);
+    this->timerUpdate();
 
-    // switch to it
+    // find runnable thread (or idle thread) and switch to it
+    thread = this->findRunnableThread();
+    if(!thread) {
+        thread = this->idle->thread;
+    }
+
     this->switchTo(thread);
 
     // we should NEVER get here
-    panic("Scheduler::switchToRunnable() returned (this should never happen)");
-}
-
-
-
-/**
- * Schedules all threads in the given task that aren't already scheduled. Any threads that are in
- * the paused state will become runnable. (Other states aren't changed.)
- */
-void Scheduler::scheduleRunnable(const rt::SharedPtr<Task> &task) {
-    // TODO: check which threas are scheduled already
-
-    RW_LOCK_READ_GUARD(task->lock);
-    for(auto &thread : task->threads) {
-        // become runnable if needed
-        if(thread->state == Thread::State::Paused) {
-            thread->setState(Thread::State::Runnable);
-        }
-
-        // if thread is runnable, add it to the run queue
-        if(thread->state != Thread::State::Runnable) continue;
-        this->schedule(thread);
-    }
-
-    // register the task with the global state if needed
-    if(!__atomic_test_and_set(&task->registered, __ATOMIC_RELAXED)) {
-        GlobalState::the()->registerTask(task);
-    }
+    panic("Scheduler::switchTo() returned (this should never happen)");
 }
 
 /**
@@ -207,8 +141,7 @@ void Scheduler::scheduleRunnable(const rt::SharedPtr<Task> &task) {
  * than the currently executing one, an immediate context switch is performed.
  *
  * @param t Thread to switch to
- * @param shouldSwitch Whether the context switch should be performed by the scheduler. An ISR may
- * want to perform some cleanup before a context switch is initiated.
+ * @param shouldSwitch Whether the context switch should be performed by the scheduler invoked IPI
  *
  * @return Whether we successfully added the thread to the appropriate run queue (0) or not
  */
@@ -217,41 +150,65 @@ int Scheduler::markThreadAsRunnable(const rt::SharedPtr<Thread> &t, const bool s
         return err;
     }
 
-    // TODO: perform context switch (if requested)
-    if(shouldSwitch) {
-        auto next = this->findRunnableThread();
-
-        // switch to that thread
-        if(next == this->running) {
-            this->switchTo(this->running, true);
-            this->timer.start(Oclock::Type::ThreadKernel);
-        } else if(next) {
-            this->switchTo(next);
-        }
+    // if this thread is higher priority, take an IPI (so we can context switch)
+    if(shouldSwitch && this->currentLevel >= getLevelFor(t)) {
+        this->sendIpi();
     }
 
     return 0;
 }
 
+
+
 /**
  * Gives up the remainder of the current thread's time quantum.
- *
- * TODO: Is this right? Currently if there's no runnable threads we'll become idle immediately, or
- * go down the next priority level, rather than returning directly to the current thread. This is
- * because the thread isn't actually rescheduled until it's actually context switched out.
  */
 void Scheduler::yield(const Thread::State state) {
-    // find the next runnable thread
-    auto runnable = this->findRunnableThread();
+    rt::SharedPtr<Thread> to;
 
-    // perform context switch to next runnable (if one was found)
-    if(runnable) {
-        this->switchTo(runnable);
+    // raise irql to prevent preemption and update time accounting
+    const auto oldIrql = platform_raise_irql(platform::Irql::Scheduler);
+    const bool expired = this->updateQuantumUsed(this->running);
+
+    // if thread is still runnable...
+    if(this->running->getState() == Thread::State::Runnable) {
+        // adjust level if its quantum expired
+        auto maxLevel = this->currentLevel;
+        if(expired) maxLevel = getLevelFor(this->running);
+
+        // and ensure it stays in bounds
+        if(maxLevel >= kNumLevels) {
+            maxLevel = kNumLevels - 1;
+        }
+
+        // are there any higher priority threads runnable?
+        for(size_t i = 0; i <= maxLevel; i++) {
+            const auto &level = this->levels[i];
+
+            // if so, switch to it
+            if(!level.storage.empty()) {
+                // but first, ensure we'll be scheduled again later by placing us on the run queue
+                if(int err = this->schedule(this->running)) {
+                    panic("failed to schedule $%p'h: %d", this->running->getHandle(), err);
+                }
+
+                goto beach;
+            }
+        }
+
+        // if we get here, they aren't. so, we can just return after lowering irql
+        this->timer.start(Oclock::Type::ThreadKernel);
+        return platform_lower_irql(oldIrql);
     }
-    // no runnable thread, so go start the idle worker
-    else {
-        this->switchTo(this->idle->thread);
-    }
+    // if not, simply pick the next thread (or idle)
+beach:;
+    to = this->findRunnableThread();
+    if(!to) to = this->idle->thread;
+
+    // switch to the destination thread
+    this->switchTo(to);
+
+    // when a thread returns, IRQL is back at Passive level. so no need to lower manually
 }
 
 /**
@@ -304,10 +261,8 @@ again:;
              * having to go through the entire run queue to remove this thread.
              */
             else if(thread->state != Thread::State::Runnable) {
-                if(kLogQueueOps) {
-                    log("sched pull %p (%d) from %lu (ignored)", static_cast<void *>(thread),
-                            static_cast<int>(thread->state), i);
-                }
+                log("sched pull %p (%d) from %lu (ignored)", static_cast<void *>(thread),
+                        static_cast<int>(thread->state), i);
                 goto again;
             }
 
@@ -349,27 +304,23 @@ again:;
  *
  * @param updateQuantum Whether we bother updating the thread's time quantum
  */
-int Scheduler::schedule(const rt::SharedPtr<Thread> &thread, const bool updateQuantum) {
+int Scheduler::schedule(const rt::SharedPtr<Thread> &thread) {
     auto &sched = thread->sched;
     const auto levelNum = this->getLevelFor(thread);
     auto &level = this->levels[levelNum];
 
-    // we may need to update the thread's time quantum
-    if(updateQuantum) {
-        // the level had to have changed
-        if(levelNum != sched.lastLevel || !sched.quantumTotal) {
-            this->updateQuantumLength(thread);
-            sched.lastLevel = levelNum;
-        }
+    // the level had to have changed
+    if(levelNum != sched.lastLevel || !sched.quantumTotal) {
+        this->updateQuantumLength(thread);
+        sched.lastLevel = levelNum;
     }
 
     // do not schedule the idle thread
     if(TestFlags(sched.flags & SchedulerThreadDataFlags::Idle)) {
         return 1;
     }
-
     // do not actually push it on the run queue if not schedulable
-    if(TestFlags(sched.flags & SchedulerThreadDataFlags::DoNotSchedule)) {
+    else if(TestFlags(sched.flags & SchedulerThreadDataFlags::DoNotSchedule)) {
         return 1;
     }
 
@@ -381,9 +332,8 @@ int Scheduler::schedule(const rt::SharedPtr<Thread> &thread, const bool updateQu
     }
     __atomic_fetch_add(&this->levelEpoch, 1, __ATOMIC_RELAXED);
 
-    if(kLogQueueOps) {
-        log("sched push %p (%d)   to %lu", static_cast<void *>(thread), static_cast<int>(thread->state),
-                levelNum);
+    if(levelNum < this->maxScheduledLevel) {
+        this->maxScheduledLevel = levelNum;
     }
 
     return 0;
@@ -408,13 +358,9 @@ size_t Scheduler::getLevelFor(const rt::SharedPtr<Thread> &thread) {
 
 /**
  * Switches to the given thread.
- *
- * @param fake When set, we skip the actual context switch part. Useful if the same thread simply
- *             gets an extension on its quantum, for example.
  */
-void Scheduler::switchTo(const rt::SharedPtr<Thread> &thread, const bool fake) {
-    // finally, perform context switch
-    if(!fake) thread->switchTo();
+void Scheduler::switchTo(const rt::SharedPtr<Thread> &thread) {
+    thread->switchTo();
 }
 
 
@@ -426,23 +372,87 @@ void Scheduler::switchTo(const rt::SharedPtr<Thread> &thread, const bool fake) {
  * @note This is invoked from an interrupt context; it is not allowed to block.
  */
 void Scheduler::timerFired() {
-    bool needsIpi = false;
+    bool preempted = false;
+    this->maxScheduledLevel = kNumLevels;
 
-    // update running thread's quantum
+    platform::StopLocalTimer();
+
+    /*
+     * Update the currently running thread's time quantum, and set the preemption flag if it has
+     * consumed it all.
+     */
     if(this->updateQuantumUsed(this->running)) {
-        // entire quantum used so preempt it
         this->running->sched.preempted = true;
-        needsIpi = true;
+        preempted = true;
     }
 
     // process any deadlines that expired already / expire soon
-    needsIpi = this->processDeadlines() ? true : needsIpi;
+    this->processDeadlines();
 
-    // send IPI if needed
-    if(needsIpi) {
+    /*
+     * Send an IPI if the currently running thread needs to be preempted, or whether a deadline
+     * scheduled a thread with a higher priority than the current one.
+     *
+     * If no IPI is needed, update the timer and return. The IPI will take care of updating the
+     * timer interval in that case.
+     */
+    if(preempted || this->currentLevel >= this->maxScheduledLevel) {
+        log("preempt? %c %lu/%lu -> IPI", preempted ? 'Y' : 'N', this->currentLevel, this->maxScheduledLevel);
         this->sendIpi();
+    } else {
+        log("preempt? %c %lu/%lu -> timer update", preempted ? 'Y' : 'N', this->currentLevel, this->maxScheduledLevel);
+        this->timerUpdate();
     }
 }
+
+/**
+ * Sets the platform timer interval to the minimum of the time to the next deadline or the current
+ * thread being preempted.
+ */
+void Scheduler::timerUpdate() {
+    uint64_t quantumRemaining = kIdleWakeupInterval;
+
+    // calculate remaining quantum
+    /*if(this->running) [[likely]] {
+        auto &sched = this->running->sched;
+
+        if(TestFlags(sched.flags & SchedulerThreadDataFlags::Idle)) [[unlikely]] {
+            quantumRemaining = kIdleWakeupInterval;
+        } else {
+            quantumRemaining = sched.quantumTotal - sched.quantumUsed;
+        }
+    }*/
+
+    // find the nearest deadline
+    auto deadline = UINTPTR_MAX;
+    const auto now = platform_timer_now();
+
+    {
+        RW_LOCK_READ_GUARD(this->deadlinesLock);
+
+        if(!this->deadlines.empty()) {
+            // is the front deadline expired/close to expiring?
+            const auto &next = this->deadlines.min();
+            const auto expires = next.expires();
+
+            if(expires <= now) { // already expired
+                deadline = 0;
+            } else { // expires in the future
+                deadline = expires - now;
+            }
+        }
+    }
+
+    // whichever is sooner, set a timer for it
+    uint64_t interval = (deadline < quantumRemaining) ? deadline : quantumRemaining;
+
+    // make sure it's at least the min interval
+    interval = (interval > this->timerMinInterval) ? interval : this->timerMinInterval;
+
+    platform::SetLocalTimer(interval);
+}
+
+
 
 /**
  * Enqueues a scheduler IPI, updating the IPI status flags as needed.
@@ -464,10 +474,7 @@ void Scheduler::sendIpi() {
 
 /**
  * Scheduler IPI has been fired. This can be in response to either a thread needing to be
- * preempted, or to wake it from idle.
- *
- * The precise actions to take are available in the IPI status struct, which is allocated
- * separately so it's cache line aligned.
+ * preempted, to wake it from idle, or because a higher priority thread was made runnable.
  *
  * On amd64, we expect this to be called with the current thread's kernel stack already active; we
  * accmplish this by not using an interrupt stack, but rather, the legacy interrupt stack switch
@@ -480,22 +487,31 @@ void Scheduler::sendIpi() {
  * @param ackCtx Arbitrary pointer passed to acknowledgement function
  */
 void Scheduler::handleIpi(void (*ackIrq)(void *), void *ackCtx) {
-    // process unblocked threads
+    this->maxScheduledLevel = kNumLevels;
+
+    // process unblocked threads (from deadlines, etc.)
     this->processUnblockedThreads();
+
+    // if current thread is still runnable, insert it to run queue
+    if(this->running->getState() == Thread::State::Runnable) {
+        this->schedule(this->running);
+    }
 
     // pick the next highest priority thread and switch to it
     auto next = this->findRunnableThread();
 
     if(next == this->running) {
-        // this thread is still highest priority. restart the counter and update timer
-        this->switchTo(this->running, true);
+        // current thread is still highest priority; update scheduler timer and accounting
+        this->timerUpdate();
         this->timer.start(Oclock::Type::ThreadKernel);
 
         return ackIrq(ackCtx);
-    } else if(!next) {
-        // there are no runnable threads anymore, go and become idle (if not already)
+    } 
+    // no runnable threads, so run idle thread
+    else if(!next) {
+        // we're already idle, so update its accounting
         if(this->running == this->idle->thread) {
-            this->switchTo(this->running, true);
+            this->timerUpdate();
             this->timer.start(Oclock::Type::ThreadKernel);
 
             return ackIrq(ackCtx);
@@ -511,61 +527,17 @@ void Scheduler::handleIpi(void (*ackIrq)(void *), void *ackCtx) {
 }
 
 
-/**
- * Calculates how many nanoseconds the given thread has received, adds it to its consumed quantum
- * allocation, and if necessary, moves it down to a lower priority queue if it used up its entire
- * time quantum.
- *
- * @note It's assumed that the timer was started when the given thread was switched in; there is
- *       nothing to actually ensure this though.
- *
- * @param thread Thread to account against
- *
- * @return Whether the thread's quantum has expired
- */
-bool Scheduler::updateQuantumUsed(const rt::SharedPtr<Thread> &thread) {
-    bool expired = false;
-
-    // stop timer and read out
-    this->timer.stop();
-    const auto nsec = this->timer.reset(Oclock::Type::ThreadKernel);
-
-    // add it to the total quantum used by the thread
-    auto &sched = thread->sched;
-
-    sched.cpuTime += nsec;
-
-    auto used = sched.quantumUsed + nsec;
-    if(used > sched.quantumTotal) {
-        // it used the entire quantum, decrement its priority
-        if(++sched.level >= kNumLevels) {
-            sched.level = (kNumLevels - 1);
-        }
-
-        // set up time quantum for the next lowest level
-        // XXX: this can still be greater than the quantum length?
-        sched.quantumUsed = used - sched.quantumTotal;
-        this->updateQuantumLength(thread);
-
-        expired = true;
-    }
-    // only part of the quantum was used
-    else {
-        sched.quantumUsed = used;
-    }
-
-    return expired;
-}
 
 /**
  * A thread has been unblocked, so add it to the list of newly runnable threads.
  *
  * This list is consulted during each scheduler invocation, and any threads in it are tested to see
  * if they should run again; if so, they're inserted in to the appropriate run queues.
+ *
+ * If the unblocked thread is higher (or equal) in priority to the currently executing thread, an
+ * IPI is taken immediately and the thread will likely be switched to.
  */
 void Scheduler::threadUnblocked(const rt::SharedPtr<Thread> &thread) {
-    DECLARE_CRITICAL();
-
     // ensure it's in a valid state
     switch(thread->state) {
         case Thread::State::Sleeping:
@@ -580,16 +552,16 @@ void Scheduler::threadUnblocked(const rt::SharedPtr<Thread> &thread) {
                     thread->getHandle(), thread->tid, static_cast<int>(thread->state));
     }
 
-    CRITICAL_ENTER();
     {
         if(!this->unblocked.insert(thread)) {
             panic("unblock list overflow");
         }
     }
-    CRITICAL_EXIT();
 
-    // request IPI
-    this->sendIpi();
+    // request IPI (if the unblocked thread is at the same or higher priority level)
+    if(this->currentLevel >= getLevelFor(thread)) {
+        this->sendIpi();
+    }
 }
 
 /**
@@ -623,9 +595,13 @@ void Scheduler::processUnblockedThreads() {
     }
 }
 
+
+
 /**
  * A thread is being context switched out. We'll stop the appropriate time counters and figure out
  * how much of the time quantum the thread spent executing.
+ *
+ * @note Called from the context switch routine. No blocking or critical sections allowed!
  */
 void Scheduler::willSwitchFrom(const rt::SharedPtr<Thread> &from) {
     auto &sched = from->sched;
@@ -634,16 +610,22 @@ void Scheduler::willSwitchFrom(const rt::SharedPtr<Thread> &from) {
         sched.preempted = false;
     }
     this->updateQuantumUsed(from);
-
-    // place this back on the run queue (if still runnable)
-    if(from->state == Thread::State::Runnable && !from->needsToDie) {
-        this->schedule(from);
-    }
-
-    if(kLogQuantum) {
-        log("executed '%s' for %lu/%lu nsec", from->name, sched.quantumUsed, sched.quantumTotal);
-    }
 }
+
+/**
+ * The thread is about to start executing on the processor. Start the thread execution time.
+ *
+ * @note Called from the context switch routine. No blocking or critical sections allowed!
+ */
+void Scheduler::willSwitchTo(const rt::SharedPtr<Thread> &to) {
+    // update scheduler timer
+    this->timerUpdate();
+
+    // start time accounting
+    this->timer.start(Oclock::Type::ThreadKernel);
+}
+
+
 
 /**
  * Updates the total length of a task's time quantum.
@@ -663,11 +645,52 @@ void Scheduler::updateQuantumLength(const rt::SharedPtr<Thread> &thread) {
 }
 
 /**
- * The thread is about to start executing on the processor. Start the thread execution time.
+ * Calculates how many nanoseconds the given thread has received, adds it to its consumed quantum
+ * allocation, and if necessary, moves it down to a lower priority queue if it used up its entire
+ * time quantum.
+ *
+ * @note It's assumed that the timer was started when the given thread was switched in; there is
+ *       nothing to actually ensure this though.
+ *
+ * @param thread Thread to account against
+ *
+ * @return Whether the thread's quantum has expired
  */
-void Scheduler::willSwitchTo(const rt::SharedPtr<Thread> &to) {
-    this->timer.start(Oclock::Type::ThreadKernel);
+bool Scheduler::updateQuantumUsed(const rt::SharedPtr<Thread> &thread) {
+    bool expired = false;
+
+    // stop timer and read out
+    this->timer.stop();
+    const auto nsec = this->timer.reset(Oclock::Type::ThreadKernel);
+
+    // add it to the total quantum used by the thread
+    auto &sched = thread->sched;
+
+    sched.cpuTime += nsec;
+
+    auto used = sched.quantumUsed + nsec;
+    if(used > sched.quantumTotal) {
+        // it used the entire quantum, decrement its priority
+        sched.lastLevel = sched.level;
+        if(++sched.level >= kNumLevels) {
+            sched.level = (kNumLevels - 1);
+        }
+
+        // set up time quantum for the next lowest level
+        // XXX: this can still be greater than the quantum length?
+        sched.quantumUsed = used - sched.quantumTotal;
+        this->updateQuantumLength(thread);
+
+        expired = true;
+    }
+    // only part of the quantum was used
+    else {
+        sched.quantumUsed = used;
+    }
+
+    return expired;
 }
+
 
 
 /**
@@ -710,21 +733,32 @@ bool Scheduler::processDeadlines() {
  * Adds a new deadline for the scheduler to consider.
  */
 void Scheduler::addDeadline(const rt::SharedPtr<Deadline> &deadline) {
-    DECLARE_CRITICAL();
+    const auto oldIrql = platform_raise_irql(platform::Irql::Scheduler);
 
     DeadlineWrapper wrap(deadline);
+    bool needTimerUpdate = true;
 
     if(kLogDeadlines) {
         log("adding deadline: %p (%lu %lu) %p", static_cast<void *>(deadline),
                 deadline->expires, wrap.expires(), &deadline->expires);
     }
 
-    CRITICAL_ENTER();
+    // modify deadlines and determine if timer needs update
     {
         RW_LOCK_WRITE_GUARD(this->deadlinesLock);
+
+        if(!this->deadlines.empty()) {
+            needTimerUpdate = this->deadlines.min() > wrap;
+        }
+
         this->deadlines.insert(wrap);
     }
-    CRITICAL_EXIT();
+
+    // update timer (if needed) and restore irql
+    if(needTimerUpdate) {
+        this->timerUpdate();
+    }
+    platform_lower_irql(oldIrql);
 }
 
 /**
@@ -733,7 +767,9 @@ void Scheduler::addDeadline(const rt::SharedPtr<Deadline> &deadline) {
  * @return Whether the given deadline was found and removed
  */
 bool Scheduler::removeDeadline(const rt::SharedPtr<Deadline> &deadline) {
-    DECLARE_CRITICAL();
+    bool needTimerUpdate;
+    const auto oldIrql = platform_raise_irql(platform::Irql::Scheduler);
+
     if(kLogDeadlines) {
         log("removing deadline: %p", static_cast<void *>(deadline));
     }
@@ -749,9 +785,10 @@ bool Scheduler::removeDeadline(const rt::SharedPtr<Deadline> &deadline) {
     RemoveInfo info(deadline);
 
     // enumerate over all the objects
-    CRITICAL_ENTER();
     {
         RW_LOCK_WRITE_GUARD(this->deadlinesLock);
+
+        const auto oldMinExpires = this->deadlines.min().expires();
 
         this->deadlines.enumerateObjects([](DeadlineWrapper &wrap, bool *remove, void *ctx) -> bool {
             auto info = reinterpret_cast<RemoveInfo *>(ctx);
@@ -765,78 +802,16 @@ bool Scheduler::removeDeadline(const rt::SharedPtr<Deadline> &deadline) {
             // continue iterating
             return true;
         }, &info);
+
+        needTimerUpdate = this->deadlines.min().expires() != oldMinExpires;
     }
-    CRITICAL_EXIT();
+
+    // lower irql again
+    if(needTimerUpdate) {
+        this->timerUpdate();
+    }
+    platform_lower_irql(oldIrql);
 
     return (info.numRemoved != 0);
 }
-
-
-
-
-/**
- * Iterates over the list of all schedulers and marks their peer lists as dirty. This will cause
- * that core to recompute its peers next time it becomes idle and needs to steal work.
- *
- * @param skip Scheduler instance to skip marking as having an invalid peer list
- */
-void Scheduler::invalidateAllPeerList(Scheduler *skip) {
-    RW_LOCK_READ(&gSchedulersLock);
-
-    for(const auto &info : *gSchedulers) {
-        auto sched = info.instance;
-        if(sched == skip) continue;
-
-        sched->invalidatePeerList();
-    }
-
-    RW_UNLOCK_READ(&gSchedulersLock);
-}
-
-/**
- * Iterates the list of all schedulers, and produces a version of this sorted in ascending order by
- * the cost of moving a thread from that core. This is used for work stealing.
- *
- * Sorting is by means of an insertion sort. This doesn't scale very well but even for pretty
- * ridiculous core counts this should not be too terribly slow; especially considering this code
- * runs very, very rarely, and even then, only when the core is otherwise idle.
- *
- * @note This may only be called from the core that owns this scheduler, as this is the only core
- * that may access the peer list.
- */
-void Scheduler::buildPeerList() {
-    // clear the old list of peers
-    this->peers.clear();
-
-    RW_LOCK_READ_GUARD(gSchedulersLock);
-    const auto numSchedulers = gSchedulers->size();
-
-    // if only one core, we have no peers
-    if(numSchedulers == 1) return;
-    this->peers.reserve(numSchedulers - 1);
-
-    // iterate over list of peers to copy the infos and insert in sorted order
-    const auto myId = arch::GetProcLocal()->getCoreId();
-
-    for(const auto &info : *gSchedulers) {
-        const auto cost = platform_core_distance(myId, info.coreId);
-
-        // find index to insert at; it goes immediately before the first with a HIGHER cost
-        size_t i = 0;
-        for(i = 0; i < this->peers.size(); i++) {
-            const auto &peer = this->peers[i];
-
-            if(cost <= platform_core_distance(myId, peer.coreId)) goto beach;
-        }
-
-beach:;
-        // actually insert it
-        this->peers.insert(i, info);
-    }
-
-    // clear the dirty flag
-    __atomic_clear(&this->peersDirty, __ATOMIC_RELAXED);
-}
-
-
 

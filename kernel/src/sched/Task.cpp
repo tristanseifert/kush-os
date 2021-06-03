@@ -258,6 +258,29 @@ rt::SharedPtr<Task> Task::current() {
 }
 
 /**
+ * Schedules all threads newly added to this task, and registers the task with the global scheduler
+ * state info.
+ */
+void Task::launch() {
+    RW_LOCK_READ_GUARD(this->lock);
+    for(auto &thread : this->threads) {
+        // become runnable if needed
+        if(thread->state == Thread::State::Paused) {
+            thread->setState(Thread::State::Runnable);
+        }
+
+        // if thread is runnable, add it to the run queue
+        if(thread->state != Thread::State::Runnable) continue;
+        Scheduler::get()->markThreadAsRunnable(thread, false);
+    }
+
+    // register the task with the global state if needed
+    if(!__atomic_test_and_set(&this->registered, __ATOMIC_RELAXED)) {
+        GlobalState::the()->registerTask(this->sharedFromThis());
+    }
+}
+
+/**
  * Inserts the given port to the task's port list. All ports that remain in this list when the
  * task is released will be released as well.
  */

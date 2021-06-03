@@ -5,6 +5,7 @@
 #define TS_OFF_STACKTOP                 0
 #define TS_OFF_FPU_ENABLED              8
 #define TS_OFF_FXSAVE                   16
+#define TS_OFF_REGS                     24
 
 #ifndef ASM_FILE
 #include <stddef.h>
@@ -12,6 +13,20 @@
 #include <string.h>
 
 namespace arch {
+/**
+ * Registers for a kernel thread as saved on the stack.
+ */
+struct CpuRegs {
+    // registers added for 64-bit mode
+    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
+    // basic registers (in common with 32-bit mode, in same order as PUSHA)
+    uint64_t rdi, rsi, rbp, rbx, rdx, rcx, rax;
+    // CPU flags
+    uint64_t rflags;
+    // instruction pointer/return address
+    uint64_t rip;
+} __attribute__((packed));
+
 /**
  * Processor state for an x86_64 thread.
  * 
@@ -32,6 +47,9 @@ struct ThreadState {
     bool fpuEnabled = false;
     /// pointer to FPU data area (must be 16 byte aligned)
     void *fxsave = nullptr;
+
+    /// saved thread state
+    CpuRegs saved;
 
     /// number of times we've taken an FPU fault in this thread
     size_t fpuFaults = 0;
@@ -189,19 +207,6 @@ struct TaskState {
         }
 };
 
-/**
- * Registers for a kernel thread as saved on the stack.
- */
-struct CpuRegs {
-    // registers added for 64-bit mode
-    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
-    // basic registers (in common with 32-bit mode, in same order as PUSHA)
-    uint64_t rdi, rsi, rbp, rbx, rdx, rcx, rax;
-    // CPU flags
-    uint64_t rflags;
-    // instruction pointer/return address
-    uint64_t rip;
-} __attribute__((packed));
 }
 
 // ensure the manually defined offsets are right
@@ -209,6 +214,7 @@ static_assert(offsetof(arch::ThreadState, stackTop) == TS_OFF_STACKTOP, "TS_OFF_
 static_assert(offsetof(arch::ThreadState, fpuEnabled) == TS_OFF_FPU_ENABLED,
         "TS_OFF_FPU_ENABLED wrong");
 static_assert(offsetof(arch::ThreadState, fxsave) == TS_OFF_FXSAVE, "TS_OFF_FXSAVE wrong");
+static_assert(offsetof(arch::ThreadState, saved) == TS_OFF_REGS, "TS_OFF_REGS wrong");
 
 #endif // ASM_FILE
 #endif

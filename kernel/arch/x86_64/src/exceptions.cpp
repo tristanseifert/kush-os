@@ -117,10 +117,12 @@ void arch::InstallExceptionHandlers(Idt *idt) {
 int amd64_exception_format_info(char *outBuf, const size_t outBufLen,
         const amd64_exception_info_t *info) {
     int err;
-    uint64_t cr0, cr2, cr3;
-    asm volatile("mov %%cr0, %0" : "=r" (cr0));
-    asm volatile("mov %%cr2, %0" : "=r" (cr2));
-    asm volatile("mov %%cr3, %0" : "=r" (cr3));
+    uint64_t cr0, cr2, cr3, cr4;
+    asm volatile("mov %%cr0, %0\n\t"
+                 "mov %%cr2, %1\n\t"
+                 "mov %%cr3, %2\n\t"
+                 "mov %%cr4, %3\n\t"
+                 : "=r" (cr0), "=r"(cr2), "=r"(cr3), "=r"(cr4));
 
     /*
     uint64_t xmm[8][2];
@@ -141,7 +143,7 @@ int amd64_exception_format_info(char *outBuf, const size_t outBufLen,
 
     // format
     err = snprintf(outBuf, outBufLen, "Exception %3llu ($%016llx)\n"
-            "CR0 $%016llx CR2 $%016llx CR3 $%016llx\n"
+            "CR0 $%016llx CR2 $%016llx CR3 $%016llx CR4 $%016llx\n"
             " CS $%04x SS $%04x RFLAGS $%016llx\n"
             " FS $%016llx  GS $%016llx KGS $%016llx\n"
             "RAX $%016llx RBX $%016llx RCX $%016llx RDX $%016llx\n"
@@ -159,7 +161,7 @@ int amd64_exception_format_info(char *outBuf, const size_t outBufLen,
             "XMM7 $%016llx%016llx\n"*/
             ,
             info->intNo, info->errCode,
-            cr0, cr2, cr3,
+            cr0, cr2, cr3, cr4,
             info->cs, info->ss, info->rflags,
             fsBase, gsBase,
             info->rax, info->rbx, info->rcx, info->rdx,

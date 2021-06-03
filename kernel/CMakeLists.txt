@@ -41,6 +41,7 @@ add_executable(kernel
     src/vm/MapEntry.cpp
     src/sched/GlobalState.cpp
     src/sched/Scheduler.cpp
+    src/sched/PeerList.cpp
     src/sched/Task.cpp
     src/sched/Thread.cpp
     src/sched/IdleWorker.cpp

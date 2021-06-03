@@ -22,6 +22,9 @@ class IrqRegistry {
     /// Maximum allowable vector number
     constexpr static const uintptr_t kVectorMax = 0xFF;
 
+    /// Vector numbers reserved for scheduler IPIs
+    constexpr static const uintptr_t kSchedulerVectorMax = 0x28;
+
     /// Total number of vectors managed in this registry
     constexpr static const size_t kNumVectors = (kVectorMax - kVectorMin) + 1;
 

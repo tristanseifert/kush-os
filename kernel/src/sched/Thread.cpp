@@ -165,6 +165,7 @@ void Thread::switchFrom() {
  */
 void Thread::switchTo() {
     auto current = Scheduler::get()->runningThread();
+    auto to = this->sharedFromThis();
 
     if(current) {
         current->switchFrom();
@@ -172,7 +173,6 @@ void Thread::switchTo() {
 
     this->lastSwitchedTo = platform_timer_now();
 
-    auto to = handle::Manager::getThread(this->handle);
     //log("switching to %s (from %s)", this->name, current ? (current->name) : "<null>");
     Scheduler::get()->setRunningThread(to);
     arch::RestoreThreadState(current, to);
@@ -283,21 +283,19 @@ void Thread::deferredTerminate() {
 void Thread::sleep(const uint64_t nanos) {
     if(!nanos) return;
 
-    DECLARE_CRITICAL();
-    auto thread = current();
+    {
+        auto thread = current();
 
-    // create the sleep deadline
-    const auto dueAt = platform_timer_now() + nanos + 10000ULL;
-    rt::SharedPtr<SleepDeadline> deadline(new SleepDeadline(dueAt, thread->sharedFromThis()));
+        // create the sleep deadline
+        const auto dueAt = platform_timer_now() + nanos + 10000ULL;
+        rt::SharedPtr<SleepDeadline> deadline(new SleepDeadline(dueAt, thread));
 
-    CRITICAL_ENTER();
+        // raise to scheduler IRQL (prevent preemption) and update thread state
+        platform_raise_irql(platform::Irql::Scheduler);
 
-    // mark thread as sleeping
-    thread->setState(State::Sleeping);
-    // add deadline to scheduler
-    Scheduler::get()->addDeadline(deadline);
-
-    CRITICAL_EXIT();
+        thread->setState(State::Sleeping);
+        Scheduler::get()->addDeadline(deadline);
+    }
 
     // give up the remaining CPU time
     sched::Thread::yield();
@@ -357,6 +355,9 @@ beach:;
     // finally, yield to scheduler if needed
     if(yield) {
         Scheduler::get()->yield();
+
+        // increment epoch value
+        __atomic_add_fetch(&this->epoch, 0, __ATOMIC_RELAXED);
     }
 
     /*

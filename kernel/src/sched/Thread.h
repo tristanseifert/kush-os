@@ -177,6 +177,16 @@ struct Thread: public rt::SharedFromThis<Thread> {
         rt::SharedPtr <SignalFlag> notificationsFlag;
 
         /**
+         * This counter is incremented any time the thread leaves the runnable state; it is used to
+         * detect when a deadline (or other unblock event) takes place yet the subject thread has
+         * changed state since then.
+         *
+         * In other words, when a deadline (or other object) fires, it should ensure the epoch
+         * value is the same as what it was when it began blocking.
+         */
+        uintptr_t epoch = 0;
+
+        /**
          * Objects this thread is currently blocking on
          */
         rt::List<rt::SharedPtr<Blockable>> blockingOn;

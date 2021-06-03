@@ -12,6 +12,7 @@
 #include "Deadline.h"
 #include "Thread.h"
 #include "Oclock.h"
+#include "PeerList.h"
 
 extern "C" void kernel_init();
 
@@ -22,20 +23,6 @@ class ApicTimer;
 namespace sched {
 class IdleWorker;
 struct Task;
-
-/**
- * Bitfield indicating what work a scheduler IPI has to do
- */
-ENUM_FLAGS_EX(IpiWorkFlags, uintptr_t);
-enum class IpiWorkFlags: uintptr_t {
-    /// No work to be done (default value)
-    None                        = 0,
-
-    /// The current thread should be preempted (quantum expired)
-    QuantumExpired              = (1 << 0),
-    /// Work has been enqueued on the scheduler's queue from another core
-    WorkGifted                  = (1 << 1),
-};
 
 /**
  * Provides multitasking abilities for multiple cores. Each scheduler handles the workload for a
@@ -57,6 +44,8 @@ class Scheduler {
     friend struct Thread;
     friend struct SleepDeadline;
 
+    friend void PeerList::invalidateOthers();
+
     public:
         /**
          * Total number of levels the scheduler is configured for.
@@ -75,11 +64,8 @@ class Scheduler {
          */
         constexpr static const uintptr_t kIdleWakeupInterval = (1000000 * 100); // 100ms
 
-        /// Default positive slack for deadlines
+        /// Default positive slack for deadlines (in ns)
         constexpr static const uint64_t kDeadlineSlack = 500;
-
-        /// Default tick rate (in Hz)
-        constexpr static const uint64_t kTickRate = 1000;
 
     public:
         // return the scheduler for the current core
@@ -96,8 +82,6 @@ class Scheduler {
             return this->running;
         }
 
-        /// schedules all runnable threads in the given task
-        void scheduleRunnable(const rt::SharedPtr<Task> &task);
         /// adds the given thread to the runnable queue
         int markThreadAsRunnable(const rt::SharedPtr<Thread> &thread,
                 const bool shouldSwitch = true);
@@ -129,22 +113,24 @@ class Scheduler {
         /// Finds the highest priority runnable thread on this core
         rt::SharedPtr<Thread> findRunnableThread();
         /// Inserts the given thread into the appropriate run queue
-        int schedule(const rt::SharedPtr<Thread> &thread, const bool updateQuantum = true);
+        int schedule(const rt::SharedPtr<Thread> &thread);
+
         /// Returns the run queue level to which the given thread belongs
         size_t getLevelFor(const rt::SharedPtr<Thread> &thread);
+        /// Updates the time quantum used by the given thread
+        bool updateQuantumUsed(const rt::SharedPtr<Thread> &thread);
         /// Calculate the total quantum length for a given thread
         void updateQuantumLength(const rt::SharedPtr<Thread> &thread);
 
+        /// Updates the period of the scheduler timer
+        void timerUpdate();
         /// Enqueue a scheduler IPI
         void sendIpi();
-        /// Updates the time quantum used by the given thread
-        bool updateQuantumUsed(const rt::SharedPtr<Thread> &thread);
 
         /// Switch to the given thread
-        void switchTo(const rt::SharedPtr<Thread> &thread, const bool fake = false);
-
+        void switchTo(const rt::SharedPtr<Thread> &thread);
         /// updates the current CPU's running thread (from thread code)
-        void setRunningThread(const rt::SharedPtr<Thread> &t) {
+        inline void setRunningThread(const rt::SharedPtr<Thread> &t) {
             this->running = t;
         }
 
@@ -152,18 +138,9 @@ class Scheduler {
         void threadUnblocked(const rt::SharedPtr<Thread> &t);
         /// Schedules all valid unblocked threads
         void processUnblockedThreads();
+
         /// Processes any expired deadlines
         bool processDeadlines();
-
-
-        /// invalidates all schedulers' peer lists
-        static void invalidateAllPeerList(Scheduler *skip = nullptr);
-        /// invalidates the peer list of this scheduler
-        inline void invalidatePeerList() {
-            __atomic_store_n(&this->peersDirty, true, __ATOMIC_RELEASE);
-        }
-        /// rebuilds the peer map
-        void buildPeerList();
 
         Scheduler();
         ~Scheduler();
@@ -201,37 +178,6 @@ class Scheduler {
             /// length of this level's quantum, in nanoseconds
             uint64_t quantumLength = 0;
         };
-
-        /**
-         * Describes information on a particular core's scheduler instance. This consists of a
-         * pointer to its scheduler instance as well as some core identification information.
-         *
-         * This is primarily accessed by idle cores when looking for work to steal. Each core's
-         * local scheduler will build a list of cores to steal from, in ascending order of some
-         * platform defined "cost" of migrating a thread off of that source core. This allows us
-         * to be aware of things like cache structures, SMP, and so forth.
-         */
-        struct InstanceInfo {
-            /// core ID (platform specific)
-            uintptr_t coreId = 0;
-            /// scheduler running on this core
-            Scheduler *instance = nullptr;
-
-            InstanceInfo() = default;
-            InstanceInfo(Scheduler *_instance) : instance(_instance) {}
-        };
-
-        /**
-         * Information consumed during a scheduler IPI to determine what work is to be done
-         *
-         * This is a separate structure, allocated separately, so that it may be aligned to the
-         * size of a cache line. This decreases the overhead of sharing it between cores, and also
-         * avoids false sharing of the regular scheduler data structure.
-         */
-        struct IpiInfo {
-            /// What work is there to be done?
-            IpiWorkFlags work;
-        } __attribute__((aligned(64)));
 
         /**
          * Small wrapper around a polymorphic Deadline shared pointer, to provide the appropriate
@@ -283,30 +229,19 @@ class Scheduler {
         /// whether deadline operations are logged
         constexpr static const bool kLogDeadlines = false;
 
-        /// all schedulers on the system. used for work stealing
-        static rt::Vector<InstanceInfo> *gSchedulers;
         /// per level configuration
         static LevelInfo gLevelInfo[kNumLevels];
 
         /// the thread that is currently being executed
-        rt::SharedPtr<Thread> running = nullptr;
+        rt::SharedPtr<Thread> running;
+        /// Platform specific core ID to which this scheduler belongs
+        uintptr_t coreId;
 
         /// timer for tracking CPU usage (how much to yeet quantum by)
         Oclock timer;
 
-        /**
-         * Whether the run queue has been modified. This is set whenever a new thread is made
-         * runnable. 
-         *
-         * This is used to perform a scheduler dispatch as needded at the end of interrupt
-         * routines. That way, the ISRs can just unconditionally call the `LazyDispatch()` method
-         * and we'll send a dispatch IPI if the run queue has changed.
-         *
-         * We'll clear this flag when we send an IPI, and when we otherwise take a trip into the
-         * dispatch machinery. (This covers the case where a thread is unblocked, but the caller's
-         * time quantum expires before a dispatch IPI can be generated.)
-         */
-        bool isDirty = false;
+        /// list of other schedulers, sorted in ascending distance
+        PeerList peers;
 
         /// Each of the levels that may contain a thread to run
         Level levels[kNumLevels];
@@ -350,31 +285,20 @@ class Scheduler {
         uint64_t timerMinInterval = 50000;
 
         /**
-         * Scheduler ticks are processed repeatedly at the given interval, in Hz. This is the
-         * minimum granularity on quantum length and preemption.
-         */
-        uint64_t tickRate = kTickRate;
-
-        /**
          * Level from which the currently executing thread was pulled, or `kNumLevels` if we're
          * executing the idle thread.
          */
         size_t currentLevel = kNumLevels;
 
         /**
-         * List of other cores' schedulers, ordered by ascending cost of migrating a thread from
-         * that core. This list is used when looking for work to steal when we become idle.
+         * This field is updated with the highest (lowest numeric value) priority of a thread that
+         * is added to the run queue.
          *
-         * The list is built lazily when we're idle and the dirty flag is set.
+         * Used to determine whether any higher priority threads are scheduled and whether an IPI
+         * is required in response to timer events.
          */
-        rt::Vector<InstanceInfo> peers;
-        /// when set, the peer map is dirty and must be updated
-        bool peersDirty = true;
+        size_t maxScheduledLevel = kNumLevels;
 
-        /// Platform specific core ID to which this scheduler belongs
-        uintptr_t coreId;
-        /// IPI information structure
-        IpiInfo *ipi = nullptr;
 
         /// lock for the deadline objects
         DECLARE_RWLOCK(deadlinesLock);

@@ -57,10 +57,9 @@ rt::SharedPtr<sched::Task> platform_init_rootsrv() {
     log("rootsrv thread: $%p $%p'h", static_cast<void *>(main), main->handle);
 #endif
 
-    // schedule it
-    sched::Scheduler::get()->scheduleRunnable(task);
-
     // done
+    task->launch();
+
     return task;
 }
 

@@ -72,7 +72,7 @@ intptr_t sys::TaskCreate(const Handle parentTaskHandle) {
      * list, so a strong reference to the task remain after this call returns. Otherwise, it will
      * be deallocated since the handle manager only holds a weak ref.
      */
-    sched::Scheduler::get()->scheduleRunnable(task);
+    task->launch();
 
     // return task handle
     return static_cast<intptr_t>(task->handle);
@@ -152,8 +152,8 @@ intptr_t sys::TaskInitialize(const Handle taskHandle, const uintptr_t userPc,
         arch::TaskWillStart(thread->task);
     });
 
-    // schedule the task
-    sched::Scheduler::get()->scheduleRunnable(task);
+    // schedule all threads in the task
+    task->launch();
 
     // return the success status of whether we could add the DPC
     return (!err ? Errors::Success : Errors::GeneralError);

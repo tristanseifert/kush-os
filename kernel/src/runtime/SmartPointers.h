@@ -280,28 +280,28 @@ class SharedPtr {
         /**
          * Shared pointers compare as equal if they point to the same object.
          */
-        bool operator==(const SharedPtr &ptr) const {
+        inline bool operator==(const SharedPtr &ptr) const {
             return (this->ptr == ptr.ptr);
         }
 
         /// Decay to a void ptr
-        explicit operator void*() const {
+        inline explicit operator void*() const {
             return this->ptr;
         }
         /// Test whether the pointee is null
-        explicit operator bool() const {
+        inline explicit operator bool() const {
             return (this->ptr != nullptr);
         }
         /// Access the pointee
-        T* operator->() const {
+        inline T* operator->() const {
             return this->ptr;
         }
         /// Dereference the pointee
-        T& operator*() const {
+        inline T& operator*() const {
             return *this->ptr;
         }
         /// Return the raw pointer
-        T* get() const {
+        inline T* get() const {
             return this->ptr;
         }
 

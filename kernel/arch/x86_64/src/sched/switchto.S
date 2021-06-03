@@ -8,15 +8,10 @@
 .global amd64_dpc_stub
 
 /**
- * Performs a context switch to a thread; context is NOT saved.
- *
- * Until we actually get down to restoring the thread state, %eax is the pointer to the arch
- * ThreadState struct.
+ * Performs a context switch to a thread; context is NOT saved. The thread to switch to should be
+ * pointed to by %rdi.
  */
 amd64_switchto:
-    // set up stack frame and get parameter
-    push        %rbp
-    mov         %rsp, %rbp
 
 /**
  * Common context switch restoration function; %rdi should point to a ThreadState struct, with a
@@ -36,22 +31,26 @@ amd64_switchto_common:
 
 amd64_switchto_common_stacked:
     // restore registers and CPU state
-    pop         %r15
-    pop         %r14
-    pop         %r13
-    pop         %r12
-    pop         %r11
-    pop         %r10
-    pop         %r9
-    pop         %r8
-    pop         %rdi
-    pop         %rsi
-    pop         %rbp
-    pop         %rbx
-    pop         %rdx
-    pop         %rcx
-    pop         %rax
+    lea         TS_OFF_REGS(%rdi), %rdi
 
+    mov           0(%rdi), %r15
+    mov           8(%rdi), %r14
+    mov          16(%rdi), %r13
+    mov          24(%rdi), %r12
+    mov          32(%rdi), %r11
+    mov          40(%rdi), %r10
+    mov          48(%rdi), %r9
+    mov          56(%rdi), %r8
+    mov          72(%rdi), %rsi
+    mov          80(%rdi), %rbp
+    mov          88(%rdi), %rbx
+    mov          96(%rdi), %rdx
+    mov         104(%rdi), %rcx
+    mov         112(%rdi), %rax
+
+    // restore flags and overwrite rdi
+    push        120(%rdi)
+    mov          64(%rdi), %rdi
     popfq
 
     // return to caller
@@ -69,35 +68,13 @@ amd64_switchto_common_stacked:
  * idiosyncrasies (emphasis on idiot) of x86 :D
  */
 amd64_switchto_save:
-    // set up stack frame
-    push        %rbp
-    mov         %rsp, %rbp
+    // push the instruction pointer (to return to)
+    //push        $amd64_switchto_swap_stub
 
-    // push the instruction pointer and flags
-    push        $amd64_switchto_swap_stub
-    pushfq
-
-    // push general-purpose registers
-    push        %rax
-    push        %rcx
-    push        %rdx
-    push        %rbx
-    push        %rbp
-    push        %rsi
-    push        %rdi
-    push        %r8
-    push        %r9
-    push        %r10
-    push        %r11
-    push        %r12
-    push        %r13
-    push        %r14
-    push        %r15
-
-    // store the stack pointer to restore to in the struct
+    // save stack pointer
     mov         %rsp, TS_OFF_STACKTOP(%rdi)
 
-    // save FPU state, if required
+    // save FPU state (if needed)
     mov         TS_OFF_FPU_ENABLED(%rdi), %rax
     test        %rax, %rax
     jz          2f
@@ -106,17 +83,37 @@ amd64_switchto_save:
     fxsave      (%rax)
 
 2:
+    // back up %rdi first so we can set it to the reg base
+    mov         %rdi, TS_OFF_REGS+64(%rdi)
+    lea         TS_OFF_REGS(%rdi), %rdi
+
+    // save general purpose regs
+    mov         %r15,   0(%rdi)
+    mov         %r14,   8(%rdi)
+    mov         %r13,  16(%rdi)
+    mov         %r12,  24(%rdi)
+    mov         %r11,  32(%rdi)
+    mov         %r10,  40(%rdi)
+    mov         %r9,   48(%rdi)
+    mov         %r8,   56(%rdi)
+    mov         %rsi,  72(%rdi)
+    mov         %rbp,  80(%rdi)
+    mov         %rbx,  88(%rdi)
+    mov         %rdx,  96(%rdi)
+    mov         %rcx, 104(%rdi)
+    mov         %rax, 112(%rdi)
+
+    pushfq
+    pop         120(%rdi)
+
     // the previous thread's state has been saved. switch to the next thread
     mov         %rsi, %rdi
-
-    // restoring the thread state is the exact same as normal
     jmp         amd64_switchto_common
 
 /**
  * Stub for returning to a task lol
  */
 amd64_switchto_swap_stub:
-    pop         %rbp
     sti
     ret
 

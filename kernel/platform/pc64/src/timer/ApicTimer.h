@@ -18,7 +18,7 @@ class ApicTimer {
 
     public:
         /// IRQ vector for the timer
-        constexpr static const uint8_t kVector = 0xB0;
+        constexpr static const uint8_t kVector = 0x2F;
 
     public:
         ApicTimer(LocalApic *parent);

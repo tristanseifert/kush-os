@@ -31,28 +31,23 @@ using namespace arch;
  * stack segment goes otherwise.
  */
 void arch::InitThreadState(sched::Thread *thread, const uintptr_t pc, const uintptr_t arg) {
-    // make space for the exception frame and initialize it
-    const auto frameSz = sizeof(CpuRegs);
-    uintptr_t *params = reinterpret_cast<uintptr_t *>((uintptr_t) thread->stack - 20);
-    auto frame = reinterpret_cast<CpuRegs *>((uintptr_t) thread->stack - frameSz - 20);
+    auto &info = thread->regs;
+    auto &regs = info.saved;
 
-    memset(frame, 0, frameSz);
-    thread->regs.stackTop = frame;
+    // initialize registers
+    memset(&regs, 0, sizeof(regs));
 
-    frame->rip = pc;
+    regs.rdi = arg;
+    regs.rip = pc;
 
-    // return argument
-    frame->rdi = arg;
-    // bogus return address
-    params[0] = reinterpret_cast<uintptr_t>(amd64_thread_end);
+    // set up the stack with one word on it, the return address
+    uintptr_t *params = reinterpret_cast<uintptr_t *>((uintptr_t) thread->stack - 8);
+    params[0] = pc;
 
-    // for threads ending up in userspace, ensure IRQs are on so they can be pre-empted
-    if(!thread->kernelMode || true) {
-        frame->rflags |= (1 << 9);
-    }
+    info.stackTop = params;
 
-    // RBP must be NULL for stack unwinding to work
-    frame->rbp = 0;
+    // IRQs should always be on (so preemption works)
+    regs.rflags |= (1 << 9);
 }
 
 /**

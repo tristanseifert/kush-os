@@ -57,11 +57,11 @@ void SchedulerState::main() {
         auto gs = GlobalState::the();
 
         for(const auto &task : gs->getTasks()) {
-            fctprintf(_outchar, 0, "%4lu $%p'h    %24s\n", task->pid, task->handle, task->name);
+            fctprintf(_outchar, 0, "%4lu $%p'h    %20s\n", task->pid, task->handle, task->name);
 
             // print each thread
-            fctprintf(_outchar, 0, " \x5  tid Handle              %24s S lv pr %14s %14s %8s %8s\n",
-                    "Name", "CPU Time", "Last Sched", "RQ Push", "RQ Pop");
+            fctprintf(_outchar, 0, " \x5  tid Handle              %20s S lv pr %14s %14s %8s %8s %8s %8s\n",
+                    "Name", "CPU Time", "Last Sched", "RQ Push", "RQ Pop", "Q used", "Q total");
             for(const auto &thread : task->threads) {
                 const auto &sched = thread->sched;
 
@@ -87,9 +87,10 @@ void SchedulerState::main() {
                         break;
                 }
 
-                fctprintf(_outchar, 0, " \x4 %4lu $%p'h %24s %s %2u %2u %14lu %14lu %8lu %8lu\n", 
+                fctprintf(_outchar, 0, " \x4 %4lu $%p'h %20s %s %2u %2u %14lu %14lu %8lu %8lu %8lu %8lu\n", 
                         thread->tid, thread->handle, thread->name, state, sched.level, sched.lastLevel,
-                        sched.cpuTime, thread->lastSwitchedTo, sched.queuePushed, sched.queuePopped);
+                        sched.cpuTime, thread->lastSwitchedTo, sched.queuePushed, sched.queuePopped,
+                        sched.quantumUsed / 10, sched.quantumTotal / 10);
             }
 
             // print each port

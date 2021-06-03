@@ -101,6 +101,9 @@ struct Task: public rt::SharedFromThis<Task> {
 
         ~Task();
 
+        /// Kicks off execution of any newly created threads.
+        void launch();
+
         /// Adds the given VM map object to the list
         void addVmRegion(const rt::SharedPtr<vm::MapEntry> &region);
         /// Removes a VM region we own
