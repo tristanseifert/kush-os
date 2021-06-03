@@ -13,6 +13,9 @@
 namespace sched {
 ENUM_FLAGS_EX(SchedulerThreadDataFlags, uintptr_t);
 enum class SchedulerThreadDataFlags: uintptr_t {
+    /// No flags set
+    None                                = 0,
+
     /**
      * Do not automatically reschedule the thread, if it becomes preempted
      */
@@ -41,7 +44,7 @@ struct SchedulerThreadData {
     size_t lastLevel = UINTPTR_MAX;
 
     /// Total number of nanoseconds of CPU time this thread has received
-    uint64_t cpuTime;
+    uint64_t cpuTime = 0;
     /// Actual number of nanoseconds of quantum time at this level
     uint64_t quantumTotal = 0;
     /// Number of nanoseconds of time quantum used at this level
@@ -53,7 +56,7 @@ struct SchedulerThreadData {
     size_t queuePopped = 0;
 
     /// flags defining the thread's state and scheduler beahvior
-    SchedulerThreadDataFlags flags;
+    SchedulerThreadDataFlags flags = SchedulerThreadDataFlags::None;
 
     /**
      * User specified priority; this is a number in [-100, 100] that affects the run queue level,

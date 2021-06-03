@@ -28,7 +28,7 @@ void debug::SchedulerStateEntry(uintptr_t arg) {
 SchedulerState::SchedulerState() {
     this->thread = sched::Thread::kernelThread(sched::Task::kern(), SchedulerStateEntry,
             reinterpret_cast<uintptr_t>(this));
-    this->thread->setName("thread state debugger");
+    this->thread->setName("thread state dbg");
     this->thread->setState(sched::Thread::State::Runnable);
     sched::Scheduler::get()->markThreadAsRunnable(this->thread, false);
 }

@@ -39,7 +39,7 @@ IrqRegistry::IrqRegistry(Idt *_idt) : idt(_idt) {
 
         // determine what IRQ stack to use
         auto stack = Idt::Stack::Stack6;
-        if(vec >= 0x20 && vec < kSchedulerVectorMax) { // IPIs in range of [0x20, 0x27]
+        if(vec >= 0x20 && vec <= kSchedulerVectorMax) { // IPIs in range of [0x20, 0x2F]
             stack = Idt::Stack::None;
         }
 

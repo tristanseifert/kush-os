@@ -10,6 +10,4 @@ extern "C" void amd64_switchto_save(arch::ThreadState *from, arch::ThreadState *
 
 extern "C" void amd64_ring3_return(const uintptr_t pc, const uintptr_t stack, const uintptr_t arg) __attribute__((noreturn));
 
-extern "C" void amd64_dpc_stub() __attribute__((noreturn));
-
 #endif

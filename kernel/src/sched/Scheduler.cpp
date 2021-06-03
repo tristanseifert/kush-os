@@ -95,7 +95,6 @@ Scheduler::~Scheduler() {
     delete this->idle;
 }
 
-
 /**
  * Initializes the scheduler data structures in a newly created thread.\
  */
@@ -130,7 +129,7 @@ void Scheduler::run() {
         thread = this->idle->thread;
     }
 
-    this->switchTo(thread);
+    thread->switchTo();
 
     // we should NEVER get here
     panic("Scheduler::switchTo() returned (this should never happen)");
@@ -146,8 +145,12 @@ void Scheduler::run() {
  * @return Whether we successfully added the thread to the appropriate run queue (0) or not
  */
 int Scheduler::markThreadAsRunnable(const rt::SharedPtr<Thread> &t, const bool shouldSwitch) {
-    if(int err = this->schedule(t)) {
-        return err;
+    int err = 0;
+    const auto oldIrql = platform_raise_irql(platform::Irql::Scheduler);
+
+    if((err = this->schedule(t))) {
+        panic("failed to schedule thread $%p'h: %d", t->getHandle(), err);
+        goto done;
     }
 
     // if this thread is higher priority, take an IPI (so we can context switch)
@@ -155,15 +158,15 @@ int Scheduler::markThreadAsRunnable(const rt::SharedPtr<Thread> &t, const bool s
         this->sendIpi();
     }
 
-    return 0;
+done:;
+    platform_lower_irql(oldIrql);
+    return err;
 }
-
-
 
 /**
  * Gives up the remainder of the current thread's time quantum.
  */
-void Scheduler::yield(const Thread::State state) {
+void Scheduler::yield() {
     rt::SharedPtr<Thread> to;
 
     // raise irql to prevent preemption and update time accounting
@@ -206,7 +209,7 @@ beach:;
     if(!to) to = this->idle->thread;
 
     // switch to the destination thread
-    this->switchTo(to);
+    to->switchTo();
 
     // when a thread returns, IRQL is back at Passive level. so no need to lower manually
 }
@@ -357,15 +360,6 @@ size_t Scheduler::getLevelFor(const rt::SharedPtr<Thread> &thread) {
 }
 
 /**
- * Switches to the given thread.
- */
-void Scheduler::switchTo(const rt::SharedPtr<Thread> &thread) {
-    thread->switchTo();
-}
-
-
-
-/**
  * Scheduler specific timer has expired; handle deadlines or figure out if the current thread can
  * be preempted.
  *
@@ -393,14 +387,12 @@ void Scheduler::timerFired() {
      * Send an IPI if the currently running thread needs to be preempted, or whether a deadline
      * scheduled a thread with a higher priority than the current one.
      *
-     * If no IPI is needed, update the timer and return. The IPI will take care of updating the
-     * timer interval in that case.
+     * If no IPI is needed, update the timer and return. Otherwise, once we take the IPI, it will
+     * update the timer.
      */
     if(preempted || this->currentLevel >= this->maxScheduledLevel) {
-        log("preempt? %c %lu/%lu -> IPI", preempted ? 'Y' : 'N', this->currentLevel, this->maxScheduledLevel);
         this->sendIpi();
     } else {
-        log("preempt? %c %lu/%lu -> timer update", preempted ? 'Y' : 'N', this->currentLevel, this->maxScheduledLevel);
         this->timerUpdate();
     }
 }
@@ -413,7 +405,7 @@ void Scheduler::timerUpdate() {
     uint64_t quantumRemaining = kIdleWakeupInterval;
 
     // calculate remaining quantum
-    /*if(this->running) [[likely]] {
+    if(this->running) [[likely]] {
         auto &sched = this->running->sched;
 
         if(TestFlags(sched.flags & SchedulerThreadDataFlags::Idle)) [[unlikely]] {
@@ -421,7 +413,7 @@ void Scheduler::timerUpdate() {
         } else {
             quantumRemaining = sched.quantumTotal - sched.quantumUsed;
         }
-    }*/
+    }
 
     // find the nearest deadline
     auto deadline = UINTPTR_MAX;
@@ -446,13 +438,14 @@ void Scheduler::timerUpdate() {
     // whichever is sooner, set a timer for it
     uint64_t interval = (deadline < quantumRemaining) ? deadline : quantumRemaining;
 
-    // make sure it's at least the min interval
-    interval = (interval > this->timerMinInterval) ? interval : this->timerMinInterval;
-
-    platform::SetLocalTimer(interval);
+    // make sure it's at least the min interval (TODO: this is a bit janky)
+    if(interval >= this->timerMinInterval) {
+        platform::SetLocalTimer(interval);
+    } else {
+        platform::SetLocalTimer(this->timerMinInterval);
+        //this->sendIpi();
+    }
 }
-
-
 
 /**
  * Enqueues a scheduler IPI, updating the IPI status flags as needed.
@@ -522,11 +515,11 @@ void Scheduler::handleIpi(void (*ackIrq)(void *), void *ackCtx) {
     }
 
     // we found a thread that's suitable to switch to so go that
+    this->timerUpdate();
+
     ackIrq(ackCtx);
-    this->switchTo(next);
+    next->switchTo();
 }
-
-
 
 /**
  * A thread has been unblocked, so add it to the list of newly runnable threads.
@@ -595,8 +588,6 @@ void Scheduler::processUnblockedThreads() {
     }
 }
 
-
-
 /**
  * A thread is being context switched out. We'll stop the appropriate time counters and figure out
  * how much of the time quantum the thread spent executing.
@@ -618,14 +609,9 @@ void Scheduler::willSwitchFrom(const rt::SharedPtr<Thread> &from) {
  * @note Called from the context switch routine. No blocking or critical sections allowed!
  */
 void Scheduler::willSwitchTo(const rt::SharedPtr<Thread> &to) {
-    // update scheduler timer
-    this->timerUpdate();
-
     // start time accounting
     this->timer.start(Oclock::Type::ThreadKernel);
 }
-
-
 
 /**
  * Updates the total length of a task's time quantum.
@@ -690,8 +676,6 @@ bool Scheduler::updateQuantumUsed(const rt::SharedPtr<Thread> &thread) {
 
     return expired;
 }
-
-
 
 /**
  * Processes all expired deadlines, by invoking their expiration methods. These may add new threads

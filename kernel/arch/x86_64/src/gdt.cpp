@@ -229,7 +229,7 @@ void Gdt::InitTss(amd64_tss_t *tss) {
     memset(tss, 0, sizeof(amd64_tss_t));
 
     // no IO map
-    tss->ioMap = (sizeof(amd64_tss_t) - 1) << 16;
+    tss->ioMap = (sizeof(amd64_tss_t) - 1);
 }
 
 /**

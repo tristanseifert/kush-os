@@ -103,8 +103,20 @@ void arch::RestoreThreadState(const rt::SharedPtr<sched::Thread> &from,
 
     // save state into current thread and switch to next
     if(from) {
+        auto &fromRegs = from->regs;
+
         // stop the task timer
         sched::Scheduler::get()->willSwitchFrom(from);
+
+        // save FPU state if needed
+        if(fromRegs.fpuEnabled && fromRegs.fpuNeedsSave) {
+            if(!fromRegs.fxsave) {
+                panic("TODO: allocate floating point save area");
+            }
+
+            asm volatile("fxsave %0" :: "m"(fromRegs.fxsave));
+            fromRegs.fpuNeedsSave = false;
+        }
 
         // set the running flags
         __atomic_store(&from->isActive, &no, __ATOMIC_RELAXED);
@@ -139,55 +151,6 @@ void arch::ReturnToUser(const uintptr_t pc, const uintptr_t _stack, const uintpt
     amd64_ring3_return(pc, _stack, arg);
 }
 
-/**
- * Pushes a stack frame to the top of the thread's stack that will cause a context switch to return
- * to the DPC handler routine, rather than the previous thread state.
- *
- * On return from the DPC handler, we perform another context switch to the real state of the
- * thread.
- *
- * We require that the thread cannot be scheduled during this time, and may not be running.
- */
-int arch::PushDpcHandlerFrame(sched::Thread *thread) {
-    // allocate stack space and get the previous restore frame if there is one
-    const auto frameSz = sizeof(CpuRegs);
-
-    CpuRegs *oldFrame = nullptr;
-    auto frame = reinterpret_cast<CpuRegs *>((uintptr_t) thread->regs.stackTop - frameSz);
-
-    if((uintptr_t) thread->stack < ((uintptr_t) thread->regs.stackTop + frameSz)) {
-        oldFrame = reinterpret_cast<CpuRegs *>((uintptr_t) thread->regs.stackTop);
-    }
-
-    memset(frame, 0, frameSz);
-    thread->regs.stackTop = frame;
-
-    // fill it
-    frame->rip = (uintptr_t) amd64_dpc_stub;
-
-    // copy some data from the previous stack frame (if there is one)
-    if(oldFrame) {
-        frame->rbp = oldFrame->rbp;
-        frame->rflags = oldFrame->rflags;
-
-        log("previous frame %p rip %016lx", oldFrame, oldFrame->rip);
-    }
-
-    // clean up
-    return 0;
-}
-
-/**
- * Invokes DPCs on the current thread.
- */
-extern "C" void amd64_dpc_handler() {
-    const auto irql = platform_raise_irql(platform::Irql::Dpc);
-
-    auto thread = sched::Thread::current();
-    thread->runDpcs();
-
-    platform_lower_irql(irql);
-}
 
 
 /**

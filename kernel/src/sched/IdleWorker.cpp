@@ -52,6 +52,10 @@ void sched::IdleEntry(uintptr_t arg) {
  */
 void IdleWorker::main() {
     while(1) {
+        // update peer list if dirtied
+        this->sched->peers.rebuild();
+
+        // check for work items and execute idle handler
         this->checkWork();
         platform::Idle();
     }

@@ -48,11 +48,6 @@ struct Thread: public rt::SharedFromThis<Thread> {
     constexpr static const size_t kNameLength = 32;
 
     private:
-        /// Info on a DPC to execute
-        struct DpcInfo {
-            void (*handler)(Thread *, void *);
-            void *context = nullptr;
-        };
         /// why a block returned
         enum class BlockState {
             None                        = 0,
@@ -203,11 +198,6 @@ struct Thread: public rt::SharedFromThis<Thread> {
         /// notification flags to signal when terminating
         rt::List<rt::SharedPtr<SignalFlag>> terminateSignals;
 
-        /// DPCs queued for the thread
-        rt::Queue<DpcInfo> dpcs;
-        /// When set, there are DPCs pending.
-        bool dpcsPending = false;
-
         /// size of the thread's kernel stack (in bytes)
         size_t stackSize = 0;
         /// bottom of the kernel stack of this thread
@@ -277,11 +267,6 @@ struct Thread: public rt::SharedFromThis<Thread> {
         void notify(const uintptr_t bits);
         /// Blocks the thread waiting to receive notifications, optionally with a mask.
         uintptr_t blockNotify(const uintptr_t mask = 0);
-
-        /// Adds a DPC to the thread's queue.
-        int addDpc(void (*handler)(Thread *, void *), void *context = nullptr);
-        /// Drains the DPC queue.
-        void runDpcs();
 
         /// Waits for the thread to be terminated.
         int waitOn(const uint64_t waitUntil = 0);

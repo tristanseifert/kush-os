@@ -262,6 +262,8 @@ rt::SharedPtr<Task> Task::current() {
  * state info.
  */
 void Task::launch() {
+    const auto oldIrql = platform_raise_irql(platform::Irql::Scheduler);
+
     RW_LOCK_READ_GUARD(this->lock);
     for(auto &thread : this->threads) {
         // become runnable if needed
@@ -278,6 +280,9 @@ void Task::launch() {
     if(!__atomic_test_and_set(&this->registered, __ATOMIC_RELAXED)) {
         GlobalState::the()->registerTask(this->sharedFromThis());
     }
+
+    // restore irql
+    platform_lower_irql(oldIrql);
 }
 
 /**

@@ -56,10 +56,13 @@ int main(int argc, const char **argv) {
     task::InfoPage::init();
 
     dispensary::init();
+    ThreadUsleep(10000);
     task::Registry::init();
+    ThreadUsleep(10000);
 
     // start RPC handlers
     task::RpcHandler::init();
+    ThreadUsleep(10000);
 
     // load bundle and the associated servers
     fprintf(stderr, "starting bundle init\n");

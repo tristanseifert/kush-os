@@ -5,7 +5,7 @@
 #define TS_OFF_STACKTOP                 0
 #define TS_OFF_FPU_ENABLED              8
 #define TS_OFF_FXSAVE                   16
-#define TS_OFF_REGS                     24
+#define TS_OFF_REGS                     32
 
 #ifndef ASM_FILE
 #include <stddef.h>
@@ -45,14 +45,15 @@ struct ThreadState {
 
     /// when set, FPU state should be saved and restored
     bool fpuEnabled = false;
+    /// whether the FPU state needs to be saved when switching out
+    bool fpuNeedsSave = true;
     /// pointer to FPU data area (must be 16 byte aligned)
     void *fxsave = nullptr;
+    /// number of times we've taken an FPU fault in this thread
+    size_t fpuFaults = 0;
 
     /// saved thread state
     CpuRegs saved;
-
-    /// number of times we've taken an FPU fault in this thread
-    size_t fpuFaults = 0;
 
     /// FS base for the thread
     uintptr_t fsBase = 0;

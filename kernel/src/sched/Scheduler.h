@@ -43,7 +43,7 @@ class Scheduler {
     friend void ::kernel_init();
     friend struct Thread;
     friend struct SleepDeadline;
-
+    friend class IdleWorker;
     friend void PeerList::invalidateOthers();
 
     public:
@@ -89,7 +89,7 @@ class Scheduler {
         /// Runs the scheduler.
         void run() __attribute__((noreturn));
         /// Yields the remainder of the current thread's CPU time.
-        void yield(const Thread::State state = Thread::State::Runnable);
+        void yield();
 
         /// The specified thread is leaving the processor
         void willSwitchFrom(const rt::SharedPtr<Thread> &from);
@@ -127,8 +127,6 @@ class Scheduler {
         /// Enqueue a scheduler IPI
         void sendIpi();
 
-        /// Switch to the given thread
-        void switchTo(const rt::SharedPtr<Thread> &thread);
         /// updates the current CPU's running thread (from thread code)
         inline void setRunningThread(const rt::SharedPtr<Thread> &t) {
             this->running = t;

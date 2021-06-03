@@ -52,7 +52,7 @@ Idt::Idt() {
  * uses the legacy TSS lookup, which we don't support. There are a total of 7 stack slots in the
  * TSS, which are all allocated for each core.
  */
-void Idt::set(const size_t entry, const uintptr_t function, const uintptr_t segment, const uintptr_t flags, const Stack stack) {
+void Idt::set(const size_t entry, const uintptr_t function, const uintptr_t segment, const uintptr_t flags, Stack stack) {
     REQUIRE(entry < kNumIdt, "IDT index out of bounds: %u", entry);
 
     if(gLogSet) log("IDT %p index %3u: addr $%016llx segment %04x flags %02x stack %u", this, entry,

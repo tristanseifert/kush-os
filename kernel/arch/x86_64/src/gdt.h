@@ -72,9 +72,10 @@ typedef struct amd64_tss {
     } __attribute__((packed)) ist[7];
 
     uint32_t reserved3[2];
+    uint16_t reserved4;
 
     // IO map offset (should be sizeof(amd64_tss) as we don't use it). use high word
-    uint32_t ioMap;
+    uint16_t ioMap;
 } __attribute__((packed)) amd64_tss_t;
 
 namespace arch {

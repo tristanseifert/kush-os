@@ -19,8 +19,8 @@ amd64_switchto:
  */
 amd64_switchto_common:
     // restore FPU state
-    mov         TS_OFF_FPU_ENABLED(%rdi), %rax
-    test        %rax, %rax
+    movb        TS_OFF_FPU_ENABLED(%rdi), %al
+    test        %al, %al
     jz          1f
 
     fxrstor     TS_OFF_FXSAVE(%rdi)
@@ -62,27 +62,11 @@ amd64_switchto_common_stacked:
  * Performs a context switch, saving the current thread state.
  *
  * %rdi: from task, %rsi: to task
-
- * Note that we actually return to a little return stub; this pops off the base pointer to undo
- * the stack frame we set up to access the parameters passed to this function. Yet another fun
- * idiosyncrasies (emphasis on idiot) of x86 :D
  */
 amd64_switchto_save:
-    // push the instruction pointer (to return to)
-    //push        $amd64_switchto_swap_stub
-
     // save stack pointer
     mov         %rsp, TS_OFF_STACKTOP(%rdi)
 
-    // save FPU state (if needed)
-    mov         TS_OFF_FPU_ENABLED(%rdi), %rax
-    test        %rax, %rax
-    jz          2f
-
-    mov         TS_OFF_FXSAVE(%rdi), %rax
-    fxsave      (%rax)
-
-2:
     // back up %rdi first so we can set it to the reg base
     mov         %rdi, TS_OFF_REGS+64(%rdi)
     lea         TS_OFF_REGS(%rdi), %rdi
@@ -109,13 +93,6 @@ amd64_switchto_save:
     // the previous thread's state has been saved. switch to the next thread
     mov         %rsi, %rdi
     jmp         amd64_switchto_common
-
-/**
- * Stub for returning to a task lol
- */
-amd64_switchto_swap_stub:
-    sti
-    ret
 
 /**
  * Builds a stack frame suitable for use with IRET to return to ring 3. Additionally, all of the
@@ -170,17 +147,3 @@ amd64_ring3_return:
     swapgs
     iretq
 
-/**
- * Invokes the DPC handler, then does a context switch to the thread state currently on the stack.
- */
-amd64_dpc_stub:
-    // set up stack frame
-    push        %rbp
-    mov         %rsp, %rbp
-
-    // run the handlers
-    call        amd64_dpc_handler
-
-    // clean up stack and perform the context switch
-    add         $8, %rsp
-    jmp         amd64_switchto_common_stacked

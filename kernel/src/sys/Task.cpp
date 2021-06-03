@@ -131,8 +131,6 @@ intptr_t sys::TaskTerminate(const Handle taskHandle, const intptr_t code) {
  */
 intptr_t sys::TaskInitialize(const Handle taskHandle, const uintptr_t userPc,
         const uintptr_t userStack) {
-    int err;
-
     // get the task handle
     auto task = handle::Manager::getTask(taskHandle);
     if(!task) {
@@ -140,23 +138,24 @@ intptr_t sys::TaskInitialize(const Handle taskHandle, const uintptr_t userPc,
     }
 
     auto info = new InitTaskDpcInfo(userPc, userStack);
+    if(!info) {
+        return Errors::NoMemory;
+    }
 
     // set up the main thread
-    auto main = sched::Thread::kernelThread(task, &UserspaceThreadStub, (uintptr_t) info);
+    auto main = sched::Thread::userThread(task, &UserspaceThreadStub, (uintptr_t) info);
+    if(!main) {
+        return Errors::NoMemory;
+    }
     main->setName("Main Thread");
-    main->kernelMode = false;
 
-    // queue a DPC to perform last minute setup
-    err = main->addDpc([](sched::Thread *thread, void *ctx) {
-        // map the syscall tables
-        arch::TaskWillStart(thread->task);
-    });
+    // perform some setup
+    arch::TaskWillStart(task);
 
     // schedule all threads in the task
     task->launch();
 
-    // return the success status of whether we could add the DPC
-    return (!err ? Errors::Success : Errors::GeneralError);
+    return Errors::Success;
 }
 
 /**
@@ -239,6 +238,5 @@ static void UserspaceThreadStub(uintptr_t arg) {
     delete info;
 
     // execute return to userspace
-    log("return to userspace for $%p'h: pc %p sp %p", static_cast<void *>(thread), pc, sp);
     thread->returnToUser(pc, sp);
 }

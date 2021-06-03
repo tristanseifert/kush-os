@@ -31,6 +31,15 @@ class PeerList {
             __atomic_store_n(&this->dirty, true, __ATOMIC_RELEASE);
         }
 
+        /**
+         * Rebuilds the peer list if it's dirtied.
+         */
+        void rebuild() {
+            if(__atomic_load_n(&this->dirty, __ATOMIC_RELAXED)) {
+                this->build();
+            }
+        }
+
     private:
         /**
          * Describes information on a particular core's scheduler instance. This consists of a
