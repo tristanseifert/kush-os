@@ -272,11 +272,15 @@ bool ElfReader::getDynRels(PaddedArray<Elf_Rel> &outRels) {
     // get the extents of the region
     uintptr_t relAddr = 0;
     size_t relEntBytes = 0, relBytes = 0;
+    bool isRela;
 
+    // get the correct relocations type
     for(const auto &entry : this->dynInfo) {
         switch(entry.d_tag) {
+#if defined(__i386__)
             case DT_REL:
                 relAddr = this->rebaseVmAddr(entry.d_un.d_ptr);
+                isRela = false;
                 break;
             case DT_RELENT:
                 relEntBytes = entry.d_un.d_val;
@@ -284,6 +288,19 @@ bool ElfReader::getDynRels(PaddedArray<Elf_Rel> &outRels) {
             case DT_RELSZ:
                 relBytes = entry.d_un.d_val;
                 break;
+#elif defined(__amd64__)
+            case DT_RELA:
+                relAddr = this->rebaseVmAddr(entry.d_un.d_ptr);
+                isRela = true;
+                break;
+            case DT_RELAENT:
+                relEntBytes = entry.d_un.d_val;
+                break;
+            case DT_RELASZ:
+                relBytes = entry.d_un.d_val;
+                break;
+#endif
+
             default:
                 continue;
         }
@@ -297,9 +314,13 @@ bool ElfReader::getDynRels(PaddedArray<Elf_Rel> &outRels) {
         Linker::Abort("failed to read %s relocs: REL %u ENT %u SZ %u", "data", relAddr,
                 relEntBytes, relBytes);
     }
-    else if(relEntBytes < sizeof(Elf_Rel)) {
+    else if(!isRela && relEntBytes < sizeof(Elf_Rel)) {
         Linker::Abort("unsupported %s relent size %u (expected %lu)", "dynamic", relEntBytes,
                 sizeof(Elf_Rel));
+    }
+    else if(isRela && relEntBytes < sizeof(Elf_Rela)) {
+        Linker::Abort("unsupported %s relent size %u (expected %lu)", "dynamic", relEntBytes,
+                sizeof(Elf_Rela));
     }
 
     // process each relocation
@@ -372,8 +393,11 @@ void ElfReader::patchRelocs(const PaddedArray<Elf_Rel> &rels, const uintptr_t ba
 #if defined(__amd64__)
         case EM_386:
             return this->patchRelocsi386(rels, base);
-        case EM_X86_64:
-            return this->patchRelocsAmd64(rels, base);
+        case EM_X86_64: {
+            // XXX: yuck... we really should do better than this
+            auto rela = reinterpret_cast<const PaddedArray<Elf_Rela> &>(rels);
+            return this->patchRelocsAmd64(rela, base);
+        }
 #endif
         default:
             Linker::Abort("don't know how to patch relocations for machine $%x", this->elfMachine);
@@ -520,6 +544,19 @@ void ElfReader::applyProtection() {
  * @param base Offset to add to the offset field in the relocation to get an absolute address.
  */
 void ElfReader::relocCopyFromShlib(const Elf_Rel &rel, const SymbolMap::Symbol *sym,
+        const uintptr_t base) {
+    auto dest = reinterpret_cast<void *>(rel.r_offset + base);
+    auto from = reinterpret_cast<const void *>(sym->address);
+
+    memcpy(dest, from, sym->length);
+}
+
+/**
+ * Copies data out of a shared object. This implements the `R_X86_64_COPY` relocation type.
+ *
+ * @param base Offset to add to the offset field in the relocation to get an absolute address.
+ */
+void ElfReader::relocCopyFromShlib(const Elf_Rela &rel, const SymbolMap::Symbol *sym,
         const uintptr_t base) {
     auto dest = reinterpret_cast<void *>(rel.r_offset + base);
     auto from = reinterpret_cast<const void *>(sym->address);

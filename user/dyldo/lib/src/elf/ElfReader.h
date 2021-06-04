@@ -79,7 +79,7 @@ class ElfReader {
         void patchRelocsi386(const PaddedArray<Elf_Rel> &rels, const uintptr_t base);
 #endif
 #if defined(__amd64__)
-        void patchRelocsAmd64(const PaddedArray<Elf_Rel> &rels, const uintptr_t base);
+        void patchRelocsAmd64(const PaddedArray<Elf_Rela> &rels, const uintptr_t base);
 #endif
 
 
@@ -96,6 +96,9 @@ class ElfReader {
 
         /// Processes a relocation indicating a copy from a shared object's data.
         void relocCopyFromShlib(const Elf_Rel &rel, const SymbolMap::Symbol * _Nonnull sym,
+                const uintptr_t base = 0);
+        /// Processes a relocation indicating a copy from a shared object's data.
+        void relocCopyFromShlib(const Elf_Rela &rel, const SymbolMap::Symbol * _Nonnull sym,
                 const uintptr_t base = 0);
 
     private:

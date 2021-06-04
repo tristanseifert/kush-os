@@ -54,21 +54,12 @@ void __dyldo_teardown_tls() {
 
 /**
  * Stub function used to get the address of a thread-local that belongs to another shared object.
- *
- * I _think_ the argument is passed in %eax; 
- *
- * TODO: implement
  */
-__attribute__ ((__regparm__ (1))) void *__dyldo_tls_get_addr(tls_index_t *ctx) {
+void *__dyldo_tls_get_addr_amd64(tls_index_t *ctx) {
     // read out TLS block base
     uintptr_t tlsBlockBase = 0;
-#if defined(__i386__)
     asm volatile("mov   %%gs:0x00, %0" : "=r" (tlsBlockBase));
-#elif defined(__amd64__)
     asm volatile("mov   %%fs:0x00, %0" : "=r" (tlsBlockBase));
-#else
-#error Update ThreadLocal for current arch
-#endif
 
     // get address
     const auto addr = tlsBlockBase + ctx->ti_module + ctx->ti_offset;
@@ -80,7 +71,28 @@ __attribute__ ((__regparm__ (1))) void *__dyldo_tls_get_addr(tls_index_t *ctx) {
     Linker::Abort("%s unimplemented: %p (mod %p off %p)", __FUNCTION__, ctx, ctx->ti_module,
             ctx->ti_offset);
 }
+/**
+ * Stub function used to get the address of a thread-local that belongs to another shared object.
+ *
+ * I _think_ the argument is passed in %eax; 
+ */
+#if defined(__i386__)
+__attribute__ ((__regparm__ (1))) void *__dyldo_tls_get_addr_i386(tls_index_t *ctx) {
+    // read out TLS block base
+    uintptr_t tlsBlockBase = 0;
+    asm volatile("mov   %%gs:0x00, %0" : "=r" (tlsBlockBase));
 
+    // get address
+    const auto addr = tlsBlockBase + ctx->ti_module + ctx->ti_offset;
+    Linker::Trace("%s %p (mod %p off %p) = %08x", __FUNCTION__, ctx, ctx->ti_module,
+            ctx->ti_offset, addr);
+
+    return reinterpret_cast<void *>(addr);
+
+    Linker::Abort("%s unimplemented: %p (mod %p off %p)", __FUNCTION__, ctx, ctx->ti_module,
+            ctx->ti_offset);
+}
+#endif
 
 /**
  * Registers the thread-local info interface.
@@ -97,8 +109,14 @@ ThreadLocal::ThreadLocal() {
             reinterpret_cast<void *>(&__dyldo_setup_tls), 0);
     Linker::the()->map->addLinkerExport("__dyldo_teardown_tls",
             reinterpret_cast<void *>(&__dyldo_teardown_tls), 0);
+
+#if defined(__i386__)
     Linker::the()->map->addLinkerExport("___tls_get_addr",
-            reinterpret_cast<void *>(&__dyldo_tls_get_addr), 0);
+            reinterpret_cast<void *>(&__dyldo_tls_get_addr_i386), 0);
+#elif defined(__amd64__)
+    Linker::the()->map->addLinkerExport("___tls_get_addr",
+            reinterpret_cast<void *>(&__dyldo_tls_get_addr_amd64), 0);
+#endif
 }
 
 /**
