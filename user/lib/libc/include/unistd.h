@@ -96,7 +96,7 @@ extern "C" {
 #endif
 
 /* 1003.1-1990 */
-void	 _exit(int);
+_Noreturn void	 _exit(int);
 int	 access(const char *, int);
 unsigned int	 alarm(unsigned int);
 int	 chdir(const char *);

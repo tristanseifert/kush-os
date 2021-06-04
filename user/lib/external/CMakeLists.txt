@@ -7,6 +7,12 @@ add_subdirectory(bzip2)
 add_subdirectory(lzfse)
 add_subdirectory(cista)
 
+# Cap'n Proto: build a minimal library (without reflection) for now
+set(EXTERNAL_CAPNP ON CACHE BOOL "" FORCE)
+set(CAPNP_LITE ON CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+add_subdirectory(capnproto/c++)
+
 # string formatting
 SET(FMT_OS OFF CACHE BOOL "disable fmtlib OS component" FORCE)
 add_subdirectory(fmtlib)

@@ -13,3 +13,6 @@
 [submodule "kernel/platform/pc64/bootboot"]
 	path = kernel/platform/pc64/bootboot
 	url = https://gitlab.com/bztsrc/bootboot.git
+[submodule "user/lib/external/capnproto"]
+	path = user/lib/external/capnproto
+	url = git@github.com:tristanseifert/capnproto.git

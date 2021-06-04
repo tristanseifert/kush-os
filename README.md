@@ -18,6 +18,9 @@ We use CMake to build everything. The single `CMakeLists.txt` in this directory 
 
 The `toolchain.diff` file contains a patch that should be applied against the checked-out LLVM source to build the toolchain required to build the kernel and userland.
 
+### Build Dependencies
+Besides cmake and the custom LLVM toolchain, the host machine needs to have the [Cap'n Proto](http://capnproto.org) library and tools installed such that the protocol files for RPC services can be built correctly.
+
 ## LLVM Toolchain
 You can use the `build_toolchain.sh` script to build a toolchain to use for compiling the system. This sets up most of the libraries required: you'll also have to build a few supporting libraries.
 
