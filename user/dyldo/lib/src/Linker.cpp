@@ -140,7 +140,6 @@ void Linker::jumpToEntry(const kush_task_launchinfo_t *info) {
     // round up stack address
     const auto stack = ((__dyldo_stack_start + 256 - 1) / 256) * 256;
 
-    Trace("Entry point: %p sp %p", this->entryAddr, stack);
     __dyldo_jmp_to(this->entryAddr, stack, info);
 
     // should really never get here...

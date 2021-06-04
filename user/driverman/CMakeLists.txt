@@ -18,6 +18,10 @@ if(${KERNEL_ARCH} STREQUAL "x86")
 target_sources(driverman PRIVATE
     src/experts/X86PcExpert.cpp
 )
+elseif(${KERNEL_ARCH} STREQUAL "x86_64")
+target_sources(driverman PRIVATE
+    src/experts/Amd64PcExpert.cpp
+)
 endif()
 
 #####
@@ -31,10 +35,6 @@ target_include_directories(driverman PRIVATE src)
 # required libraries
 add_dependencies(driverman c_dynamic system_dynamic)
 target_link_libraries(driverman PRIVATE rpc driver)
-
-# we can remove this when it gets implemented :D
-target_compile_definitions(driverman PRIVATE -DCLI11_HAS_FILESYSTEM=0)
-target_link_libraries(driverman PRIVATE CLI11::CLI11)
 
 # install it to boot directory in sysroot
 install(TARGETS driverman RUNTIME DESTINATION ${SYSROOT_DIR}/boot)

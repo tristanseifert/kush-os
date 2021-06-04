@@ -1,11 +1,9 @@
 #include <string>
 #include <thread>
 
-#include "Log.h"
+#include <getopt.h>
 
-#include "CLI/App.hpp"
-#include "CLI/Formatter.hpp"
-#include "CLI/Config.hpp"
+#include "Log.h"
 
 #include "db/DriverDb.h"
 #include "forest/Forest.h"
@@ -15,18 +13,54 @@
 const char *gLogTag = "driverman";
 
 /**
+ * State as read in from command line
+ */
+static struct {
+    /// Name of the expert to initialize
+    std::string expertName;
+} gState;
+
+/**
+ * Parse command line options
+ */
+static int ParseCommandLine(const int argc, char **argv) {
+    int ch;
+
+    /*
+     * Define arguments for getopt_long()
+     */
+    static struct option options[] = {
+        {"expert", required_argument, nullptr, 'e'},
+        {nullptr, 0, nullptr, 0}
+    };
+
+    // iterate until all are options read
+    while((ch = getopt_long(argc, argv, "", options, nullptr)) != -1) {
+
+        switch(ch) {
+            case 'e':
+                gState.expertName = std::string(optarg);
+                break;
+
+            default:
+                return -1;
+        }
+    }
+
+    return 0;
+}
+
+/**
  * Entry point for the driver manager
  */
-int main(const int argc, const char **argv) {
+int main(const int argc, char **argv) {
     // parse arguments
-    CLI::App app{"Driver manager"};
-
-    std::string expertName;
-    app.add_option("-e,--expert", expertName, "Platform expert to initialize");
-    CLI11_PARSE(app, argc, argv);
+    if(int err = ParseCommandLine(argc, argv)) {
+        return err;
+    }
 
     // load the driver database and set up forest
-    Success("driverman starting (pexpert '%s')", expertName.c_str());
+    Success("driverman starting (pexpert '%s')", gState.expertName.c_str());
 
     Forest::init();
     MessageLoop::init();
@@ -34,9 +68,9 @@ int main(const int argc, const char **argv) {
     DriverDb::init();
 
     // create platform export
-    auto expert = Expert::create(expertName);
+    auto expert = Expert::create(gState.expertName);
     if(!expert) {
-        Abort("Invalid platform expert: %s", expertName.c_str());
+        Abort("Invalid platform expert: %s", gState.expertName.c_str());
     }
 
     Trace("Beginning pexpert probe");

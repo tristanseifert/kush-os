@@ -74,6 +74,8 @@ struct Task: public rt::SharedFromThis<Task> {
         bool skipThreadDealloc = false;
         /// whether the task is in the global registry
         bool registered = false;
+        /// whether termination of the task causes a kernel panic
+        bool isCritical = false;
 
         /// number of physical pages owned by this task
         uintptr_t physPagesOwned = 0;
@@ -125,6 +127,11 @@ struct Task: public rt::SharedFromThis<Task> {
 
         /// Terminates this task with the given return code
         int terminate(int status);
+
+        /// Sets the critical flag, which when set, will panic the kernel if the task temrinates
+        inline void setCritical(bool critical) {
+            this->isCritical = critical;
+        }
 
         /// Returns a handle to the currently executing task.
         static rt::SharedPtr<Task> current();

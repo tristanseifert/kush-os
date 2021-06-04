@@ -37,12 +37,13 @@ static void AllocSrvStack(const uintptr_t, const uintptr_t);
 /**
  * Loads the root server binary from the ramdisk.
  */
-rt::SharedPtr<sched::Task> platform_init_rootsrv() {
+rt::SharedPtr<sched::Task> platform::InitRootsrv() {
     // create the task
     auto task = sched::Task::alloc();
     REQUIRE(task, "failed to allocate rootsrv task");
 
     task->setName("rootsrv");
+    task->setCritical(true);
 
 #if LOG_SETUP
     log("created rootsrv task: %p $%016llx'h", static_cast<void *>(task), task->handle);

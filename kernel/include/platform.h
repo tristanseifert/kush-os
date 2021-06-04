@@ -68,17 +68,22 @@ void RequestSchedulerIpi(const uintptr_t coreId);
  * platform code can use this to place the processor in a low power state.
  */
 void Idle();
+
+/**
+ * Initializes the root server task.
+ */
+rt::SharedPtr<sched::Task> InitRootsrv();
+
+/**
+ * Notifies platform code that virtual memory is available.
+ */
+void VmAvailable();
 }
 
 /**
  * Performs platform-specific initialization.
  */
 extern "C" void platform_init();
-
-/**
- * Notifies platform code that virtual memory is available.
- */
-void platform_vm_available();
 
 /**
  * Writes a character to the platform debug spew, if any.
@@ -169,10 +174,6 @@ void platform_lower_irql(const platform::Irql irql, const bool enableIrq = true)
  */
 const platform::Irql platform_get_irql();
 
-/**
- * Requests a dispatch IPI to be sent to the current processor.
- */
-void platform_request_dispatch();
 
 /**
  * Ensures we're at the given IRQL.
@@ -216,12 +217,5 @@ uint64_t platform_local_timer_now();
  * @return Negative if error, or a cost value [0, INT_MAX).
  */
 int platform_core_distance(const uintptr_t a, const uintptr_t b);
-
-
-/**
- * Initializes the root server task.
- */
-rt::SharedPtr<sched::Task> platform_init_rootsrv();
-
 
 #endif

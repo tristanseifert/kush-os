@@ -65,6 +65,9 @@ list(APPEND c_objs_files
     src/sys/assert.c
     src/sys/atexit.c
     src/sys/exit.c
+    # stdlib
+    src/stdlib/getopt.c
+    src/stdlib/getsubopt.c
     # stdlib math stuff
     src/stdlib/abs.c
     src/stdlib/div.c

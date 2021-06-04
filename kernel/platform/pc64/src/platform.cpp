@@ -52,7 +52,7 @@ void platform_init() {
  * Once VM is available, perform some initialization. We'll parse some basic ACPI tables in order
  * to set up interrupts.
  */
-void platform_vm_available() {
+void platform::VmAvailable() {
     AcpiParser::Init();
 
     // set up the system timer and BSP TSC

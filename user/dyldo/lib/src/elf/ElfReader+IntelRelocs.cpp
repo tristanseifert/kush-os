@@ -196,6 +196,11 @@ void ElfReader::patchRelocsi386(const PaddedArray<Elf_Rel> &rels, const uintptr_
 void ElfReader::patchRelocsAmd64(const PaddedArray<Elf_Rela> &rels, const uintptr_t base) {
     const SymbolMap::Symbol *symbol;
 
+    // ensure stride is valid
+    if(rels.elementStride() < sizeof(Elf_Rela)) {
+        Linker::Abort("Invalid %s stride: %lu", "Elf_Rela", rels.elementStride());
+    }
+
     // process each relocation
     for(const auto &rel : rels) {
         const auto type = ELF_R_TYPE(rel.r_info);

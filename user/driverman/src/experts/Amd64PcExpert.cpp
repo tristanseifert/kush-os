@@ -1,7 +1,7 @@
-#include "X86PcExpert.h"
+#include "Amd64PcExpert.h"
 #include "Log.h"
 
-#include <rpc/task.h>
+#include <rpc/Task.h>
 
 /**
  * Probes for devices.
@@ -9,7 +9,7 @@
  * This loads drivers for some fixed hardware, then starts the ACPI server to discover
  * additional hardware.
  */
-void X86PcExpert::probe() {
+void Amd64PcExpert::probe() {
     // create some architectural shit
 
     // start ACPI server
@@ -30,8 +30,8 @@ void X86PcExpert::probe() {
 }
 
 /**
- * Exports fixed platform devices, i.e. those that are present on all x86 PCs.
+ * Exports fixed platform devices, i.e. those that are present on all 64 bit x86_64 PCs.
  */
-void X86PcExpert::exportFixed() {
+void Amd64PcExpert::exportFixed() {
 
 }

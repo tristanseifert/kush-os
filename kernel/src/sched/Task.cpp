@@ -245,6 +245,10 @@ int Task::terminate(int status) {
     // request task deletion later
     Scheduler::get()->idle->queueDestroyTask(this->sharedFromThis());
 
+    // if the task is critical, panic kernel
+    if(this->isCritical) {
+        panic("critical task '%s' exited (%d)", this->name, status);
+    }
     // finally, terminate calling thread, if it is also in this task
     if(current->task.get() == this) {
         __atomic_store(&current->attachedToTask, &no, __ATOMIC_RELEASE);

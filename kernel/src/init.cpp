@@ -51,7 +51,7 @@ void kernel_init() {
     sched::Scheduler::Init();
 
     // notify other components of VM availability
-    platform_vm_available();
+    platform::VmAvailable();
 }
 
 /**
@@ -62,7 +62,7 @@ void kernel_main() {
     PrintBanner();
 
     // kernel is initialized. launch the root server
-    gRootServer = platform_init_rootsrv();
+    gRootServer = platform::InitRootsrv();
 
     // invoke the scheduler
     sched::Scheduler::get()->run();
