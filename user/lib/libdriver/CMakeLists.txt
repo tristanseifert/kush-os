@@ -20,7 +20,6 @@ target_compile_options(driver PRIVATE -flto)
 target_include_directories(driver PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 target_include_directories(driver PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 
-# for rpc stuff we need Cista
 target_link_libraries(driver PRIVATE mpack_dynamic)
 
 # install the library to the sysroot

@@ -11,13 +11,13 @@
 #include <malloc.h>
 #include <threads.h>
 
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <span>
 #include <vector>
 
-#include <cista/serialization.h>
 #include <rpc/RpcPacket.hpp>
 #include <rpc/FileIO.hpp>
 
@@ -88,7 +88,7 @@ static bool fileio::UpdateCaps() {
     req.requestedVersion = 1;
 
     auto requestBuf = std::span<uint8_t>(reinterpret_cast<uint8_t *>(&req), sizeof(FileIoGetCaps));
-    err = _RpcSend(gState.ioServerPort, static_cast<uint32_t>(FileIoEpType::GetCapabilities),
+    err = rpc::RpcSend(gState.ioServerPort, static_cast<uint32_t>(FileIoEpType::GetCapabilities),
             requestBuf, gState.replyPort);
     if(err) return false;
 

@@ -17,9 +17,13 @@ void exit(int status) {
 /**
  * Terminates the calling task, without invoking any cleanup.
  */
-void _Exit(int status) {
+void _exit(int status) {
     TaskExit(0, status);
 
     // we should never get here
     while(1) {}
+}
+// synonym for _exit(int)
+void _Exit(int status) {
+    _exit(status);
 }

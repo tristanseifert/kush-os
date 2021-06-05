@@ -74,7 +74,7 @@ int FileOpen(const char * _Nonnull _path, const uintptr_t flags, uintptr_t * _No
     }
 
     requestBuf = std::span<uint8_t>(reinterpret_cast<uint8_t *>(open), openMsgLen);
-    err = _RpcSend(gState.ioServerPort, static_cast<uint32_t>(FileIoEpType::OpenFile),
+    err = rpc::RpcSend(gState.ioServerPort, static_cast<uint32_t>(FileIoEpType::OpenFile),
             requestBuf, gState.replyPort);
 
     free(open);
@@ -185,7 +185,7 @@ int FileClose(const uintptr_t file) {
 
     requestBuf = std::span<uint8_t>(reinterpret_cast<uint8_t *>(&req), sizeof(req));
 
-    err = _RpcSend(gState.ioServerPort, static_cast<uint32_t>(FileIoEpType::CloseFile),
+    err = rpc::RpcSend(gState.ioServerPort, static_cast<uint32_t>(FileIoEpType::CloseFile),
             requestBuf, gState.replyPort);
     if(err) {
         err = -2;

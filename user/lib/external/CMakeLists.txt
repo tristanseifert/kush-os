@@ -5,7 +5,6 @@
 # these have native cmake-based build systems
 add_subdirectory(bzip2)
 add_subdirectory(lzfse)
-add_subdirectory(cista)
 
 # Cap'n Proto: build a minimal library (without reflection) for now
 set(EXTERNAL_CAPNP ON CACHE BOOL "" FORCE)

@@ -2,7 +2,8 @@
 #include "Task.h"
 
 #include <sys/syscalls.h>
-#include <cista/serialization.h>
+#include <capnp/message.h>
+#include <capnp/serialize.h>
 
 #include <cstring>
 #include <span>
@@ -10,12 +11,15 @@
 #include "log.h"
 #include "dispensary/Dispensary.h"
 
-#include "rpc/RootSrvTaskEndpoint.hpp"
+#include "rpc/TaskEndpoint.capnp.h"
+
 #include <rpc/RpcPacket.hpp>
+#include <rpc/Helpers.hpp>
 
 using namespace std::literals;
 using namespace task;
 using namespace rpc;
+using namespace rpc::TaskEndpoint;
 
 // declare the constants for the handler
 const std::string_view RpcHandler::kPortName = "me.blraaz.rpc.rootsrv.task"sv;
@@ -57,10 +61,12 @@ void RpcHandler::main() {
     err = posix_memalign(&rxBuf, 16, kMaxMsgLen);
     REQUIRE(!err, "failed to allocate message rx buffer: %d", err);
 
+    memset(rxBuf, 0, kMaxMsgLen);
+
     // process messages
     while(this->run) {
         // clear out any previous messages
-        memset(rxBuf, 0, kMaxMsgLen);
+        memset(rxBuf, 0, sizeof(struct MessageHeader));
 
         // read from the port
         struct MessageHeader *msg = (struct MessageHeader *) rxBuf;
@@ -69,7 +75,7 @@ void RpcHandler::main() {
         if(err > 0) {
             // read out the type
             if(msg->receivedBytes < sizeof(rpc::RpcPacket)) {
-                LOG("Port $%08x'h received too small message (%u)", this->portHandle,
+                LOG("Port $%p'h received too small message (%u)", this->portHandle,
                         msg->receivedBytes);
                 continue;
             }
@@ -78,12 +84,12 @@ void RpcHandler::main() {
 
             // invoke the appropriate handler
             switch(packet->type) {
-                case static_cast<uint32_t>(rpc::RootSrvTaskEpType::TaskCreate):
+                case K_TYPE_CREATE_REQUEST:
                     this->handleCreate(msg, packet);
                     break;
 
                 default:
-                    LOG("Task RPC invalid msg type: $%08x", packet->type);
+                    LOG("Task RPC invalid msg type: $%0x", packet->type);
                     break;
             }
         }
@@ -101,60 +107,37 @@ void RpcHandler::main() {
  * Processes the create task request.
  */
 void RpcHandler::handleCreate(const struct MessageHeader *msg, const RpcPacket *packet) {
+    capnp::MallocMessageBuilder replyBuilder;
+    auto reply = replyBuilder.initRoot<rpc::TaskEndpoint::CreateReply>();
+
     // get at the data and try to deserialize
     auto reqBuf = std::span(packet->payload, msg->receivedBytes - sizeof(RpcPacket));
-    auto req = cista::deserialize<RootSrvTaskCreate>(reqBuf);
+    kj::ArrayPtr<const capnp::word> message(reinterpret_cast<const capnp::word *>(reqBuf.data()),
+            reqBuf.size() / sizeof(capnp::word));
+    capnp::FlatArrayMessageReader reader(message);
+    auto req = reader.getRoot<rpc::TaskEndpoint::CreateRequest>();
 
     // create the task
-    const std::string path(req->path);
+    const std::string path(req.getPath());
     std::vector<std::string> params;
 
-    for(const auto &arg : req->args) {
+    for(const auto &arg : req.getArgs()) {
         params.emplace_back(arg);
     }
 
-    auto taskHandle = Task::createFromFile(path, params);
-
-    // build reply
-    RootSrvTaskCreateReply reply;
-    reply.handle = taskHandle;
-    reply.status = (taskHandle ? 0 : -1);
-
-    // send it
-    auto buf = cista::serialize(reply);
-    this->reply(packet, RootSrvTaskEpType::TaskCreateReply, buf);
-
-}
-
-/**
- * Sends an RPC message.
- */
-void RpcHandler::reply(const rpc::RpcPacket *packet, const rpc::RootSrvTaskEpType type,
-        const std::span<uint8_t> &buf) {
-    int err;
-    void *txBuf = nullptr;
-
-    // allocate the reply buffer
-    const auto replySize = buf.size() + sizeof(rpc::RpcPacket);
-    err = posix_memalign(&txBuf, 16, replySize);
-    if(err) {
-        throw std::system_error(err, std::generic_category(), "posix_memalign");
+    try {
+        auto taskHandle = Task::createFromFile(path, params);
+        reply.setHandle(taskHandle);
+        reply.setStatus(0);
+    } catch(std::exception &e) {
+        LOG("Failed to create task: %s", e.what());
+        reply.setStatus(-1);
     }
 
-    auto txPacket = reinterpret_cast<rpc::RpcPacket *>(txBuf);
-    txPacket->type = static_cast<uint32_t>(type);
-    txPacket->replyPort = 0;
-
-    memcpy(txPacket->payload, buf.data(), buf.size());
-
-    // send it
-    const auto replyPort = packet->replyPort;
-    err = PortSend(replyPort, txPacket, replySize);
-
-    free(txBuf);
-
+    // send reply
+    int err = RpcSend(packet->replyPort, K_TYPE_CREATE_REPLY, replyBuilder);
     if(err) {
-        throw std::system_error(err, std::generic_category(), "PortSend");
+        throw std::system_error(err, std::generic_category(), "RpcSend");
     }
 }
 

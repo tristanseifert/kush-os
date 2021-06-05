@@ -89,7 +89,9 @@ typedef    size_t    useconds_t;
 #define	_SC_2_UPE		25 /* user */
 #define	_SC_STREAM_MAX		26 /* user */
 #define	_SC_TZNAME_MAX		27 /* user */
-#define _SC_PAGESIZE        28 
+
+#define _SC_PAGESIZE            28 
+#define _SC_PAGE_SIZE           _SC_PAGESIZE
 
 #ifdef __cplusplus
 extern "C" {

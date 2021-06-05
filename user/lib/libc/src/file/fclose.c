@@ -1,12 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "file_private.h"
+#include "fd/map.h"
 
 /**
  * Close the specified file descriptor.
  */
 int fclose(FILE *stream) {
     int err = 0;
+
+    // unregister the FD
+#ifndef LIBC_NOTLS
+    UnregisterFdStream(stream);
+#endif
 
     // invoke the close handler
     if(stream->close) {

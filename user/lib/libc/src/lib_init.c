@@ -1,4 +1,5 @@
 #include "threads/thread_info.h"
+#include "file/fd/map.h"
 #include "LaunchInfo.h"
 
 extern void __stdstream_init();
@@ -17,6 +18,9 @@ void __libc_init() {
 #endif
 
     // set up input/output streams
+#ifndef LIBC_NOTLS
+    InitFdToStreamMap();
+#endif
     __stdstream_init();
 }
 

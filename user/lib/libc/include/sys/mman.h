@@ -4,6 +4,10 @@
 #include <_libc.h>
 #include <sys/types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Protections are chosen from these bits, or-ed together
  */
@@ -37,6 +41,9 @@
 // mask for flag values
 #define MAP_FLAGMASK                    0xfff7
 
+/// indicates a call to mmap() failed
+#define MAP_FAILED                      ((void *) -1)
+
 /*
  * Flags for msync
  */
@@ -64,4 +71,7 @@ LIBC_EXPORT int    munlock(const void *, size_t);
 LIBC_EXPORT int    munlockall(void);
 LIBC_EXPORT int    munmap(void *, size_t);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

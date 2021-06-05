@@ -8,10 +8,13 @@
 #include <string_view>
 #include <thread>
 
-#include "rpc/RootSrvTaskEndpoint.hpp"
 #include <rpc/RpcPacket.hpp>
 
 struct MessageHeader;
+
+namespace capnp {
+class MessageBuilder;
+}
 
 namespace task {
 /**
@@ -38,8 +41,6 @@ class RpcHandler {
         void main();
         /// Handles a "create task" request
         void handleCreate(const struct MessageHeader *, const rpc::RpcPacket *);
-
-        void reply(const rpc::RpcPacket *, const rpc::RootSrvTaskEpType, const std::span<uint8_t> &);
 
     private:
         static RpcHandler *gShared;

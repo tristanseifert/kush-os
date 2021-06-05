@@ -3,14 +3,17 @@
 #include "helpers/Send.h"
 
 #include <cstdint>
+#include <cstdio>
 
 #include <rpc/RpcPacket.hpp>
-#include <rpc/RootSrvTaskEndpoint.hpp>
+#include "rpc/rootsrv/TaskEndpoint.capnp.h"
 
-#include <cista/serialization.h>
+#include <capnp/message.h>
+#include <capnp/serialize.h>
 
 using namespace task;
 using namespace rpc;
+using namespace rpc::TaskEndpoint;
 
 /**
  * Task creation function
@@ -26,14 +29,24 @@ int RpcTaskCreate(const char *path, const char **args, uintptr_t *outHandle) {
     });
 
     // build up message
-    RootSrvTaskCreate req;
+    capnp::MallocMessageBuilder requestBuilder;
+    auto request = requestBuilder.initRoot<rpc::TaskEndpoint::CreateRequest>();
 
-    req.path = std::string(path);
+    request.setPath(path);
 
     if(args) {
-        const char *arg = args[0];
-        for(size_t i = 0; arg; i++, arg = args[i]) {
-            req.args.push_back(std::string(arg));
+        // count number of args
+        size_t nArgs = 0;
+        for(const char *arg = args[0]; arg; nArgs++, arg = args[nArgs]) { }
+
+        // set up the list
+        if(nArgs) {
+            auto list = request.initArgs(nArgs);
+
+            const char *arg = args[0];
+            for(size_t i = 0; arg; i++, arg = args[i]) {
+                list.set(i, arg);
+            }
         }
     }
 
@@ -42,9 +55,7 @@ int RpcTaskCreate(const char *path, const char **args, uintptr_t *outHandle) {
     if(err != thrd_success) return -1;
 
     // send it
-    auto buf = cista::serialize(req);
-    err = _RpcSend(gState.serverPort, static_cast<uint32_t>(RootSrvTaskEpType::TaskCreate),
-            buf, gState.replyPort);
+    err = rpc::RpcSend(gState.serverPort, K_TYPE_CREATE_REQUEST, requestBuilder, gState.replyPort);
 
     if(err) {
         err = -1;
@@ -65,22 +76,26 @@ int RpcTaskCreate(const char *path, const char **args, uintptr_t *outHandle) {
         }
 
         const auto packet = reinterpret_cast<RpcPacket *>(rxMsg->data);
-        if(packet->type != static_cast<uint32_t>(RootSrvTaskEpType::TaskCreateReply)) {
+        if(packet->type != K_TYPE_CREATE_REPLY) {
             fprintf(stderr, "%s received wrong packet type %08x!\n", __FUNCTION__, packet->type);
             err = -3;
             goto fail;
         }
 
         // deserialize the response
-        auto data = std::span(packet->payload, err - sizeof(RpcPacket));
-        auto res = cista::deserialize<RootSrvTaskCreateReply>(data);
-        if(res->status) {
-            err = res->status;
+        auto resBuf = std::span(packet->payload, err - sizeof(RpcPacket));
+        kj::ArrayPtr<const capnp::word> message(reinterpret_cast<const capnp::word *>(resBuf.data()),
+                resBuf.size() / sizeof(capnp::word));
+        capnp::FlatArrayMessageReader responseReader(message);
+        auto res = responseReader.getRoot<rpc::TaskEndpoint::CreateReply>();
+
+        if(res.getStatus()) {
+            err = res.getStatus();
         } else {
             err = 0;
 
             if(outHandle) {
-                *outHandle = res->handle;
+                *outHandle = res.getHandle();
             }
         }
     }

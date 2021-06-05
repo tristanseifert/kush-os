@@ -44,3 +44,19 @@ void operator delete[](void *p) {
 void operator delete(void *p, std::align_val_t al) {
     free(p);
 }
+
+namespace std {
+/// provide a bogus implementation of this getter; there are no exceptions here
+int uncaught_exceptions() noexcept {
+    return 0;
+}
+}
+
+// we're single threaded, so stub out the C++ static allocation guards
+extern "C" int __cxa_guard_acquire(uint64_t* guard_object) {
+    return 0;
+}
+extern "C" void __cxa_guard_release(uint64_t *object) {
+    *object |= 0xFF;
+}
+

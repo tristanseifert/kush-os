@@ -34,7 +34,7 @@ target_include_directories(driverman PRIVATE src)
 
 # required libraries
 add_dependencies(driverman c_dynamic system_dynamic)
-target_link_libraries(driverman PRIVATE rpc driver)
+target_link_libraries(driverman PRIVATE capnp rpc driver)
 
 # install it to boot directory in sysroot
 install(TARGETS driverman RUNTIME DESTINATION ${SYSROOT_DIR}/boot)

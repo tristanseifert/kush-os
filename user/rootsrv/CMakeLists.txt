@@ -1,6 +1,14 @@
 ###############################################################################
 # Root server (init task)
 ###############################################################################
+# compile all Cap'n Proto schemas
+find_package(CapnProto)
+set(CAPNP_INCLUDE_DIRECTORY "${SYSROOT_DIR}/usr/include/capnp")
+
+capnp_generate_cpp(CAPNP_SRCS CAPNP_HDRS
+    rpc/TaskEndpoint.capnp
+)
+
 add_executable(rootsrv
     src/main.cpp
     src/log.c
@@ -12,13 +20,13 @@ add_executable(rootsrv
     src/task/Registry.cpp
     src/task/RpcHandler.cpp
     src/task/InfoPage.cpp
-    src/task/DyldoPipe.cpp
     src/task/loader/ElfCommon.cpp
     src/task/loader/Elf32.cpp
     src/task/loader/Elf64.cpp
     src/dispensary/Dispensary.cpp
     src/dispensary/Registry.cpp
     src/dispensary/RpcHandler.cpp
+    ${CAPNP_SRCS}
 )
 
 #### arch specific ELF loader code
@@ -40,18 +48,18 @@ target_compile_options(rootsrv PRIVATE -flto)
 
 # copy the bundle types include file
 file(COPY ${CMAKE_CURRENT_LIST_DIR}/../../tools/mkinit/src/BundleTypes.h DESTINATION ${CMAKE_CURRENT_LIST_DIR}/src/init)
-# copy the dynamic linker RPC headers
-file(COPY ${CMAKE_CURRENT_LIST_DIR}/../dyldo/srv/include/rpc/LoaderPort.h DESTINATION ${CMAKE_CURRENT_LIST_DIR}/include/rpc)
 
 # search our codebase for includes
 target_include_directories(rootsrv PRIVATE include)
 target_include_directories(rootsrv PRIVATE src)
+target_include_directories(rootsrv PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 # required libraries
 add_dependencies(rootsrv c_static)
 target_link_libraries(rootsrv PRIVATE c_static)
-target_link_libraries(rootsrv PRIVATE system_static rpc_static lzfse_static unwind cista)
+target_link_libraries(rootsrv PRIVATE system_static rpc_static lzfse_static unwind)
 target_link_libraries(rootsrv PRIVATE fmt::fmt-header-only)
+target_link_libraries(rootsrv PRIVATE capnp)
 
 # we have to compile the root server as standalone
 target_link_options(rootsrv PRIVATE -static)

@@ -3,6 +3,7 @@
 #include <errno.h>
 #include "file_private.h"
 #include "rpc_file_streams.h"
+#include "fd/map.h"
 
 /**
  * Table of file open handlers; multiple different backends can implement file-like interfaces. We
@@ -23,7 +24,14 @@ FILE *fopen(const char * restrict path, const char * restrict mode) {
 
     for(size_t i = 0; i < kNumOpenHandlers; i++) {
         file = (gOpenHandlers[i])(path, mode);
-        if(file) return file;
+        if(file) {
+#ifndef LIBC_NOTLS
+            // register a file descriptor number
+            int err = RegisterFdStream(file, true);
+            if(err) abort();
+#endif
+            return file;
+        }
     }
 
     // no handler could satisfy this request
@@ -31,7 +39,15 @@ FILE *fopen(const char * restrict path, const char * restrict mode) {
     return NULL;
 }
 
-FILE *fdopen(int fildes, const char *mode) {
-    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
+/**
+ * Simply return the file stream previously allocated to this descriptor.
+ *
+ * TODO: Do stuff with the mode argument
+ */
+FILE *fdopen(int filedes, const char *mode) {
+#ifndef LIBC_NOTLS
+    return ConvertFdToStream(filedes);
+#else
     return NULL;
+#endif
 }

@@ -222,8 +222,9 @@ void ElfReader::patchRelocsAmd64(const PaddedArray<Elf_Rela> &rels, const uintpt
 
                 const auto name = this->readStrtab(sym.st_name);
                 if(!name) {
-                    Linker::Abort("failed to resolve name for symbol %lu (off %lx info %lx base %lx)",
+                    Linker::Info("failed to resolve name for symbol %lu (off %lx info %lx base %lx)",
                             symIdx, rel.r_offset, rel.r_info, base);
+                    continue;
                 }
 
                 // resolve to symbol

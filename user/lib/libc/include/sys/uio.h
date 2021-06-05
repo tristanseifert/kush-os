@@ -4,6 +4,10 @@
 #include <_libc.h>
 #include <sys/cdefs.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /// Maximum of IO vectors per IO (XXX: this is arbitrarily set)
 #define IOV_MAX         (100)
 
@@ -22,4 +26,7 @@ LIBC_EXPORT ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
 /// Write to the given file descriptor with vectored IO
 LIBC_EXPORT ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

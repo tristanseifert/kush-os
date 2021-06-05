@@ -16,6 +16,7 @@ set(SYSROOT_DIR ${CMAKE_CURRENT_BINARY_DIR}/../sysroot CACHE FILEPATH "Sysroot d
 message("Sysroot at ${SYSROOT_DIR}")
 
 set(CMAKE_INSTALL_PREFIX ${SYSROOT_DIR})
+set(CMAKE_INSTALL_INCLUDEDIR "usr/include")
 
 ##### Version
 include(GetGitRevisionDescription)

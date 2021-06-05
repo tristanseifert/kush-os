@@ -1,7 +1,6 @@
 #include "Task.h"
 #include "Registry.h"
 #include "InfoPage.h"
-#include "DyldoPipe.h"
 
 #include "LaunchInfo.h"
 #include "loader/Loader.h"

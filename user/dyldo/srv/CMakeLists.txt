@@ -13,8 +13,6 @@ add_executable(dyldosrv
     src/dylib/Registry.cpp
     # prelinking of runtime libs
     src/prelink/Prelink.cpp
-    # rpc servers
-    src/server/LoaderPort.cpp
 )
 
 #####
@@ -27,7 +25,7 @@ target_include_directories(dyldosrv PRIVATE src)
 
 # required libraries
 add_dependencies(dyldosrv c_dynamic system_dynamic)
-target_link_libraries(dyldosrv PRIVATE rpc_dynamic unwind cista fmt::fmt-header-only)
+target_link_libraries(dyldosrv PRIVATE rpc_dynamic unwind fmt::fmt-header-only)
 
 # build a static binary
 #target_link_options(dyldosrv PRIVATE -static)

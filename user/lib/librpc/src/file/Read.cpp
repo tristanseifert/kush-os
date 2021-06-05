@@ -65,7 +65,7 @@ LIBRPC_INTERNAL static int FileReadDirect(const uintptr_t file, const uint64_t _
 
         auto requestBuf = std::span<uint8_t>(reinterpret_cast<uint8_t *>(&req), sizeof(req));
 
-        err = _RpcSend(gState.ioServerPort, static_cast<uint32_t>(FileIoEpType::ReadFileDirect),
+        err = rpc::RpcSend(gState.ioServerPort, static_cast<uint32_t>(FileIoEpType::ReadFileDirect),
                 requestBuf, gState.replyPort);
         if(err) goto fail;
 

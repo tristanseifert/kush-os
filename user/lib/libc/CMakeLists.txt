@@ -145,6 +145,7 @@ list(APPEND c_objs_files
     src/threads/c11_threads.c
     src/threads/c11_threadlocal.c
     src/threads/c11_mutex.c
+    src/threads/sched.c
     # internal data structures
     src/struct/hashmap.c
 )
@@ -156,6 +157,18 @@ add_library(c_objs OBJECT
 
 target_compile_options(c_objs PRIVATE -flto -fno-exceptions -fno-rtti)
 target_compile_definitions(c_objs PRIVATE BUILDING_LIBC=1)
+
+# additional objects for the "full" (aka not the "NO_TLS")  libc
+add_library(c_extra_objs OBJECT
+    # file IO but with file descriptor numbers
+    src/file/fd/map.c
+    src/file/fd/read.c
+    src/file/fd/write.c
+    src/file/fd/close.c
+)
+
+target_compile_options(c_extra_objs PRIVATE -flto -fno-exceptions -fno-rtti)
+target_compile_definitions(c_extra_objs PRIVATE BUILDING_LIBC=1)
 
 # gdtoa: for floating point conversions
 add_library(c_gdtoa OBJECT
@@ -209,10 +222,12 @@ file(COPY ${CMAKE_CURRENT_LIST_DIR}/../../rootsrv/include/LaunchInfo.h  DESTINAT
 
 # specify the include directories
 target_include_directories(c_objs PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
+target_include_directories(c_extra_objs PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 target_include_directories(c_objs PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
+target_include_directories(c_extra_objs PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 
 # set up the static and dynamic targets
-add_library(c_static STATIC $<TARGET_OBJECTS:c_objs> $<TARGET_OBJECTS:c_gdtoa>
+add_library(c_static STATIC $<TARGET_OBJECTS:c_objs> $<TARGET_OBJECTS:c_extra_objs> $<TARGET_OBJECTS:c_gdtoa>
     src/dylink/dl_iterate_phdr_static.c
     src/threads/tls_static.c
 )
@@ -221,7 +236,7 @@ set_target_properties(c_static PROPERTIES OUTPUT_NAME "c")
 target_include_directories(c_static PUBLIC include)
 target_link_libraries(c_static PUBLIC system_static)
 
-add_library(c_dynamic SHARED $<TARGET_OBJECTS:c_objs> $<TARGET_OBJECTS:c_gdtoa>
+add_library(c_dynamic SHARED $<TARGET_OBJECTS:c_objs> $<TARGET_OBJECTS:c_extra_objs> $<TARGET_OBJECTS:c_gdtoa>
     src/dylink/dl_iterate_phdr_dynamic.c
     src/threads/tls_dynamic.c
 )

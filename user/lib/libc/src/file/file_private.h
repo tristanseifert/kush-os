@@ -16,6 +16,8 @@
 typedef struct __libc_file_stream {
     /// length of the whole struct
     size_t length;
+    /// fake file descriptor index
+    int fd;
 
     /// lock over the stream
     mtx_t lock;

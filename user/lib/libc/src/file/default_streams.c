@@ -4,10 +4,12 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <sys/syscalls.h>
 
 #include "file_private.h"
+#include "fd/map.h"
 
 /**
  * Define the default streams (stdin, stdout, and stderr) and provide the code to connect them at
@@ -112,18 +114,25 @@ static int DebugOutPurge(struct __libc_file_stream *_file) {
  * each of them.
  */
 LIBC_INTERNAL void __stdstream_init() {
-    // allocate a stream
-    struct DebugOutStream *stream = calloc(1, sizeof(struct DebugOutStream));
+    struct DebugOutStream *stream;
+
+    // allocate the stderr stream
+    stream = calloc(1, sizeof(struct DebugOutStream));
     if(!stream) abort();
 
     stream->header.length = sizeof(struct DebugOutStream);
+    stream->header.fd = STDERR_FILENO;
 
     stream->header.putc = DebugOutPutc;
     stream->header.flush = DebugOutFlush;
     stream->header.purge = DebugOutPurge;
     stream->header.tell = DebugTell;
 
-    // configure it as the standard output and error out
+#ifndef LIBC_NOTLS
+    int err = RegisterFdStream((stream_t *) stream, false);
+    if(err) abort();
+#endif
+
     __stderrp = (FILE *) stream;
     __stdoutp = (FILE *) stream;
 }

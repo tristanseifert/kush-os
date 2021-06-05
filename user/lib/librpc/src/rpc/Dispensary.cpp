@@ -108,7 +108,7 @@ int LookupService(const char * _Nonnull _name, uintptr_t * _Nonnull outPort) {\
 
     buf = std::span<uint8_t>(reinterpret_cast<uint8_t *>(req), packetLen);
 
-    err = _RpcSend(__kush_infopg->dispensaryPort,
+    err = RpcSend(__kush_infopg->dispensaryPort,
             static_cast<uint32_t>(RootSrvDispensaryEpType::Lookup), buf, gLookupReplyPort);
 
     if(err) {
@@ -217,7 +217,7 @@ int RegisterService(const char * _Nonnull _name, const uintptr_t port) {
     buf = std::span<uint8_t>(reinterpret_cast<uint8_t *>(req), packetLen);
 
     // and send it
-    err = _RpcSend(__kush_infopg->dispensaryPort,
+    err = RpcSend(__kush_infopg->dispensaryPort,
             static_cast<uint32_t>(RootSrvDispensaryEpType::Register), buf, gLookupReplyPort);
     if(err) {
         goto fail;
