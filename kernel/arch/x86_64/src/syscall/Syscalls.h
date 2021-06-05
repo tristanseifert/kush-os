@@ -7,6 +7,7 @@
 
 namespace arch::syscall {
 intptr_t UpdateThreadTlsBase(const uintptr_t threadHandle, const bool gs, const uintptr_t base);
+intptr_t GetLoaderInfo(void *outBuf, const size_t outBufLen);
 }
 
 #endif

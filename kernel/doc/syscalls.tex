@@ -7,6 +7,7 @@
 \usepackage{bytefield}
 \usepackage{xcolor}
 \usepackage{amsmath}
+\usepackage{hyperref}
 
 
 % facilitates the creation of memory maps. Start address at the bottom, end address at the top.
@@ -608,5 +609,12 @@ Sets the thread-local base to the given address. This updates the value of \text
 Sets the thread-local base to the given address. This updates the value of \texttt{\%gs} or \texttt{\%fs} that's updated every time the thread is switched in. The initial value of both registers is 0.
 
 An index of $1$ writes to \texttt{\%gs}, and $0$ to \texttt{\%fs}.
+
+%%%%%
+\subsubsection{{\tt 0x41}: Get bootloader info struct}
+\textbf{Arguments:} (2) Output buffer address, output buffer size \\
+\textbf{Returns:} Positive number of bytes copied on success, or a negative error code \\
+
+Copies the information structure provided by the bootloader (if any) into the provided userspace buffer. On all current amd64 implementations, this is the \href{https://gitlab.com/bztsrc/bootboot/}{BOOTBOOT} loader.
 
 \end{document}  

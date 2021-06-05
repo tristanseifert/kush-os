@@ -16,6 +16,11 @@ static bool gLogAcpicaMemMap = false;
 /// Whether memory read/write is logged
 static bool gLogAcpicaMemOps = true;
 
+
+/// VM range [start, end) into which ACPI mappings are placed
+static const uintptr_t kVmMappingRange[2] = {
+    0x10000000000, 0x20000000000
+};
 /**
  * Allocate memory; thunk through to the C heap.
  */
@@ -49,16 +54,16 @@ void *AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, ACPI_SIZE Length) {
     const uintptr_t pageLength = ((Length + pageSz - 1) / pageSz) * pageSz;
 
     // perform the mapping; we want it to be RW
-    err = AllocVirtualRegion(physBase, 0, pageLength, VM_REGION_RW, &region);
+    err = AllocVirtualPhysRegion(physBase, pageLength, VM_REGION_RW, &region);
     if(err) {
-        Warn("%s failed: %d", "AllocVirtualRegion", err);
+        Warn("%s failed: %d", "AllocVirtualPhysRegion", err);
         return NULL;
     }
 
-    // get the base address of the region
-    err = VirtualRegionGetInfo(region, &regionBase, NULL, NULL);
+    // map it
+    err = MapVirtualRegionRange(region, kVmMappingRange, pageLength, 0, &regionBase);
     if(err) {
-        Warn("%s failed: %d", "VirtualRegionGetInfo", err);
+        Warn("%s failed: %d", "MapVirtualRegionRange", err);
         return NULL;
     }
 

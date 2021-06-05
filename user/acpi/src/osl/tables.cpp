@@ -37,8 +37,10 @@ ACPI_STATUS AcpiOsPhysicalTableOverride(ACPI_TABLE_HEADER *ExistingTable,
 /**
  * Locates the ACPI table root pointer (RSDP).
  *
- * On x86, we use the built-in function to scan the first 1M of memory for the table; other
- * platforms will have different mechanisms to acquire this table pointer.
+ * The way this works is platform specific:
+ *
+ * - x86: Use the built-in ACPI function to find the root pointer in the first 1M of memory.
+ * - amd64: Receive root pointer from BOOTBOOT loader
  */
 ACPI_PHYSICAL_ADDRESS AcpiOsGetRootPointer() {
 #if defined(__i386__)

@@ -34,6 +34,8 @@ enum Errors: int {
     DeadlockPrevented                   = -12,
     /// Required memory allocation failed
     NoMemory                            = -13,
+    /// The buffer provided to the call is too small for the requested operation.
+    BufferTooSmall                      = -14,
 };
 }
 

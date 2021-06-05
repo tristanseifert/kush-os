@@ -21,6 +21,8 @@ extern "C" {
 LIBSYSTEM_EXPORT int Amd64SetThreadLocalBase(const int which, const uintptr_t base);
 LIBSYSTEM_EXPORT int Amd64SetThreadLocalBaseFor(const uintptr_t threadHandle, const int which, const uintptr_t base);
 
+LIBSYSTEM_EXPORT int Amd64CopyLoaderInfo(void *outBuf, const size_t outBufLen);
+
 #ifdef __cplusplus
 }
 #endif

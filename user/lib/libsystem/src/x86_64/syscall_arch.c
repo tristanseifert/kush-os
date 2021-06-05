@@ -21,6 +21,15 @@ int Amd64SetThreadLocalBaseFor(const uintptr_t threadHandle, const int which, co
 }
 
 /**
+ * Copies out bootloader information into the provided user buffer.
+ *
+ * @return Number of bytes copied, or negative error code.
+ */
+int Amd64CopyLoaderInfo(void *outBuf, const size_t outBufLen) {
+    return __do_syscall2((uintptr_t) outBuf, outBufLen, SYS_ARCH_AMD64_GET_LOADER_INFO);
+}
+
+/**
  * Called when a thread returns; it'll gracefully destroy this one.
  */
 void LIBSYSTEM_INTERNAL Amd64ThreadExit() {

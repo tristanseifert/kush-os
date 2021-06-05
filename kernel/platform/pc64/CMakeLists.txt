@@ -28,6 +28,7 @@ add_library(kernel_platform_pc64 OBJECT
     src/timer/pit.cpp
     src/init/LoadRootsrv.cpp
     src/acpi/Parser.cpp
+    src/syscall/LoaderInfo.cpp
 )
 
 target_include_directories(kernel_platform_pc64 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../src)

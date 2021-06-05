@@ -155,6 +155,8 @@ arch_syscall_table:
 
     // 0x40: amd64: Set thread local base address
     .quad       _ZN4arch7syscall19UpdateThreadTlsBaseEmbm
+    // 0x41: amd64: Get bootloader info
+    .quad       _ZN4arch7syscall13GetLoaderInfoEPvm
 
 arch_syscall_table_end:
 
