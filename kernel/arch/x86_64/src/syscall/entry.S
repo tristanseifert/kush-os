@@ -61,7 +61,7 @@ arch_syscall_table:
     .quad       _ZN3sys7Syscall20UnimplementedSyscallEv
 
     // 0x08: Receive notification
-    .quad       _ZN3sys13NotifyReceiveEm
+    .quad       _ZN3sys13NotifyReceiveEmm
     // 0x09: Send notification
     .quad       _ZN3sys10NotifySendE6Handlem
     // 0x0A-0x0F: Reserved

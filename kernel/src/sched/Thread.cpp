@@ -575,15 +575,25 @@ unhandled:;
  * this and the notification mask is nonzero, the thread is unblocked (if it is blocked.)
  */
 void Thread::notify(const uintptr_t bits) {
+    DECLARE_CRITICAL();
+
     uintptr_t mask;
+
+    CRITICAL_ENTER();
 
     // set the bits
     const auto set = __atomic_or_fetch(&this->notifications, bits, __ATOMIC_RELEASE);
     __atomic_load(&this->notificationMask, &mask, __ATOMIC_RELAXED);
 
+    // wake thread if needed
     if(set & mask) {
-        // TODO: wake up thread
+        if(this->state == State::NotifyWait) {
+            Scheduler::get()->threadUnblocked(this->sharedFromThis());
+            this->blockState = BlockState::Unblocked;
+        }
     }
+
+    CRITICAL_EXIT();
 }
 
 /**
@@ -591,9 +601,12 @@ void Thread::notify(const uintptr_t bits) {
  *
  * @param mask If nonzero, a new value to set for the thread's notification mask.
  * @return The bitwise AND of the notification bits and the notification mask.
+ *
+ * TODO: Handle timeout value!
  */
-uintptr_t Thread::blockNotify(const uintptr_t _mask) {
+uintptr_t Thread::blockNotify(const uintptr_t _mask, const uintptr_t timeout) {
     uintptr_t mask;
+    bool shouldBlock = !!timeout;
 
     DECLARE_CRITICAL();
     CRITICAL_ENTER();
@@ -614,19 +627,18 @@ uintptr_t Thread::blockNotify(const uintptr_t _mask) {
         return (oldBits & mask);
     }
 
-    // prepare for blocking
-    auto flag = SignalFlag::make();
-    this->notificationsFlag = flag;
-
+    // we need to block
+    if(shouldBlock) {
+        this->setState(State::NotifyWait);
+    }
     CRITICAL_EXIT();
 
-    // block on it
-    this->blockOn(this->notificationsFlag);
+    if(shouldBlock) {
+        Scheduler::get()->yield();
+        __atomic_clear(&this->notified, __ATOMIC_RELEASE);
+    }
 
-    // woke up from blocking. return the set bits
-    this->notificationsFlag = nullptr;
-    __atomic_clear(&this->notified, __ATOMIC_RELEASE);
-
+    // return the set bits
     const auto newBits = __atomic_fetch_and(&this->notifications, ~mask, __ATOMIC_RELAXED);
     return (newBits & mask);
 } 

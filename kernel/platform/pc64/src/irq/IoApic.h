@@ -17,7 +17,7 @@ namespace platform {
 class IoApic {
     public:
         /// Vector number for the first IOAPIC interrupt
-        constexpr static const uint8_t kFirstVector = 0x40;
+        constexpr static const uint8_t kFirstVector = 0x30;
 
     public:
         IoApic(const uintptr_t base, const uint32_t irqBase, const uint8_t id);

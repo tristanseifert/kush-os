@@ -17,8 +17,8 @@ add_library(kernel_platform_pc64 OBJECT
     src/irq/LocalApic.cpp
     src/irq/IoApic.cpp
     src/irq/Irql.cpp
-    src/irq/Ipi.cpp
-    src/irq/Registry.cpp
+    src/irq/CoreLocalRegistry.cpp
+    src/irq/RegistryThunks.cpp
     src/irq/pic.cpp
     src/irq/Idle.cpp
     src/timer/ApicTimer.cpp

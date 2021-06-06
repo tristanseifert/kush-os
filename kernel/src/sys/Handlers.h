@@ -30,7 +30,7 @@ intptr_t PortDealloc(const Handle portHandle);
 /// Sets the given notification bits in the thread.
 intptr_t NotifySend(const Handle threadHandle, const uintptr_t bits);
 /// Blocks waiting to receive a notification.
-intptr_t NotifyReceive(uintptr_t mask);
+intptr_t NotifyReceive(uintptr_t mask, const uintptr_t timeout);
 
 
 struct VmInfo;

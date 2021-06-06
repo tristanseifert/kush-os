@@ -44,6 +44,7 @@ enum class IrqFlags {
  */
 class IrqManager {
     friend class AcpiParser;
+    friend class CoreLocalIrqRegistry;
 
     public:
         /// Initialize the global IRQ manager.

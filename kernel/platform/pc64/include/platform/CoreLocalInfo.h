@@ -6,6 +6,7 @@
 namespace platform {
 class LocalApic;
 class Tsc;
+class CoreLocalIrqRegistry;
 
 /**
  * PC platform specific information that's stored in the core local info block.
@@ -15,6 +16,9 @@ struct CoreLocalInfo {
     LocalApic *lapic = nullptr;
     /// TSC timer wrapper
     Tsc *tsc = nullptr;
+
+    /// per core high level irq registrar
+    CoreLocalIrqRegistry *irqRegistrar = nullptr;
 };
 }
 

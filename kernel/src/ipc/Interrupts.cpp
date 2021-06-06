@@ -21,7 +21,7 @@ IrqHandler::IrqHandler(const rt::SharedPtr<sched::Thread> &_thread, const uintpt
  */
 IrqHandler::~IrqHandler() {
     if(this->platformToken) {
-        platform_irq_unregister(this->platformToken);
+        platform::IrqUnregister(this->platformToken);
     }
 }
 
@@ -52,7 +52,7 @@ rt::SharedPtr<IrqHandler> Interrupts::create(const uintptr_t irq,
     REQUIRE(static_cast<uintptr_t>(info->handle), "failed to make handle for irq handler");
 
     // register interrupt
-    info->platformToken = platform_irq_register(irq, [](void *ctx, const uintptr_t) -> bool {
+    info->platformToken = platform::IrqRegister(irq, [](void *ctx, const uintptr_t) -> bool {
         auto info = reinterpret_cast<IrqHandler *>(ctx);
         info->fired();
 

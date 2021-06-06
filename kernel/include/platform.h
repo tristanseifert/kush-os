@@ -78,6 +78,32 @@ rt::SharedPtr<sched::Task> InitRootsrv();
  * Notifies platform code that virtual memory is available.
  */
 void VmAvailable();
+
+/**
+ * Acknowledges an interrupt. The provided value is opaque and defined by the platform code. Specifically, you
+ * should not assume that 0 indicates no interrupt. Any value you receive as an interrupt token can be passed into
+ * this function without causing a panic.
+ */
+int IrqAck(const uintptr_t token);
+
+/**
+ * Registers an interrupt handler.
+ *
+ * @note The second argument to the callback is the platform IRQ vector number, which can be used
+ * to acknowledge/defer the interrupt. You're probably going to ignore this.
+ *
+ * @note Return true from the callback to indicate you've handled the interrupt.
+ *
+ * @return An interrupt token (used to later remove the handler) or 0.
+ */
+uintptr_t IrqRegister(const uintptr_t irq, bool(*callback)(void *, const uintptr_t), void *ctx);
+
+/**
+ * Removes a previously set up interrupt handler.
+ *
+ * @return 0 on success, error code otherwise.
+ */
+int IrqUnregister(const uintptr_t token);
 }
 
 /**
@@ -134,31 +160,6 @@ typedef enum platform_section {
 int platform_section_get_info(const platform_section_t section, uint64_t *physAddr,
         uintptr_t *virtAddr, uintptr_t *length);
 
-
-
-/**
- * Acknowledges an interrupt. The provided value is opaque and defined by the platform code. Specifically, you
- * should not assume that 0 indicates no interrupt. Any value you receive as an interrupt token can be passed into
- * this function without causing a panic.
- */
-int platform_irq_ack(const uintptr_t token);
-
-/**
- * Registers an interrupt handler.
- *
- * @note The second argument to the callback is the platform IRQ vector number, which can be used
- * to acknowledge/defer the interrupt. You're probably going to ignore this.
- *
- * @note Return true from the callback to indicate you've handled the interrupt.
- *
- * @return A positive interrupt token (used to later remove the handler) or 0.
- */
-int platform_irq_register(const uintptr_t irq, bool(*callback)(void *, const uintptr_t), void *ctx);
-
-/**
- * Removes a previously set up interrupt handler.
- */
-void platform_irq_unregister(const uintptr_t token);
 
 
 /**

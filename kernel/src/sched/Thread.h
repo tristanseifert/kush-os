@@ -169,7 +169,6 @@ struct Thread: public rt::SharedFromThis<Thread> {
         uintptr_t notifications = 0;
         uintptr_t notificationMask = 0;
         bool notified = false;
-        rt::SharedPtr <SignalFlag> notificationsFlag;
 
         /**
          * This counter is incremented any time the thread leaves the runnable state; it is used to
@@ -266,7 +265,7 @@ struct Thread: public rt::SharedFromThis<Thread> {
         /// Sets the given notification bits.
         void notify(const uintptr_t bits);
         /// Blocks the thread waiting to receive notifications, optionally with a mask.
-        uintptr_t blockNotify(const uintptr_t mask = 0);
+        uintptr_t blockNotify(const uintptr_t mask = 0, const uintptr_t timeout = UINTPTR_MAX);
 
         /// Waits for the thread to be terminated.
         int waitOn(const uint64_t waitUntil = 0);

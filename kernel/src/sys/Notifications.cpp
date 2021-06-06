@@ -42,10 +42,12 @@ intptr_t sys::NotifySend(const Handle threadHandle, const uintptr_t bits) {
  * Blocks the calling thread waiting to receive notifications.
  *
  * @param mask Notification mask to set; 0 is equivalent to all bits set
+ * @param timeout How long to wait for a notification; a value of 0 means polling, and UINTPTR_MAX
+ *        means blocking forever.
  *
  * @return Notify bits that were set when the thread was unblocked
  */
-intptr_t sys::NotifyReceive(uintptr_t mask) {
+intptr_t sys::NotifyReceive(uintptr_t mask, const uintptr_t timeout) {
     auto thread = sched::Thread::current();
 
     // get mask
