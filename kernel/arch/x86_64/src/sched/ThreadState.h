@@ -110,6 +110,13 @@ struct TaskState {
     }
 
     /**
+     * Locks the IO permissions bitmap.
+     */
+    void lockIoPermissions() {
+        __atomic_store_n(&this->ioBitmapLocked, true, __ATOMIC_RELAXED);
+    }
+
+    /**
      * Test whether a particular IO port range can be accessed.
      *
      * @param base IO port base to test for access permissions
@@ -203,8 +210,8 @@ struct TaskState {
          * Tests whether a single IO port is accessible. No sanity checking is performed; it's
          * assumed the IO bitmap exists.
          */
-        inline bool testIoPort(const uint16_t base) const {
-            return (this->ioBitmap[base / 8] % (1 << (base % 8))) != 0;
+        constexpr inline bool testIoPort(const uint16_t base) const {
+            return (this->ioBitmap[base / 8] & (1 << (base % 8))) != 0;
         }
 };
 

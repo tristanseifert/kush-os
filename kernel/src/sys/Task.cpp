@@ -91,7 +91,7 @@ intptr_t sys::TaskCreate(const Handle parentTaskHandle) {
  */
 intptr_t sys::TaskTerminate(const Handle taskHandle, const intptr_t code) {
     int err;
-    rt::SharedPtr<sched::Task> task = nullptr;
+    rt::SharedPtr<sched::Task> task;
 
     // get the task
     if(!taskHandle) {

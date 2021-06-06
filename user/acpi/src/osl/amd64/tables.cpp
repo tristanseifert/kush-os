@@ -59,37 +59,45 @@ ACPI_STATUS AcpiOsPhysicalTableOverride(ACPI_TABLE_HEADER *ExistingTable,
  * address from it.
  */
 static void InitAcpiTableBase() {
+    size_t cfgTableBytes;
+    uintptr_t cfgTablePhys;
+
     // read boot info structure
     int err = Amd64CopyLoaderInfo(&gLoaderInfo, sizeof(gLoaderInfo));
     if(err < 0) {
         Abort("%s failed: %d", "Amd64CopyLoaderInfo", err);
     }
 
-    Trace("EFI sysinfo $%p, ACPI ptr $%p", gLoaderInfo.arch.x86_64.efi_ptr,
-            gLoaderInfo.arch.x86_64.acpi_ptr);
+    Trace("EFI sysinfo at phys $%p", gLoaderInfo.arch.x86_64.efi_ptr);
 
-    // map the EFI info table and get the config table base
-    const auto sysinfoPhys = gLoaderInfo.arch.x86_64.efi_ptr;
-    void *sysinfoMapped = AcpiOsMapMemory(sysinfoPhys, sizeof(efi_system_table));
-    if(!sysinfoMapped) {
-        Abort("Failed to map %s (phys $%p)", "EFI system info table", sysinfoPhys);
+    {
+        // map the EFI info table and get the config table base
+        const auto sysinfoPhys = gLoaderInfo.arch.x86_64.efi_ptr;
+        void *sysinfoMapped = AcpiOsMapMemory(sysinfoPhys, sizeof(efi_system_table));
+        if(!sysinfoMapped) {
+            Abort("Failed to map %s (phys $%p)", "EFI system info table", sysinfoPhys);
+        }
+
+        const auto sysinfo = reinterpret_cast<const efi_system_table *>(sysinfoMapped);
+
+        Trace("EFI sysinfo has %lu configuration tables at $%p",
+                sysinfo->NumberOfTableEntries, sysinfo->ConfigurationTable);
+
+        // unmap the system table now once we've read the cfg table info
+        cfgTableBytes = sizeof(efi_configuration_table) * sysinfo->NumberOfTableEntries;
+        cfgTablePhys = reinterpret_cast<uintptr_t>(sysinfo->ConfigurationTable);
+
+        AcpiOsUnmapMemory(sysinfoMapped, sizeof(efi_system_table));
     }
 
-    const auto sysinfo = reinterpret_cast<const efi_system_table *>(sysinfoMapped);
-
-    Trace("EFI system table signature %p: have %lu tables at $%p", sysinfo->Hdr.Signature,
-            sysinfo->NumberOfTableEntries, sysinfo->ConfigurationTable);
-    if(!sysinfo->ConfigurationTable || !sysinfo->NumberOfTableEntries) {
+    if(!cfgTablePhys || !cfgTableBytes) {
         Abort("EFI system table has no configuration tables; cannot find RSDP");
     }
 
     // map config tables base
-    const size_t cfgTableBytes = sizeof(efi_configuration_table) * sysinfo->NumberOfTableEntries;
-    void *cfgTableBase = AcpiOsMapMemory(reinterpret_cast<uintptr_t>(sysinfo->ConfigurationTable),
-            cfgTableBytes);
+    void *cfgTableBase = AcpiOsMapMemory(cfgTablePhys, cfgTableBytes);
     if(!cfgTableBase) {
-        Abort("Failed to map %s (phys $%p)", "EFI configuration tables",
-                sysinfo->ConfigurationTable);
+        Abort("Failed to map %s (phys $%p)", "EFI configuration tables", cfgTablePhys);
     }
 
     // define the table GUIDs we're interested in
@@ -97,7 +105,9 @@ static void InitAcpiTableBase() {
 
     // iterate over all config tables
     auto tables = reinterpret_cast<const efi_configuration_table *>(cfgTableBase);
-    for(size_t i = 0; i < sysinfo->NumberOfTableEntries; i++) {
+    const auto cfgTableNum = cfgTableBytes / sizeof(efi_configuration_table);
+
+    for(size_t i = 0; i < cfgTableNum; i++) {
         const auto &table = tables[i];
 
         // check the GUID: is it the ACPI 2.0 table?
@@ -111,11 +121,10 @@ static void InitAcpiTableBase() {
     Abort("Failed to find ACPI RSDP in EFI config tables!");
 
 beach:;
-    Trace("Found RSDP: $%p", gTableAddress);
+    Trace("Found RSDP at phys $%p", gTableAddress);
 
     // clean up
     AcpiOsUnmapMemory(cfgTableBase, cfgTableBytes);
-    AcpiOsUnmapMemory(sysinfoMapped, sizeof(efi_system_table));
 
     // mark as valid
     __atomic_store_n(&gLoaderInfoValid, true, __ATOMIC_RELAXED);

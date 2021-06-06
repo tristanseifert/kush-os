@@ -36,6 +36,8 @@ enum Errors: int {
     NoMemory                            = -13,
     /// The buffer provided to the call is too small for the requested operation.
     BufferTooSmall                      = -14,
+    /// The buffer provided to the call is too large for the requested operation.
+    BufferTooLarge                      = -15,
 };
 }
 

@@ -17,8 +17,14 @@ static bool gLogAcpicaMemMap = false;
 static bool gLogAcpicaMemOps = true;
 
 
-/// VM range [start, end) into which ACPI mappings are placed
-static const uintptr_t kVmMappingRange[2] = {
+/**
+ * VM range [start, end) into which ACPI mappings are placed
+ *
+ * We continuously move the start forward until we're within 4GB of the end, at which point we wrap
+ * back to the starting value.
+ */
+static const uintptr_t kVmMappingRangeStart = 0x18000000000;
+static uintptr_t kVmMappingRange[2] = {
     0x18000000000, 0x20000000000
 };
 /**
@@ -35,6 +41,22 @@ void AcpiOsFree(void *Memory) {
 }
 
 /**
+ * Advances the mapping range pointer.
+ */
+static void UpdateMappingRange(const size_t bytesMapped) {
+    const auto newStart = kVmMappingRange[0] + bytesMapped;
+
+    // less than 4G to end of region
+    if((newStart + 0x100000000) >= kVmMappingRange[1]) {
+        kVmMappingRange[0] = kVmMappingRangeStart;
+    }
+    // increment is ok
+    else {
+        kVmMappingRange[0] = newStart;
+    }
+}
+
+/**
  * Requests mapping of virtual memory.
  *
  * Gotchas with this method include that the physical address nor page number may not be aligned.
@@ -42,8 +64,6 @@ void AcpiOsFree(void *Memory) {
 void *AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, ACPI_SIZE Length) {
     uintptr_t region, regionBase;
     int err;
-
-    if(gLogAcpicaMemMap) Trace("AcpiOsMapMemory %08x len %u", PhysicalAddress, Length);
 
     // round to page size
     const long pageSz = sysconf(_SC_PAGESIZE);
@@ -67,6 +87,11 @@ void *AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, ACPI_SIZE Length) {
         return NULL;
     }
 
+    UpdateMappingRange(pageLength);
+
+    if(gLogAcpicaMemMap) Trace("AcpiOsMapMemory $%p len %lu: region $%p'h at $%p", PhysicalAddress,
+            Length, region, regionBase);
+
     // return a correctly offset pointer
     return reinterpret_cast<void *>(regionBase + physOffset);
 }
@@ -78,7 +103,7 @@ void AcpiOsUnmapMemory(void *where, ACPI_SIZE length) {
     uintptr_t region = 0;
     int err;
 
-    if(gLogAcpicaMemMap) Trace("AcpiOsUnmapMemory %p len %u", where, length);
+    if(gLogAcpicaMemMap) Trace("AcpiOsUnmapMemory $%p len %lu", where, length);
 
     // find the VM object corresponding to this address
     err = VirtualGetHandleForAddr(reinterpret_cast<uintptr_t>(where), &region);
@@ -94,6 +119,8 @@ void AcpiOsUnmapMemory(void *where, ACPI_SIZE length) {
             return;
         }
     }
+
+    if(gLogAcpicaMemMap) Trace("$%p -> $%p'h", where, region);
 
     // unmap it
     err = UnmapVirtualRegion(region);

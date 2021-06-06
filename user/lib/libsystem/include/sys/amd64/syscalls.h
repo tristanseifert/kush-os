@@ -35,6 +35,9 @@ LIBSYSTEM_EXPORT int Amd64CopyLoaderInfo(void *outBuf, const size_t outBufLen);
 LIBSYSTEM_EXPORT int Amd64UpdateAllowedIoPortsFor(const uintptr_t taskHandle, const void *bitmap, const size_t numBits, const uintptr_t portOffset);
 LIBSYSTEM_EXPORT int Amd64UpdateAllowedIoPorts(const void *bitmap, const size_t numBits, const uintptr_t portOffset);
 
+LIBSYSTEM_EXPORT int Amd64LockAllowedIoPortsFor(const uintptr_t taskHandle);
+LIBSYSTEM_EXPORT int Amd64LockAllowedIoPorts();
+
 LIBSYSTEM_EXPORT int Amd64PortRead(const uintptr_t port, const uintptr_t flags, uint32_t *read);
 LIBSYSTEM_EXPORT int Amd64PortReadB(const uintptr_t port, const uintptr_t flags, uint8_t *read);
 

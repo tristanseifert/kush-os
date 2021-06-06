@@ -16,7 +16,7 @@
 #include <acpi.h>
 
 /// Whether port accesses are logged
-static bool gLogAcpicaPortIo = true;
+static bool gLogAcpicaPortIo = false;
 
 /// Represents an IO port base + length
 using IoRange = std::pair<uint16_t, size_t>;

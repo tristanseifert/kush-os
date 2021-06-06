@@ -617,4 +617,39 @@ An index of $1$ writes to \texttt{\%gs}, and $0$ to \texttt{\%fs}.
 
 Copies the information structure provided by the bootloader (if any) into the provided userspace buffer. On all current amd64 implementations, this is the \href{https://gitlab.com/bztsrc/bootboot/}{BOOTBOOT} loader.
 
+%%%%%
+\subsubsection{{\tt 0x42}: Update port access list}
+\textbf{Arguments:} (4) Task handle, bitmap pointer, number of bits, port offset \\
+\textbf{Returns:} 0, or a negative error code \\
+
+Updates the task's IO permission bitmap to allow access to the ports referenced by the given bitmap; each bit represents one port. The provided offset is added to each bit's index in the bitmap to produce the final bit number.
+
+%%%%%
+\subsubsection{{\tt 0x43}: Lock port access list}
+\textbf{Arguments:} (1) Task handle \\
+\textbf{Returns:} 0, or a negative error code \\
+
+Locks the IO permission bitmap of the specified task (0 meaning the calling task,) ensuring no further changes can be made to it.
+
+%%%%%
+\subsubsection{{\tt 0x44}: Perform IO port read}
+\textbf{Arguments:} (3) IO port number, flags, output pointer \\
+\textbf{Returns:} 0, or a negative error code \\
+
+Performs an IO port read from the given port. The result is placed in the provided buffer, which is assumed to be at least of size \texttt{uint32\_t}, which is the maximum IO size.
+
+The flags field is used to specify the size of the IO operation. The following values are supported:
+\begin{itemize}
+\item \texttt{0x01}: Byte access
+\item \texttt{0x02}: Word access
+\item \texttt{0x03}: DWord access
+\end{itemize}
+
+%%%%%
+\subsubsection{{\tt 0x45}: Perform IO port write}
+\textbf{Arguments:} (3) IO port number, flags, value to write \\
+\textbf{Returns:} 0, or a negative error code \\
+
+Performs an IO port write to the given port. The flags field is used to specify the size of the IO operation, using the same meaning as for IO port reads.
+
 \end{document}  

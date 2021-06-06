@@ -118,7 +118,8 @@ int Amd64UpdateAllowedIoPortsFor(const uintptr_t taskHandle, const void *bitmap,
     }
 
     // perform call
-    return __do_syscall4(taskHandle, (uintptr_t) bitmap, numBits, offset, SYS_ARCH_AMD64_PORT_ALLOWLIST);
+    // TODO: use the flags value
+    return __do_syscall5(taskHandle, (uintptr_t) bitmap, numBits, offset, 0, SYS_ARCH_AMD64_PORT_ALLOWLIST);
 }
 
 /**
@@ -126,6 +127,17 @@ int Amd64UpdateAllowedIoPortsFor(const uintptr_t taskHandle, const void *bitmap,
  */
 int Amd64UpdateAllowedIoPorts(const void *bitmap, const size_t numBits, const uintptr_t portOffset) {
     return Amd64UpdateAllowedIoPortsFor(0, bitmap, numBits, portOffset);
+}
+
+
+/**
+ * Locks the IO port bitmap for the given task.
+ */
+int Amd64LockAllowedIoPortsFor(const uintptr_t taskHandle) {
+    return __do_syscall1(taskHandle, SYS_ARCH_AMD64_PORT_ALLOWLIST_LOCK);
+}
+int Amd64LockAllowedIoPorts() {
+    return Amd64LockAllowedIoPortsFor(0);
 }
 
 
