@@ -4,6 +4,6 @@
 #include <stdint.h>
 
 LIBSYSTEM_EXPORT int NotificationSend(const uintptr_t threadHandle, const uintptr_t bits);
-LIBSYSTEM_EXPORT uintptr_t NotificationReceive(const uintptr_t mask);
+LIBSYSTEM_EXPORT uintptr_t NotificationReceive(const uintptr_t mask, const uintptr_t timeout);
 
 #endif

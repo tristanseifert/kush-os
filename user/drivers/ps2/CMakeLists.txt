@@ -13,6 +13,17 @@ add_executable(ps2drv
 
 target_include_directories(ps2drv PRIVATE src/acpica/include)
 
+# add platform specific code
+if(${KERNEL_ARCH} STREQUAL "x86")
+target_sources(ps2drv PRIVATE
+    src/PortIo+x86.cpp
+)
+elseif(${KERNEL_ARCH} STREQUAL "x86_64")
+target_sources(ps2drv PRIVATE
+    src/PortIo+amd64.cpp
+)
+endif()
+
 # allow link time optimization
 target_compile_options(ps2drv PRIVATE "-flto")
 
@@ -26,4 +37,5 @@ target_link_libraries(ps2drv PRIVATE rpc driver mpack_dynamic acpisrv_serializat
 
 # install it to boot directory in sysroot
 install(TARGETS ps2drv RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)
+install(TARGETS ps2drv RUNTIME DESTINATION ${SYSROOT_DIR}/boot/sbin)
 

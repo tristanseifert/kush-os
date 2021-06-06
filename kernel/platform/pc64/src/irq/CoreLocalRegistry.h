@@ -55,6 +55,9 @@ class CoreLocalIrqRegistry {
         /// Total number of irq vectors handled
         constexpr static const size_t kNumIrqs = 208;
 
+        /// whether handler add/remove is logged
+        static bool gLogHandlers;
+
         /**
          * Represents information on a single installed handler. These form a linked list for each
          * interrupt vector and are invoked in sequence.

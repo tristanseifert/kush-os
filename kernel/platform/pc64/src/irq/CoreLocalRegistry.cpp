@@ -1,11 +1,14 @@
 #include "CoreLocalRegistry.h"
 #include "Manager.h"
+#include "LocalApic.h"
 
 #include <arch/critical.h>
 #include <arch/IrqRegistry.h>
 #include <log.h>
 
 using namespace platform;
+
+bool CoreLocalIrqRegistry::gLogHandlers = true;
 
 /// incremented for every new irq handler that's inserted
 uintptr_t CoreLocalIrqRegistry::HandlerNode::gNextToken = 0;
@@ -47,6 +50,11 @@ uintptr_t CoreLocalIrqRegistry::add(const uintptr_t irq, Handler callback, void 
     // allocate the node to be inserted
     auto toInsert = new HandlerNode(callback, callbackCtx);
     bool isFirstHandler = false;
+
+    if(gLogHandlers) {
+        log("Irq %3lu: add handler %p(%p) node %p (token $%x)", irq, callback, callbackCtx,
+                toInsert, toInsert->token);
+    }
 
     // insert it
     {
@@ -181,18 +189,22 @@ void CoreLocalIrqRegistry::ArchIrqEntry(const uintptr_t vector, void *ctx) {
 
     // invoke handlers 
     reg->invokeHandlers(irq);
+
+    // acknowledge the irq
+    LocalApic::the()->eoi();
 }
 
 /**
  * Invokes all handlers registered for the given irq.
  */
 void CoreLocalIrqRegistry::invokeHandlers(const uintptr_t irq) {
+    bool goNext = true;
     auto node = this->registrations[irq];
 
     log("CoreLocal irq %lu (%p)", irq, node);
 
-    while(node) {
-        node->handler(node->handlerCtx, irq);
+    while(node && goNext) {
+        goNext = node->handler(node->handlerCtx, irq);
 
         // go to next
         node = node->next;

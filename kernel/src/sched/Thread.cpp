@@ -587,9 +587,10 @@ void Thread::notify(const uintptr_t bits) {
 
     // wake thread if needed
     if(set & mask) {
-        if(this->state == State::NotifyWait) {
-            Scheduler::get()->threadUnblocked(this->sharedFromThis());
+        if(this->state == State::NotifyWait &&
+           !__atomic_test_and_set(&this->notified, __ATOMIC_RELAXED)) {
             this->blockState = BlockState::Unblocked;
+            Scheduler::get()->threadUnblocked(this->sharedFromThis());
         }
     }
 

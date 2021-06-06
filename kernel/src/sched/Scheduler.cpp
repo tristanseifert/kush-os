@@ -486,7 +486,7 @@ void Scheduler::handleIpi(void (*ackIrq)(void *), void *ackCtx) {
     this->processUnblockedThreads();
 
     // if current thread is still runnable, insert it to run queue
-    if(this->running->getState() == Thread::State::Runnable) {
+    if(this->running && this->running->getState() == Thread::State::Runnable) {
         this->schedule(this->running);
     }
 

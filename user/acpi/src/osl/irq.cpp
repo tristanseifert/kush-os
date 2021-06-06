@@ -150,8 +150,8 @@ static void DispatcherMain() {
     // process requests
     while(gRun) {
         // receive all notifications and handle our notify bits
-        note = NotificationReceive(UINTPTR_MAX);
-        Trace("Notify %08x", note);
+        note = NotificationReceive(UINTPTR_MAX, UINTPTR_MAX);
+        Trace("Notify $%p", note);
 
         if(note & kDispatcherEvent) {
             // nothing to handle

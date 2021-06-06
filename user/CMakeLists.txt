@@ -12,7 +12,7 @@ if(BUILD_SYSTEM_SERVERS)
     add_subdirectory(rootsrv)
     add_subdirectory(driverman)
     add_subdirectory(acpi)
-    #add_subdirectory(drivers)
+    add_subdirectory(drivers)
 endif()
 
 add_subdirectory(dyldo)

@@ -162,12 +162,11 @@ struct Thread: public rt::SharedFromThis<Thread> {
          * Each thread defines a notification mask, which indicates on which bits (set) of the
          * notification set the thread is interested in; when the notification mask is updated, it
          * is compared against the mask, and if any bits are set, the thread can be unblocked.
-         *
-         * The notifications flag is set whenever a thread is blocking on notification bits. It
-         * should be signalled whenever a notification is received that activates the thread.
          */
         uintptr_t notifications = 0;
         uintptr_t notificationMask = 0;
+
+        /// Set once a thread has moved from NotifyWait to possibly runnable
         bool notified = false;
 
         /**

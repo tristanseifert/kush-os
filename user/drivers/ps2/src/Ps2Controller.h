@@ -1,6 +1,8 @@
 #ifndef PS2CONTROLLER_H
 #define PS2CONTROLLER_H
 
+#include "PortIo.h"
+
 #include <array>
 #include <atomic>
 #include <cstddef>
@@ -139,6 +141,9 @@ class Ps2Controller {
         uintptr_t kbdIrq = 0;
         /// IRQ for the mouse port
         uintptr_t mouseIrq = 0;
+
+        /// access to the 8042 ports
+        std::unique_ptr<PortIo> io;
 
         /// Address of the data port
         uint16_t dataPort = 0;

@@ -51,6 +51,9 @@ Ps2Controller::Ps2Controller(const std::span<std::byte> &aux) {
         Warn("No mouse port for PS/2 controller");
     }
 
+    // set up IO port
+    this->io = std::make_unique<PortIo>(this->cmdPort, this->dataPort);
+
     // initialize the run loop
     this->run = true;
 }
@@ -115,24 +118,11 @@ void Ps2Controller::decodeResources(mpack_node_t &list, const bool isKbd) {
  * one is to be the command/status port.
  */
 void Ps2Controller::handlePortResource(const ACPI_RESOURCE_IO &io, const size_t num) {
-    int err;
-
     // figure out which port it is
     if(!num) {
         this->dataPort = io.Minimum;
     } else {
         this->cmdPort = io.Minimum;
-    }
-
-    // whitelist the port
-    static const uint8_t bitmap[] = {
-        0xFF
-    };
-
-    err = X86UpdateIopb(&bitmap, io.AddressLength, io.Minimum);
-    if(err) {
-        Abort("%s failed: %d (base %04x len %u)", "X86UpdateIopb", err, io.Minimum,
-                io.AddressLength);
     }
 
     Trace("IO: %04x - %04x (align %u addr len %u decode %u)", io.Minimum, io.Maximum,
@@ -177,19 +167,19 @@ void Ps2Controller::workerMain() {
         uint8_t temp;
 
         // wait on notification
-        note = NotificationReceive(UINTPTR_MAX);
-        // Trace("Notify %08x", note);
+        note = NotificationReceive(UINTPTR_MAX, UINTPTR_MAX);
+        Trace("Notify $%08x", note);
 
         // read port 1 byte
         if(note & kKeyboardIrq) {
-            temp = io_inb(this->dataPort);
+            temp = this->io->read(PortIo::Port::Data);
 
             // TODO: send to port 1 device, or handle in hotplug detection
             Trace("<< %u %02x", 1, temp);
         }
         // read port 2 byte
         if(note & kMouseIrq) {
-            temp = io_inb(this->dataPort);
+            temp = this->io->read(PortIo::Port::Data);
 
             // TODO: send to port 2 device, or handle in hotplug detection
             Trace("<< %u %02x", 2, temp);
@@ -256,7 +246,7 @@ void Ps2Controller::reset() {
     this->writeCmd(kDisablePort1);
     this->writeCmd(kDisablePort2);
 
-    io_inb(this->dataPort);
+    this->io->read(PortIo::Port::Data);
 
     /*
      * Update the configuration byte of the controller; we disable translation, and disable the
@@ -322,7 +312,7 @@ void Ps2Controller::reset() {
      * port has no device set up yet) and probe the device.
      */
     // turn on interrupts
-    io_outb(this->cmdPort, kGetConfigByte);
+    this->io->write(PortIo::Port::Command, kGetConfigByte);
     if(!this->readBytePoll(temp)) {
         Abort("failed to read %s reply", "get config byte");
     }
@@ -356,9 +346,9 @@ bool Ps2Controller::readBytePoll(uint8_t &out, const int timeout) {
     // read data
     do {
         // check the status port
-        temp = io_inb(this->cmdPort);
+        temp = this->io->read(PortIo::Port::Command);
         if(temp & kOutputBufferFull) {
-            out = io_inb(this->dataPort);
+            out = this->io->read(PortIo::Port::Data);
 
             if(gLogReads) {
                 Trace("<- %02x", out);
@@ -376,7 +366,7 @@ bool Ps2Controller::readBytePoll(uint8_t &out, const int timeout) {
  * Writes a single byte command that requires no arguments.
  */
 void Ps2Controller::writeCmd(const uint8_t cmd) {
-    io_outb(this->cmdPort, cmd);
+    this->io->write(PortIo::Port::Command, cmd);
 
     if(gLogCmds) {
         Trace("-> %02x", cmd);
@@ -390,18 +380,18 @@ void Ps2Controller::writeCmd(const uint8_t cmd, const uint8_t arg1) {
     uint8_t temp;
 
     // send command
-    io_outb(this->cmdPort, cmd);
+    this->io->write(PortIo::Port::Command, cmd);
 
     // wait to be ready to accept data
     while(1) {
-        temp = io_inb(this->cmdPort);
+        temp = this->io->read(PortIo::Port::Command);
         if((temp & kInputBufferFull) == 0) {
             break;
         }
     }
 
     // send data
-    io_outb(this->dataPort, arg1);
+    this->io->write(PortIo::Port::Data, arg1);
 
     if(gLogCmds) {
         Trace("-> %02x %02x", cmd, arg1);
@@ -428,20 +418,20 @@ void Ps2Controller::writeDevice(const Port port, const uint8_t cmd, const int ti
         case Port::Primary:
             break;
         case Port::Secondary:
-            io_outb(this->cmdPort, kWritePort2);
+            this->io->write(PortIo::Port::Command, kWritePort2);
             break;
     }
 
     // wait for the input buffer to be available (TODO; timeout)
     while(1) { // TODO: timeout
-        temp = io_inb(this->cmdPort);
+        temp = this->io->read(PortIo::Port::Command);
         if((temp & kInputBufferFull) == 0) {
             break;
         }
     }
 
     // then write the data byte
-    io_outb(this->dataPort, cmd);
+    this->io->write(PortIo::Port::Data, cmd);
 
     if(gLogDeviceCmds) {
         Trace(">> %u %02x", (port == Port::Primary) ? 1 : 2, cmd);
