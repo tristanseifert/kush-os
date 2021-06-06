@@ -16,17 +16,31 @@ add_executable(acpisrv
     src/osl/memory.cpp
     src/osl/mutex.cpp
     src/osl/output.cpp
-    src/osl/pci.cpp
-    src/osl/ports.cpp
     src/osl/power.cpp
     src/osl/semaphore.cpp
     src/osl/spinlock.cpp
-    src/osl/tables.cpp
     src/osl/thread.cpp
     src/osl/time.cpp
 )
 
 target_include_directories(acpisrv PRIVATE src/acpica/include)
+
+## Platform specific files
+if(${KERNEL_ARCH} STREQUAL "x86")
+    target_sources(acpisrv PRIVATE
+        src/osl/x86/pci.cpp
+        src/osl/x86/ports.cpp
+        src/osl/x86/tables.cpp
+    )
+elseif(${KERNEL_ARCH} STREQUAL "x86_64")
+    target_sources(acpisrv PRIVATE
+        src/osl/amd64/ports.cpp
+        src/osl/amd64/pci.cpp
+        src/osl/amd64/tables.cpp
+    )
+else()
+    message(FATAL_ERROR "acpisrv has no PCI drivers for architecture '${KERNEL_ARCH}'")
+endif()
 
 #### Serialization of ACPI structures
 add_library(acpisrv_serialization OBJECT
@@ -230,4 +244,5 @@ target_link_libraries(acpisrv PRIVATE rpc driver mpack_dynamic)
 
 # install it to boot directory in sysroot
 install(TARGETS acpisrv RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)
+install(TARGETS acpisrv RUNTIME DESTINATION ${SYSROOT_DIR}/boot/sbin)
 

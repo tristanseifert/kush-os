@@ -1,7 +1,6 @@
 /*
- * Implementations of the ACPICA OS layer for addressing the PCI bus.
- *
- * This implements the x86 IO port based configuration mechanism.
+ * Implementations of the ACPICA OS layer for addressing the PCI bus using the legacy x86 IO port
+ * access mechanism.
  */
 #include "osl.h"
 #include "x86_io.h"

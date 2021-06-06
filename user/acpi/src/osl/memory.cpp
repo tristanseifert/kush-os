@@ -19,7 +19,7 @@ static bool gLogAcpicaMemOps = true;
 
 /// VM range [start, end) into which ACPI mappings are placed
 static const uintptr_t kVmMappingRange[2] = {
-    0x10000000000, 0x20000000000
+    0x18000000000, 0x20000000000
 };
 /**
  * Allocate memory; thunk through to the C heap.

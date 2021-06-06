@@ -83,7 +83,7 @@ int RpcTaskCreate(const char *path, const char **args, uintptr_t *outHandle) {
         }
 
         // deserialize the response
-        auto resBuf = std::span(packet->payload, err - sizeof(RpcPacket));
+        auto resBuf = std::span(packet->payload, rxMsg->receivedBytes - sizeof(RpcPacket));
         kj::ArrayPtr<const capnp::word> message(reinterpret_cast<const capnp::word *>(resBuf.data()),
                 resBuf.size() / sizeof(capnp::word));
         capnp::FlatArrayMessageReader responseReader(message);

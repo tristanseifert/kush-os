@@ -19,7 +19,7 @@ struct RpcPacket {
     uintptr_t replyPort;
     /// serialized message
     char payload[];
-} __attribute__((packed));
+};
 }
 
 #endif

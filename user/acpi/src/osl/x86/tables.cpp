@@ -4,8 +4,12 @@
  * None of these currently do anything.
  */
 #include "osl.h"
+#include "log.h"
 
 #include <acpi.h>
+#include <threads.h>
+
+#include <sys/syscalls.h>
 
 /**
  * Override an object in ACPI namespace.
@@ -37,18 +41,12 @@ ACPI_STATUS AcpiOsPhysicalTableOverride(ACPI_TABLE_HEADER *ExistingTable,
 /**
  * Locates the ACPI table root pointer (RSDP).
  *
- * The way this works is platform specific:
- *
- * - x86: Use the built-in ACPI function to find the root pointer in the first 1M of memory.
- * - amd64: Receive root pointer from BOOTBOOT loader
+ * We simply use the built in function to scan the first 1M of physical memory for the ACPI table
+ * root pointer.
  */
 ACPI_PHYSICAL_ADDRESS AcpiOsGetRootPointer() {
-#if defined(__i386__)
     ACPI_PHYSICAL_ADDRESS  Ret;
     Ret = 0;
     AcpiFindRootPointer(&Ret);
     return Ret;
-#else
-#error AcpiOsGetRootPointer unimplemented for current arch
-#endif
 }
