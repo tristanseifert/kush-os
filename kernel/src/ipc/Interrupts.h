@@ -47,7 +47,7 @@ class IrqHandler {
         uintptr_t irqNum = 0;
 
         /// thread to notify when the irq fires
-        rt::SharedPtr<sched::Thread> thread = nullptr;
+        rt::SharedPtr<sched::Thread> thread;
         /// notification bits to yeet on the thread
         uintptr_t bits = 0;
 };

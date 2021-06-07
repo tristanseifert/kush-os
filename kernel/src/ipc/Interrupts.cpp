@@ -29,6 +29,7 @@ IrqHandler::~IrqHandler() {
  * Notifies the thread that the interrupt has fired.
  */
 void IrqHandler::fired() {
+    REQUIRE(this->thread, "cannot deliver irq to nonexistent thread");
     this->thread->notify(this->bits);
 }
 

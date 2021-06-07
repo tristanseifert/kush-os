@@ -16,7 +16,6 @@ platform::Irql platform_raise_irql(const platform::Irql irql, const bool enableI
     Irql prev, newVal = irql;
     auto info = arch::PerCpuInfo::get();
 
-    asm volatile("cli");
     REQUIRE(irql >= info->irql, "cannot %s irql: current %d, requested %d", "raise",
             (int) info->irql, (int) irql);
     __atomic_exchange(&info->irql, &newVal, &prev, __ATOMIC_ACQUIRE);
@@ -24,10 +23,6 @@ platform::Irql platform_raise_irql(const platform::Irql irql, const bool enableI
     if(gLogIrql) log("raise irql: %u (%p)", (uintptr_t) irql, info->p.lapic);
     if(info->p.lapic) {
         info->p.lapic->updateTpr(irql);
-    }
-
-    if(enableIrq && irql < Irql::CriticalSection) {
-        asm volatile("sti");
     }
 
     return prev;
@@ -42,7 +37,6 @@ platform::Irql platform_raise_irql(const platform::Irql irql, const bool enableI
 void platform_lower_irql(const platform::Irql irql, const bool enableIrq) {
     auto info = arch::PerCpuInfo::get();
 
-    asm volatile("cli");
     REQUIRE(irql <= info->irql, "cannot %s irql: current %d, requested %d", "lower", 
             (int) info->irql, (int) irql);
 
@@ -52,10 +46,6 @@ void platform_lower_irql(const platform::Irql irql, const bool enableIrq) {
     if(gLogIrql) log("lower irql: %u (%p)", (uintptr_t) irql, info->p.lapic);
     if(info->p.lapic) {
         info->p.lapic->updateTpr(irql);
-    }
-
-    if(enableIrq && irql < Irql::CriticalSection) {
-        asm volatile("sti");
     }
 }
 
