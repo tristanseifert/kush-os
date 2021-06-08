@@ -8,7 +8,7 @@
 
 using namespace platform;
 
-bool CoreLocalIrqRegistry::gLogHandlers = true;
+bool CoreLocalIrqRegistry::gLogHandlers = false;
 
 /// incremented for every new irq handler that's inserted
 uintptr_t CoreLocalIrqRegistry::HandlerNode::gNextToken = 0;
@@ -200,8 +200,6 @@ void CoreLocalIrqRegistry::ArchIrqEntry(const uintptr_t vector, void *ctx) {
 void CoreLocalIrqRegistry::invokeHandlers(const uintptr_t irq) {
     bool goNext = true;
     auto node = this->registrations[irq];
-
-    log("CoreLocal irq %lu (%p)", irq, node);
 
     while(node && goNext) {
         goNext = node->handler(node->handlerCtx, irq);

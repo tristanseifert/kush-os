@@ -15,9 +15,12 @@
 #include <x86_io.h>
 #endif
 
-bool Ps2Controller::gLogCmds = true;
-bool Ps2Controller::gLogDeviceCmds = true;
-bool Ps2Controller::gLogReads = true;
+bool Ps2Controller::gLogResources       = false;
+bool Ps2Controller::gLogCmds            = false;
+bool Ps2Controller::gLogReads           = false;
+bool Ps2Controller::gLogDeviceCmds      = false;
+bool Ps2Controller::gLogDeviceReads     = false;
+bool Ps2Controller::gLogCommands        = true;
 
 /**
  * Initializes a PS/2 controller with the provided aux data structure. This should be a map, with
@@ -62,13 +65,8 @@ Ps2Controller::Ps2Controller(const std::span<std::byte> &aux) {
  * Tears down PS/2 controller resources.
  */
 Ps2Controller::~Ps2Controller() {
-    // shut down devices
-
-    // destroy detectors
-    delete this->detectors[0];
-    if(this->hasMouse) {
-        delete this->detectors[1];
-    }
+    // beyond this point it's no longer possible to send new device commands
+    this->acceptCommands = false;
 }
 
 /**
@@ -125,8 +123,10 @@ void Ps2Controller::handlePortResource(const ACPI_RESOURCE_IO &io, const size_t 
         this->cmdPort = io.Minimum;
     }
 
-    Trace("IO: %04x - %04x (align %u addr len %u decode %u)", io.Minimum, io.Maximum,
-            io.Alignment, io.AddressLength, io.IoDecode);
+    if(gLogResources) {
+        Trace("IO: %04x - %04x (align %u addr len %u decode %u)", io.Minimum, io.Maximum,
+                io.Alignment, io.AddressLength, io.IoDecode);
+    }
 }
 
 
@@ -153,9 +153,9 @@ void Ps2Controller::workerMain() {
     }
 
     // create the controllers
-    this->detectors[0] = new PortDetector(this, Port::Primary);
+    this->detectors[0] = std::make_unique<PortDetector>(this, Port::Primary);
     if(this->hasMouse) {
-        this->detectors[1] = new PortDetector(this, Port::Secondary);
+        this->detectors[1] = std::make_unique<PortDetector>(this, Port::Secondary);
     }
 
     // initialize the controller
@@ -164,30 +164,145 @@ void Ps2Controller::workerMain() {
 
     // work loop
     while(this->run) {
-        uint8_t temp;
+        std::byte temp;
 
         // wait on notification
         note = NotificationReceive(UINTPTR_MAX, UINTPTR_MAX);
-        Trace("Notify $%08x", note);
+        //Trace("Notify $%08x", note);
 
         // read port 1 byte
         if(note & kKeyboardIrq) {
-            temp = this->io->read(PortIo::Port::Data);
+            temp = std::byte(this->io->read(PortIo::Port::Data));
 
-            // TODO: send to port 1 device, or handle in hotplug detection
-            Trace("<< %u %02x", 1, temp);
+            // handle any pending commands
+            if(gLogDeviceReads) Trace("<< %u %02x", 1, temp);
+
+            if(!this->checkDeviceCommand(0, temp)) {
+                // if no commands pending, forward to device or port detector
+                if(this->devices[0]) {
+                    this->devices[0]->handleRx(temp);
+                } else {
+                    this->detectors[0]->handleRx(temp);
+                }
+            }
         }
         // read port 2 byte
         if(note & kMouseIrq) {
-            temp = this->io->read(PortIo::Port::Data);
+            temp = std::byte(this->io->read(PortIo::Port::Data));
 
-            // TODO: send to port 2 device, or handle in hotplug detection
-            Trace("<< %u %02x", 2, temp);
+            // send to port 2 device, if allocated
+            if(gLogDeviceReads) Trace("<< %u %02x", 2, temp);
+
+            if(!this->checkDeviceCommand(1, temp)) {
+                // if no commands pending, forward to device or port detector
+                if(this->devices[1]) {
+                    this->devices[1]->handleRx(temp);
+                } else {
+                    this->detectors[1]->handleRx(temp);
+                }
+            }
         }
     }
 
     // clean up
     this->deinit();
+}
+
+/**
+ * Adds a command to the device's command queue. If there are no commands pending, we start to send
+ * it immediately; otherwise, the command will be transmitted after all other pending ones have
+ * been completed.
+ */
+void Ps2Controller::submit(const Port p, Ps2Command &_cmd) {
+    auto &cq = this->cmdQueue[p == Port::Primary ? 0 : 1];
+    const bool sendNow = cq.empty();
+
+    // enqueue the command
+    cq.push(_cmd);
+
+    auto &cmd = cq.back();
+    cmd.markPending();
+
+    if(gLogCommands) {
+        Trace("%s command $%p ($%02x)", "Submitted", &cmd, cmd.command);
+    }
+
+    // send it immediately if we've no other pending commands
+    if(sendNow) {
+        cmd.send(p, this);
+    }
+}
+
+/**
+ * Checks whether there's a pending command for the given device index; if so, it will be sent the
+ * received byte, and the command completed if it expects no more data.
+ *
+ * @return Whether the data byte was handled by a pending command
+ */
+bool Ps2Controller::checkDeviceCommand(const size_t i, const std::byte data) {
+    auto &cq = this->cmdQueue[i];
+    const auto port = !i ? Port::Primary : Port::Secondary;
+
+    // process in command
+    if(!cq.empty()) {
+        auto &cmd = cq.front();
+
+        // the command is complete!
+        if(cmd.handleRx(port, this, data)) {
+            if(gLogCommands) {
+                Trace("%s command $%p ($%02x)", "Completed", &cmd, cmd.command);
+            }
+
+            cq.pop();
+        } else {
+            return true;
+        }
+
+        // if we've any further commands, we should send it
+        if(!cq.empty()) {
+            auto &cmd = cq.front();
+            cmd.send(port, this);
+        }
+
+        return true;
+    }
+
+    // we haven't handled the byte via a command
+    return false;
+}
+
+/**
+ * Forces the given device to be re-initialized. This will deallocate any existing device instance,
+ * then send the a reset command to the port and go through the standard device detection
+ * machinery.
+ */
+void Ps2Controller::forceDetection(const Port p) {
+    // destroy device
+    this->devices[(p == Port::Primary) ? 0 : 1].reset();
+
+    // build the command and send it
+    auto cmd = Ps2Command::Reset([](const Port p, auto command, void *ctx) {
+        auto controller = reinterpret_cast<Ps2Controller *>(ctx);
+        if(command->didCompleteSuccessfully()) {
+            controller->detectors[(p == Port::Primary) ? 0 : 1]->reset();
+        } else {
+            Warn("Failed to reset device on %s port", (p == Port::Primary) ? "primary" : "secondary");
+        }
+    }, this);
+
+    this->submit(p, cmd);
+}
+
+/**
+ * Sets the device connected to the given port.
+ */
+void Ps2Controller::setDevice(const Port p, const std::shared_ptr<Ps2Device> &device) {
+    const size_t i = (p == Port::Primary) ? 0 : 1;
+
+    // store device
+    this->devices[i] = device;
+
+    // TODO: then register in device tree
 }
 
 
@@ -224,6 +339,13 @@ void Ps2Controller::init() {
  * remove the interrupt handlers.
  */
 void Ps2Controller::deinit() {
+    // deallocate devices
+    for(auto &device : this->devices) {
+        device.reset();
+    }
+
+    this->acceptCommands = false;
+
     // remove the IRQ handlers
     if(this->kbdIrqHandler) {
         IrqHandlerRemove(this->kbdIrqHandler);
@@ -323,12 +445,14 @@ void Ps2Controller::reset() {
 
     this->writeCmd(kSetConfigByte, temp);
 
-    // first, reset the primary device. the secondary device is reset later
-    this->writeDevice(Port::Primary, 0xFF);
+    // reset both devices
+    this->acceptCommands = true;
+    /*this->writeDevice(Port::Primary, std::byte(0xFF));
 
     if(this->hasMouse) {
-        this->writeDevice(Port::Secondary, 0xFF);
-    }
+        this->writeDevice(Port::Secondary, std::byte(0xFF));
+    }*/
+    this->forceDetection(Port::Primary);
 }
 
 /**
@@ -403,7 +527,7 @@ void Ps2Controller::writeCmd(const uint8_t cmd, const uint8_t arg1) {
 /**
  * Writes a byte to the specified device.
  */
-void Ps2Controller::writeDevice(const Port port, const uint8_t cmd, const int timeout) {
+void Ps2Controller::writeDevice(const Port port, const std::byte cmd, const int timeout) {
     uint8_t temp;
 
     /*
@@ -431,7 +555,7 @@ void Ps2Controller::writeDevice(const Port port, const uint8_t cmd, const int ti
     }
 
     // then write the data byte
-    this->io->write(PortIo::Port::Data, cmd);
+    this->io->write(PortIo::Port::Data, static_cast<uint8_t>(cmd));
 
     if(gLogDeviceCmds) {
         Trace(">> %u %02x", (port == Port::Primary) ? 1 : 2, cmd);
