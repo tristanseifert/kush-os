@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -21,6 +22,7 @@ struct Ps2Command {
     friend class Ps2Controller;
 
     using Callback = std::function<void(const Ps2Port, Ps2Command * _Nonnull, void * _Nullable)>;
+    using CommandPtr = std::shared_ptr<Ps2Command>;
 
     /// Default value of retries for a command
     constexpr static const size_t kMaxRetries = 3;
@@ -90,25 +92,16 @@ struct Ps2Command {
 
     public:
         /// Creates a command that will reset the device.
-        static Ps2Command Reset(const Callback &cb, void * _Nullable context) {
-            Ps2Command cmd(kCommandReset, cb, context);
-            return cmd;
+        static auto Reset(const Callback &cb, void * _Nullable context) {
+            return std::make_shared<Ps2Command>(kCommandReset, cb, context);
         }
         /// Creates a command that will disable updates from the device.
-        static Ps2Command DisableUpdates(const Callback &cb, void * _Nullable context) {
-            Ps2Command cmd(kCommandDisableUpdates, cb, context);
-            return cmd;
+        static auto DisableUpdates(const Callback &cb, void * _Nullable context) {
+            return std::make_shared<Ps2Command>(kCommandDisableUpdates, cb, context);
         }
         /// Creates a command that will enable updates from the device.
-        static Ps2Command EnableUpdates(const Callback &cb, void * _Nullable context) {
-            Ps2Command cmd(kCommandEnableUpdates, cb, context);
-            return cmd;
-        }
-        /// Creates a command that receives the device's identification
-        static Ps2Command Identify(const Callback &cb, void * _Nullable context) {
-            Ps2Command cmd(kCommandIdentify, cb, context);
-            cmd.replyBytesExpected.second = 2; // max 2 bytes
-            return cmd;
+        static auto EnableUpdates(const Callback &cb, void * _Nullable context) {
+            return std::make_shared<Ps2Command>(kCommandEnableUpdates, cb, context);
         }
 
         Ps2Command() = default;
@@ -144,6 +137,9 @@ struct Ps2Command {
                 const std::byte data);
         /// Resets the receive timeout
         virtual void resetRxTimeout();
+
+        /// Early completion test for multibyte responses
+        virtual bool isReplyComplete();
 
         /// Invokes the completion handler.
         virtual void complete(const Ps2Port port, Ps2Controller * _Nonnull controller,

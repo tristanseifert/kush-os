@@ -170,6 +170,8 @@ void Ps2Controller::workerMain() {
         note = NotificationReceive(UINTPTR_MAX, UINTPTR_MAX);
         //Trace("Notify $%08x", note);
 
+        this->inCmdLoop = true;
+
         // read port 1 byte
         if(note & kKeyboardIrq) {
             temp = std::byte(this->io->read(PortIo::Port::Data));
@@ -202,6 +204,17 @@ void Ps2Controller::workerMain() {
                 }
             }
         }
+
+        this->inCmdLoop = false;
+
+        // process any commands we haven't sent yet
+        if(this->testPendingCommands[0]) {
+            this->cmdQueue[0].front()->send(Port::Primary, this);
+            this->testPendingCommands[0] = false;
+        } else if(this->testPendingCommands[1]) {
+            this->cmdQueue[1].front()->send(Port::Secondary, this);
+            this->testPendingCommands[1] = false;
+        }
     }
 
     // clean up
@@ -213,23 +226,30 @@ void Ps2Controller::workerMain() {
  * it immediately; otherwise, the command will be transmitted after all other pending ones have
  * been completed.
  */
-void Ps2Controller::submit(const Port p, Ps2Command &_cmd) {
-    auto &cq = this->cmdQueue[p == Port::Primary ? 0 : 1];
+void Ps2Controller::submit(const Port p, const std::shared_ptr<Ps2Command> &_cmd) {
+    const size_t i = (p == Port::Primary) ? 0 : 1;
+    auto &cq = this->cmdQueue[i];
+
     const bool sendNow = cq.empty();
 
     // enqueue the command
     cq.push(_cmd);
 
     auto &cmd = cq.back();
-    cmd.markPending();
+    cmd->markPending();
 
     if(gLogCommands) {
-        Trace("%s command $%p ($%02x)", "Submitted", &cmd, cmd.command);
+        Trace("%s command $%p - %s ($%02x)", "Submitted", cmd.get(),
+                (p == Port::Primary) ? "primary" : "secondary", cmd->command);
     }
 
     // send it immediately if we've no other pending commands
     if(sendNow) {
-        cmd.send(p, this);
+        if(!this->inCmdLoop) {
+            cmd->send(p, this);
+        } else {
+            this->testPendingCommands[i] = true;
+        }
     }
 }
 
@@ -248,9 +268,10 @@ bool Ps2Controller::checkDeviceCommand(const size_t i, const std::byte data) {
         auto &cmd = cq.front();
 
         // the command is complete!
-        if(cmd.handleRx(port, this, data)) {
+        if(cmd->handleRx(port, this, data)) {
             if(gLogCommands) {
-                Trace("%s command $%p ($%02x)", "Completed", &cmd, cmd.command);
+                Trace("%s command $%p - %s ($%02x)", "Completed", cmd.get(),
+                        (port == Port::Primary) ? "primary" : "secondary", cmd->command);
             }
 
             cq.pop();
@@ -261,7 +282,7 @@ bool Ps2Controller::checkDeviceCommand(const size_t i, const std::byte data) {
         // if we've any further commands, we should send it
         if(!cq.empty()) {
             auto &cmd = cq.front();
-            cmd.send(port, this);
+            cmd->send(port, this);
         }
 
         return true;
@@ -303,6 +324,17 @@ void Ps2Controller::setDevice(const Port p, const std::shared_ptr<Ps2Device> &de
     this->devices[i] = device;
 
     // TODO: then register in device tree
+}
+
+/**
+ * On completion of the detection process for the first port, kick off detection for the second
+ * port if necessary.
+ */
+void Ps2Controller::detectionCompleted(const Port p, const bool success) {
+    if(p == Port::Primary && this->detectPort2) {
+        this->detectPort2 = false;
+        this->forceDetection(Port::Secondary);
+    }
 }
 
 
@@ -453,6 +485,7 @@ void Ps2Controller::reset() {
         this->writeDevice(Port::Secondary, std::byte(0xFF));
     }*/
     this->forceDetection(Port::Primary);
+    this->detectPort2 = this->hasMouse;
 }
 
 /**

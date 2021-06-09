@@ -12,6 +12,7 @@ add_executable(ps2drv
     src/PortDetector.cpp
     src/SupportedDevices.cpp
     src/device/Keyboard.cpp
+    src/device/GenericMouse.cpp
 )
 
 target_include_directories(ps2drv PRIVATE src/acpica/include)

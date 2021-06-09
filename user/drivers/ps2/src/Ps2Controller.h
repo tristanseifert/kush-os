@@ -120,7 +120,7 @@ class Ps2Controller {
             return this->acceptCommands;
         }
         /// Submits a command
-        void submit(const Port, Ps2Command &);
+        void submit(const Port, const std::shared_ptr<Ps2Command> &);
 
         /// Writes a byte of data to the first or second port.
         void writeDevice(const Port port, const std::byte cmd, const int timeout = -1);
@@ -129,6 +129,8 @@ class Ps2Controller {
         void forceDetection(const Port);
         /// Sets the device that's connected to a particular port.
         void setDevice(const Port p, const std::shared_ptr<Ps2Device> &dev);
+        /// Detection for the given port completed
+        void detectionCompleted(const Port p, const bool success);
 
     private:
         /// Read a byte from the controller.
@@ -164,32 +166,38 @@ class Ps2Controller {
 
     private:
         /// whether this is a dual-port controller with mouse support
-        bool hasMouse = false;
+        bool hasMouse{false};
 
         /// IRQ for the keyboard port
-        uintptr_t kbdIrq = 0;
+        uintptr_t kbdIrq{0};
         /// IRQ for the mouse port
-        uintptr_t mouseIrq = 0;
+        uintptr_t mouseIrq{0};
 
         /// access to the 8042 ports
         std::unique_ptr<PortIo> io;
 
         /// Address of the data port
-        uint16_t dataPort = 0;
+        uint16_t dataPort{0};
         /// Command and status port address
-        uint16_t cmdPort = 0;
+        uint16_t cmdPort{0};
 
         /// whether we're able to accept commands
         std::atomic_bool acceptCommands{true};
         /// Run the run loop as long as this is set
         std::atomic_bool run;
         /// Native thread handle for the notification thread
-        uintptr_t threadHandle = 0;
+        uintptr_t threadHandle{0};
 
+        /// when set, we need to detect port 2 once port 1 has resulted in detection
+        bool detectPort2{false};
+        /// are we executing in the command loop?
+        bool inCmdLoop{false};
+        /// we need to test which queues have commands to send
+        std::array<bool, 2> testPendingCommands{false, false};
         /// Interrupt handler token for the keyboard irq
-        uintptr_t kbdIrqHandler = 0;
+        uintptr_t kbdIrqHandler{0};
         /// Interrupt handler token for the mouse irq
-        uintptr_t mouseIrqHandler = 0;
+        uintptr_t mouseIrqHandler{0};
 
         /// detector instances for each port
         std::array<std::unique_ptr<PortDetector>, 2> detectors;
@@ -197,7 +205,7 @@ class Ps2Controller {
         std::array<std::shared_ptr<Ps2Device>, 2> devices;
 
         /// queue of commands pending to be sent to each device
-        std::array<std::queue<Ps2Command>, 2> cmdQueue;
+        std::array<std::queue<std::shared_ptr<Ps2Command>>, 2> cmdQueue;
 };
 
 #endif

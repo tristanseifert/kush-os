@@ -1,6 +1,7 @@
 #include "PortDetector.h"
 
 #include "device/Keyboard.h"
+#include "device/GenericMouse.h"
 
 #include <memory>
 
@@ -15,9 +16,15 @@ using namespace std::literals;
  */
 const std::array<PortDetector::IdentifyDescriptor, PortDetector::kNumIdentifyDescriptors>
     PortDetector::gIdDescriptors{
-    // standard PS/2 mouse
+    // plain PS/2 mouse
     PortDetector::IdentifyDescriptor{
-        1, {std::byte{0x03}}, "Generic PS/2 mouse"sv, [](auto controller, auto port) {
+        1, {std::byte{0x00}}, "Generic PS/2 mouse"sv, [](auto controller, auto port) {
+            return std::make_shared<GenericMouse>(controller, port);
+        }
+    },
+    // PS/2 mouse with wheel
+    PortDetector::IdentifyDescriptor{
+        1, {std::byte{0x03}}, "Generic PS/2 mouse with scroll wheel"sv, [](auto controller, auto port) {
             return nullptr;
         }
     },

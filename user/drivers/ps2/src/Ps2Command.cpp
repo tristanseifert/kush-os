@@ -67,8 +67,18 @@ bool Ps2Command::handleRx(const Ps2Controller::Port port, Ps2Controller *control
                     Abort("TODO: implement command resend");
                 }
             }
-            // unknown reply from device
+            /*
+             * Unknown reply to an acknowledgement; this typically happens when the command is a
+             * reset, and the device also returns its identifier after the ack byte. So, this will
+             * show up in the next command during initialization, which is always a "disable
+             * updates" command. This only really happens with mice, which start out as ID 0x00
+             * after a reset so we discard a zero byte.
+             */
             else {
+                if(this->command == kCommandDisableUpdates && data == std::byte{0x00}) {
+                    return false;
+                }
+
                 Abort("Unknown command ack byte: $%02x", data);
             }
         }
@@ -88,7 +98,8 @@ reply:;
         this->replyBytes.push_back(data);
 
         // complete if the reply is the maximum
-        if(this->replyBytes.size() == this->replyBytesExpected.second) {
+        if(this->replyBytes.size() == this->replyBytesExpected.second ||
+           this->isReplyComplete()) {
             this->complete(port, controller, CompletionState::Acknowledged);
             return true;
         }
@@ -100,8 +111,8 @@ reply:;
     }
 
     // XXX: should not get down here?
-    Abort("Invalid state for command $%p: %lu ($%02x)", this, static_cast<uintptr_t>(this->state),
-            data);
+    Abort("Invalid state for receive command $%p: %lu ($%02x)", this,
+            static_cast<uintptr_t>(this->state), data);
 }
 
 /**
@@ -127,4 +138,15 @@ void Ps2Command::complete(const Ps2Port port, Ps2Controller *controller,
  */
 void Ps2Command::resetRxTimeout() {
     // TODO: implement
+}
+
+/**
+ * Overrideable method for other commands to determine whether the reply phase of a command should
+ * be terminated early, based on the data that has been received so far.
+ *
+ * @return Whether the reception phase can be completed early.
+ */
+bool Ps2Command::isReplyComplete() {
+    // Give the default behavior forcing full reception/timeout
+    return false;
 }

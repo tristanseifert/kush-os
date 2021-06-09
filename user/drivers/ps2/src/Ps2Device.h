@@ -16,7 +16,7 @@ class Ps2Device {
 
     protected:
         /// Submits a command to the port this device is connected to
-        inline void submit(Ps2Command &cmd) {
+        inline void submit(const std::shared_ptr<Ps2Command> &cmd) {
             this->controller->submit(this->port, cmd);
         }
 

@@ -92,7 +92,7 @@ class PortDetector {
         State state = State::Idle;
 
         /// Number of identification descriptors for built in drivers
-        constexpr static const size_t kNumIdentifyDescriptors = 2;
+        constexpr static const size_t kNumIdentifyDescriptors = 3;
         /// Built in drivers
         static const std::array<IdentifyDescriptor, kNumIdentifyDescriptors> gIdDescriptors;
 };

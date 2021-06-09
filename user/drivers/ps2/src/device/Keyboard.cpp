@@ -11,7 +11,7 @@
  */
 Keyboard::Keyboard(Ps2Controller *controller, const Ps2Port port) : Ps2Device(controller, port) {
     // submit the set scan code set command
-    Ps2Command cmd(kCommandSetScanSet, [](auto p, auto cmd, auto ctx) {
+    auto cmd = std::make_shared<Ps2Command>(kCommandSetScanSet, [](auto p, auto cmd, auto ctx) {
         auto kbd = reinterpret_cast<Keyboard *>(ctx);
         if(cmd->didCompleteSuccessfully()) {
             kbd->enableUpdates();
@@ -20,7 +20,7 @@ Keyboard::Keyboard(Ps2Controller *controller, const Ps2Port port) : Ps2Device(co
         }
     }, this);
 
-    cmd.commandPayload = {std::byte{0x02}}; // set scan code set 2
+    cmd->commandPayload = {std::byte{0x02}}; // set scan code set 2
     submit(cmd);
 }
 
@@ -28,7 +28,7 @@ Keyboard::Keyboard(Ps2Controller *controller, const Ps2Port port) : Ps2Device(co
  * Disables scanning of the keyboard, if possible.
  */
 Keyboard::~Keyboard() {
-
+    // TODO: implement
 }
 
 

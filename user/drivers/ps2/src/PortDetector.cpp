@@ -1,5 +1,6 @@
 #include "PortDetector.h"
 #include "Ps2Controller.h"
+#include "Ps2IdentifyCommand.h"
 #include "Log.h"
 
 #include <algorithm>
@@ -85,6 +86,7 @@ void PortDetector::handleRx(const std::byte data) {
  */
 void PortDetector::deviceFailed() {
     this->state = State::FaultyDevice;
+    this->controller->detectionCompleted(this->port, false);
 }
 
 /**
@@ -94,7 +96,7 @@ void PortDetector::identifyDevice() {
     this->state = State::Identify;
 
     // set up the command
-    auto cmd = Ps2Command::Identify([](auto p, auto cmd, auto ctx) {
+    auto cmd = std::make_shared<Ps2IdentifyCommand>([](auto p, auto cmd, auto ctx) {
         auto detector = reinterpret_cast<PortDetector *>(ctx);
 
         if(cmd->didCompleteSuccessfully()) {
@@ -121,7 +123,7 @@ void PortDetector::handleIdentify(const std::span<std::byte> &id) {
         if(match.numIdentifyBytes != id.size()) continue;
         // compare the ID bytes (or match if both are empty)
         if(id.empty() ||
-           std::equal(match.identifyBytes.begin(), match.identifyBytes.end(), id.begin())) {
+           std::equal(id.begin(), id.end(), match.identifyBytes.begin())) {
             // if equal, create the device
             Success("Device on %s port is '%s'",
                     this->port == Ps2Controller::Port::Primary ? "primary" : "secondary",
@@ -130,11 +132,14 @@ void PortDetector::handleIdentify(const std::span<std::byte> &id) {
             auto device = match.construct(this->controller, this->port);
 
             this->controller->setDevice(this->port, std::move(device));
+            this->controller->detectionCompleted(this->port, true);
             return;
         }
     }
 
     // failed to match device
-    Warn("Failed to identify device on %s port! (got %lu id bytes)",
-            this->port == Ps2Controller::Port::Primary ? "primary" : "secondary", id.size());
+    Warn("Failed to identify device on %s port! (got %lu id bytes, first is $%02x)",
+            this->port == Ps2Controller::Port::Primary ? "primary" : "secondary", id.size(),
+            id[0]);
+    this->controller->detectionCompleted(this->port, false);
 }

@@ -67,7 +67,7 @@ void Warn(const char *str, ...) {
  * Logs an error and terminates the task.
  */
 void Abort(const char *str, ...) {
-    fputs("\e[31m[acpi] ", stderr);
+    fprintf(stderr, "\e[31m[%s] ", gLogTag);
 
     va_list va;
     va_start(va, str);

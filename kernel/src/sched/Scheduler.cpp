@@ -209,7 +209,9 @@ beach:;
     if(!to) to = this->idle->thread;
 
     // switch to the destination thread
-    to->switchTo();
+    if(to != this->running) {
+        to->switchTo();
+    }
 
     // when a thread returns, IRQL is back at Passive level. so no need to lower manually
 }
