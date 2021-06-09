@@ -19,15 +19,15 @@ const std::array<PortDetector::IdentifyDescriptor, PortDetector::kNumIdentifyDes
     // plain PS/2 mouse
     PortDetector::IdentifyDescriptor{
         1, {std::byte{0x00}}, "Generic PS/2 mouse"sv, [](auto controller, auto port) {
-            return std::make_shared<GenericMouse>(controller, port);
+            return std::make_shared<GenericMouse>(controller, port, true);
         }
     },
     // PS/2 mouse with wheel
-    PortDetector::IdentifyDescriptor{
+    /*PortDetector::IdentifyDescriptor{
         1, {std::byte{0x03}}, "Generic PS/2 mouse with scroll wheel"sv, [](auto controller, auto port) {
-            return nullptr;
+            return std::make_shared<ThreeAxisMouse>(controller, port);
         }
-    },
+    },*/
     // MF2 keyboard
     PortDetector::IdentifyDescriptor{
         2, {std::byte{0xAB}, std::byte{0x83}}, "MF2 keyboard"sv, [](auto controller, auto port) {

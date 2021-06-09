@@ -13,6 +13,7 @@ add_executable(ps2drv
     src/SupportedDevices.cpp
     src/device/Keyboard.cpp
     src/device/GenericMouse.cpp
+    src/device/ThreeAxisMouse.cpp
 )
 
 target_include_directories(ps2drv PRIVATE src/acpica/include)
@@ -29,7 +30,7 @@ target_sources(ps2drv PRIVATE
 endif()
 
 # allow link time optimization
-target_compile_options(ps2drv PRIVATE "-flto")
+target_compile_options(ps2drv PRIVATE -flto)
 
 # search our codebase for includes
 target_include_directories(ps2drv PRIVATE include)

@@ -56,7 +56,7 @@ struct Ps2Command {
         /// Command byte to send to device
         std::byte command;
         /// Does the command generate an ACK on success?
-        bool commandGeneratesAck = true;
+        bool commandGeneratesAck{true};
         /// Any additional bytes to go with the command
         std::vector<std::byte> commandPayload;
 

@@ -20,7 +20,7 @@ bool Ps2Controller::gLogCmds            = false;
 bool Ps2Controller::gLogReads           = false;
 bool Ps2Controller::gLogDeviceCmds      = false;
 bool Ps2Controller::gLogDeviceReads     = false;
-bool Ps2Controller::gLogCommands        = true;
+bool Ps2Controller::gLogCommands        = false;
 
 /**
  * Initializes a PS/2 controller with the provided aux data structure. This should be a map, with

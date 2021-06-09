@@ -31,7 +31,7 @@ enum class MouseFlags: uint8_t {
 };
 ENUM_FLAGS_EX(MouseFlags, uint8_t);
 
-
+class ThreeAxisMouse;
 
 /**
  * Driver for a basic PS/2 mouse. The sample rate and resolution are fixed, as mouse cursor
@@ -43,6 +43,8 @@ ENUM_FLAGS_EX(MouseFlags, uint8_t);
  * byte packet mode.
  */
 class GenericMouse: public Ps2Device {
+    friend class ThreeAxisMouse;
+
     protected:
         /// Sets the resolution used by the mouse, followed by one byte 0-3
         constexpr static const std::byte kCommandSetResolution{0xE8};
@@ -89,7 +91,8 @@ class GenericMouse: public Ps2Device {
         } __attribute__((__packed__));
 
     public:
-        GenericMouse(Ps2Controller * _Nonnull controller, const Ps2Port port);
+        GenericMouse(Ps2Controller * _Nonnull controller, const Ps2Port port,
+                const bool tryUpgrade);
         ~GenericMouse();
 
         /// Enables position updates.
@@ -101,14 +104,14 @@ class GenericMouse: public Ps2Device {
         void handleRx(const std::byte data) override;
 
     protected:
+        /// Initialize the mouse without doing anything special
+        GenericMouse(Ps2Controller * _Nonnull controller, const Ps2Port port) :
+            Ps2Device(controller, port) {};
         /// Decodes a mouse packet
         virtual void handlePacket(const std::span<std::byte> &packet);
 
-    private:
-        /// Whether mouse input is enabled
-        std::atomic_bool enabled{false};
-        /// whether we've just been enabled
-        bool freshlyEnabled{false};
+        /// Completes initialization, if the upgrade process has failed.
+        void finishInit();
 
         /// current write offset into packet buffer
         size_t packetBufOff{0};
@@ -116,6 +119,12 @@ class GenericMouse: public Ps2Device {
         size_t packetLen{3};
         /// receive buffer for mouse data packet
         std::array<std::byte, kMaxPacketLen> packetBuf;
+
+    private:
+        /// Whether mouse input is enabled
+        std::atomic_bool enabled{false};
+        /// whether we've just been enabled
+        bool freshlyEnabled{false};
 };
 
 #endif

@@ -26,6 +26,11 @@ struct Ps2IdentifyCommand: public Ps2Command {
          * Allow the ID read command to exit early if the single ID code has been recognized.
          */
         bool isReplyComplete() override {
+            // ignore if 0xFA
+            if(this->replyBytes.back() == Ps2Command::kCommandReplyAck) {
+                this->replyBytes.pop_back();
+            }
+
             if(this->replyBytes.size() == 1) {
                 const auto x = this->replyBytes[0];
                 return (std::find(gKnownIds.begin(), gKnownIds.end(), x) != gKnownIds.end());

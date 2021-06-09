@@ -1,4 +1,5 @@
 #include "GenericMouse.h"
+#include "ThreeAxisMouse.h"
 
 #include "Log.h"
 
@@ -6,12 +7,19 @@
  * Initializes the mouse. We'll set its resolution to 4 counts/mm, since the sensitivity scaling
  * is done in software in higher levels.
  */
-GenericMouse::GenericMouse(Ps2Controller *controller, const Ps2Port port) : Ps2Device(controller, port) {
+GenericMouse::GenericMouse(Ps2Controller *controller, const Ps2Port port, const bool tryUpgrade) : 
+    Ps2Device(controller, port) {
     // set the resolution of the mouse
-    auto cmd = std::make_shared<Ps2Command>(kCommandSetResolution, [](auto, auto cmd, auto ctx) {
+    auto cmd = std::make_shared<Ps2Command>(kCommandSetResolution, [tryUpgrade](auto, auto cmd, auto ctx) {
         auto m = reinterpret_cast<GenericMouse *>(ctx);
         if(cmd->didCompleteSuccessfully()) {
-            m->enableUpdates();
+            if(tryUpgrade) {
+                ThreeAxisMouse::TryUpgrade(m);
+            }
+            // do not attempt to upgrade to Z axis mode
+            else {
+                m->enableUpdates();
+            }
         } else {
             Warn("Failed to set resolution set for device $%p", m);
         }
@@ -19,6 +27,14 @@ GenericMouse::GenericMouse(Ps2Controller *controller, const Ps2Port port) : Ps2D
 
     cmd->commandPayload = {std::byte{0x02}};
     submit(cmd);
+}
+
+/**
+ * Performs initialization once the upgrade process changed. This means simply resetting the update
+ * rate and enabling updates again.
+ */
+void GenericMouse::finishInit() {
+    this->enableUpdates();
 }
 
 /**
@@ -80,7 +96,6 @@ void GenericMouse::handlePacket(const std::span<std::byte> &_packet) {
 void GenericMouse::enableUpdates() {
     // reset internal pointers
     this->packetBufOff = 0;
-    this->packetLen = 3;
 
     // then submit the enable command
     auto cmd = Ps2Command::EnableUpdates([](auto p, auto cmd, auto ctx) {
