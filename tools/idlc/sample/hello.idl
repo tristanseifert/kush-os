@@ -1,0 +1,35 @@
+// Defines a basic interface that is basically an echo server.
+  // more comment
+# hash comment
+
+    // comment
+
+/*
+ * block comment
+ */
+interface Hello {
+    // message with no reply
+    asyncMessage() =|
+    asyncMessage2(withArg: Int32, fucker: Bitch) =|
+
+    // invalid() => (argument: )
+
+    // message with argument and a single response object
+    sayHello(message: String) => (reply: String)
+    sayHello2(message: String, length: Int) => (reply: String)
+
+    // message with an empty reply
+    poke() => ()
+}
+
+/*interface Hello {
+    // message with argument and a single response object
+    sayHello(message: String) => (reply: String)
+
+    // message with an empty reply
+    poke() => ()
+
+    // message with no reply
+    asyncMessage() =|
+} */
+// end of file comment

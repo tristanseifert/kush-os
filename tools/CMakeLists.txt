@@ -29,3 +29,4 @@ endif()
 
 # include the tools' binaries
 add_subdirectory(mkinit)
+add_subdirectory(idlc)

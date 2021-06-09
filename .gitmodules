@@ -13,3 +13,6 @@
 [submodule "user/lib/external/capnproto"]
 	path = user/lib/external/capnproto
 	url = git@github.com:tristanseifert/capnproto.git
+[submodule "tools/idlc/lib/PEGTL"]
+	path = tools/idlc/lib/PEGTL
+	url = git@github.com:taocpp/PEGTL.git
