@@ -5,6 +5,9 @@ add_executable(idlc
     src/main.cpp
     src/IDLParser.cpp
     src/InterfaceDescription.cpp
+    src/InterfaceDescriptionBuilder.cpp
+    src/CodeGenerator.cpp
+    src/util/MurmurHash2.cpp
 )
 
 # libraries

@@ -1,5 +1,7 @@
 #include "IDLParser.h"
 #include "IDLGrammar.h"
+#include "InterfaceDescriptionBuilderActions.h"
+#include "InterfaceDescription.h"
 
 #include <iostream>
 
@@ -11,9 +13,9 @@
  * Any parse errors are caught internally here, and printed to standard error stream. Other errors,
  * such as file IO, are not caught and are expected to be dealt with by the caller.
  *
- * @return A parsed interface description, or `nullptr` if parsing failed.
+ * @return Whether parsing was successful or not.
  */
-std::shared_ptr<InterfaceDescription> IDLParser::parse(const std::string &filename) {
+bool IDLParser::parse(const std::string &filename, std::vector<IDPointer> &outInterfaces) {
     using namespace tao;
 
     // open the input
@@ -21,10 +23,12 @@ std::shared_ptr<InterfaceDescription> IDLParser::parse(const std::string &filena
     pegtl::file_input in(filename);
 
     // then try to parse it
+    idl::Builder builder(filename);
+
     try {
-        if(!pegtl::parse<idl::grammar>(in)) {
+        if(!pegtl::parse<idl::grammar, idl::action>(in, builder)) {
             std::cerr << "Local parsing error" << std::endl;
-            return nullptr;
+            return false;
         }
     }
     // handle parse exceptions
@@ -33,9 +37,12 @@ std::shared_ptr<InterfaceDescription> IDLParser::parse(const std::string &filena
         std::cerr << e.what() << '\n'
                   << in.line_at(p) << '\n'
                   << std::setw(p.column) << '^' << std::endl;
+        return false;
     }
 
-    // return parsed object
-    return nullptr;
+    // extract the created interfaces
+    builder.finalize(outInterfaces);
+
+    return true;
 }
 

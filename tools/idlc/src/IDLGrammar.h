@@ -1,6 +1,10 @@
 #ifndef IDLGRAMMER_H
 #define IDLGRAMMER_H
 
+#include "InterfaceDescriptionBuilder.h"
+
+#include <iostream>
+#include <memory>
 #include <tao/pegtl.hpp>
 
 /**
@@ -34,11 +38,24 @@ struct end_interface : one<'}'> {};
 // empty lines (only whitespace)
 struct empty_line : seq<star<ascii::blank>, eol> {};
 
+// decorators (arbitrary key/value tags to "glue" to a subsequent method)
+struct decorator_ws : star<ascii::blank> {};
+
+struct decorator_open : one<'['> {};
+struct decorator_key : identifier {};
+struct decorator_sep : pad<one<'='>> {};
+struct decorator_value : star<sor<ranges< 'a', 'z', 'A', 'Z', '0', '9', '_' >>> {};
+struct decorator_close : one<']'> {};
+
+struct decorator_content: seq<decorator_key, decorator_sep, decorator_value> {};
+struct method_decorator_group: seq<decorator_open, decorator_content, decorator_close, decorator_ws> {};
+
 // define an interface method
 struct method_arg_name : identifier {};
 struct method_arg_sep : pad<one<':'>> {};
 struct method_arg_type: identifier {};
-struct method_arg : seq<method_arg_name, method_arg_sep, method_arg_type> {};
+struct method_arg_end : success{};
+struct method_arg : seq<method_arg_name, method_arg_sep, method_arg_type, method_arg_end> {};
 
 struct method_next_arg_sep : padr<one<','>> {};
 struct method_next_arg : seq<method_arg> {};
@@ -53,23 +70,36 @@ struct method_args_group: sor<
                         > {};
 
 // whitespace allowed in a method body
+struct method_return_open : one<'('> {};
+struct method_return_close : one<')'> {};
+
 struct method_ws : star<ascii::blank> {};
+struct method_name: identifier {};
+struct method_return : sor<must<method_return_open, method_args, method_return_close>> {};
 
-struct method_return : method_args_group {};
-struct method_return_type : sor<TAO_PEGTL_STRING("=|"), must<TAO_PEGTL_STRING("=>"), method_ws, method_return>> {};
+struct method_async_return_marker : TAO_PEGTL_STRING("=|") {};
+struct method_sync_return_marker : TAO_PEGTL_STRING("=>") {};
 
-struct method: seq<method_ws, identifier,
+struct method_sync_return : must<method_sync_return_marker, method_ws, method_return> {};
+
+struct method_end : success{};
+struct method_return_type : sor<method_async_return_marker, method_sync_return> {};
+
+struct method: seq<
+    method_name, method_ws,
+    opt<star<method_decorator_group>>,
     method_ws, method_args_group, 
     method_ws, method_return_type,
-    method_ws> {};
+    method_ws, method_end> {};
 
 // define overall structure of the interface construct
-struct interface_start: seq<padl<TAO_PEGTL_KEYWORD("interface")>, plus<ws>, identifier, star<ws>,
+struct interface_name : identifier {};
+struct interface_start : seq<padl<TAO_PEGTL_KEYWORD("interface")>, plus<ws>, interface_name, star<ws>,
     one<'{'>> {};
-struct interface_member: sor<empty_line, comment, method> {};
-struct interface_next_member: seq<interface_member> {};
-struct interface_content: opt<interface_member, star<interface_next_member>> {};
-struct interface_end: pad<one<'}'>> {};
+struct interface_member : sor<empty_line, comment, padl<method>> {};
+struct interface_next_member : seq<interface_member> {};
+struct interface_content : opt<interface_member, star<interface_next_member>> {};
+struct interface_end : pad<one<'}'>> {};
 
 struct interface : seq<interface_start, interface_content, interface_end> {};
 

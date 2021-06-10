@@ -1,4 +1,5 @@
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -8,6 +9,7 @@
 
 #include "InterfaceDescription.h"
 #include "IDLParser.h"
+#include "CodeGenerator.h"
 
 /**
  * Global state for the compiler
@@ -17,6 +19,9 @@ static struct {
     std::string stubNs;
     /// directory to place output files in
     std::string outDir{"."};
+
+    /// when set, we'll do a debug print of each interface loaded
+    bool printInterfaces{false};
 
     /// filenames of input files
     std::vector<std::string> inFiles;
@@ -34,6 +39,8 @@ static int ParseCommandLine(int argc, char **argv) {
         {"namespace", required_argument, nullptr, 'n'},
         // output directory for compiled files
         {"out", required_argument, nullptr, 'o'},
+        // just print the read in interface, do not generate any code
+        {"print", no_argument, nullptr, 'p'},
         {nullptr, 0, nullptr, 0}
     };
 
@@ -46,6 +53,9 @@ static int ParseCommandLine(int argc, char **argv) {
                 break;
             case 'o':
                 gState.outDir = std::string(optarg);
+                break;
+            case 'p':
+                gState.printInterfaces = true;
                 break;
 
             default:
@@ -71,10 +81,19 @@ static int ParseCommandLine(int argc, char **argv) {
  * generation process.
  */
 int main(int argc, char **argv) {
-    int ret = 1;
+    int ret = 0;
 
     // initialize
     if(ParseCommandLine(argc, argv)) {
+        return -1;
+    }
+
+    std::filesystem::path outDir(gState.outDir);
+    try {
+        std::filesystem::create_directories(outDir);
+    } catch(const std::filesystem::filesystem_error &e) {
+        std::cerr << "Failed to create output directory '" << gState.outDir << "': " << e.what()
+                  << std::endl;
         return -1;
     }
 
@@ -84,16 +103,38 @@ int main(int argc, char **argv) {
 
     for(const auto &name : gState.inFiles) {
         try {
+            std::vector<std::shared_ptr<InterfaceDescription>> tempIntfs;
+
             // open file and parse
-            auto parsed = parser.parse(name);
+            auto parsed = parser.parse(name, tempIntfs);
             if(!parsed) return -1;
 
-            // store it
-            interfaces.emplace_back(std::move(parsed));
+            std::cout << "* Found " << tempIntfs.size() << " interface(s) in " << name
+                      << std::endl;
+
+            // print each interface for debugging if needed
+            if(gState.printInterfaces) {
+                for(const auto &intf : tempIntfs) {
+                    std::cout << *intf << std::endl;
+                }
+            }
+
+            // store the whole set of interfaces for later
+            interfaces.insert(interfaces.end(), tempIntfs.begin(), tempIntfs.end());
         } catch(const std::exception &e) {
-            std::cerr << "failed to process '" << name << "': " << e.what() << std::endl;
+            std::cerr << "Failed to process '" << name << "': " << e.what() << std::endl;
             return -1;
         }
+    }
+
+    // generate the Cap'n proto and the C++ server and client stubs for each interface
+    for(auto &intf : interfaces) {
+        // set up the code generator
+        std::cout << "* CodeGen for '" << intf->getName() << "' from " << intf->getSourceFilename() << std::endl;
+        CodeGenerator gen(outDir, intf);
+
+        // create the protocol files
+        gen.generateProto();
     }
 
     return ret;

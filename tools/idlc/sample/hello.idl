@@ -8,28 +8,15 @@
  * block comment
  */
 interface Hello {
-    // message with no reply
-    asyncMessage() =|
-    asyncMessage2(withArg: Int32, fucker: Bitch) =|
-
-    // invalid() => (argument: )
+    // this one has a fixed ID and some other decorators
+    messageWithFixedId [identifier=0xdeadbeef06969] [pland=delicious] () =|
 
     // message with argument and a single response object
     sayHello(message: String) => (reply: String)
-    sayHello2(message: String, length: Int) => (reply: String)
+    // message with two arguments
+    sayHello2(message: String, length: Int32) => (reply: String)
 
     // message with an empty reply
     poke() => ()
 }
 
-/*interface Hello {
-    // message with argument and a single response object
-    sayHello(message: String) => (reply: String)
-
-    // message with an empty reply
-    poke() => ()
-
-    // message with no reply
-    asyncMessage() =|
-} */
-// end of file comment
