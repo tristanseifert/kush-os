@@ -20,8 +20,9 @@ class CodeGenerator {
     using Argument = InterfaceDescription::Argument;
     using Method = InterfaceDescription::Method;
 
-    /// namespace in which all protocol definitions live
-    constexpr static const std::string_view kProtoNamespace{"rpc::_proto::messages"};
+    public:
+        /// namespace in which all protocol definitions live
+        constexpr static const std::string_view kProtoNamespace{"rpc::_proto::messages"};
 
     public:
         CodeGenerator(const std::filesystem::path &outDir, const IDPointer &interface);

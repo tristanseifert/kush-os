@@ -16,6 +16,9 @@ interface Hello {
     // message with two arguments
     sayHello2(message: String, number: UInt32) => (reply: String)
 
+    // this has a data blob
+    dataMsg(blob: Blob) =|
+
     // message with an empty reply
     poke() => ()
 }

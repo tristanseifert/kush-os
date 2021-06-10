@@ -105,7 +105,7 @@ void CodeGenerator::protoWriteArgs(std::ofstream &os, const std::vector<Argument
         // write out the name label
         const auto &a = args.at(i);
 
-        if(!a.isPrimitiveType()) {
+        if(!a.isBuiltinType()) {
             os << "# Custom serialization type; was '" << a.getTypeName() << '\'' << std::endl;
         }
 
@@ -120,11 +120,10 @@ void CodeGenerator::protoWriteArgs(std::ofstream &os, const std::vector<Argument
  * Convert an IDL type to a Cap'n Proto type name.
  */
 std::string CodeGenerator::ProtoTypenameForArg(const Argument &a) {
-    if(a.isPrimitiveType()) {
+    if(a.isBuiltinType()) {
         // convert from serialization names to the Cap'n Proto names
         auto lowerName = a.getTypeName();
-        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
-                [](unsigned char c){ return std::tolower(c); });
+        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
 
         return gProtoTypeNames.at(lowerName);
     }
