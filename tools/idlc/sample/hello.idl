@@ -14,7 +14,7 @@ interface Hello {
     // message with argument and a single response object
     sayHello(message: String) => (reply: String)
     // message with two arguments
-    sayHello2(message: String, length: Int32) => (reply: String)
+    sayHello2(message: String, number: UInt32) => (reply: String)
 
     // message with an empty reply
     poke() => ()

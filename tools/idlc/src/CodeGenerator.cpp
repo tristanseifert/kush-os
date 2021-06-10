@@ -1,14 +1,12 @@
 #include "CodeGenerator.h"
-#include "InterfaceDescription.h"
 
-#include <algorithm>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
+#include <cstdio>
+#include <ctime>
+#include <string>
+#include <unordered_map>
 
 /**
- * Defines the mapping of lowercased type name strings to Cap'n Proto types.
+ * Defines the mapping of lowercased IDL type name strings to Cap'n Proto types.
  */
 const std::unordered_map<std::string, std::string> CodeGenerator::gProtoTypeNames{
     {"bool", "Bool"},
@@ -20,33 +18,18 @@ const std::unordered_map<std::string, std::string> CodeGenerator::gProtoTypeName
     {"void", "Void"},
 };
 
+/**
+ * Defines the mapping of lowercased IDL type name strings to C++ types.
+ */
+const std::unordered_map<std::string, std::string> CodeGenerator::gCppTypeNames{
+    {"bool", "bool"},
+    {"int8",  "int8_t"},  {"int16",  "int16_t"},  {"int32",  "int32_t"},  {"int64",  "int64_t"},
+    {"uint8", "uint8_t"}, {"uint16", "uint16_t"}, {"uint32", "uint32_t"}, {"uint64", "uint64_t"},
+    {"float32", "float"}, {"float64", "double"},
+    {"string", "std::string"}, {"blob", "std::span<std::byte>"},
 
-/**
- * Returns the name of the given interface converted to the name of the request or response Cap'n
- * Proto structure.
- */
-static inline std::string GetMessageStructName(const std::string &name, const bool isResponse) {
-    auto temp = name;
-    temp[0] = std::toupper(temp[0]);
-    return temp + (isResponse ? "Response" : "Request");
-}
-/**
- * Returns the name of the given interface's identifier constant.
- */
-static inline std::string GetMessageIdConstName(const std::string &name) {
-    auto temp = name;
-    temp[0] = std::toupper(temp[0]);
-    return "messageId" + temp;
-}
-/**
- * Returns the name of a message argument converted to what's suitable as a field name in Cap'n
- * Proto messages.
- */
-static inline std::string GetMessageArgName(const std::string &name) {
-    auto temp = name;
-    temp[0] = std::tolower(temp[0]);
-    return temp;
-}
+    {"void", "Void"},
+};
 
 
 
@@ -55,97 +38,16 @@ static inline std::string GetMessageArgName(const std::string &name) {
  */
 CodeGenerator::CodeGenerator(const std::filesystem::path &_outDir, const IDPointer &_interface) :
     interface(_interface), outDir(_outDir) {
-    // nothing
-}
+    // get the generation timestamp
+    time_t rawtime;
+    struct tm *timeinfo;
+    constexpr static const size_t kBufferSz{60};
+    char buffer[kBufferSz] {};
 
-/**
- * Generates the Cap'n Proto file for the interface.
- */
-void CodeGenerator::generateProto() {
-    // open the output stream
-    auto fileName = this->outDir / (this->interface->getName() + ".capnp");
-    std::cout << "    * Wire format: " << fileName.string() << std::endl;
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
 
-    std::ofstream os(fileName.string(), std::ofstream::trunc);
+    strftime(buffer, kBufferSz, "%Y-%m-%dT%H:%M:%S%z", timeinfo);
 
-    // generate file header and place in private namespace
-    os << "# This is an automatically generated file (by idlc). Do not edit." << std::endl;
-    os << "# Generated from " << this->interface->getSourceFilename() << " for interface "
-       << this->interface->getName() << std::endl;
-    os << "@0x" << std::hex << this->interface->getIdentifier() << ';' << std::endl;
-
-    os << R"(using Cxx = import "/capnp/c++.capnp";)" << std::endl;
-    os << "$Cxx.namespace(\"" << kProtoNamespace << "\");" << std::endl;
-
-    // output info for each method
-    os << R"(
-######################
-# Method defenitions #
-######################)" << "\n\n";
-
-    for(const auto &method : this->interface->getMethods()) {
-        this->protoWriteMethod(os, method);
-    }
-}
-
-/**
- * Writes the structure info for the given method.
- */
-void CodeGenerator::protoWriteMethod(std::ofstream &os, const InterfaceDescription::Method &m) {
-    os << R"(############################################################
-# Structures for message ')" << m.getName() << "'" << std::endl;
-
-    // define the message id
-    os << "const " << GetMessageIdConstName(m.getName()) << ":UInt64 = 0x" << std::hex
-       << m.getIdentifier() << ';' << std::endl << std::endl;
-
-    // start with the request structure
-    os << "struct " << GetMessageStructName(m.getName(), false) << " {" << std::endl;
-    this->protoWriteArgs(os, m.getParameters());
-    os << "}" << std::endl;
-
-    // asynchronous messages do not have a reply structure
-    if(m.isAsync()) {
-        os << "# Message is async, no response struct needed" << std::endl;
-    } 
-    // if message is synchronous, define its reply structure
-    else {
-        os << "struct " << GetMessageStructName(m.getName(), true) << " {" << std::endl;
-        this->protoWriteArgs(os, m.getReturns());
-        os << "}" << std::endl;
-    }
-
-    os << std::endl;
-}
-
-/**
- * Writes the argument fields provided out to the struct sequentially.
- */
-void CodeGenerator::protoWriteArgs(std::ofstream &os,
-        const std::vector<InterfaceDescription::Argument> &args) {
-    for(size_t i = 0; i < args.size(); i++) {
-        // write out the name label
-        const auto &a = args.at(i);
-
-        if(!a.isPrimitiveType()) {
-            os << "# Custom serialization type; was '" << a.getTypeName() << '\'' << std::endl;
-        }
-
-        os << "    " << std::setw(28) << GetMessageArgName(a.getName()) << " @" << i << ": ";
-
-        // write its type
-        if(a.isPrimitiveType()) {
-            // convert from serialization names to the Cap'n Proto names
-            auto lowerName = a.getTypeName();
-            std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
-                    [](unsigned char c){ return std::tolower(c); });
-
-            os << gProtoTypeNames.at(lowerName);
-        } else {
-            // non-primitive types employ manual serialization to blobs
-            os << "Data";
-        }
-
-        os << ';' << std::endl;
-    }
+    this->creationTimestamp = std::string(buffer);
 }

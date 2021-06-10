@@ -41,6 +41,10 @@ class InterfaceDescription {
                 constexpr inline auto &getTypeName() const {
                     return this->typeName;
                 }
+                /// Is the type built in?
+                constexpr inline auto isBuiltinType() const {
+                    return this->isBuiltin;
+                }
                 /// Is the type primitive?
                 constexpr inline auto isPrimitiveType() const {
                     return this->isPrimitive;
@@ -54,7 +58,9 @@ class InterfaceDescription {
                 // name of the type
                 std::string typeName;
 
-                // determine if the type is a primitive
+                // determine if the type is a built in type (primitives, plus string and blob)
+                bool isBuiltin{false};
+                // determine if the type is a primitive (bool/int/float)
                 bool isPrimitive{false};
 
             private:

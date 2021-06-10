@@ -135,6 +135,9 @@ int main(int argc, char **argv) {
 
         // create the protocol files
         gen.generateProto();
+
+        // and the server and client stubs
+        gen.generateServerStub();
     }
 
     return ret;

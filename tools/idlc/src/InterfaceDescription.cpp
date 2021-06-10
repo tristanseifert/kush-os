@@ -32,15 +32,18 @@ Argument::Argument(const std::string &_name, const std::string &_typeName) :
     std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
             [](unsigned char c){ return std::tolower(c); });
 
-    this->isPrimitive = std::find(gPrimitiveTypeNames.begin(), gPrimitiveTypeNames.end(),
+    this->isBuiltin = std::find(gPrimitiveTypeNames.begin(), gPrimitiveTypeNames.end(),
             lowerName) != gPrimitiveTypeNames.end();
+    if(this->isBuiltin) {
+        this->isPrimitive = (lowerName != "string") && (lowerName != "blob");
+    }
 }
 
 /**
  * Prints a textual representation of a method argument.
  */
 std::ostream& operator<<(std::ostream& os, const InterfaceDescription::Argument& m) {
-    if(m.isPrimitive) {
+    if(m.isBuiltin) {
         os << '(' << m.name <<  ": " << m.typeName << ')';
     } else {
         os << '[' << m.name <<  ": " << m.typeName << ']';
