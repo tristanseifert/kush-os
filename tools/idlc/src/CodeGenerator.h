@@ -31,6 +31,8 @@ class CodeGenerator {
         void generateProto();
         /// Generates the server stub for the interface
         void generateServerStub();
+        /// Generates the client stub for the interface
+        void generateClientStub();
 
     private:
         void protoWriteMethod(std::ofstream &, const Method &);
@@ -45,7 +47,14 @@ class CodeGenerator {
         void serverWriteMarshallMethod(std::ofstream &, const Method &);
         void serverWriteMarshallMethodReply(std::ofstream &, const Method &);
 
-        void serverWriteMethodDef(std::ofstream &, const Method &, const std::string &prefix = "");
+        void clientWriteInfoBlock(std::ofstream &);
+        void clientWriteHeader(std::ofstream &);
+
+        void clientWriteImpl(std::ofstream &);
+        void clientWriteMarshallMethod(std::ofstream &, const Method &);
+        void clientWriteMarshallMethodReply(std::ofstream &, const Method &);
+
+        void cppWriteMethodDef(std::ofstream &, const Method &, const std::string &prefix = "");
         static std::string CppTypenameForArg(const Argument &);
 
     private:

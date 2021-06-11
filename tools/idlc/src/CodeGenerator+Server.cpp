@@ -1,4 +1,5 @@
 #include "CodeGenerator.h"
+#include "CodeGenerator+CppHelpers.h"
 #include "InterfaceDescription.h"
 
 #include <algorithm>
@@ -9,45 +10,6 @@
 #include <iomanip>
 #include <iostream>
 
-// Check if the string is all caps
-bool all_caps(const std::string &s) {
-    return std::none_of(s.begin(), s.end(), ::islower);
-}
-
-/**
- * Convert lowerCamelCase and UpperCamelCase strings to UPPER_WITH_UNDERSCORES
- */
-static inline std::string CamelToUpper(const std::string &camelCase) {
-    std::string str(1, tolower(camelCase[0]));
-
-    // First place underscores between contiguous lower and upper case letters.
-    // For example, `_LowerCamelCase` becomes `_Lower_Camel_Case`.
-    for (auto it = camelCase.begin() + 1; it != camelCase.end(); ++it) {
-        if (isupper(*it) && *(it-1) != '_' && islower(*(it-1))) {
-            str += "_";
-        }
-
-        str += *it;
-    }
-
-    // then to uppercase
-    std::transform(str.begin(), str.end(), str.begin(), ::toupper);
-    return str;
-}
-
-/**
- * Returns the fully qualified name of the namespace in which a particular message struct was
- * encoded to.
- */
-static inline std::string GetProtoMsgNsName(const InterfaceDescription::Method &m,
-        const bool isResponse) {
-    auto temp = m.getName();
-    temp[0] = std::toupper(temp[0]);
-
-    temp.append(isResponse ? "Response" : "Request");
-    return std::string(CodeGenerator::kProtoNamespace) + "::" + temp;
-}
-
 /**
  * Returns the name of the stub class for the server, given the interface name.
  */
@@ -56,41 +18,6 @@ static inline std::string GetClassName(const std::shared_ptr<InterfaceDescriptio
     temp[0] = std::toupper(temp[0]);
 
     return temp + "Server";
-}
-/**
- * Returns the name of the method for use in a stub class.
- */
-static inline std::string GetMethodName(const InterfaceDescription::Method &m) {
-    auto temp = m.getName();
-    temp[0] = std::toupper(temp[0]);
-    return temp;
-}
-
-/**
- * Returns the fully qualified name of the constant that contains the identifier of the given
- * method.
- */
-static inline std::string GetMethodIdConst(const InterfaceDescription::Method &m) {
-    auto temp = m.getName();
-    temp = CamelToUpper(temp);
-    return "rpc::_proto::messages::MESSAGE_ID_" + temp;
-}
-
-/**
- * Returns the name of the getter for the given argument.
- */
-static inline std::string GetterNameFor(const InterfaceDescription::Argument &a) {
-    auto temp = a.getName();
-    temp[0] = std::toupper(temp[0]);
-    return "get" + temp;
-}
-/**
- * Returns the name of the setter for the given argument.
- */
-static inline std::string SetterNameFor(const InterfaceDescription::Argument &a) {
-    auto temp = a.getName();
-    temp[0] = std::toupper(temp[0]);
-    return "set" + temp;
 }
 
 
@@ -136,8 +63,12 @@ void CodeGenerator::generateServerStub() {
 #include <capnp/serialize.h>
 
 using namespace rpc;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
 )";
     this->serverWriteImpl(implementation);
+    implementation << "#pragma clang diagnostic pop" << std::endl;
 }
 
 /**
@@ -181,13 +112,15 @@ void CodeGenerator::serverWriteHeader(std::ofstream &os) {
      * valid for as long as the stream is active. The transmit buffer is required to only be
      * valid for the duration of the `send()` call.
      */
-    os << R"(#ifndef __RPC_RPCSTREAM_H
-#define __RPC_RPCSTREAM_H
-class RpcIoStream {
+    os << R"(#ifndef __RPC_SERVERRPCSTREAM_H
+#define __RPC_SERVERRPCSTREAM_H
+class ServerRpcIoStream {
     public:
-        virtual ~RpcIoStream() = default;
+        virtual ~ServerRpcIoStream() = default;
 
+        /// Pop oldest message from receive queue
         virtual bool receive(std::span<std::byte> &outRxBuf, const bool block) = 0;
+        /// Send a reply to the most recently received message
         virtual bool reply(const std::span<std::byte> &buf) = 0;
 };
 #endif
@@ -220,7 +153,7 @@ class RpcIoStream {
     // public methods
     os << R"(
     public:
-        )" << className << R"((const std::shared_ptr<RpcIoStream> &stream);
+        )" << className << R"((const std::shared_ptr<ServerRpcIoStream> &stream);
         virtual ~)" << className << R"(();
 
         // Server's main loop; continuously read and handle messages.
@@ -236,7 +169,7 @@ class RpcIoStream {
 )";
     for(const auto &m : this->interface->getMethods()) {
         os << "        virtual ";
-        this->serverWriteMethodDef(os, m, "impl");
+        this->cppWriteMethodDef(os, m, "impl");
         os << " = 0;" << std::endl;
     }
 
@@ -250,7 +183,7 @@ class RpcIoStream {
 
     // Implementation details; pretend this does not exist
     private:
-        std::shared_ptr<RpcIoStream> io;
+        std::shared_ptr<ServerRpcIoStream> io;
         size_t txBufSize{0};
         void *txBuf{nullptr};
 
@@ -280,8 +213,23 @@ void CodeGenerator::serverWriteImpl(std::ofstream &os) {
     const auto className = GetClassName(this->interface);
     os << "using Server = " << className << ';' << std::endl << std::endl;
 
-    // run method
+    // constructors and run method
     os << R"(/**
+ * Creates a new server instance, with the given IO stream.
+ */
+Server::)" << className << R"((const std::shared_ptr<ServerRpcIoStream> &stream) : io(stream) {
+}
+
+/**
+ * Releases any allocated resources.
+ */
+Server::~)" << className << R"(() {
+    if(this->txBuf) {
+        free(this->txBuf);
+    }
+}
+
+/**
  * Continuously processes messages until processing fails to receive another message.
  */
 bool Server::run(const bool block) {
@@ -305,9 +253,7 @@ bool Server::runOne(const bool block) {
     if(!this->io->receive(buf, block)) return false;
 
     // get the message header and its payload
-    if(buf.size() < sizeof(MessageHeader)) {
-        throw std::runtime_error("received message too small");
-    }
+    if(buf.size() < sizeof(MessageHeader)) throw std::runtime_error("Received message too small");
     const auto hdr = reinterpret_cast<const MessageHeader *>(buf.data());
 
     const auto payload = buf.subspan(offsetof(MessageHeader, payload));
@@ -328,11 +274,6 @@ bool Server::runOne(const bool block) {
 }
 
 )";
-
-    // implementations of marshalling methods
-    for(const auto &m : this->interface->getMethods()) {
-        this->serverWriteMarshallMethod(os, m);
-    }
 
     // built in helpers
     os << R"(
@@ -370,6 +311,11 @@ void Server::_ensureTxBuf(const size_t len) {
     }
 }
 )";
+
+    // implementations of marshalling methods
+    for(const auto &m : this->interface->getMethods()) {
+        this->serverWriteMarshallMethod(os, m);
+    }
 }
 
 /**
@@ -508,77 +454,4 @@ void CodeGenerator::serverWriteMarshallMethodReply(std::ofstream &os, const Meth
 }
 
 
-
-/**
- * Writes the server method definition for the given method.
- */
-void CodeGenerator::serverWriteMethodDef(std::ofstream &os, const Method &m,
-        const std::string &namePrefix) {
-    // return type
-    if(m.isAsync()) {
-        os << "void ";
-    } else {
-        auto &rets = m.getReturns();
-        if(rets.empty()) {
-            os << "void ";
-        } else {
-            // single argument?
-            if(rets.size() == 1) {
-                os << CppTypenameForArg(rets[0]) << ' ';
-            }
-            // more than one; we have to define a struct type
-            else {
-                throw std::runtime_error("multiple return types not yet implemented");
-            }
-        }
-    }
-
-    // its name and opening bracket
-    const auto methodName = GetMethodName(m);
-    os << namePrefix << methodName << '(';
-
-    // any arguments
-    const auto &params = m.getParameters();
-    for(size_t i = 0; i < params.size(); i++) {
-        const auto &a = params[i];
-
-        // print its type (it's a const reference if it's non primitive)
-        if(!a.isPrimitiveType()) {
-            os << "const ";
-        }
-        os << CppTypenameForArg(a) << ' ';
-
-        if(!a.isPrimitiveType()) {
-            os << '&';
-        }
-
-        // its name and a comma if not last
-        os << a.getName();
-
-        if(i != params.size()-1) {
-            os << ", ";
-        }
-    }
-
-    // closing bracket
-    os << ')';
-}
-
-
-
-/**
- * Returns the C++ type name for the given argument.
- */
-std::string CodeGenerator::CppTypenameForArg(const Argument &a) {
-    // look up built in types in the map
-    if(a.isBuiltinType()) {
-        // convert the argument to lowercase and lookup
-        auto lowerName = a.getTypeName();
-        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
-
-        return gCppTypeNames.at(lowerName);
-    }
-    // otherwise, return its type as-is
-    return a.getTypeName();
-}
 

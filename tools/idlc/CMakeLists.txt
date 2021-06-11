@@ -9,6 +9,8 @@ add_executable(idlc
     src/CodeGenerator.cpp
     src/CodeGenerator+Proto.cpp
     src/CodeGenerator+Server.cpp
+    src/CodeGenerator+Client.cpp
+    src/CodeGenerator+CppHelpers.cpp
     src/util/MurmurHash2.cpp
 )
 

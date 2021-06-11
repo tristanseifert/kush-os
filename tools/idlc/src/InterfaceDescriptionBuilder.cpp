@@ -62,6 +62,11 @@ void Builder::beginMethod(const std::string &name) {
     assert(this->current);
     assert(!this->currentMethod);
 
+    // cannot start with underscores
+    if(name[0] == '_') {
+        throw std::runtime_error("Method name '" + name + "' is not allowed; names may not start with underscores");
+    }
+
     this->currentMethod = std::make_shared<InterfaceDescription::Method>(name);
 }
 

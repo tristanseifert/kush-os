@@ -26,7 +26,7 @@ endif()
 
 #####
 # allow link time optimization
-target_compile_options(driverman PRIVATE "-flto")
+target_compile_options(driverman PRIVATE -flto)
 
 # search our codebase for includes
 target_include_directories(driverman PRIVATE include)

@@ -138,6 +138,7 @@ int main(int argc, char **argv) {
 
         // and the server and client stubs
         gen.generateServerStub();
+        gen.generateClientStub();
     }
 
     return ret;

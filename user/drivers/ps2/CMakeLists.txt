@@ -30,7 +30,7 @@ target_sources(ps2drv PRIVATE
 endif()
 
 # allow link time optimization
-target_compile_options(ps2drv PRIVATE -flto)
+target_compile_options(ps2drv PRIVATE -flto -fno-rtti)
 
 # search our codebase for includes
 target_include_directories(ps2drv PRIVATE include)
@@ -38,7 +38,7 @@ target_include_directories(ps2drv PRIVATE src)
 
 # required libraries
 add_dependencies(ps2drv c_dynamic system_dynamic)
-target_link_libraries(ps2drv PRIVATE rpc driver mpack_dynamic acpisrv_serialization)
+target_link_libraries(ps2drv PRIVATE capnp rpc driver mpack_dynamic acpisrv_serialization)
 
 # install it to boot directory in sysroot
 install(TARGETS ps2drv RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)
