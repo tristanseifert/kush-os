@@ -7,6 +7,7 @@
 
 #include <getopt.h>
 
+#include "version.h"
 #include "InterfaceDescription.h"
 #include "IDLParser.h"
 #include "CodeGenerator.h"
@@ -29,6 +30,8 @@ static struct {
 
 /**
  * Parse the command line into the config state.
+ *
+ * @return 0 on success, 1 to exit with success, -1 for error exit.
  */
 static int ParseCommandLine(int argc, char **argv) {
     int ch;
@@ -41,13 +44,20 @@ static int ParseCommandLine(int argc, char **argv) {
         {"out", required_argument, nullptr, 'o'},
         // just print the read in interface, do not generate any code
         {"print", no_argument, nullptr, 'p'},
+        // print the version and exit
+        {"version", no_argument, nullptr, 'v'},
         {nullptr, 0, nullptr, 0}
     };
 
     // iterate until all are options read
-    while((ch = getopt_long(argc, argv, "", options, nullptr)) != -1) {
+    while((ch = getopt_long(argc, argv, "v", options, nullptr)) != -1) {
 
         switch(ch) {
+            case 'v':
+                std::cout << "This is idlc, the kush RPC IDL compiler (git rev "
+                          << std::string(gVERSION_HASH).substr(0, 8) << ")" << std::endl;
+                return 1;
+                break;
             case 'n':
                 gState.stubNs = std::string(optarg);
                 break;
@@ -84,8 +94,8 @@ int main(int argc, char **argv) {
     int ret = 0;
 
     // initialize
-    if(ParseCommandLine(argc, argv)) {
-        return -1;
+    if((ret = ParseCommandLine(argc, argv))) {
+        return (ret == 1) ? 0 : -1;
     }
 
     std::filesystem::path outDir(gState.outDir);

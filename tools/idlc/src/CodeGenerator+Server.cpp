@@ -59,6 +59,8 @@ void CodeGenerator::generateServerStub() {
 #include <cstring>
 #include <stdexcept>
 
+#include <rpc/rt/RpcIoStream.hpp>
+
 #include <capnp/message.h>
 #include <capnp/serialize.h>
 
@@ -103,30 +105,8 @@ void CodeGenerator::serverWriteHeader(std::ofstream &os) {
     // set up the starting of the class
     const auto className = GetClassName(this->interface);
 
-    os << "namespace rpc {" << std::endl;
-    /**
-     * Define the RPC stream type; this is an abstract interface that defines how the rest of the
-     * server stub receives and sends messages.
-     *
-     * Note that the IO stream instance owns the receive message data, and that it must remain
-     * valid for as long as the stream is active. The transmit buffer is required to only be
-     * valid for the duration of the `send()` call.
-     */
-    os << R"(#ifndef __RPC_SERVERRPCSTREAM_H
-#define __RPC_SERVERRPCSTREAM_H
-class ServerRpcIoStream {
-    public:
-        virtual ~ServerRpcIoStream() = default;
-
-        /// Pop oldest message from receive queue
-        virtual bool receive(std::span<std::byte> &outRxBuf, const bool block) = 0;
-        /// Send a reply to the most recently received message
-        virtual bool reply(const std::span<std::byte> &buf) = 0;
-};
-#endif
-
-)";
-
+    os << "namespace rpc {" << std::endl << "namespace rt { class ServerRpcIoStream; }"
+       << std::endl;
     os << "class " << className << " {";
 
     /*
@@ -148,19 +128,22 @@ class ServerRpcIoStream {
     };
     static_assert(!(offsetof(MessageHeader, payload) % sizeof(uintptr_t)),
         "message header's payload is not word aligned");
-    )";
+
+    protected:
+        using IoStream = rt::ServerRpcIoStream;
+)";
 
     // public methods
     os << R"(
     public:
-        )" << className << R"((const std::shared_ptr<ServerRpcIoStream> &stream);
+        )" << className << R"((const std::shared_ptr<IoStream> &stream);
         virtual ~)" << className << R"(();
 
         // Server's main loop; continuously read and handle messages.
         bool run(const bool block = true);
         // Process a single message.
         bool runOne(const bool block);
-    )";
+)";
 
     // abstract methods to implement
     os << R"(
@@ -183,7 +166,7 @@ class ServerRpcIoStream {
 
     // Implementation details; pretend this does not exist
     private:
-        std::shared_ptr<ServerRpcIoStream> io;
+        std::shared_ptr<IoStream> io;
         size_t txBufSize{0};
         void *txBuf{nullptr};
 
@@ -217,7 +200,7 @@ void CodeGenerator::serverWriteImpl(std::ofstream &os) {
     os << R"(/**
  * Creates a new server instance, with the given IO stream.
  */
-Server::)" << className << R"((const std::shared_ptr<ServerRpcIoStream> &stream) : io(stream) {
+Server::)" << className << R"((const std::shared_ptr<IoStream> &stream) : io(stream) {
 }
 
 /**

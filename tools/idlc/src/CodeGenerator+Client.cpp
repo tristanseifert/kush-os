@@ -61,6 +61,8 @@ void CodeGenerator::generateClientStub() {
 #include <capnp/message.h>
 #include <capnp/serialize.h>
 
+#include <rpc/rt/RpcIoStream.hpp>
+
 using namespace rpc;
 
 #pragma clang diagnostic push
@@ -100,30 +102,8 @@ void CodeGenerator::clientWriteHeader(std::ofstream &os) {
     // set up the starting of the class
     const auto className = GetClassName(this->interface);
 
-    os << "namespace rpc {" << std::endl;
-    /**
-     * Define the RPC stream type; this is an abstract interface that defines how the rest of the
-     * server stub receives and sends messages.
-     *
-     * Note that the IO stream instance owns the receive message data, and that it must remain
-     * valid for as long as the stream is active. The transmit buffer is required to only be
-     * valid for the duration of the `send()` call.
-     */
-    os << R"(#ifndef __RPC_CLIENTRPCSTREAM_H
-#define __RPC_CLIENTRPCSTREAM_H
-class ClientRpcIoStream {
-    public:
-        virtual ~ClientRpcIoStream() = default;
-
-        /// Send the serialized request to the remote connection
-        virtual bool sendRequest(const std::span<std::byte> &buf) = 0;
-        /// Receive a reply from the remote connection
-        virtual bool receiveReply(std::span<std::byte> &outRxBuf) = 0;
-};
-#endif
-
-)";
-
+    os << "namespace rpc {" << std::endl << "namespace rt { class ClientRpcIoStream; }"
+       << std::endl;
     os << "class " << className << " {";
 
     /*
@@ -145,14 +125,17 @@ class ClientRpcIoStream {
     };
     static_assert(!(offsetof(MessageHeader, payload) % sizeof(uintptr_t)),
         "message header's payload is not word aligned");
-    )";
+
+    protected:
+        using IoStream = rt::ClientRpcIoStream;
+)";
 
     // public methods
     os << R"(
     public:
-        )" << className << R"((const std::shared_ptr<ClientRpcIoStream> &stream);
+        )" << className << R"((const std::shared_ptr<IoStream> &stream);
         virtual ~)" << className << R"(();
-    )";
+)";
 
     // actual RPC methods
     os << R"(
@@ -173,7 +156,7 @@ class ClientRpcIoStream {
 
     // Implementation details; pretend this does not exist
     private:
-        std::shared_ptr<ClientRpcIoStream> io;
+        std::shared_ptr<IoStream> io;
         size_t txBufSize{0};
         void *txBuf{nullptr};
 
@@ -202,7 +185,7 @@ void CodeGenerator::clientWriteImpl(std::ofstream &os) {
     os << R"(/**
  * Creates a new client instance, with the given IO stream.
  */
-Client::)" << className << R"((const std::shared_ptr<ClientRpcIoStream> &stream) : io(stream) {
+Client::)" << className << R"((const std::shared_ptr<IoStream> &stream) : io(stream) {
 }
 
 /**

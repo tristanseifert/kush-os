@@ -14,6 +14,13 @@ add_executable(idlc
     src/util/MurmurHash2.cpp
 )
 
+target_include_directories(idlc PRIVATE include)
+
+# version
+configure_file(${CMAKE_CURRENT_LIST_DIR}/src/version.cpp.in
+    ${CMAKE_CURRENT_BINARY_DIR}/version.cpp)
+target_sources(idlc PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/version.cpp)
+
 # libraries
 add_subdirectory(lib/PEGTL)
 target_link_libraries(idlc PRIVATE taocpp::pegtl)
