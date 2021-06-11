@@ -45,6 +45,7 @@ void CodeGenerator::generateServerStub() {
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <vector>
 )" << std::endl;
     this->serverWriteHeader(header);
 
@@ -413,8 +414,11 @@ void CodeGenerator::serverWriteMarshallMethodReply(std::ofstream &os, const Meth
                 if(lowerName == "string") {
                     os << "    reply." << SetterNameFor(a) << "(retVal);" << std::endl;
                 } else if(lowerName == "blob") {
-                    os << "    reply." << SetterNameFor(a) << "(retVal.data(), retVal.size());"
-                       << std::endl;
+                    os << "    capnp::Data::Reader blobReader_" << a.getName()
+                       << "(reinterpret_cast<const kj::byte *>(retVal.data()), retVal.size());"
+                       << std::endl
+                       << "    reply." << SetterNameFor(a) << "(blobReader_" << a.getName()
+                       << ");" << std::endl;
                 } else {
                     throw std::runtime_error("Unknown non-primitive builtin type");
                 }

@@ -1,8 +1,6 @@
 #ifndef DB_DRIVERDB_H
 #define DB_DRIVERDB_H
 
-#include <driver/Discovery.hpp>
-
 #include <cassert>
 #include <memory>
 #include <unordered_map>
@@ -29,7 +27,7 @@ class DriverDb {
         }
 
         /// Finds a driver that matches the given match objects.
-        std::shared_ptr<Driver> findDriver(const std::span<libdriver::DeviceMatch *> &matches);
+        //std::shared_ptr<Driver> findDriver(const std::span<libdriver::DeviceMatch *> &matches);
 
         /// Registers a new driver.
         uintptr_t addDriver(std::shared_ptr<Driver> &driver);

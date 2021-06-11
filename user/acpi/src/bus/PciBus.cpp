@@ -3,7 +3,7 @@
 #include "acpi.h"
 #include "log.h"
 
-#include <driver/Discovery.hpp>
+#include <driver/DrivermanClient.h>
 #include <mpack/mpack.h>
 
 using namespace acpi;
@@ -158,18 +158,11 @@ void PciBus::getIrqRoutes(ACPI_HANDLE object) {
  * Loads a driver for this PCI bus.
  */
 void PciBus::loadDriver(const uintptr_t) {
-    // build the message and send it
-    auto msg = new libdriver::DeviceDiscovered;
-    auto match = new libdriver::DeviceNameMatch(kDriverName);
-    msg->matches.push_back(match);
+    std::vector<std::byte> aux;
+    this->serializeAuxData(aux);
 
-    this->serializeAuxData(msg->aux);
-
-    libdriver::SendToSrv(msg);
-
-    // clean up
-    delete match;
-    delete msg;
+    this->drivermanPath = libdriver::RpcClient::the()->AddDevice(kAcpiBusRoot, kDriverName, aux);
+    Trace("PCI bus registered at %s", this->drivermanPath.c_str());
 }
 
 /**

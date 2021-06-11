@@ -10,6 +10,10 @@ namespace acpi {
  */
 class Bus {
     public:
+        /// Path under which all ACPI found busses are installed
+        static const std::string kAcpiBusRoot;
+
+    public:
         Bus(Bus * _Nullable _parent, const std::string &path) : parent(_parent),
             acpiPath(path) {}
 
@@ -32,8 +36,11 @@ class Bus {
          */
         Bus * _Nullable parent = nullptr;
 
+        /// Path under which this bus is registered in the driver registry
+        std::string drivermanPath{""};
+
         /// ACPI path
-        std::string acpiPath;
+        std::string acpiPath{""};
 };
 }
 

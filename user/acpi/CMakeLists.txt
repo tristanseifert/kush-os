@@ -8,7 +8,9 @@ add_executable(acpisrv
     src/main.cpp
     src/Log.cpp
     src/AcpicaWrapper.cpp
+    src/bus/Bus.cpp
     src/bus/PciBus.cpp
+    src/bus/PciExpressBus.cpp
     src/bus/Ps2Bus.cpp
     # ACPICA OS layer
     src/osl/init.cpp
@@ -232,7 +234,7 @@ target_link_libraries(acpisrv PRIVATE acpisrv_acpica)
 
 #####
 # allow link time optimization
-target_compile_options(acpisrv PRIVATE "-flto")
+target_compile_options(acpisrv PRIVATE -flto)
 
 # search our codebase for includes
 target_include_directories(acpisrv PRIVATE include)
@@ -240,7 +242,7 @@ target_include_directories(acpisrv PRIVATE src)
 
 # required libraries
 add_dependencies(acpisrv c_dynamic system_dynamic)
-target_link_libraries(acpisrv PRIVATE rpc driver mpack_dynamic)
+target_link_libraries(acpisrv PRIVATE capnp driver rpc_dynamic mpack_dynamic)
 
 # install it to boot directory in sysroot
 install(TARGETS acpisrv RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)

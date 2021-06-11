@@ -42,6 +42,9 @@ class AcpicaWrapper {
         void foundPciRoot(ACPI_HANDLE);
         void pciGetIrqRoutes(ACPI_HANDLE, std::shared_ptr<acpi::PciBus> &);
 
+        void probePciExpress();
+        void foundPcieSegment(const size_t, const ACPI_MCFG_ALLOCATION &);
+
         void probePcDevices();
 
     private:

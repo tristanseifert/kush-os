@@ -7,9 +7,9 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <string_view>
 #include <span>
 #include <stdexcept>
+#include <string_view>
 #include <system_error>
 
 namespace rpc::rt {

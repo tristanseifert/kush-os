@@ -1,0 +1,15 @@
+/*
+ * This file describes the RPC interface for the driver manager.
+ *
+ * A generic interface for use by drivers to register/remove devices, and query the hardware in the
+ * system.
+ */
+interface Driverman {
+    // Registers a new device on the device tree; returns path or empty string on failure
+    addDevice(parent: String, driverId: String, auxData: Blob) => (path: String)
+
+    // Sets a property on a device based on its path
+    setDeviceProperty(path: String, key: String, data: Blob) => ()
+    // Gets the value of a property on a device based on its path
+    getDeviceProperty(path: String, key: String) => (data: Blob)
+}

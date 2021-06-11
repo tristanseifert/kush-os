@@ -3,6 +3,7 @@
 #include "log.h"
 
 #include "bus/PciBus.h"
+#include "bus/PciExpressBus.h"
 #include "bus/Ps2Bus.h"
 
 #include <cassert>
@@ -142,7 +143,10 @@ void AcpicaWrapper::configureApic() {
  */
 void AcpicaWrapper::probeBusses() {
     // probe the busses
+#ifndef __amd64__
     gShared->probePci();
+#endif
+    gShared->probePciExpress();
     gShared->probePcDevices();
 
     // yeet
@@ -170,9 +174,6 @@ void AcpicaWrapper::probeDevices() {
  * Enumerates all PCI busses in the ACPI namespace, and then launches the PCI driver for them.
  *
  * PNP0A03 = PCI bus
- * PNP0A05 = Generic ACPI bus
- * PNP0A06 = Generic ACPI extended IO bus
- * PNP0A08 = PCI express bus
  */
 void AcpicaWrapper::probePci() {
     void *retval;
@@ -262,6 +263,44 @@ void AcpicaWrapper::foundPciRoot(ACPI_HANDLE object) {
     // store bus
     this->busses.emplace(this->nextBusId++, std::dynamic_pointer_cast<Bus>(bobj));
 }
+
+/**
+ * Parses the MCFG table to find all PCIe configuration regions
+ */
+void AcpicaWrapper::probePciExpress() {
+    // try to locate the table
+    ACPI_TABLE_HEADER *hdr{nullptr};
+    ACPI_STATUS ret = AcpiGetTable(ACPI_SIG_MCFG, 1, &hdr);
+    if(ret == AE_NOT_FOUND) {
+        Warn("Failed to find MCFG table (%d) - does this machine have a PCIe bus?", ret);
+        return;
+    } else if(ret != AE_OK) {
+        Abort("AcpiGetTable() failed: %d", ret);
+    }
+
+    const auto mcfg = reinterpret_cast<ACPI_TABLE_MCFG *>(hdr);
+    const auto numEntries = (hdr->Length - sizeof(*mcfg)) / sizeof(ACPI_MCFG_ALLOCATION);
+
+    Trace("MCFG table is at %p; has %lu entries", mcfg, numEntries);
+
+    // handle each entry
+    const auto entries = reinterpret_cast<ACPI_MCFG_ALLOCATION *>(
+            reinterpret_cast<uintptr_t>(mcfg) + sizeof(*mcfg));
+
+    for(size_t i = 0; i < numEntries; i++) {
+        const auto &e = entries[i];
+        this->foundPcieSegment(i, e);
+    }
+}
+
+/**
+ * Processes a found PCI Express segment.
+ */
+void AcpicaWrapper::foundPcieSegment(const size_t idx, const ACPI_MCFG_ALLOCATION &s) {
+    auto pcie = std::make_shared<PciExpressBus>(nullptr, "", s);
+    this->busses.emplace(this->nextBusId++, std::dynamic_pointer_cast<Bus>(pcie));
+}
+
 
 
 

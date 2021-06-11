@@ -4,13 +4,12 @@
 # Helpers for writing driver servers.
 ###############################################################################
 add_library(driver STATIC
+    # RPC implementations
+    src/rpc/Driverman.capnp.c++
+    src/rpc/Client_Driverman.cpp
+    src/rpc/Client.cpp
     # serialization helpers
     src/serialize/base85.c
-    # message implementations
-    src/messages/Send.cpp
-    src/messages/Messages.cpp
-    src/messages/Discovery.cpp
-    src/messages/Pci.cpp
 )
 
 # allow the library to have link time optimization

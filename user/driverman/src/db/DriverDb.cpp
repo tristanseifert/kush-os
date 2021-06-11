@@ -12,7 +12,7 @@ DriverDb *DriverDb::gShared = nullptr;
  * TODO: actually load it; we just create dummy entries for now
  */
 DriverDb::DriverDb() {
-    // bus drivers
+/*    // bus drivers
     auto pciRoot = std::make_shared<Driver>("/sbin/pcisrv");
     pciRoot->addMatch(static_cast<libdriver::DeviceMatch *>(
                 new libdriver::DeviceNameMatch("AcpiPciRootBridge")));
@@ -22,7 +22,7 @@ DriverDb::DriverDb() {
     auto ps2Controller = std::make_shared<Driver>("/sbin/ps2drv");
     ps2Controller->addMatch(static_cast<libdriver::DeviceMatch *>(
                 new libdriver::DeviceNameMatch("AcpiPs2Controller")));
-    this->addDriver(ps2Controller);
+    this->addDriver(ps2Controller);*/
 }
 
 
@@ -31,6 +31,7 @@ DriverDb::DriverDb() {
  *
  * @return Driver if found, otherwise `nullptr.`
  */
+/*
 std::shared_ptr<Driver> DriverDb::findDriver(const std::span<libdriver::DeviceMatch *> &matches) {
     std::shared_ptr<Driver> ret = nullptr;
 
@@ -46,7 +47,7 @@ std::shared_ptr<Driver> DriverDb::findDriver(const std::span<libdriver::DeviceMa
     // done
     this->driversLock.unlock_shared();
     return ret;
-}
+}*/
 
 /**
  * Register new driver.

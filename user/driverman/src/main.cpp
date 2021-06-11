@@ -8,7 +8,7 @@
 #include "db/DriverDb.h"
 #include "forest/Forest.h"
 #include "experts/Expert.h"
-#include "rpc/MessageLoop.h"
+#include "rpc/Server.h"
 
 const char *gLogTag = "driverman";
 
@@ -63,7 +63,7 @@ int main(const int argc, char **argv) {
     Success("driverman starting (pexpert '%s')", gState.expertName.c_str());
 
     Forest::init();
-    MessageLoop::init();
+    RpcServer::init();
 
     DriverDb::init();
 
@@ -77,5 +77,6 @@ int main(const int argc, char **argv) {
     expert->probe();
 
     // enter main message loop
-    MessageLoop::the()->run();
+    RpcServer::the()->run();
+    Abort("RpcServer returned!");
 }

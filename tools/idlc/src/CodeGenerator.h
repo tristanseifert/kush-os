@@ -55,13 +55,14 @@ class CodeGenerator {
         void clientWriteMarshallMethodReply(std::ofstream &, const Method &);
 
         void cppWriteMethodDef(std::ofstream &, const Method &, const std::string &prefix = "");
-        static std::string CppTypenameForArg(const Argument &);
+        static std::string CppTypenameForArg(const Argument &, const bool isArg);
 
     private:
         // mapping of the type names defined in the IDL to Cap'n Proto names
         static const std::unordered_map<std::string, std::string> gProtoTypeNames;
         // mapping of the type names defined in the IDL to C++ type names
-        static const std::unordered_map<std::string, std::string> gCppTypeNames;
+        static const std::unordered_map<std::string, std::string> gCppArgTypeNames;
+        static const std::unordered_map<std::string, std::string> gCppReturnTypeNames;
 
         // timestamp for generation (ins ISO 8601 format)
         std::string creationTimestamp;

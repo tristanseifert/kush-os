@@ -1,8 +1,6 @@
 #ifndef DB_DRIVER_H
 #define DB_DRIVER_H
 
-#include <driver/Discovery.hpp>
-
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -15,13 +13,13 @@
 class Driver {
     public:
         Driver(const std::string &path);
-        virtual ~Driver();
-
+        virtual ~Driver() = default;
+/*
         /// Adds a new match object to the driver. We take ownership of the pointer.
         void addMatch(libdriver::DeviceMatch *);
         /// Determine whether this driver matches against the given list.
         virtual bool test(const std::span<libdriver::DeviceMatch *> &matches, const bool oand = false);
-
+*/
         /// Instantiates the driver with the given aux data.
         virtual void start(const std::span<std::byte> &auxData);
 
@@ -37,7 +35,7 @@ class Driver {
         /**
          * An array of match structures, each of which describes a device that we can operate on.
          */
-        std::vector<libdriver::DeviceMatch *> matches;
+        //std::vector<libdriver::DeviceMatch *> matches;
 
         /// when set, the driver does not share tasks
         bool alwaysLaunchNew = false;

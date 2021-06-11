@@ -6,7 +6,7 @@
 
 #include <type_traits>
 
-#include <driver/Discovery.hpp>
+#include <driver/DrivermanClient.h>
 #include <mpack/mpack.h>
 
 #include <acpi.h>
@@ -139,18 +139,11 @@ void Ps2Bus::extractResources(ACPI_HANDLE object, std::vector<Resource> &outRsrc
  * Load the PS/2 bus driver.
  */
 void Ps2Bus::loadDriver(const uintptr_t id) {
-    // build the message and send it
-    auto msg = new libdriver::DeviceDiscovered;
-    auto match = new libdriver::DeviceNameMatch(kDriverName);
-    msg->matches.push_back(match);
+    std::vector<std::byte> aux;
+    this->serializeAuxData(aux);
 
-    this->serializeAuxData(msg->aux);
-
-    libdriver::SendToSrv(msg);
-
-    // clean up
-    delete match;
-    delete msg;
+    this->drivermanPath = libdriver::RpcClient::the()->AddDevice(kAcpiBusRoot, kDriverName, aux);
+    Trace("PS/2 bus registered at %s", this->drivermanPath.c_str());
 }
 
 /**

@@ -44,6 +44,7 @@ void CodeGenerator::generateClientStub() {
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <vector>
 )" << std::endl;
     this->clientWriteHeader(header);
 
@@ -344,7 +345,33 @@ void CodeGenerator::clientWriteMarshallMethodReply(std::ofstream &os, const Meth
     const auto &returns = m.getReturns();
     if(returns.size() == 1) {
         const auto &a = returns[0];
-        os << "        return reply." << GetterNameFor(a) << "();";
+
+        if(a.isBuiltinType()) {
+            if(a.isPrimitiveType()) {
+                os << "        return reply." << GetterNameFor(a) << "();";
+            }
+            else {
+                auto lowerName = a.getTypeName();
+                std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+
+                if(lowerName == "string") {
+                    os << "        return reply." << GetterNameFor(a) << "();";
+                } else if(lowerName == "blob") {
+                    os << "        const auto retBlob = reply." << GetterNameFor(a) << "();" << std::endl
+                       << "        return std::vector<std::byte>("
+                       << "reinterpret_cast<const std::byte *>(retBlob.begin()),"
+                       << "reinterpret_cast<const std::byte *>(retBlob.end()));"
+                       << std::endl;
+                } else {
+                    throw std::runtime_error("Unknown non-primitive builtin type");
+                }
+            }
+        }
+        // non-builtin types aren't yet supported
+        else {
+            throw std::runtime_error("Serializing non-builtin type not yet supported");
+        }
+
     } else if(!returns.empty()) {
         throw std::runtime_error("Methods with more than one return value are not yet supported");
     }

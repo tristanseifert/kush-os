@@ -9,7 +9,9 @@ add_executable(driverman
     src/Log.cpp
     src/experts/Expert.cpp
     src/forest/Forest.cpp
-    src/rpc/MessageLoop.cpp
+    src/rpc/Server.cpp
+    src/rpc/Server_Driverman.cpp
+    src/rpc/Driverman.capnp.c++
     src/db/Driver.cpp
     src/db/DriverDb.cpp
 )

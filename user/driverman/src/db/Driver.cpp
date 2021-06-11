@@ -15,26 +15,18 @@ Driver::Driver(const std::string &_path) : path(_path) {
 
 }
 
-/**
- * Deletes all memory we allocated.
- */
-Driver::~Driver() {
-    for(auto match : this->matches) {
-        delete match;
-    }
-}
-
 
 /**
  * Adds a match object.
  */
-void Driver::addMatch(libdriver::DeviceMatch *match) {
+/*void Driver::addMatch(libdriver::DeviceMatch *match) {
     this->matches.push_back(match);
-}
+}*/
 
 /**
  * Tests whether any or all of the match structures provided match this driver's.
  */
+/*
 bool Driver::test(const std::span<libdriver::DeviceMatch *> &matches, const bool oand) {
     // TODO: implement the AND operation
     if(oand) {
@@ -53,7 +45,7 @@ bool Driver::test(const std::span<libdriver::DeviceMatch *> &matches, const bool
 
     // no matches
     return false;
-}
+}*/
 
 
 
