@@ -42,7 +42,7 @@ struct AddDeviceRequest {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(b2514fdb24e770b3, 0, 3)
+    CAPNP_DECLARE_STRUCT_HEADER(b2514fdb24e770b3, 0, 2)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -151,9 +151,6 @@ public:
   inline bool hasDriverId() const;
   inline  ::capnp::Text::Reader getDriverId() const;
 
-  inline bool hasAuxData() const;
-  inline  ::capnp::Data::Reader getAuxData() const;
-
 private:
   ::capnp::_::StructReader _reader;
   template <typename, ::capnp::Kind>
@@ -195,13 +192,6 @@ public:
   inline  ::capnp::Text::Builder initDriverId(unsigned int size);
   inline void adoptDriverId(::capnp::Orphan< ::capnp::Text>&& value);
   inline ::capnp::Orphan< ::capnp::Text> disownDriverId();
-
-  inline bool hasAuxData();
-  inline  ::capnp::Data::Builder getAuxData();
-  inline void setAuxData( ::capnp::Data::Reader value);
-  inline  ::capnp::Data::Builder initAuxData(unsigned int size);
-  inline void adoptAuxData(::capnp::Orphan< ::capnp::Data>&& value);
-  inline ::capnp::Orphan< ::capnp::Data> disownAuxData();
 
 private:
   ::capnp::_::StructBuilder _builder;
@@ -722,40 +712,6 @@ inline void AddDeviceRequest::Builder::adoptDriverId(
 inline ::capnp::Orphan< ::capnp::Text> AddDeviceRequest::Builder::disownDriverId() {
   return ::capnp::_::PointerHelpers< ::capnp::Text>::disown(_builder.getPointerField(
       ::capnp::bounded<1>() * ::capnp::POINTERS));
-}
-
-inline bool AddDeviceRequest::Reader::hasAuxData() const {
-  return !_reader.getPointerField(
-      ::capnp::bounded<2>() * ::capnp::POINTERS).isNull();
-}
-inline bool AddDeviceRequest::Builder::hasAuxData() {
-  return !_builder.getPointerField(
-      ::capnp::bounded<2>() * ::capnp::POINTERS).isNull();
-}
-inline  ::capnp::Data::Reader AddDeviceRequest::Reader::getAuxData() const {
-  return ::capnp::_::PointerHelpers< ::capnp::Data>::get(_reader.getPointerField(
-      ::capnp::bounded<2>() * ::capnp::POINTERS));
-}
-inline  ::capnp::Data::Builder AddDeviceRequest::Builder::getAuxData() {
-  return ::capnp::_::PointerHelpers< ::capnp::Data>::get(_builder.getPointerField(
-      ::capnp::bounded<2>() * ::capnp::POINTERS));
-}
-inline void AddDeviceRequest::Builder::setAuxData( ::capnp::Data::Reader value) {
-  ::capnp::_::PointerHelpers< ::capnp::Data>::set(_builder.getPointerField(
-      ::capnp::bounded<2>() * ::capnp::POINTERS), value);
-}
-inline  ::capnp::Data::Builder AddDeviceRequest::Builder::initAuxData(unsigned int size) {
-  return ::capnp::_::PointerHelpers< ::capnp::Data>::init(_builder.getPointerField(
-      ::capnp::bounded<2>() * ::capnp::POINTERS), size);
-}
-inline void AddDeviceRequest::Builder::adoptAuxData(
-    ::capnp::Orphan< ::capnp::Data>&& value) {
-  ::capnp::_::PointerHelpers< ::capnp::Data>::adopt(_builder.getPointerField(
-      ::capnp::bounded<2>() * ::capnp::POINTERS), kj::mv(value));
-}
-inline ::capnp::Orphan< ::capnp::Data> AddDeviceRequest::Builder::disownAuxData() {
-  return ::capnp::_::PointerHelpers< ::capnp::Data>::disown(_builder.getPointerField(
-      ::capnp::bounded<2>() * ::capnp::POINTERS));
 }
 
 inline bool AddDeviceResponse::Reader::hasPath() const {

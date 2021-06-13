@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -19,6 +20,9 @@ class Ps2Bus: public Bus {
     private:
         static const std::string kBusName;
         static const std::string kDriverName;
+
+        /// key to the device specific aux data property
+        constexpr static const std::string_view kAuxDataKey{"ps2.resources"};
 
         /// resources we can assign a PS/2 controller
         using Resource = std::variant<ACPI_RESOURCE_IRQ, ACPI_RESOURCE_IO>;

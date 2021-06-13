@@ -3,6 +3,10 @@
 
 #include <rpc/Task.h>
 
+#include "forest/Device.h"
+#include "forest/DriverInstance.h"
+#include "forest/Forest.h"
+
 /**
  * Probes for devices.
  *
@@ -10,7 +14,12 @@
  * additional hardware.
  */
 void Amd64PcExpert::probe() {
-    // create some architectural shit
+    std::string rootPath;
+
+    // create the root node
+    auto driver = std::make_shared<Device>(kAcpiServerDriverName);
+    //Forest::the()->setRoot(driver);
+    Forest::the()->insertDevice("/", driver, rootPath);
 
     // start ACPI server
     const char *args[] = {

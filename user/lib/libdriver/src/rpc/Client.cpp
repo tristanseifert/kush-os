@@ -19,3 +19,21 @@ RpcClient *RpcClient::the() {
 
     return gShared;
 }
+
+/**
+ * Allows setting keys with a string_view instead of a string.
+ */
+void RpcClient::SetDeviceProperty(const std::string_view &_path, const std::string_view &_key,
+        const std::span<std::byte> &data) {
+    const std::string path(_path), key(_key);
+    this->SetDeviceProperty(path, key, data);
+}
+/**
+ * Allows getting keys with a string_view instead of a string.
+ */
+RpcClient::ByteVec RpcClient::GetDeviceProperty(const std::string_view &_path,
+        const std::string_view &_key) {
+    const std::string path(_path), key(_key);
+    return this->GetDeviceProperty(path, key);
+}
+

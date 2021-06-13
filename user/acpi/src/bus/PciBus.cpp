@@ -161,8 +161,14 @@ void PciBus::loadDriver(const uintptr_t) {
     std::vector<std::byte> aux;
     this->serializeAuxData(aux);
 
-    this->drivermanPath = libdriver::RpcClient::the()->AddDevice(kAcpiBusRoot, kDriverName, aux);
+    auto rpc = libdriver::RpcClient::the();
+
+    // register driver
+    this->drivermanPath = libdriver::RpcClient::the()->AddDevice(kAcpiBusRoot, kDriverName);
     Trace("PCI bus registered at %s", this->drivermanPath.c_str());
+
+    // set configuration
+    rpc->SetDeviceProperty(this->drivermanPath, kAuxDataKey, aux);
 }
 
 /**

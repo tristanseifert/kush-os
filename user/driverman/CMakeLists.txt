@@ -9,6 +9,8 @@ add_executable(driverman
     src/Log.cpp
     src/experts/Expert.cpp
     src/forest/Forest.cpp
+    src/forest/DriverInstance.cpp
+    src/forest/Device.cpp
     src/rpc/Server.cpp
     src/rpc/Server_Driverman.cpp
     src/rpc/Driverman.capnp.c++

@@ -1,6 +1,11 @@
 #include "Server.h"
 #include "Log.h"
 
+#include "forest/Forest.h"
+#include "forest/Device.h"
+
+#include "util/String.h"
+
 #include <rpc/rt/ServerPortRpcStream.h>
 
 RpcServer *RpcServer::gShared{nullptr};
@@ -21,20 +26,25 @@ void RpcServer::init() {
  *
  * @param parent Path to the parent device under which to add this one; may be empty for the root
  * @param driverId A name or list of names of drivers to handle this device, in descending order
- * @param auxData Binary data that is passed to the driver for this device when they're loaded
  *
  * @return Path to the inserted device, or an empty string on error
  */
-std::string RpcServer::implAddDevice(const std::string &_parent, const std::string &driverId,
-        const std::span<std::byte> &auxData) {
+std::string RpcServer::implAddDevice(const std::string &_parent, const std::string &driverId) {
+    std::string devPath;
+
     // allow an empty string to stand for the root of the device tree
     auto parent = _parent;
     if(parent.empty()) {
         parent = "/";
     }
 
-    Trace("Adding driver '%s' under '%s' (%lu bytes aux data)", driverId.c_str(), parent.c_str(),
-            auxData.size());
+    // create device and insert it
+    auto device = std::make_shared<Device>(driverId);
+    const auto success = Forest::the()->insertDevice(parent, device, devPath);
+
+    if(success) {
+        return devPath;
+    }
 
     return "";
 }
@@ -50,7 +60,18 @@ std::string RpcServer::implAddDevice(const std::string &_parent, const std::stri
  * @param data Data to set under this key; a zero byte value will delete the key.
  */
 void RpcServer::implSetDeviceProperty(const std::string &path, const std::string &key, const std::span<std::byte> &data) {
+    auto device = Forest::the()->getDevice(path);
+    if(!device) {
+        Warn("Failed to get device at '%s' to set property '%s'", path.c_str(), key.c_str());
+        throw std::invalid_argument("Invalid path");
+    }
+
     Trace("%s: Set %s = (%lu bytes)", path.c_str(), key.c_str(), data.size());
+    if(data.empty()) {
+        device->removeProperty(key);
+    } else {
+        device->setProperty(key, data);
+    }
 }
 
 /**

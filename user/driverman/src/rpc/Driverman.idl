@@ -6,7 +6,7 @@
  */
 interface Driverman {
     // Registers a new device on the device tree; returns path or empty string on failure
-    addDevice(parent: String, driverId: String, auxData: Blob) => (path: String)
+    addDevice(parent: String, driverId: String) => (path: String)
 
     // Sets a property on a device based on its path
     setDeviceProperty(path: String, key: String, data: Blob) => ()

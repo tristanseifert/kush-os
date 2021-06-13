@@ -14,7 +14,7 @@ class RpcServer: public rpc::DrivermanServer {
             return gShared;
         }
 
-        std::string implAddDevice(const std::string &parent, const std::string &driverId, const std::span<std::byte> &auxData) override;
+        std::string implAddDevice(const std::string &parent, const std::string &driverId) override;
         void implSetDeviceProperty(const std::string &path, const std::string &key, const std::span<std::byte> &data) override;
         std::vector<std::byte> implGetDeviceProperty(const std::string &path, const std::string &key) override;
 

@@ -142,8 +142,14 @@ void Ps2Bus::loadDriver(const uintptr_t id) {
     std::vector<std::byte> aux;
     this->serializeAuxData(aux);
 
-    this->drivermanPath = libdriver::RpcClient::the()->AddDevice(kAcpiBusRoot, kDriverName, aux);
+    auto rpc = libdriver::RpcClient::the();
+
+    // register driver
+    this->drivermanPath = rpc->AddDevice(kAcpiBusRoot, kDriverName);
     Trace("PS/2 bus registered at %s", this->drivermanPath.c_str());
+
+    // set configuration
+    rpc->SetDeviceProperty(this->drivermanPath, kAuxDataKey, aux);
 }
 
 /**

@@ -3,10 +3,15 @@
 
 #include "Expert.h"
 
+#include <string_view>
+
 /**
  * Platform expert for amd64 PCs
  */
 class Amd64PcExpert: public Expert {
+    /// Name of the root device node
+    constexpr static const std::string_view kAcpiServerDriverName{"AcpiGenericPc"};
+
     public:
         void probe() override;
 

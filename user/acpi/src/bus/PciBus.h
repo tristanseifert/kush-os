@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -21,6 +22,9 @@ class PciBus: public Bus {
     private:
         static const std::string kBusName;
         static const std::string kDriverName;
+
+        /// key to the device specific aux data property
+        constexpr static const std::string_view kAuxDataKey{"pci.resources"};
 
     public:
         /**
