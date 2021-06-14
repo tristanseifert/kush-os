@@ -5,6 +5,7 @@
 #include "util/String.h"
 
 #include <stdexcept>
+#include <sstream>
 
 Forest *Forest::gShared = nullptr;
 
@@ -88,31 +89,25 @@ bool Forest::find(const std::string_view &_path, std::shared_ptr<Forest::Leaf> &
     std::string path(_path);
     auto leaf = this->root;
 
-    size_t start{(path[0] == kPathSeparator[0]) ? 1UL : 0}, current{0};
-    bool next{true};
-    while(next) {
-        current = path.find_first_of(kPathSeparator, start);
-        next = (current != std::string::npos);
+    if(path[0] == '/') {
+        path = path.substr(1);
+    }
 
-        std::string name;
-        if(next) {
-            name = std::string(path.substr(start, current-1));
-        } else {
-            name = std::string(path.substr(start));
-        }
+    std::stringstream stream{path};
+    std::string name;
 
+    while(std::getline(stream, name, '/')) {
         // search the leaf's children for one with this name
         for(const auto &child : *leaf) {
             if(child->name == name) {
                 leaf = child;
-                goto beach;
+                goto mcdonalds;
             }
         }
         return false;
 
         // check next component
-beach:;
-        start = current+1;
+mcdonalds:;
     }
 
     // return the leaf

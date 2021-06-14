@@ -3,49 +3,42 @@
 #include <thread>
 #include <vector>
 
-#include <malloc.h>
-#include <driver/base85.h>
 #include <sys/syscalls.h>
 
-#include "bus/PciConfig.h"
 #include "bus/RootBridge.h"
+#include "bus/pcie/PciExpressBus.h"
 #include "Log.h"
 
 const char *gLogTag = "pci";
 
-/// all PCI root bridges in the system
-std::vector<std::shared_ptr<RootBridge>> roots;
-
 /**
- * Entry point for the driver manager
+ * Entry point for the PCI driver. It's responsible for scanning all PCI busses and providing
+ * interrupt and other resource management.
  */
 int main(const int argc, const char **argv) {
-    Success("pcisrv starting (%u args)", argc);
+    std::vector<std::shared_ptr<PciExpressBus>> pcie;
 
-    // set up some stuff
-    PciConfig::init();
+    Success("pcisrv starting");
 
     // initialize instances for each additional argument
     for(size_t i = 1; i < argc; i++) {
-        // convert base85 to binary
-        const auto inChars = strlen(argv[i]);
-        void *data = malloc(inChars);
-        if(!data) Abort("out of memory");
+        const std::string_view path(argv[i]);
 
-        void *end = b85tobin(data, argv[i]);
-        if(!end) Abort("failed to convert base85");
-
-        const auto binBytes = reinterpret_cast<uintptr_t>(end) - reinterpret_cast<uintptr_t>(data);
-
-        // create a bridge from this
-        std::span<std::byte> aux(reinterpret_cast<std::byte *>(data), binBytes);
-
-        auto bridge = std::make_shared<RootBridge>(aux);
-        roots.emplace_back(std::move(bridge));
-
-        // clean up again
-        free(data);
+        // is it PCI Express?
+        if(path.find("PciExpress") != std::string_view::npos) {
+            auto bus = std::make_shared<PciExpressBus>(path);
+            pcie.push_back(std::move(bus));
+        }
     }
+
+    // scan for devices on all busses
+    Trace("Beginning PCI device scan...");
+    size_t devices{0};
+    for(const auto &bus : pcie) {
+        bus->scan();
+        devices += bus->getDevices().size();
+    }
+    Success("Completed PCI device scan. Found %lu devices", devices);
 
     // TODO: start message loop
     while(1) {

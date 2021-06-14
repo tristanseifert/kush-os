@@ -12,7 +12,11 @@ bool DeviceNameMatch::supportsDevice(const std::shared_ptr<Device> &dev, int &ou
     const auto &names = dev->getDriverNames();
 
     for(size_t i = 0; i < names.size(); i++) {
-        const auto &dn = names[i];
+        // trim off the aux info if needed
+        std::string dn = names[i];
+        if(dn.find_first_of('@') != std::string::npos) {
+            dn = dn.substr(0, dn.find_first_of('@'));
+        }
 
         if(dn == this->name) {
             outPriority = this->priority - static_cast<int>(i);

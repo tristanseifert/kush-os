@@ -14,7 +14,7 @@ add_subdirectory(capnproto/c++)
 
 # string formatting
 SET(FMT_OS OFF CACHE BOOL "disable fmtlib OS component" FORCE)
-add_subdirectory(fmtlib)
+add_subdirectory(fmtlib EXCLUDE_FROM_ALL)
 
 # header only libraries
 add_subdirectory(HppOnly/tomlplusplus EXCLUDE_FROM_ALL)

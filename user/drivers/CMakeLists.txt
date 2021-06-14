@@ -2,5 +2,5 @@
 # Drivers
 ###############################################################################
 
-#add_subdirectory(pci)
+add_subdirectory(pci)
 add_subdirectory(ps2)

@@ -40,7 +40,7 @@ void PciExpressBus::serializeAuxData(std::vector<std::byte> &out) {
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, &data, &size);
 
-    mpack_start_map(&writer, 3);
+    mpack_start_map(&writer, 4);
     mpack_write_cstr(&writer, "busMin");
     mpack_write_u8(&writer, this->busses.first);
     mpack_write_cstr(&writer, "busMax");

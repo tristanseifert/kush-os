@@ -18,6 +18,9 @@ class DriverInstance;
  * Each node in the forest has an associated device. These are lightweight objects that hold some
  * key/value properties, and an identifier used for driver matching. Drivers may store specific
  * data as key/value pairs.
+ *
+ * Note that identifiers may contain auxiliary information beyond the name; that is, any text
+ * after the at (@) symbol to the next comma or end of string is ignored when matching drivers.
  */
 class Device: public std::enable_shared_from_this<Device> {
     using ByteSpan = std::span<std::byte>;

@@ -1,22 +1,13 @@
 #include <cstddef>
-#include <cstring>
-#include <memory>
-#include <thread>
-#include <span>
 #include <vector>
 
-#include <malloc.h>
 #include <driver/DrivermanClient.h>
-#include <sys/syscalls.h>
 
 #include "Ps2Controller.h"
 #include "Log.h"
 
 const char *gLogTag = "ps2";
 constexpr static const std::string_view kAuxDataKey{"ps2.resources"};
-
-/// global PS2 controller object
-// std::shared_ptr<Ps2Controller> gController;
 
 /**
  * Gets the PS/2 controller resource information from the forest.

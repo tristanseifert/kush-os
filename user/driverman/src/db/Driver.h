@@ -16,6 +16,8 @@ class DriverInstance;
  * Represents a single device driver, capable of matching against any number of devices.
  */
 class Driver: public std::enable_shared_from_this<Driver> {
+    friend class DbParser;
+
     public:
         Driver(const std::string &path);
         virtual ~Driver();

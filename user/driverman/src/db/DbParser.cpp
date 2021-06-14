@@ -86,6 +86,11 @@ bool DbParser::processEntry(const toml::table &n, DriverList &dl) {
         return false;
     }
 
+    // optional keys
+    if(n.contains("matchAll")) {
+        driver->mustMatchAll = n["matchAll"].value<bool>().value();
+    }
+
     // done
     dl.push_back(std::move(driver));
     return true;
