@@ -1,60 +1,72 @@
 #include "DriverDb.h"
+#include "DbParser.h"
 #include "Driver.h"
 #include "Log.h"
 
-DriverDb *DriverDb::gShared = nullptr;
+#include <queue>
+
+DriverDb *DriverDb::gShared{nullptr};
 
 
 
 /**
- * Load the driver database.
+ * Load the driver database. Since this is called during early driverman setup when we're running
+ * out of the RAM disk, this will be the driver listing for the drivers that are required to get
+ * the filesystem access going.
  *
- * TODO: actually load it; we just create dummy entries for now
+ * Once we can read the boot filesystem, we'll read a second driver database file that will
+ * supplant (but not replace; devices can still be matched by them, but the paths they reference
+ * must also exist on the real filesystem) the init drivers.
  */
 DriverDb::DriverDb() {
-/*    // bus drivers
-    auto pciRoot = std::make_shared<Driver>("/sbin/pcisrv");
-    pciRoot->addMatch(static_cast<libdriver::DeviceMatch *>(
-                new libdriver::DeviceNameMatch("AcpiPciRootBridge")));
-    this->addDriver(pciRoot);
+    DbParser p;
 
-    // PS/2 controller
-    auto ps2Controller = std::make_shared<Driver>("/sbin/ps2drv");
-    ps2Controller->addMatch(static_cast<libdriver::DeviceMatch *>(
-                new libdriver::DeviceNameMatch("AcpiPs2Controller")));
-    this->addDriver(ps2Controller);*/
+    if(!p.parse(kBootDbPath, this)) {
+        Abort("Failed to load initial driver database");
+    }
 }
 
 
 /**
- * Attempts to find a driver that matches any of the given match constraints.
+ * Finds a driver that can match to the given device. If there are multiple drivers that match,
+ * the one with the highest priority is returned.
  *
- * @return Driver if found, otherwise `nullptr.`
+ * @param device Device to match against
+ * @param outDriver Optional pointer to a match info structure that will be filled in on match
+ *
+ * @return The appropriate driver, or `nullptr` if none were found.
  */
-/*
-std::shared_ptr<Driver> DriverDb::findDriver(const std::span<libdriver::DeviceMatch *> &matches) {
-    std::shared_ptr<Driver> ret = nullptr;
+std::shared_ptr<Driver> DriverDb::findDriver(const std::shared_ptr<Device> &device,
+        MatchInfo *outDriver) {
+    std::priority_queue<MatchInfo> mi;
 
-    // scan all drivers
+    // check all drivers to see if they match
     this->driversLock.lock_shared();
 
-    for(auto &[id, driver] : this->drivers) {
-        if(driver->test(matches)) {
-            ret = driver;
+    for(const auto &[key, driver] : this->drivers) {
+        int score{0};
+        if(driver->test(device, score)) {
+            mi.emplace(driver, score);
         }
     }
 
-    // done
     this->driversLock.unlock_shared();
-    return ret;
-}*/
+
+    // select the highest priority match
+    if(mi.empty()) return nullptr;
+
+    auto &best = mi.top();
+    if(outDriver) *outDriver = best;
+    return best.driver;
+}
+
 
 /**
  * Register new driver.
  *
  * @return ID of the newly inserted driver.
  */
-uintptr_t DriverDb::addDriver(std::shared_ptr<Driver> &driver) {
+uintptr_t DriverDb::addDriver(const std::shared_ptr<Driver> &driver) {
     // acquire lock, get id
     this->driversLock.lock();
 

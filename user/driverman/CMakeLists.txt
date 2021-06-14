@@ -16,6 +16,8 @@ add_executable(driverman
     src/rpc/Driverman.capnp.c++
     src/db/Driver.cpp
     src/db/DriverDb.cpp
+    src/db/DbParser.cpp
+    src/db/DeviceMatch.cpp
 )
 
 if(${KERNEL_ARCH} STREQUAL "x86")
@@ -26,6 +28,8 @@ elseif(${KERNEL_ARCH} STREQUAL "x86_64")
 target_sources(driverman PRIVATE
     src/experts/Amd64PcExpert.cpp
 )
+install(FILES ${CMAKE_CURRENT_LIST_DIR}/dist/amd64/BootDriverDb.toml DESTINATION
+    ${SYSROOT_DIR}/boot/config RENAME DriverDb.toml)
 endif()
 
 #####
@@ -36,11 +40,14 @@ target_compile_options(driverman PRIVATE -flto)
 target_include_directories(driverman PRIVATE include)
 target_include_directories(driverman PRIVATE src)
 
+# config parsing library
+target_link_libraries(driverman PRIVATE tomlplusplus::tomlplusplus)
+
 # required libraries
 add_dependencies(driverman c_dynamic system_dynamic)
 target_link_libraries(driverman PRIVATE capnp rpc driver)
 
 # install it to boot directory in sysroot
 install(TARGETS driverman RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)
-install(TARGETS driverman RUNTIME DESTINATION ${SYSROOT_DIR}/boot)
+install(TARGETS driverman RUNTIME DESTINATION ${SYSROOT_DIR}/boot/sbin)
 

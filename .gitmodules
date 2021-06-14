@@ -16,3 +16,6 @@
 [submodule "tools/idlc/lib/PEGTL"]
 	path = tools/idlc/lib/PEGTL
 	url = git@github.com:taocpp/PEGTL.git
+[submodule "user/lib/external/HppOnly/tomlplusplus"]
+	path = user/lib/external/HppOnly/tomlplusplus
+	url = git@github.com:marzer/tomlplusplus.git

@@ -1,0 +1,26 @@
+###############################################################################
+# This is the early boot driver database for amd64
+###############################################################################
+# ACPI driver
+[[drivers]]
+path = "/sbin/acpisrv"
+[[drivers.match]]
+name = "AcpiGenericPc"
+priority = 1000
+
+# PCI and PCI Express root bridge driver
+[[drivers]]
+path = "/sbin/pcisrv"
+[[drivers.match]]
+name = "AcpiPciRootBridge"
+priority = 1000
+[[drivers.match]]
+name = "AcpiPciExpressRootBridge"
+priority = 1000
+
+# PS/2 keyboard and mouse
+[[drivers]]
+path = "/sbin/ps2drv"
+[[drivers.match]]
+name = "AcpiPs2Controller"
+

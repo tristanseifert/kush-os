@@ -25,6 +25,8 @@ class RpcServer: public rpc::DrivermanServer {
     private:
         /// Name to register the RPC service under
         constexpr static const std::string_view kRpcEndpointName{"me.blraaz.rpc.driverman"};
+        /// whether property set/gets are logged
+        constexpr static const bool kLogProperties{false};
 
         /// shared RPC server instance
         static RpcServer *gShared;

@@ -66,7 +66,7 @@ void RpcServer::implSetDeviceProperty(const std::string &path, const std::string
         throw std::invalid_argument("Invalid path");
     }
 
-    Trace("%s: Set %s = (%lu bytes)", path.c_str(), key.c_str(), data.size());
+    if(kLogProperties) Trace("%s: Set %s = (%lu bytes)", path.c_str(), key.c_str(), data.size());
     if(data.empty()) {
         device->removeProperty(key);
     } else {
@@ -84,8 +84,16 @@ void RpcServer::implSetDeviceProperty(const std::string &path, const std::string
  */
 std::vector<std::byte> RpcServer::implGetDeviceProperty(const std::string &path,
         const std::string &key) {
-    Trace("%s: Get %s", path.c_str(), key.c_str());
+    auto device = Forest::the()->getDevice(path);
+    if(!device) {
+        Warn("Failed to get device at '%s' to set property '%s'", path.c_str(), key.c_str());
+        throw std::invalid_argument("Invalid path");
+    }
 
+    if(kLogProperties) Trace("%s: Get %s", path.c_str(), key.c_str());
+    if(device->hasProperty(key)) {
+        return device->getProperty(key);
+    }
     return {};
 }
 

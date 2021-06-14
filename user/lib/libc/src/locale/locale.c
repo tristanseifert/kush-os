@@ -1,13 +1,19 @@
 #include <sys/cdefs.h>
 #include <ctype.h>
-#include <locale.h>
+#include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+#include <locale.h>
+
+#include "locale_internal.h"
 
 /**
  * Releases a locale.
  */
 void freelocale(locale_t loc) {
-    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);    
+    // release memory
+    free(loc->name);
+    free(loc);
 }
 
 /**
@@ -18,12 +24,12 @@ void freelocale(locale_t loc) {
 #pragma clang diagnostic ignored "-Wincompatible-pointer-types-discards-qualifiers"
 char *setlocale(int category, const char *locale) {
     fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
-    
+
     // return current locale
     if(!locale) {
         return "";
     }
-    
+
     // make the caller think they got one
     return locale;
 }
@@ -42,9 +48,19 @@ locale_t uselocale(locale_t loc) {
 /**
  * Creates a new locale.
  */
-locale_t newlocale(int mask, const char * locale, locale_t base) {
-    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
-    return NULL;
+locale_t newlocale(int mask, const char * name, locale_t base) {
+    // create a new locale
+    struct _xlocale *loc = calloc(1, sizeof(*loc));
+    if(!loc) return NULL;
+
+    if(name) {
+        loc->name = strdup(name);
+    } else {
+        loc->name = strdup("C");
+    }
+
+    // TODO: copy the different masks
+    return loc;
 }
 
 

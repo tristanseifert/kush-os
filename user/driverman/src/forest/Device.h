@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <span>
 #include <string>
@@ -18,7 +19,7 @@ class DriverInstance;
  * key/value properties, and an identifier used for driver matching. Drivers may store specific
  * data as key/value pairs.
  */
-class Device {
+class Device: public std::enable_shared_from_this<Device> {
     using ByteSpan = std::span<std::byte>;
     using ByteVec = std::vector<std::byte>;
 
@@ -37,9 +38,19 @@ class Device {
         /// Cleans up device resources.
         virtual ~Device() = default;
 
+        /// Attempts to find and start a driver for the device.
+        virtual bool findAndLoadDriver();
+
+        /// Gets the device's path in the forest if it is contained within
+        std::optional<std::string> getPath();
+
         /// Get the primary driver name, used as part of the device's path.
         constexpr const std::string &getPrimaryName() const {
             return this->driverNames[0];
+        }
+        /// Gets all driver names.
+        constexpr const std::vector<std::string> &getDriverNames() const {
+            return this->driverNames;
         }
 
         /// Sets a property, overwriting it if it already exists.
@@ -74,6 +85,14 @@ class Device {
         /// Sets the driver associated with the device.
         void setDriver(const std::shared_ptr<DriverInstance> &newDriver) {
             this->driver = newDriver;
+        }
+        /// Tests if we have an assigned driver.
+        constexpr bool hasDriver() const {
+            return !!this->driver;
+        }
+        /// Returns the driver associated with the device.
+        auto getDriver() const {
+            return this->driver;
         }
 
         /// The device is about to be removed from the given forest node.

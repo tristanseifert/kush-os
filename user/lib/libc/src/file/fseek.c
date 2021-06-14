@@ -12,8 +12,13 @@ int fseek(FILE *stream, long offset, int whence) {
     return -1;
 }
 
+// XXX: this was simply copied from fseek; is this going to cause any problems?
 int fseeko(FILE *stream, off_t offset, int whence) {
-    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
+    if(stream->seek) {
+        return stream->seek(stream, offset, whence);
+    }
+
+    errno = ENODEV;
     return -1;
 }
 
@@ -39,6 +44,17 @@ long ftell(FILE *stream) {
 }
 
 off_t ftello(FILE *stream) {
-    fprintf(stderr, "%s unimplemented\n", __PRETTY_FUNCTION__);
-    return 0;
+    if(stream->tell) {
+        long ret = 0;
+        int err = stream->tell(stream, &ret);
+
+        if(err >= 0) {
+            return ret;
+        } else {
+            return err;
+        }
+    }
+
+    errno = ENODEV;
+    return -1;
 }

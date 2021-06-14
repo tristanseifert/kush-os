@@ -22,11 +22,12 @@ Forest::Forest() {
  * @param path Parent node to insert the device under
  * @param dev Device to insert
  * @param outPath Path that the device was inserted at
+ * @param loadDriver If set, whether we should immediately attempt to find a driver for the device
  *
  * @return Whether the node was inserted, e.g. whether the given path of its parent is valid.
  */
 bool Forest::insertDevice(const std::string_view &path, const std::shared_ptr<Device> &dev,
-        std::string &outPath) {
+        std::string &outPath, const bool loadDriver) {
     std::string desiredName;
 
     // locate parent
@@ -51,6 +52,11 @@ bool Forest::insertDevice(const std::string_view &path, const std::shared_ptr<De
 
     // and store its path
     outPath = leaf->getPath();
+
+    // try matching a driver if not already assigned
+    if(loadDriver && !dev->hasDriver()) {
+        dev->findAndLoadDriver();
+    }
 
     return true;
 }

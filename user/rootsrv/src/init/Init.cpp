@@ -21,7 +21,7 @@ static void InitServer(std::shared_ptr<Bundle> &bundle, const std::string &name,
  */
 void init::SetupServers(std::shared_ptr<Bundle> &bundle) {
     // get the script file
-    auto scriptFile = bundle->open("default.init");
+    auto scriptFile = bundle->open("/config/default.init");
     REQUIRE(scriptFile, "failed to open default init script");
 
     // parse it
@@ -53,11 +53,9 @@ static void InitServer(std::shared_ptr<Bundle> &bundle, const std::string &name,
 
     // determine the path
     auto path = name;
-#if 0
     if(path.find_first_of('/') == std::string::npos) {
         path = "/sbin/" + name;
     }
-#endif
 
     // create a task
     auto taskHandle = task::Task::createFromFile(path, params);

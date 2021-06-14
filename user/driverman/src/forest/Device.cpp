@@ -3,6 +3,8 @@
 #include "DriverInstance.h"
 #include "Log.h"
 
+#include "db/Driver.h"
+#include "db/DriverDb.h"
 #include "util/String.h"
 
 #include <stdexcept>
@@ -52,4 +54,36 @@ void Device::willDeforest(const std::shared_ptr<Forest::Leaf> &leaf) {
  */
 void Device::didReforest(const std::shared_ptr<Forest::Leaf> &leaf) {
     this->leaf = leaf;
+}
+
+
+
+/**
+ * If the device is in the forest, return its path.
+ */
+std::optional<std::string> Device::getPath() {
+    auto leaf = this->leaf.lock();
+    if(leaf) {
+        return leaf->getPath();
+    }
+    return std::nullopt;
+}
+
+/**
+ * Tries to find a driver for this device.
+ *
+ * @return Whether a driver was found and loaded.
+ */
+bool Device::findAndLoadDriver() {
+    DriverDb::MatchInfo info;
+    auto sThis = this->shared_from_this();
+
+    // find the driver
+    auto driver = DriverDb::the()->findDriver(sThis, &info);
+    if(!driver) return false;
+
+    // cool! start it (this will set our instance ptr)
+    driver->start(sThis);
+
+    return true;
 }

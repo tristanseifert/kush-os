@@ -16,6 +16,9 @@ add_subdirectory(capnproto/c++)
 SET(FMT_OS OFF CACHE BOOL "disable fmtlib OS component" FORCE)
 add_subdirectory(fmtlib)
 
+# header only libraries
+add_subdirectory(HppOnly/tomlplusplus EXCLUDE_FROM_ALL)
+
 # OpenLibm (math library)
 ExternalProject_Add(openlibm
     SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/openlibm

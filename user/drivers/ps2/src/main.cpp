@@ -6,41 +6,45 @@
 #include <vector>
 
 #include <malloc.h>
-#include <driver/base85.h>
+#include <driver/DrivermanClient.h>
 #include <sys/syscalls.h>
 
 #include "Ps2Controller.h"
 #include "Log.h"
 
 const char *gLogTag = "ps2";
+constexpr static const std::string_view kAuxDataKey{"ps2.resources"};
 
 /// global PS2 controller object
-std::shared_ptr<Ps2Controller> gController;
+// std::shared_ptr<Ps2Controller> gController;
+
+/**
+ * Gets the PS/2 controller resource information from the forest.
+ */
+static void GetResourceInfo(const std::string_view &path, std::vector<std::byte> &outBytes) {
+    auto rpc = libdriver::RpcClient::the();
+    outBytes = rpc->GetDeviceProperty(path, kAuxDataKey);
+}
 
 /**
  * Entry point for the PS/2 controller: there can only ever be one of these in a system.
+ *
+ * The second argument is the driver forest path of this device.
  */
 int main(const int argc, const char **argv) {
-    // decode the first argument as base85
+    // retrieve the aux data from the RPC properties
+    std::vector<std::byte> auxData;
+
     if(argc != 2) {
         Abort("must have exactly one argument");
     }
 
-    const auto inChars = strlen(argv[1]);
-    void *data = malloc(inChars);
-    if(!data) Abort("out of memory");
+    GetResourceInfo(argv[1], auxData);
+    if(auxData.empty()) {
+        Abort("Failed to get aux data (%s %s)", argv[1], kAuxDataKey);
+    }
 
-    void *end = b85tobin(data, argv[1]);
-    if(!end) Abort("failed to convert base85");
-
-    const auto binBytes = reinterpret_cast<uintptr_t>(end) - reinterpret_cast<uintptr_t>(data);
-
-    // initialize a controller instance
-    std::span<std::byte> aux(reinterpret_cast<std::byte *>(data), binBytes);
-    gController = std::make_shared<Ps2Controller>(aux);
-    free(data);
-
-    // enter run loop
-    gController->workerMain();
-    gController = nullptr;
+    // enter controller work loop
+    Ps2Controller c(auxData);
+    c.workerMain();
 }

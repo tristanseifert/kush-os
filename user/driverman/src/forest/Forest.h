@@ -37,7 +37,7 @@ class Forest {
 
         /// Inserts a new device node.
         bool insertDevice(const std::string_view &path, const std::shared_ptr<Device> &device,
-                std::string &outPath);
+                std::string &outPath, const bool loadDriver = true);
         /// Gets the device associated with the node at the given path.
         std::shared_ptr<Device> getDevice(const std::string_view &path);
 

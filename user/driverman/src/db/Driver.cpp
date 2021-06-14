@@ -1,5 +1,9 @@
 #include "Driver.h"
+#include "DeviceMatch.h"
 #include "Log.h"
+
+#include "forest/DriverInstance.h"
+#include "forest/Device.h"
 
 #include <rpc/task.h>
 #include <driver/base85.h>
@@ -15,91 +19,116 @@ Driver::Driver(const std::string &_path) : path(_path) {
 
 }
 
+/**
+ * Delete all match objects.
+ */
+Driver::~Driver() {
+    for(auto ptr : this->matches) {
+        delete ptr;
+    }
+}
+
 
 /**
  * Adds a match object.
  */
-/*void Driver::addMatch(libdriver::DeviceMatch *match) {
+void Driver::addMatch(DeviceMatch *match) {
     this->matches.push_back(match);
-}*/
+}
 
 /**
- * Tests whether any or all of the match structures provided match this driver's.
+ * Tests whether we can match to the device. This will query every match descriptor to see if it
+ * matches, and and returns the highest priority value returned by them all.
  */
-/*
-bool Driver::test(const std::span<libdriver::DeviceMatch *> &matches, const bool oand) {
-    // TODO: implement the AND operation
-    if(oand) {
-        return false;
-    }
+bool Driver::test(const std::shared_ptr<Device> &dev, int &outPriority) {
+    int priority{0};
 
-    // iterate over all matches
-    for(auto &match : this->matches) {
-        auto m = std::any_of(matches.begin(), matches.end(), [&](const auto &in) {
-            return in->matches(match);
-        });
-        if(m) {
-            return true;
+    // bail if no match descriptors
+    if(this->matches.empty()) return false;
+
+    // we must match all of the descriptors, but return the highest priority
+    if(this->mustMatchAll) {
+        for(auto m : this->matches) {
+            int temp{0};
+
+            if(!m->supportsDevice(dev, temp)) return false;
+            priority = std::max(priority, temp);
         }
-    }
 
-    // no matches
-    return false;
-}*/
+        outPriority = priority;
+        return true;
+    }
+    // any match is ok; select the highest priority one
+    else {
+        bool matched{false};
+
+        for(auto m : this->matches) {
+            int temp{0};
+
+            if(!m->supportsDevice(dev, temp)) continue;
+            priority = std::max(priority, temp);
+            matched = true;
+        }
+
+        if(matched) outPriority = priority;
+        return matched;
+    }
+}
 
 
 
 /**
- * Instantiates an instance of the driver. Depending on the configuration, this will always spawn a
- * new task, or spawn one task and send messages for further instantiations to it.
+ * Either starts a new instance of the driver, or connects to an existing driver and notifies it
+ * that a device has been added.
+ *
+ * Regardless, the passed in device will have a driver instance object assigned.
  */
-void Driver::start(const std::span<std::byte> &auxData) {
-    int err;
+void Driver::start(const std::shared_ptr<Device> &dev) {
+    std::shared_ptr<DriverInstance> inst;
 
     // first instance OR always launch a new instance
-    if(this->taskHandles.empty() || this->alwaysLaunchNew) {
-        // serialize aux data and build args
-        char *argPtr = nullptr;
-        const char *params[3] = {
-            this->path.c_str(),
-            // if we have aux params, write them here
-            nullptr,
-            // end of list
-            nullptr,
-        };
-
-        if(!auxData.empty()) {
-            // allocate a buffer: every 4 bytes input -> 5 chars output
-            const auto outSize = (((auxData.size() + 4 - 3) / 4) * 6) + 8;
-            argPtr = reinterpret_cast<char *>(malloc(outSize));
-            if(!argPtr) {
-                throw std::bad_alloc();
-            }
-
-            memset(argPtr, 0, outSize);
-
-            // do base85 encoding
-            bintob85(argPtr, auxData.data(), auxData.size());
-            params[1] = argPtr;
-        }
-
-        Trace("Launching driver %s", this->path.c_str());
-
-        // launch the task
-        uintptr_t handle;
-        err = RpcTaskCreate(this->path.c_str(), params, &handle);
-
-        if(argPtr) {
-            // release the param buffer
-            free(argPtr);
-        }
-
-        if(err) {
-            throw std::system_error(err, std::system_category(), "RpcTaskCreate");
-        }
+    if(this->instances.empty() || this->alwaysLaunchNew) {
+        inst = this->makeInstance(dev);
+        this->instances.push_back(inst);
     }
     // notify existing instance
     else {
-        Warn("%s unimplemented", __PRETTY_FUNCTION__);
+        Abort("%s (2+ instance) unimplemented", __PRETTY_FUNCTION__);
     }
+
+    // update the device
+    dev->setDriver(inst);
+}
+
+/**
+ * Creates a new driver instance object for the given device.
+ */
+std::shared_ptr<DriverInstance> Driver::makeInstance(const std::shared_ptr<Device> &dev) {
+    int err;
+    const std::string devPath = dev->getPath().value();
+
+    // create the argument string
+    const char *params[3] = {
+        // path of the executable
+        this->path.c_str(),
+        // path of the device in forest
+        devPath.c_str(),
+        // end of list
+        nullptr,
+    };
+
+    Trace("Launching driver %s", this->path.c_str());
+
+    // TODO: create the driver port
+
+    // launch the task
+    uintptr_t handle;
+    err = RpcTaskCreate(this->path.c_str(), params, &handle);
+
+    if(err) {
+        throw std::system_error(err, std::system_category(), "RpcTaskCreate");
+    }
+
+    // create the instance object
+    return std::make_shared<DriverInstance>(this->shared_from_this(), handle);
 }
