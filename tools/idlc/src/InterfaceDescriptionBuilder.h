@@ -76,6 +76,9 @@ class Builder {
         /// Pushes the decorator whose key/value we've collected on the decorator stack
         void pushNextDecorator();
 
+        /// Adds an include path.
+        void addIncludePath(const std::string &path);
+
     private:
         /// filename being processed
         std::string filename;
@@ -101,6 +104,9 @@ class Builder {
         std::string nextDecoratorValue;
         /// map of decorators collected for a function
         std::unordered_map<std::string, std::string> decorators;
+
+        /// list of include paths collected; they are applied to _all_ interfaces found
+        std::vector<std::string> includes;
 };
 }
 

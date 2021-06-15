@@ -28,6 +28,12 @@ void Builder::reset() {
  * During finalization, simply copy out all interface descriptors.
  */
 void Builder::finalize(std::vector<IDPointer> &out) {
+    // apply include paths
+    for(const auto &id : this->allIds) {
+        id->includes = this->includes;
+    }
+
+    // copy them from our internal buffer
     out.insert(out.end(), this->allIds.begin(), this->allIds.end());
 
     // prepare for re-use
@@ -65,6 +71,12 @@ void Builder::beginMethod(const std::string &name) {
     // cannot start with underscores
     if(name[0] == '_') {
         throw std::runtime_error("Method name '" + name + "' is not allowed; names may not start with underscores");
+    }
+    // we can't have a method with this name
+    for(const auto &m : this->current->getMethods()) {
+        if(m.getName() == name) {
+            throw std::runtime_error("Duplicate method: " + name);
+        }
     }
 
     this->currentMethod = std::make_shared<InterfaceDescription::Method>(name);
@@ -170,6 +182,9 @@ void Builder::pushNextArg() {
     assert(!this->nextArgTypename.empty());
 
     InterfaceDescription::Argument arg(this->nextArgName, this->nextArgTypename);
+    if(!arg.isBuiltinType()) {
+        this->current->numCustomTypes++;
+    }
 
     switch(this->argContext) {
         case ArgContext::Parameter:
@@ -218,4 +233,11 @@ void Builder::pushNextDecorator() {
     // reset decorator state
     this->nextDecoratorKey.clear();
     this->nextDecoratorValue.clear();
+}
+
+/**
+ * Adds an include file required for an interface's C++ stubs.
+ */
+void Builder::addIncludePath(const std::string &path) {
+    this->includes.emplace_back(std::move(path));
 }

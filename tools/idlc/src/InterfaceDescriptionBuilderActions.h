@@ -120,7 +120,13 @@ template<> struct action<decorator_close> {
     }
 };
 
-
+// Include files
+template<> struct action<include_path> {
+    template<typename ParseInput>
+    static void apply(const ParseInput &in, Builder &b) {
+        b.addIncludePath(in.string());
+    }
+};
 }
 
 #endif

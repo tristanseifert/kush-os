@@ -22,14 +22,22 @@ struct padl : seq<star<P>, R> {};
 template<typename R, typename P = ws>
 struct pad : seq<star<P>, R, star<P>> {};
 
-// single line comments are any lines that start with the "//" or "#" tokens
+// single line comments are any lines that start with the "//" tokens
 struct single_comment_cont : until<eolf> {};
-struct single_comment : seq<star<ws>, sor<one<'#'>, two<'/'>>, single_comment_cont> {};
+struct single_comment : seq<star<ws>, two<'/'>, single_comment_cont> {};
 // multiline comments are any string enclosed by "/*" and "*/"
 struct multi_comment_cont : until<TAO_PEGTL_STRING("*/")> {};
 struct multi_comment : seq<star<ws>, TAO_PEGTL_STRING("/*"), multi_comment_cont> {};
 // either type of comment is acceptable anywhere
 struct comment : sor<single_comment, multi_comment> {};
+
+// include statement
+struct include_open: one<'<'> {};
+struct include_path: star<sor<ascii::identifier_other, one<'.'>, one<'/'>>> {};
+struct include_close: one<'>'> {};
+struct include_cont : until<eolf> {};
+struct include : seq<TAO_PEGTL_STRING("#include"), star<ascii::blank>,
+    include_open, include_path, include_close, include_cont> {};
 
 // define basic structure of the interface
 struct begin_interface : padr<one<'{'>> {};
@@ -53,7 +61,7 @@ struct method_decorator_group: seq<decorator_open, decorator_content, decorator_
 // define an interface method
 struct method_arg_name : identifier {};
 struct method_arg_sep : pad<one<':'>> {};
-struct method_arg_type: identifier {};
+struct method_arg_type: seq<identifier_first, star<sor<identifier_other, two<':'>>>> {};
 struct method_arg_end : success{};
 struct method_arg : seq<method_arg_name, method_arg_sep, method_arg_type, method_arg_end> {};
 
@@ -105,7 +113,7 @@ struct interface : seq<interface_start, interface_content, interface_end> {};
 
 
 // Define the grammar as an arbitrary sequence of comments and interfaces, followed by end-of-file.
-struct grammar : must<star<sor<empty_line, comment, interface>>, eof> {};
+struct grammar : must<star<sor<empty_line, include, comment, interface>>, eof> {};
 }
 
 #endif

@@ -46,6 +46,7 @@ void CodeGenerator::generateClientStub() {
 #include <span>
 #include <vector>
 )" << std::endl;
+    this->cppWriteIncludes(header);
     this->clientWriteHeader(header);
 
     // and then the implementation
@@ -179,10 +180,13 @@ void CodeGenerator::clientWriteHeader(std::ofstream &os) {
  * Writes the implementation for the client stub.
  */
 void CodeGenerator::clientWriteImpl(std::ofstream &os) {
-    // define the constructor and destructors, as well as internal helpers
+    // define templated custom serialization methods if needed
     const auto className = GetClassName(this->interface);
     os << "using Client = " << className << ';' << std::endl << std::endl;
 
+    this->cppWriteCustomTypeHelpers(os);
+
+    // define the constructor and destructors, as well as internal helpers
     os << R"(/**
  * Creates a new client instance, with the given IO stream.
  */
@@ -289,8 +293,19 @@ void CodeGenerator::clientWriteMarshallMethod(std::ofstream &os, const Method &m
                 }
             }
         }
+        // invoke the serializer method for custom types
         else {
-            throw std::runtime_error("Serializing non-builtin type not yet supported");
+            // encode it into a blob
+            os << "        std::vector<std::byte> blobTemp_" << a.getName() << ";" << std::endl
+               << "        rpc::serialize(blobTemp_" << a.getName() << ", " << a.getName() << ");"
+               << std::endl;
+
+            // then write that blob into the field
+            os << "        capnp::Data::Reader blobReader_" << a.getName()
+               << "(reinterpret_cast<const kj::byte *>(blobTemp_" << a.getName() << ".data()), "
+               << "blobTemp_" << a.getName() << ".size());" << std::endl
+               << "        request." << SetterNameFor(a) << "(blobReader_" << a.getName()
+               << ");" << std::endl;
         }
     }
 
@@ -367,9 +382,8 @@ void CodeGenerator::clientWriteMarshallMethodReply(std::ofstream &os, const Meth
                 }
             }
         }
-        // non-builtin types aren't yet supported
         else {
-            throw std::runtime_error("Serializing non-builtin type not yet supported");
+            throw std::runtime_error("Serializing non-builtin type (for return) not yet supported");
         }
 
     } else if(!returns.empty()) {

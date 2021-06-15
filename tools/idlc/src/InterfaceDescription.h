@@ -164,6 +164,15 @@ class InterfaceDescription {
         constexpr auto &getMethods() const {
             return this->methods;
         }
+        /// Returns read-only access to the include paths
+        constexpr auto &getIncludes() const {
+            return this->includes;
+        }
+
+        /// Does this interface use any custom types?
+        constexpr bool hasCustomTypes() const {
+            return !!this->numCustomTypes;
+        }
 
         friend std::ostream& operator<<(std::ostream& os, const InterfaceDescription& intf);
 
@@ -175,8 +184,13 @@ class InterfaceDescription {
         /// callable methods on the interface
         std::vector<Method> methods;
 
+        /// Optional list of include files required in the C++ stubs
+        std::vector<std::string> includes;
+
         /// identifier used for the Cap'n Proto structures (file id). generated from name
         uint64_t identifier{0};
+        /// number of fields with custom types
+        size_t numCustomTypes{0};
 };
 
 #endif

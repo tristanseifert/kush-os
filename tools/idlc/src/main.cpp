@@ -139,16 +139,22 @@ int main(int argc, char **argv) {
 
     // generate the Cap'n proto and the C++ server and client stubs for each interface
     for(auto &intf : interfaces) {
-        // set up the code generator
-        std::cout << "* CodeGen for '" << intf->getName() << "' from " << intf->getSourceFilename() << std::endl;
-        CodeGenerator gen(outDir, intf);
+        try {
+            // set up the code generator
+            std::cout << "* CodeGen for '" << intf->getName() << "' from " << intf->getSourceFilename() << std::endl;
+            CodeGenerator gen(outDir, intf);
 
-        // create the protocol files
-        gen.generateProto();
+            // create the protocol files
+            gen.generateProto();
 
-        // and the server and client stubs
-        gen.generateServerStub();
-        gen.generateClientStub();
+            // and the server and client stubs
+            gen.generateServerStub();
+            gen.generateClientStub();
+        } catch(const std::exception &e) {
+            std::cerr << "Failed to process interface " << intf->getName() << ": " << e.what()
+                      << std::endl;
+            return -1;
+        }
     }
 
     return ret;

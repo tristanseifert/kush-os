@@ -47,6 +47,7 @@ void CodeGenerator::generateServerStub() {
 #include <span>
 #include <vector>
 )" << std::endl;
+    this->cppWriteIncludes(header);
     this->serverWriteHeader(header);
 
     // and then the implementation
@@ -196,6 +197,8 @@ void CodeGenerator::serverWriteHeader(std::ofstream &os) {
 void CodeGenerator::serverWriteImpl(std::ofstream &os) {
     const auto className = GetClassName(this->interface);
     os << "using Server = " << className << ';' << std::endl << std::endl;
+
+    this->cppWriteCustomTypeHelpers(os);
 
     // constructors and run method
     os << R"(/**
@@ -349,9 +352,20 @@ void CodeGenerator::serverWriteMarshallMethod(std::ofstream &os, const Method &m
                 }
             }
         }
-        // non-builtin types aren't yet supported
+        // for custom types, invoke the appropriate deserializer method
         else {
-            throw std::runtime_error("Deserializing non-builtin type not yet supported");
+            // get at the blob
+            os << "    const auto dec_temp_" << a.getName() << " = request."
+                << GetterNameFor(a) << "();" << std::endl;
+            os << "    const std::span<std::byte> dec_raw_" << a.getName()
+               << "(reinterpret_cast<std::byte *>(const_cast<unsigned char *>(dec_temp_"
+               << a.getName() << ".begin())), dec_temp_" << a.getName() << ".size());"
+               << std::endl;
+
+            // then invoke the custom deserializer
+            os << "    " << a.getTypeName() << " dec_" << a.getName() << ';' << std::endl
+               << "    rpc::deserialize(dec_raw_" << a.getName() << ", dec_" << a.getName() << ");"
+               << std::endl;
         }
     }
 

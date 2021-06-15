@@ -85,6 +85,43 @@ void CodeGenerator::cppWriteMethodDef(std::ofstream &os, const Method &m,
 }
 
 /**
+ * Writes out the list of include files required for user defined types.
+ */
+void CodeGenerator::cppWriteIncludes(std::ofstream &os) {
+    const auto &includes = this->interface->getIncludes();
+    if(includes.empty()) return;
+
+    os << "#define RPC_USER_TYPES_INCLUDES" << std::endl;
+
+    for(const auto &path : includes) {
+        os << "#include <" << path << '>' << std::endl;
+    }
+
+    os << "#undef RPC_USER_TYPES_INCLUDES" << std::endl << std::endl;
+}
+
+/**
+ * Writes out the templated helpers for serializing custom types.
+ */
+void CodeGenerator::cppWriteCustomTypeHelpers(std::ofstream &os) {
+    if(!this->interface->hasCustomTypes()) return;
+
+    os << R"(// stubs for custom type serialization
+template<typename... _blah>
+constexpr auto TemplatedFalseFlag = false;
+
+template<typename T>
+inline bool deserialize(const std::span<std::byte> &, T &) {
+    static_assert(TemplatedFalseFlag<T>, "rpc::deserialize not implemented for custom type");
+}
+template<typename T>
+inline bool serialize(std::vector<std::byte> &, const T &) {
+    static_assert(TemplatedFalseFlag<T>, "rpc::serialize not implemented for custom type");
+}
+)";
+}
+
+/**
  * Returns the C++ type name for the given argument.
  */
 std::string CodeGenerator::CppTypenameForArg(const Argument &a, const bool isArg) {
