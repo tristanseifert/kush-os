@@ -23,7 +23,7 @@ class Device {
     using BusPtr = std::shared_ptr<PciExpressBus>;
     using DeviceAddress = libdriver::pci::BusAddress;
 
-    constexpr static const std::string_view kPciAddressPropertyName{"pcie.address"};
+    constexpr static const std::string_view kPciAddressPropertyName{"pcie.info"};
 
     public:
         Device(const BusPtr &bus, const DeviceAddress &address);
@@ -35,7 +35,8 @@ class Device {
         }
 
     private:
-        void serializeAuxData(std::vector<std::byte> &);
+        void serializeAuxData(std::vector<std::byte> &, const uint16_t, const uint16_t,
+                const uint8_t, const uint8_t);
 
     private:
         /// Whether the forest paths new devices are registered under is logged

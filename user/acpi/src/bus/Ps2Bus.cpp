@@ -150,6 +150,8 @@ void Ps2Bus::loadDriver(const uintptr_t id) {
 
     // set configuration
     rpc->SetDeviceProperty(this->drivermanPath, kAuxDataKey, aux);
+
+    rpc->StartDevice(this->drivermanPath);
 }
 
 /**

@@ -114,6 +114,14 @@ bool DbParser::processMatch(const toml::table &n, const DriverPtr &driver) {
         auto m = new DeviceNameMatch(*name, priority);
         driver->addMatch(m);
     }
+    // PCI device
+    else if(n.contains("pci")) {
+        if(!this->processPciMatch(n, driver)) {
+            Warn("Driver %s is invalid: %s", driver->getPath().c_str(),
+                    "Failed to create PCI device match");
+            return false;
+        }
+    }
     // we don't know this type
     else {
         Warn("Driver %s is invalid: %s", driver->getPath().c_str(),
@@ -124,3 +132,54 @@ bool DbParser::processMatch(const toml::table &n, const DriverPtr &driver) {
     return true;
 }
 
+/**
+ * Processes a PCI device match. These are tables with the following top level keys:
+ *
+ * - conjunction: If set, ALL conditions must be satisfied. Default false.
+ * - priority: If set, the priority of this driver match.
+ * - class: If specified, the device must have this value in the class ID field.
+ * - subclass: If specified, device must have this value in the subclass ID field.
+ * - device: If specified, an array of tables of vendor/product IDs, any of which will be a match.
+ *   - vid: Vendor id; mandatory.
+ *   - pid: If specified, a literal product id to match. If omitted, only the vendor id must match.
+ *   - priority: Overrides the default priority of the driver if this vid/pid matches.
+ */
+bool DbParser::processPciMatch(const toml::table &n, const DriverPtr &driver) {
+    // read optional priority value
+    int priority = 0;
+    if(n.contains("priority")) {
+        priority = n["priority"].value<int>().value_or(0);
+    }
+
+    // get conjunction flag and create the PCI match boi
+    const bool conjunction = n["conjunction"].value<bool>().value_or(false);
+
+    auto m = new PciDeviceMatch(conjunction, priority);
+
+    // construct the class match
+    if(n.contains("class")) {
+        m->setClassId(n["class"].value<uint8_t>().value_or(0xFF));
+    }
+    if(n.contains("subclass")) {
+        m->setSubclassId(n["subclass"].value<uint8_t>().value_or(0xFF));
+    }
+
+    // construct the individual vid/pid matches
+    if(n.contains("device")) {
+        auto vids = n["device"].as_array();
+        if(!vids) return false;
+
+        for(const auto &elem : *vids) {
+            auto match = elem.as_table();
+            if(!match) return false;
+            const auto &info = *match;
+
+            m->addVidPidMatch(info["vid"].value<uint16_t>().value_or(0xFFFF),
+                    info["pid"].value<uint16_t>(), info["priority"].value<int>());
+        }
+    }
+
+    // finally, add to driver
+    driver->addMatch(m);
+    return true;
+}

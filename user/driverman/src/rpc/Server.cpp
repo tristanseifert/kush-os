@@ -97,3 +97,31 @@ std::vector<std::byte> RpcServer::implGetDeviceProperty(const std::string &path,
     return {};
 }
 
+
+
+/**
+ * Starts the specified device.
+ */
+int32_t RpcServer::implStartDevice(const std::string &path) {
+    auto device = Forest::the()->getDevice(path);
+    if(!device) return Status::NoDevice;
+
+    // load a driver if not already
+    if(!device->hasDriver()) {
+        device->findAndLoadDriver();
+    }
+
+    // start it
+    return device->start();
+}
+
+/**
+ * Stops the given device.
+ */
+int32_t RpcServer::implStopDevice(const std::string &path) {
+    auto device = Forest::the()->getDevice(path);
+    if(!device) return Status::NoDevice;
+
+    // send stop request
+    return device->stop();
+}

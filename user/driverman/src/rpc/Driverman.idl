@@ -12,4 +12,9 @@ interface Driverman {
     setDeviceProperty(path: String, key: String, data: Blob) => ()
     // Gets the value of a property on a device based on its path
     getDeviceProperty(path: String, key: String) => (data: Blob)
+
+    // Start the given device.
+    StartDevice(path: String) => (status: Int32)
+    // Stop the given device.
+    StopDevice(path: String) => (status: Int32)
 }

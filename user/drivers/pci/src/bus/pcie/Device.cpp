@@ -20,8 +20,8 @@ Device::Device(const BusPtr &_bus, const DeviceAddress &_address) : bus(_bus), a
     // read some device infos
     const uint32_t ids = c->read(this->address, 0, PciConfig::Width::DWord);
     const uint16_t vid = (ids & 0xFFFF), pid = (ids >> 16);
-    //const uint16_t classes = c->read(this->address, 0xA, PciConfig::Width::Word);
-    //const uint8_t subclass = (classes & 0xFF), classCode = (classes >> 8);
+    const uint16_t classes = c->read(this->address, 0xA, PciConfig::Width::Word);
+    const uint8_t subclass = (classes & 0xFF), classCode = (classes >> 8);
 
     // build the string to advertise under
     std::string name = fmt::format("PciExpress{:04x}.{:04x}@{:x}.{:x}.{:x},GenericPciExpressDevice",
@@ -31,13 +31,15 @@ Device::Device(const BusPtr &_bus, const DeviceAddress &_address) : bus(_bus), a
     auto rpc = libdriver::RpcClient::the();
 
     std::vector<std::byte> aux;
-    this->serializeAuxData(aux);
+    this->serializeAuxData(aux, vid, pid, classCode, subclass);
 
     this->path = rpc->AddDevice(_bus->getForestPath(), name);
     if(kLogPaths) Trace("%s", fmt::format("PCI device at {} registered as {}", _address,
                 this->path).c_str());
 
     rpc->SetDeviceProperty(this->path, kPciAddressPropertyName, aux);
+
+    rpc->StartDevice(this->path);
 }
 
 /**
@@ -52,7 +54,8 @@ Device::~Device() {
 /**
  * Serializes information about this device.
  */
-void Device::serializeAuxData(std::vector<std::byte> &out) {
+void Device::serializeAuxData(std::vector<std::byte> &out, const uint16_t vid, const uint16_t pid,
+        const uint8_t classId, const uint8_t subclassId) {
     char *data;
     size_t size;
 
@@ -62,7 +65,7 @@ void Device::serializeAuxData(std::vector<std::byte> &out) {
     mpack_writer_t writer;
     mpack_writer_init_growable(&writer, &data, &size);
 
-    mpack_start_map(&writer, 4);
+    mpack_start_map(&writer, 8);
     mpack_write_cstr(&writer, "segment");
     mpack_write_u16(&writer, a.segment);
     mpack_write_cstr(&writer, "bus");
@@ -71,6 +74,15 @@ void Device::serializeAuxData(std::vector<std::byte> &out) {
     mpack_write_u8(&writer, a.device);
     mpack_write_cstr(&writer, "function");
     mpack_write_u8(&writer, a.function);
+
+    mpack_write_cstr(&writer, "vid");
+    mpack_write_u16(&writer, vid);
+    mpack_write_cstr(&writer, "pid");
+    mpack_write_u16(&writer, pid);
+    mpack_write_cstr(&writer, "class");
+    mpack_write_u8(&writer, classId);
+    mpack_write_cstr(&writer, "subclass");
+    mpack_write_u8(&writer, subclassId);
 
     // clean up
     mpack_finish_map(&writer);

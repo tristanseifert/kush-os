@@ -26,8 +26,11 @@ class DbParser {
     private:
         /// Generate a driver object for an entry.
         [[nodiscard]] bool processEntry(const toml::table &, DriverList &);
+
         /// Processes a match structure
         [[nodiscard]] bool processMatch(const toml::table &, const DriverPtr &);
+        /// Creates a PCI match object.
+        [[nodiscard]] bool processPciMatch(const toml::table &, const DriverPtr &);
 };
 
 #endif

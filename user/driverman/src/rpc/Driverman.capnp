@@ -1,5 +1,5 @@
 # This is an automatically generated file (by idlc). Do not edit.
-# Generated from Driverman.idl for interface Driverman at 2021-06-12T19:56:56-0500
+# Generated from Driverman.idl for interface Driverman at 2021-06-16T01:08:23-0500
 @0x9c46a74e95804d52;
 using Cxx = import "/capnp/c++.capnp";
 $Cxx.namespace("rpc::_proto::messages");
@@ -42,5 +42,27 @@ struct GetDevicePropertyRequest {
 }
 struct GetDevicePropertyResponse {
                             data @0: Data;
+}
+
+############################################################
+# Structures for message 'StartDevice'
+const messageIdStartDevice:UInt64 = 0x6a7cbf9e2efa75f0;
+
+struct StartDeviceRequest {
+                            path @0: Text;
+}
+struct StartDeviceResponse {
+                          status @0: Int32;
+}
+
+############################################################
+# Structures for message 'StopDevice'
+const messageIdStopDevice:UInt64 = 0xee8b158787490a80;
+
+struct StopDeviceRequest {
+                            path @0: Text;
+}
+struct StopDeviceResponse {
+                          status @0: Int32;
 }
 

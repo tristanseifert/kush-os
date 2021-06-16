@@ -43,6 +43,14 @@ class Device: public std::enable_shared_from_this<Device> {
 
         /// Attempts to find and start a driver for the device.
         virtual bool findAndLoadDriver();
+        /// Starts the device. For most devices, once the driver is loaded, no extra work is needed.
+        virtual int start() {
+            return 0;
+        }
+        /// Stops the device.
+        virtual int stop() {
+            return 0;
+        }
 
         /// Gets the device's path in the forest if it is contained within
         std::optional<std::string> getPath();

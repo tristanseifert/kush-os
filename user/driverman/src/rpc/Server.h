@@ -7,6 +7,13 @@
 
 class RpcServer: public rpc::DrivermanServer {
     public:
+        enum Status: int32_t {
+            /// The request completed successfully
+            Success                     = 0,
+            /// There is no device at this path
+            NoDevice                    = -1,
+        };
+
         /// Initialize the global RPC server instance
         static void init();
         /// Return the global shared instance
@@ -17,6 +24,9 @@ class RpcServer: public rpc::DrivermanServer {
         std::string implAddDevice(const std::string &parent, const std::string &driverId) override;
         void implSetDeviceProperty(const std::string &path, const std::string &key, const std::span<std::byte> &data) override;
         std::vector<std::byte> implGetDeviceProperty(const std::string &path, const std::string &key) override;
+
+        int32_t implStartDevice(const std::string &path) override;
+        int32_t implStopDevice(const std::string &path) override;
 
     private:
         /// Sets up the RPC server with the given IO stream.

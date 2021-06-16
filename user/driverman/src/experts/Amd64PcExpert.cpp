@@ -18,6 +18,6 @@ void Amd64PcExpert::probe() {
 
     // create the ACPI device
     auto driver = std::make_shared<Device>(kAcpiServerDriverName);
-    Forest::the()->insertDevice("/", driver, rootPath);
+    Forest::the()->insertDevice("/", driver, rootPath, true);
 }
 

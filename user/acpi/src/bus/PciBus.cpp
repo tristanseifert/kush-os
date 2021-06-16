@@ -169,6 +169,8 @@ void PciBus::loadDriver(const uintptr_t) {
 
     // set configuration
     rpc->SetDeviceProperty(this->drivermanPath, kAuxDataKey, aux);
+
+    rpc->StartDevice(this->drivermanPath);
 }
 
 /**

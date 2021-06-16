@@ -26,6 +26,8 @@ void PciExpressBus::loadDriver(const uintptr_t) {
 
     // set configuration
     rpc->SetDeviceProperty(this->drivermanPath, kAuxDataKey, aux);
+
+    rpc->StartDevice(this->drivermanPath);
 }
 
 
