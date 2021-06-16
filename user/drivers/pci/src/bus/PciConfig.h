@@ -5,12 +5,15 @@
 #include <cstdint>
 #include <cstddef>
 
+#include <driver/PciUserClientTypes.h>
 #include <fmt/format.h>
 
 /**
  * Base interface for all PCI configuration space access methods. 
  */
 class PciConfig {
+    using DeviceAddress = libdriver::pci::BusAddress;
+
     public:
         /// Width of a configuration space access, in bits
         enum class Width {
@@ -18,23 +21,6 @@ class PciConfig {
             Word                        = 16,
             DWord                       = 32,
             QWord                       = 64,
-        };
-
-        /// The address of a device on the PCI bus
-        struct DeviceAddress {
-            uint16_t segment{0};
-            uint8_t bus{0};
-            uint8_t device{0};
-            uint8_t function{0};
-
-            DeviceAddress() = default;
-            DeviceAddress(const uint16_t _segment, const uint8_t _bus, const uint8_t _device,
-                    const uint8_t _function = 0) : segment(_segment), bus(_bus), device(_device),
-                    function(_function) {};
-            DeviceAddress(const DeviceAddress &da, const uint8_t _function) : segment(da.segment),
-                bus(da.bus), device(da.device), function(_function) {}
-
-            inline auto operator<=>(const DeviceAddress &) const = default;
         };
 
     public:
@@ -64,8 +50,8 @@ class PciConfig {
 };
 
 namespace std {
-template <> struct hash<PciConfig::DeviceAddress> {
-    std::size_t operator()(const PciConfig::DeviceAddress &da) const {
+template <> struct hash<libdriver::pci::BusAddress> {
+    std::size_t operator()(const libdriver::pci::BusAddress &da) const {
         uint64_t temp{da.segment};
         temp |= (static_cast<uint64_t>(da.bus) << 16);
         temp |= (static_cast<uint64_t>(da.device) << 24);
@@ -76,11 +62,11 @@ template <> struct hash<PciConfig::DeviceAddress> {
 }
 
 template <>
-struct fmt::formatter<PciConfig::DeviceAddress> {
+struct fmt::formatter<libdriver::pci::BusAddress> {
     constexpr auto parse(format_parse_context &ctx) { return ctx.begin(); }
 
     template <typename FormatContext>
-    auto format(const PciConfig::DeviceAddress &a, FormatContext &ctx) {
+    auto format(const libdriver::pci::BusAddress &a, FormatContext &ctx) {
         return format_to(ctx.out(), "{:04x}:{:02x}:{:02x}:{:02x}", a.segment, a.bus, a.device,
                 a.function);
     }

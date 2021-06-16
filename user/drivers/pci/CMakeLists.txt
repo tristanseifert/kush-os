@@ -7,10 +7,14 @@
 ###############################################################################
 add_executable(pcisrv
     src/main.cpp
+    src/BusRegistry.cpp
     src/Log.cpp
     src/bus/pcie/PciExpressBus.cpp
     src/bus/pcie/Device.cpp
     src/bus/pcie/ConfigSpaceReader.cpp
+    src/rpc/Server.cpp
+    src/rpc/PciDriverUser.capnp.c++
+    src/rpc/Server_PciDriverUser.cpp
 )
 
 target_include_directories(pcisrv PRIVATE src/acpica/include)

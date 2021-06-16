@@ -3,11 +3,11 @@
 #include <thread>
 #include <vector>
 
-#include <sys/syscalls.h>
-
+#include "BusRegistry.h"
+#include "Log.h"
+#include "rpc/Server.h"
 #include "bus/RootBridge.h"
 #include "bus/pcie/PciExpressBus.h"
-#include "Log.h"
 
 const char *gLogTag = "pci";
 
@@ -16,9 +16,9 @@ const char *gLogTag = "pci";
  * interrupt and other resource management.
  */
 int main(const int argc, const char **argv) {
-    std::vector<std::shared_ptr<PciExpressBus>> pcie;
-
     Success("pcisrv starting");
+    BusRegistry::init();
+    RpcServer::init();
 
     // initialize instances for each additional argument
     for(size_t i = 1; i < argc; i++) {
@@ -27,21 +27,16 @@ int main(const int argc, const char **argv) {
         // is it PCI Express?
         if(path.find("PciExpress") != std::string_view::npos) {
             auto bus = std::make_shared<PciExpressBus>(path);
-            pcie.push_back(std::move(bus));
+            BusRegistry::the()->add(std::move(bus));
         }
     }
 
     // scan for devices on all busses
     Trace("Beginning PCI device scan...");
-    size_t devices{0};
-    for(const auto &bus : pcie) {
-        bus->scan();
-        devices += bus->getDevices().size();
-    }
+    const auto devices = BusRegistry::the()->scanAll();
     Success("Completed PCI device scan. Found %lu devices", devices);
 
-    // TODO: start message loop
-    while(1) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(420));
-    }
+    // start the message loop
+    RpcServer::the()->run();
+    Abort("RpcServer returned!");
 }

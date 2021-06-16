@@ -8,6 +8,10 @@ add_library(driver STATIC
     src/rpc/Driverman.capnp.c++
     src/rpc/Client_Driverman.cpp
     src/rpc/Client.cpp
+    # RPC user clients
+    src/clients/pci/PciDriverUser.capnp.c++
+    src/clients/pci/Client_PciDriverUser.cpp
+    src/clients/pci/Client.cpp
     # serialization helpers
     src/serialize/base85.c
 )

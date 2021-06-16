@@ -113,10 +113,12 @@ PciExpressBus::~PciExpressBus() {
  * as stupid shitty.
  */
 void PciExpressBus::scan() {
+    using namespace libdriver::pci;
+
     for(size_t bus = this->busses.first; bus <= this->busses.second; bus++) {
         // check each device on this bus
         for(uint8_t device = 0; device < 32; device++) {
-            PciConfig::DeviceAddress addr(this->segment, bus, device);
+            BusAddress addr(this->segment, bus, device);
             this->probeDevice(addr);
         }
     }
@@ -128,7 +130,8 @@ void PciExpressBus::scan() {
  * This relies on the fact that a value of 0xFFFF for the vendor id is invalid, and that reads from
  * nonexistent busses/devices return all ones.
  */
-void PciExpressBus::probeDevice(const PciConfig::DeviceAddress &addr) {
+void PciExpressBus::probeDevice(const DeviceAddr &addr) {
+    using namespace libdriver::pci;
     auto c = this->cfgReader;
 
     // read vendor id
@@ -143,7 +146,7 @@ void PciExpressBus::probeDevice(const PciConfig::DeviceAddress &addr) {
     if(headerType & (1 << 7)) {
         // scan the remaining functions
         for(uint8_t func = 1; func < 8; func++) {
-            const PciConfig::DeviceAddress fAddr(addr, func);
+            const BusAddress fAddr(addr, func);
 
             // if this function is valid, probe and register
             uint16_t vid = c->read(fAddr, 0, PciConfig::Width::Word);
@@ -158,7 +161,7 @@ void PciExpressBus::probeDevice(const PciConfig::DeviceAddress &addr) {
  * Creates a PCI device object for the device at the given address. It is likewise also registered
  * in with the driver manager.
  */
-void PciExpressBus::createDeviceIfNeeded(const PciConfig::DeviceAddress &addr) {
+void PciExpressBus::createDeviceIfNeeded(const DeviceAddr &addr) {
     auto c = this->cfgReader;
 
     // read out the vendor and product IDs

@@ -8,6 +8,7 @@
 #include <memory>
 #include <vector>
 
+#include <driver/PciUserClientTypes.h>
 #include "bus/PciConfig.h"
 
 class PciExpressBus;
@@ -20,7 +21,7 @@ namespace pcie {
  */
 class Device {
     using BusPtr = std::shared_ptr<PciExpressBus>;
-    using DeviceAddress = PciConfig::DeviceAddress;
+    using DeviceAddress = libdriver::pci::BusAddress;
 
     constexpr static const std::string_view kPciAddressPropertyName{"pcie.address"};
 
@@ -28,10 +29,18 @@ class Device {
         Device(const BusPtr &bus, const DeviceAddress &address);
         virtual ~Device();
 
+        /// Get the path of this device in the forest.
+        constexpr const std::string &getForestPath() const {
+            return this->path;
+        }
+
     private:
         void serializeAuxData(std::vector<std::byte> &);
 
     private:
+        /// Whether the forest paths new devices are registered under is logged
+        constexpr static const bool kLogPaths{false};
+
         /// the bus that this device is on
         std::weak_ptr<PciExpressBus> bus;
         /// device address

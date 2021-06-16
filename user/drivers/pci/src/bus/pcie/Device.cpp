@@ -34,7 +34,8 @@ Device::Device(const BusPtr &_bus, const DeviceAddress &_address) : bus(_bus), a
     this->serializeAuxData(aux);
 
     this->path = rpc->AddDevice(_bus->getForestPath(), name);
-    Trace("%s", fmt::format("PCI device at {} registered as {}", _address, this->path).c_str());
+    if(kLogPaths) Trace("%s", fmt::format("PCI device at {} registered as {}", _address,
+                this->path).c_str());
 
     rpc->SetDeviceProperty(this->path, kPciAddressPropertyName, aux);
 }

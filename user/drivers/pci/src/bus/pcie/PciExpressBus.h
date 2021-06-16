@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <utility>
 
+#include <driver/PciUserClientTypes.h>
+
 #include "ConfigSpaceReader.h"
 
 namespace pcie { class Device; }
@@ -24,11 +26,27 @@ class PciExpressBus: public std::enable_shared_from_this<PciExpressBus> {
     constexpr static const std::string_view kEcamPropertyKey{"pcie.resources"};
 
     using DevicePtr = std::shared_ptr<pcie::Device>;
-    using DeviceAddr = PciConfig::DeviceAddress;
+    using DeviceAddr = libdriver::pci::BusAddress;
 
     public:
         PciExpressBus(const std::string_view &forestPath);
         ~PciExpressBus();
+
+        /// Test whether the given device address lies on this bus.
+        constexpr bool containsDevice(const DeviceAddr &a) const {
+            if(a.segment != this->segment) return false;
+            else if(a.bus < this->busses.first && a.bus > this->busses.second) return false;
+            return true;
+        }
+        /// Test whether we've scanned and found a device at the given address.
+        constexpr bool hasDevice(const DeviceAddr &a) const {
+            return this->devices.contains(a);
+        }
+        /// Returns the device object at the given address.
+        inline auto getDevice(const DeviceAddr &a) const {
+            return this->devices.at(a);
+        }
+
 
         /// Get the path of this bus object.
         constexpr const std::string &getForestPath() const {
