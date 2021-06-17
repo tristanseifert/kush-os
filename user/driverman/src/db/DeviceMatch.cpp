@@ -50,14 +50,16 @@ bool PciDeviceMatch::supportsDevice(const std::shared_ptr<Device> &dev, int &out
 
     // decode the PCI info
     mpack_tree_t tree;
+    std::vector<std::byte> info;
 
     if(dev->hasProperty(kPciExpressInfoPropertyName)) {
-        const auto info = dev->getProperty(kPciExpressInfoPropertyName);
+        info = dev->getProperty(kPciExpressInfoPropertyName);
         mpack_tree_init_data(&tree, reinterpret_cast<const char *>(info.data()), info.size());
     } else {
         // not a PCI device
         return false;
     }
+
 
     mpack_tree_parse(&tree);
     mpack_node_t root = mpack_tree_root(&tree);
@@ -67,34 +69,33 @@ bool PciDeviceMatch::supportsDevice(const std::shared_ptr<Device> &dev, int &out
     const uint16_t    vid = mpack_node_u16(mpack_node_map_cstr(root, "vid")),
                       pid = mpack_node_u16(mpack_node_map_cstr(root, "pid"));
 
+    if(kLogMatch) Trace("Match against %04x:%04x, class %02x:%02x (expected %02x %02x)", vid, pid,
+            classId, subclassId, this->classId.value_or(-1), this->subclassId.value_or(-1));
+
+    // clean up the msgpack decoder
+    auto status = mpack_tree_destroy(&tree);
+    if(status != mpack_ok) {
+        Warn("%s failed: %d", "mpack_tree_destroy", status);
+    }
+
     // match class id if needed
     if(this->classId) {
-        if(*this->classId != classId) goto beach;
+        if(*this->classId != classId) return false;
 
         outPriority = this->priority;
-        if(!this->conjunction) {
-            success = true;
-            goto vegetal;
-        }
+        success = true;
     }
     // match subclass id if needed
     if(this->subclassId) {
-        if(*this->subclassId != subclassId) goto beach;
+        if(*this->subclassId != subclassId) return false;
 
         outPriority = this->priority;
-        if(!this->conjunction) {
-            success = true;
-            goto vegetal;
-        }
-    }
-
-    // if we get here, and there are no vid/pid matches, assume success.
-    if(this->vidPid.empty()) {
         success = true;
-        goto beach;
     }
 
-vegetal:;
+    // if there's no VIDs to match against we can exit with success
+    if(this->vidPid.empty()) return success;
+
     // find a vid/pid match, even if we've already succeeded, to catch priority override
     for(const auto &m : this->vidPid) {
         // check vid (always required for match)
@@ -106,19 +107,10 @@ vegetal:;
         if(m.priority) outPriority = *m.priority;
         success = true;
 
-        goto beach;
+        return true;
     }
 
     // if we get here, no device matched :(
-    success = false;
-
-    // clean up the decode and return success code
-beach:;
-    auto status = mpack_tree_destroy(&tree);
-    if(status != mpack_ok) {
-        Warn("%s failed: %d", "mpack_tree_destroy", status);
-    }
-
     return success;
 }
 

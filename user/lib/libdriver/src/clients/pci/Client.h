@@ -18,6 +18,8 @@ namespace libdriver::pci {
  * from a PCI device node can read the device config space, among other tasks.
  */
 class UserClient: public rpc::PciDriverUserClient {
+    friend class Device;
+
     /// Name of the PCI driver's run loop port
     constexpr static const std::string_view kPortName{"me.blraaz.driver.pci"};
 
@@ -27,6 +29,10 @@ class UserClient: public rpc::PciDriverUserClient {
 
     private:
         UserClient(const std::shared_ptr<IoStream> &io) : PciDriverUserClient(io) {}
+
+        using PciDriverUserClient::GetDeviceAt;
+        using PciDriverUserClient::ReadCfgSpace32;
+        using PciDriverUserClient::WriteCfgSpace32;
 
     private:
         static std::once_flag gInitFlag;

@@ -38,5 +38,10 @@ _start:
     call        main
 
 3:
-    // return to the dynamic linker that called us
-    ret
+    // call TaskExit with the return value of main (in %rax)
+    xor         %rdi, %rdi
+    mov         %rax, %rsi
+    call        TaskExit
+
+    // should never get here!
+    ud2

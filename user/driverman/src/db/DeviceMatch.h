@@ -51,6 +51,9 @@ class DeviceNameMatch: public DeviceMatch {
  * added to the forest, so we simply decode that information.
  */
 class PciDeviceMatch: public DeviceMatch {
+    /// Whether potential matches are logged
+    constexpr static const bool kLogMatch{false};
+
     /// Property storing the PCI device information
     static const std::string kPciExpressInfoPropertyName;
 

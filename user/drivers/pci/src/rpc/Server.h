@@ -31,6 +31,10 @@ class RpcServer: public rpc::PciDriverUserServer {
     private:
         /// Name to register the RPC service under
         constexpr static const std::string_view kRpcEndpointName{"me.blraaz.driver.pci"};
+        /// Whether config space reads are logged
+        constexpr static const bool kLogCfgRead{false};
+        /// Whether config space writes are logged
+        constexpr static const bool kLogCfgWrite{true};
 
         /// shared RPC server instance
         static RpcServer *gShared;

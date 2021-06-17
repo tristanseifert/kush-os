@@ -39,8 +39,10 @@ std::string RpcServer::implGetDeviceAt(const libdriver::pci::BusAddress &address
  * Performs a 32-bit wide read from the device's config space.
  */
 uint32_t RpcServer::implReadCfgSpace32(const libdriver::pci::BusAddress &address, uint16_t offset) {
-    Trace("Cfg space read: %04x:%02x:%02x:%02x off $%03x", address.segment, address.bus,
-            address.device, address.function, offset);
+    if(kLogCfgRead) {
+        Trace("Cfg space read: %04x:%02x:%02x:%02x off $%03x", address.segment, address.bus,
+                address.device, address.function, offset);
+    }
 
     auto bus = BusRegistry::the()->get(address);
     if(!bus) return 0;
@@ -54,8 +56,10 @@ uint32_t RpcServer::implReadCfgSpace32(const libdriver::pci::BusAddress &address
  */
 void RpcServer::implWriteCfgSpace32(const libdriver::pci::BusAddress &address, uint16_t offset,
         uint32_t value) {
-    Trace("Cfg space write: %04x:%02x:%02x:%02x off $%03x => %08x", address.segment, address.bus,
+    if(kLogCfgWrite) {
+        Trace("Cfg space write: %04x:%02x:%02x:%02x off $%03x => %08x", address.segment, address.bus,
             address.device, address.function, offset, value);
+    }
 
     Warn("TODO: implement %s", __PRETTY_FUNCTION__);
 }

@@ -12,6 +12,8 @@ add_library(driver STATIC
     src/clients/pci/PciDriverUser.capnp.c++
     src/clients/pci/Client_PciDriverUser.cpp
     src/clients/pci/Client.cpp
+    src/clients/pci/Device.cpp
+    src/clients/pci/Helpers.cpp
     # serialization helpers
     src/serialize/base85.c
 )

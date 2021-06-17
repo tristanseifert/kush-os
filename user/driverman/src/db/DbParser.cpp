@@ -116,7 +116,14 @@ bool DbParser::processMatch(const toml::table &n, const DriverPtr &driver) {
     }
     // PCI device
     else if(n.contains("pci")) {
-        if(!this->processPciMatch(n, driver)) {
+        auto tbl = n["pci"].as_table();
+        if(!tbl) {
+            Warn("Driver %s is invalid: %s", driver->getPath().c_str(),
+                    "pci key is wrong type");
+            return false;
+        }
+
+        if(!this->processPciMatch(*tbl, driver)) {
             Warn("Driver %s is invalid: %s", driver->getPath().c_str(),
                     "Failed to create PCI device match");
             return false;
@@ -158,10 +165,10 @@ bool DbParser::processPciMatch(const toml::table &n, const DriverPtr &driver) {
 
     // construct the class match
     if(n.contains("class")) {
-        m->setClassId(n["class"].value<uint8_t>().value_or(0xFF));
+        m->setClassId(n["class"].value<uint8_t>().value());
     }
     if(n.contains("subclass")) {
-        m->setSubclassId(n["subclass"].value<uint8_t>().value_or(0xFF));
+        m->setSubclassId(n["subclass"].value<uint8_t>().value());
     }
 
     // construct the individual vid/pid matches
