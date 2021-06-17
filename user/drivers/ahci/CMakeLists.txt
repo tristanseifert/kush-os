@@ -18,7 +18,7 @@ target_include_directories(ahcidrv PRIVATE src)
 
 # required libraries
 add_dependencies(ahcidrv c_dynamic system_dynamic)
-target_link_libraries(ahcidrv PRIVATE capnp driver rpc mpack_dynamic)
+target_link_libraries(ahcidrv PRIVATE capnp driver libpci rpc mpack_dynamic)
 
 # install it to boot directory in sysroot
 install(TARGETS ahcidrv RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)

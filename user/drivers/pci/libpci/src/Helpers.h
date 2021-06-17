@@ -4,9 +4,9 @@
 #include <cstddef>
 #include <span>
 
-#include <driver/PciUserClientTypes.h>
+#include "userclient/UserClientTypes.h"
 
-namespace libdriver::pci::internal {
+namespace libpci::internal {
 /// Decodes the aux data blob into a bus address.
 bool DecodeAddressInfo(const std::span<std::byte> &data, BusAddress &outAddr);
 }

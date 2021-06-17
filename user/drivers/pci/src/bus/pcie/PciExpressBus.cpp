@@ -113,7 +113,7 @@ PciExpressBus::~PciExpressBus() {
  * as stupid shitty.
  */
 void PciExpressBus::scan() {
-    using namespace libdriver::pci;
+    using namespace libpci;
 
     for(size_t bus = this->busses.first; bus <= this->busses.second; bus++) {
         // check each device on this bus
@@ -131,7 +131,7 @@ void PciExpressBus::scan() {
  * nonexistent busses/devices return all ones.
  */
 void PciExpressBus::probeDevice(const DeviceAddr &addr) {
-    using namespace libdriver::pci;
+    using namespace libpci;
     auto c = this->cfgReader;
 
     // read vendor id

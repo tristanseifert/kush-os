@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <utility>
 
-#include <driver/PciUserClientTypes.h>
+#include <libpci/UserClientTypes.h>
 
 #include "ConfigSpaceReader.h"
 
@@ -26,7 +26,7 @@ class PciExpressBus: public std::enable_shared_from_this<PciExpressBus> {
     constexpr static const std::string_view kEcamPropertyKey{"pcie.resources"};
 
     using DevicePtr = std::shared_ptr<pcie::Device>;
-    using DeviceAddr = libdriver::pci::BusAddress;
+    using DeviceAddr = libpci::BusAddress;
 
     public:
         PciExpressBus(const std::string_view &forestPath);

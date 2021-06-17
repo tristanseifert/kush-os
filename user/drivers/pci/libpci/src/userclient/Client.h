@@ -3,7 +3,9 @@
 
 #include "Client_PciDriverUser.hpp"
 
-#include <driver/PciUserClientTypes.h>
+#include <libpci/UserClientTypes.h>
+#include <libpci/Device.h>
+
 #include <capnp/serialize.h>
 
 #include <cstddef>
@@ -12,7 +14,7 @@
 #include <memory>
 #include <string_view>
 
-namespace libdriver::pci {
+namespace libpci {
 /**
  * Provides an interface to the PCI bus driver, so that drivers that were instantiated
  * from a PCI device node can read the device config space, among other tasks.

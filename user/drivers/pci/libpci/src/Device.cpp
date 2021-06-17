@@ -1,12 +1,12 @@
-#include "Client.h"
+#include "Device.h"
 #include "Helpers.h"
+#include "userclient/Client.h"
 
 #include <driver/DrivermanClient.h>
-#include <driver/PciUserClientTypes.h>
 
 #include <stdexcept>
 
-using namespace libdriver::pci;
+using namespace libpci;
 
 /**
  * Initializes a device based on a given bus address.

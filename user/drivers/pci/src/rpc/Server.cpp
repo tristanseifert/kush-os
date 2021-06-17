@@ -23,7 +23,7 @@ void RpcServer::init() {
  *
  * @return Forest path to the device, or empty string if there is no such device.
  */
-std::string RpcServer::implGetDeviceAt(const libdriver::pci::BusAddress &address) {
+std::string RpcServer::implGetDeviceAt(const libpci::BusAddress &address) {
     // get the bus and test if it contains the device
     auto bus = BusRegistry::the()->get(address);
     if(!bus) return "";
@@ -38,7 +38,7 @@ std::string RpcServer::implGetDeviceAt(const libdriver::pci::BusAddress &address
 /**
  * Performs a 32-bit wide read from the device's config space.
  */
-uint32_t RpcServer::implReadCfgSpace32(const libdriver::pci::BusAddress &address, uint16_t offset) {
+uint32_t RpcServer::implReadCfgSpace32(const libpci::BusAddress &address, uint16_t offset) {
     if(kLogCfgRead) {
         Trace("Cfg space read: %04x:%02x:%02x:%02x off $%03x", address.segment, address.bus,
                 address.device, address.function, offset);
@@ -54,7 +54,7 @@ uint32_t RpcServer::implReadCfgSpace32(const libdriver::pci::BusAddress &address
 /**
  * Performs a 32-bit wide write to the device's config space.
  */
-void RpcServer::implWriteCfgSpace32(const libdriver::pci::BusAddress &address, uint16_t offset,
+void RpcServer::implWriteCfgSpace32(const libpci::BusAddress &address, uint16_t offset,
         uint32_t value) {
     if(kLogCfgWrite) {
         Trace("Cfg space write: %04x:%02x:%02x:%02x off $%03x => %08x", address.segment, address.bus,

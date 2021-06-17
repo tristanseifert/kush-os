@@ -1,8 +1,7 @@
 #include <cstddef>
 #include <vector>
 
-#include <driver/DrivermanClient.h>
-#include <driver/PciUserClient.h>
+#include <libpci/UserClient.h>
 
 #include "Log.h"
 
@@ -19,7 +18,7 @@ int main(const int argc, const char **argv) {
 
     // create the devices
     for(size_t i = 1; i < argc; i++) {
-        auto dev = std::make_shared<libdriver::pci::Device>(argv[i]);
+        auto dev = std::make_shared<libpci::Device>(argv[i]);
 
         Trace("Device %lu: %s (%p) vid %04x pid %04x, class %02x:%02x", i-1, argv[i], dev.get(),
                 dev->getVid(), dev->getPid(), dev->getClassId(), dev->getSubclassId());

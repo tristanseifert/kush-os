@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include <driver/PciUserClientTypes.h>
+#include <libpci/UserClientTypes.h>
 
 class PciExpressBus;
 
@@ -18,7 +18,7 @@ class PciExpressBus;
  * It allows quickly looking up the bus that is responsible for handling a device by its address.
  */
 class BusRegistry {
-    using DeviceAddress = libdriver::pci::BusAddress;
+    using DeviceAddress = libpci::BusAddress;
 
     public:
         /// Initialize the shared instance of the bus registry

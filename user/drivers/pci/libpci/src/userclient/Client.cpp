@@ -4,7 +4,7 @@
 
 #include <rpc/rt/ClientPortRpcStream.h>
 
-using namespace libdriver::pci;
+using namespace libpci;
 
 UserClient *UserClient::gShared{nullptr};
 std::once_flag UserClient::gInitFlag;
@@ -27,7 +27,7 @@ UserClient *UserClient::the() {
 /**
  * Serializes a device address; this just packs the address values sequentially.
  */
-void rpc::serialize(std::vector<std::byte> &outData, const libdriver::pci::BusAddress &addr) {
+void rpc::serialize(std::vector<std::byte> &outData, const BusAddress &addr) {
     // reserve space
     outData.resize(5, std::byte{0});
     auto bytes = outData.data();
@@ -42,7 +42,7 @@ void rpc::serialize(std::vector<std::byte> &outData, const libdriver::pci::BusAd
  * Deserializes a device address; this unpacks the address values that were packed sequentially
  * after one another.
  */
-void rpc::deserialize(const std::span<std::byte> &bytes, libdriver::pci::BusAddress &addr) {
+void rpc::deserialize(const std::span<std::byte> &bytes, BusAddress &addr) {
     memcpy(&addr.segment, &bytes[0], sizeof(addr.segment));
     memcpy(&addr.bus, &bytes[2], sizeof(addr.bus));
     memcpy(&addr.device, &bytes[3], sizeof(addr.device));

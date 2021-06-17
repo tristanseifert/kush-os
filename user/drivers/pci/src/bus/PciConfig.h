@@ -5,14 +5,14 @@
 #include <cstdint>
 #include <cstddef>
 
-#include <driver/PciUserClientTypes.h>
+#include <libpci/UserClientTypes.h>
 #include <fmt/format.h>
 
 /**
  * Base interface for all PCI configuration space access methods. 
  */
 class PciConfig {
-    using DeviceAddress = libdriver::pci::BusAddress;
+    using DeviceAddress = libpci::BusAddress;
 
     public:
         /// Width of a configuration space access, in bits
@@ -50,8 +50,8 @@ class PciConfig {
 };
 
 namespace std {
-template <> struct hash<libdriver::pci::BusAddress> {
-    std::size_t operator()(const libdriver::pci::BusAddress &da) const {
+template <> struct hash<libpci::BusAddress> {
+    std::size_t operator()(const libpci::BusAddress &da) const {
         uint64_t temp{da.segment};
         temp |= (static_cast<uint64_t>(da.bus) << 16);
         temp |= (static_cast<uint64_t>(da.device) << 24);
@@ -62,11 +62,11 @@ template <> struct hash<libdriver::pci::BusAddress> {
 }
 
 template <>
-struct fmt::formatter<libdriver::pci::BusAddress> {
+struct fmt::formatter<libpci::BusAddress> {
     constexpr auto parse(format_parse_context &ctx) { return ctx.begin(); }
 
     template <typename FormatContext>
-    auto format(const libdriver::pci::BusAddress &a, FormatContext &ctx) {
+    auto format(const libpci::BusAddress &a, FormatContext &ctx) {
         return format_to(ctx.out(), "{:04x}:{:02x}:{:02x}:{:02x}", a.segment, a.bus, a.device,
                 a.function);
     }

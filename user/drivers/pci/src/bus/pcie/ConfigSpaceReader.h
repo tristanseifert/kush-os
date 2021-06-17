@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <memory>
 
-#include <driver/PciUserClientTypes.h>
+#include <libpci/UserClientTypes.h>
 #include "bus/PciConfig.h"
 
 class PciExpressBus;
@@ -15,7 +15,7 @@ namespace pcie {
  * the mapped ECAM region.
  */
 class ConfigSpaceReader: public PciConfig {
-    using DeviceAddress = libdriver::pci::BusAddress;
+    using DeviceAddress = libpci::BusAddress;
 
     public:
         ConfigSpaceReader(PciExpressBus *);

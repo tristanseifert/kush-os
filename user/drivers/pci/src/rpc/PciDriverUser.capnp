@@ -1,5 +1,5 @@
 # This is an automatically generated file (by idlc). Do not edit.
-# Generated from UserClient.idl for interface PciDriverUser at 2021-06-15T01:48:49-0500
+# Generated from UserClient.idl for interface PciDriverUser at 2021-06-17T13:20:46-0500
 @0xfacd9e8b419e773c;
 using Cxx = import "/capnp/c++.capnp";
 $Cxx.namespace("rpc::_proto::messages");
@@ -13,7 +13,7 @@ $Cxx.namespace("rpc::_proto::messages");
 const messageIdGetDeviceAt:UInt64 = 0xd5b64160331233f1;
 
 struct GetDeviceAtRequest {
-# Custom serialization type; was 'libdriver::pci::BusAddress'
+# Custom serialization type; was 'libpci::BusAddress'
                          address @0: Data;
 }
 struct GetDeviceAtResponse {
@@ -25,7 +25,7 @@ struct GetDeviceAtResponse {
 const messageIdReadCfgSpace32:UInt64 = 0x441bae330756a108;
 
 struct ReadCfgSpace32Request {
-# Custom serialization type; was 'libdriver::pci::BusAddress'
+# Custom serialization type; was 'libpci::BusAddress'
                          address @0: Data;
                           offset @1: UInt16;
 }
@@ -38,7 +38,7 @@ struct ReadCfgSpace32Response {
 const messageIdWriteCfgSpace32:UInt64 = 0xde92bb2db0b09f5d;
 
 struct WriteCfgSpace32Request {
-# Custom serialization type; was 'libdriver::pci::BusAddress'
+# Custom serialization type; was 'libpci::BusAddress'
                          address @0: Data;
                           offset @1: UInt16;
                            value @2: UInt32;

@@ -3,7 +3,7 @@
 
 #include "Server_PciDriverUser.hpp"
 
-#include <driver/PciUserClientTypes.h>
+#include <libpci/UserClientTypes.h>
 
 #include <cstdint>
 #include <memory>
@@ -19,9 +19,9 @@ class RpcServer: public rpc::PciDriverUserServer {
         }
 
     public:
-        std::string implGetDeviceAt(const libdriver::pci::BusAddress &address) override;
-        uint32_t implReadCfgSpace32(const libdriver::pci::BusAddress &address, uint16_t offset) override;
-        void implWriteCfgSpace32(const libdriver::pci::BusAddress &address, uint16_t offset,
+        std::string implGetDeviceAt(const libpci::BusAddress &address) override;
+        uint32_t implReadCfgSpace32(const libpci::BusAddress &address, uint16_t offset) override;
+        void implWriteCfgSpace32(const libpci::BusAddress &address, uint16_t offset,
                 uint32_t value) override;
 
     private:
