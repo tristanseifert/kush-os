@@ -91,9 +91,11 @@ arch_syscall_table:
     .quad       _ZN3sys13VmTaskGetInfoE6HandlePNS_10VmTaskInfoEm
     // 0x1A: Convert virtual address to region handle
     .quad       _ZN3sys14VmAddrToRegionE6Handlem
+    // 0x1B: Convert virtual addresses to physical
+    .quad       _ZN3sys21VmTranslateVirtToPhysE6HandlePKmPmm
 
     // 0x1B-0x1F: VM calls (reserved)
-    .rept       5
+    .rept       4
     .quad       _ZN3sys7Syscall20UnimplementedSyscallEv
     .endr
 
@@ -147,9 +149,15 @@ arch_syscall_table:
     .quad       _ZN3sys17IrqHandlerInstallEm6Handlem
     // 0x39: Unregister IRQ handler
     .quad       _ZN3sys16IrqHandlerRemoveE6Handle
+    // 0x3A: Update IRQ handler
+    .quad       _ZN3sys16IrqHandlerUpdateE6HandleS0_m
+    // 0x3B: Get IRQ handler information
+    .quad       _ZN3sys17IrqHandlerGetInfoE6Handlem
+    // 0x3C: Allocate processor local IRQ handler
+    .quad       _ZN3sys24IrqHandlerAllocCoreLocalE6Handlem
 
-    // 0x3A-0x3F: Reserved
-    .rept       6
+    // 0x3D-0x3F: Reserved
+    .rept       3
     .quad       _ZN3sys7Syscall20UnimplementedSyscallEv
     .endr
 

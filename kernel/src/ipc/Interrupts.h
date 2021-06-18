@@ -22,13 +22,20 @@ class IrqHandler {
 
     public:
         /// Return the handle for this irq handler.
-        const Handle getHandle() const {
+        constexpr const Handle getHandle() const {
             return this->handle;
         }
         /// Return the thread to which this irq handler delivers notifications
         auto getThread() const {
             return this->thread;
         }
+        /// Returns the vector number for this handler.
+        constexpr auto getIrqNum() const {
+            return this->irqNum;
+        }
+
+        /// Update the thread that is notified when the interrupt fires
+        void setTarget(const rt::SharedPtr<sched::Thread> &thread, const uintptr_t bits);
 
         ~IrqHandler();
 

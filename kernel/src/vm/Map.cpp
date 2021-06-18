@@ -272,12 +272,13 @@ fail:;
  * MapEntry object. This should, however, be the only type of mappings an user task will ever
  * have to encounter.
  */
-bool Map::findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &outOffset) {
+bool Map::findRegion(const uintptr_t virtAddr, rt::SharedPtr<MapEntry> &outEntry,
+        uintptr_t &outOffset) {
     RW_LOCK_READ_GUARD(this->lock);
 
     auto vobj = this->entries.find(virtAddr, outOffset);
     if(vobj) {
-        outHandle = vobj->getHandle();
+        outEntry = vobj;
         return true;
     }
 

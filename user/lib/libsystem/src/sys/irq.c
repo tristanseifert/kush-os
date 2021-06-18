@@ -31,3 +31,30 @@ int IrqHandlerInstall(const uintptr_t irqNum, const uintptr_t threadHandle,
 int IrqHandlerRemove(const uintptr_t handle) {
     return __do_syscall1(handle, SYS_ARCH_UNINSTALL_IRQ);
 }
+
+/**
+ * Updates an IRQ handler's thread and notification bits.
+ *
+ * @note This will _replace_ notification bits. Therefore, calling with a value of 0 is invalid.
+ */
+int IrqHandlerUpdate(const uintptr_t irqHandle, const uintptr_t threadHandle, const uintptr_t bits) {
+    return __do_syscall3(irqHandle, threadHandle, bits, SYS_ARCH_UPDATE_IRQ);
+}
+
+/**
+ * Gets information about an IRQ handler.
+ */
+int IrqHandlerGetInfo(const uintptr_t irqHandle, const uintptr_t info) {
+    return __do_syscall2(irqHandle, info, SYS_ARCH_IRQ_GETINFO);
+}
+
+/**
+ * Creates a new IRQ handler that is bound to the current processor. This can be used to implement
+ * driver specific IPIs or message-signaled hardware interrupts.
+ *
+ * The `IrqHandlerGetInfo` call can be used to discover the assigned vector number.
+ */
+int IrqHandlerInstallLocal(const uintptr_t threadHandle, const uintptr_t bits) {
+    return __do_syscall2(threadHandle, bits, SYS_ARCH_IRQ_GETINFO);
+}
+

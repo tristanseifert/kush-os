@@ -44,6 +44,9 @@ enum class MappingFlags {
     /// Whether the object is mapped copy-on-write in non-owner tasks
     CopyOnWrite                         = (1 << 16),
 
+    /// The region is locked in memory, i.e. physical pages cannot be moved or swapped out.
+    Locked                              = (1 << 24),
+
     /// Mask including all permission bits
     PermissionsMask                     = (Read | Write | Execute),
     /// Mask including all cacheability bits

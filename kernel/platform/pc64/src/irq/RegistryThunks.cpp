@@ -5,6 +5,22 @@
 #include <platform.h>
 #include <log.h>
 
+using namespace platform;
+
+/**
+ * Allocates the core local IRQ registry, if needed.
+ */
+static void EnsureIrqRegistrar(CoreLocalInfo &p) {
+    const auto oldIrql = platform_raise_irql(platform::Irql::Scheduler);
+
+    if(!p.irqRegistrar) {
+        p.irqRegistrar = new CoreLocalIrqRegistry;
+        REQUIRE(p.irqRegistrar, "failed to allocate irq registrar");
+    }
+
+    platform_lower_irql(oldIrql);
+}
+
 /**
  * Registers a new interrupt handler for the given irq number. When the interrupt is triggered,
  * the specified callback is invoked with the specified context, and an opaque irq token that can
@@ -28,16 +44,7 @@ uintptr_t platform::IrqRegister(const uintptr_t irq, bool(*callback)(void *, con
 
     // set up irq registry for this core if needed
     auto &p = arch::GetProcLocal()->p;
-    {
-        const auto oldIrql = platform_raise_irql(platform::Irql::Scheduler);
-
-        if(!p.irqRegistrar) {
-            p.irqRegistrar = new CoreLocalIrqRegistry;
-            REQUIRE(p.irqRegistrar, "failed to allocate irq registrar");
-        }
-
-        platform_lower_irql(oldIrql);
-    }
+    EnsureIrqRegistrar(p);
 
     // invoke its register method with the real vector number
     return p.irqRegistrar->add(irq, callback, ctx);
@@ -72,3 +79,14 @@ int platform::IrqAck(const uintptr_t token) {
     return 0;
 }
 
+/**
+ * Allocates a core local interrupt vector.
+ */
+uintptr_t platform::IrqAllocCoreLocal() {
+    // get the core local registry
+    auto &p = arch::GetProcLocal()->p;
+    EnsureIrqRegistrar(p);
+
+    // allocate vector number
+    return p.irqRegistrar->allocateVector();
+}

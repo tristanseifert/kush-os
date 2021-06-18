@@ -3,6 +3,8 @@
 
 #include <libpci/UserClient.h>
 
+#include "Controller.h"
+#include "ControllerRegistry.h"
 #include "Log.h"
 
 const char *gLogTag = "ahci";
@@ -16,14 +18,18 @@ int main(const int argc, const char **argv) {
         Abort("You must specify at least one forest path of a device to attach to.");
     }
 
+    ControllerRegistry::init();
+
     // create the devices
     for(size_t i = 1; i < argc; i++) {
-        auto dev = std::make_shared<libpci::Device>(argv[i]);
+        auto pciDev = std::make_shared<libpci::Device>(argv[i]);
+        auto controller = std::make_shared<Controller>(pciDev);
 
-        Trace("Device %lu: %s (%p) vid %04x pid %04x, class %02x:%02x", i-1, argv[i], dev.get(),
-                dev->getVid(), dev->getPid(), dev->getClassId(), dev->getSubclassId());
+        ControllerRegistry::the()->addController(controller);
     }
 
     // start em
+
+    // receive messages from driverman
     return 0;
 }

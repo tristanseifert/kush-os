@@ -47,6 +47,7 @@ LIBSYSTEM_INTERNAL intptr_t __do_syscall5(const uintptr_t arg0, const uintptr_t 
 #define SYS_VM_GET_INFO                 0x18
 #define SYS_VM_GET_TASK_INFO            0x19
 #define SYS_VM_ADDR_TO_HANDLE           0x1A
+#define SYS_VM_VIRT_TO_PHYS             0x1B
 
 #define SYS_THREAD_GET_HANDLE           0x20
 #define SYS_THREAD_YIELD                0x21
@@ -71,6 +72,9 @@ LIBSYSTEM_INTERNAL intptr_t __do_syscall5(const uintptr_t arg0, const uintptr_t 
 
 #define SYS_ARCH_INSTALL_IRQ            0x38
 #define SYS_ARCH_UNINSTALL_IRQ          0x39
+#define SYS_ARCH_UPDATE_IRQ             0x3A
+#define SYS_ARCH_IRQ_GETINFO            0x3B
+#define SYS_ARCH_ALLOC_LOCAL            0x3C
 
 // first architecture specific syscall number
 #define SYS_ARCH                        0x40

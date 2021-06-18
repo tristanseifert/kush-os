@@ -104,6 +104,13 @@ uintptr_t IrqRegister(const uintptr_t irq, bool(*callback)(void *, const uintptr
  * @return 0 on success, error code otherwise.
  */
 int IrqUnregister(const uintptr_t token);
+
+/**
+ * Allocates a core-local interrupt vector number.
+ *
+ * @return Vector number on success, or 0 if error.
+ */
+uintptr_t IrqAllocCoreLocal();
 }
 
 /**

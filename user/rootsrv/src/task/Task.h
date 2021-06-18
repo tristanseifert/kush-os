@@ -74,6 +74,11 @@ class Task: public std::enable_shared_from_this<Task> {
         /// address range for temporary mappings
         static const uintptr_t kTempMappingRange[2];
 
+        /// whether general info about a binary that's being loaded is logged
+        constexpr static const bool kLogLoad{false};
+        /// whether info pertaining to dynamically linked executables is logged
+        constexpr static const bool kLogDynamic{false};
+
     private:
         /// path from which the binary was loaded
         std::string binaryPath;

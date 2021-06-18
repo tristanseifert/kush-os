@@ -44,6 +44,9 @@ class RpcHandler {
     private:
         static RpcHandler *gShared;
 
+        /// whether dispensary resolutions are logged
+        constexpr static const bool kLogRequests{false};
+
         /// port on which we listen for requests
         uintptr_t portHandle = 0;
         /// as long as this set, the worker will continue execute

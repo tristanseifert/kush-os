@@ -23,6 +23,7 @@ class CoreLocalIrqRegistry {
     public:
         CoreLocalIrqRegistry() {
             memset(&this->registrations, 0, sizeof(registrations));
+            memset(&this->isIrqMsi, false, sizeof(isIrqMsi));
         };
         ~CoreLocalIrqRegistry();
 
@@ -30,6 +31,9 @@ class CoreLocalIrqRegistry {
         uintptr_t add(const uintptr_t irq, Handler callback, void *callbackCtx);
         /// Remove an existing irq handler
         int remove(const uintptr_t token);
+
+        /// Allocates a vector number for core-local use.
+        uintptr_t allocateVector();
 
     private:
         /// Converts an amd64 vector number to an irq number
@@ -87,6 +91,8 @@ class CoreLocalIrqRegistry {
 
         /// All registered handlers
         HandlerNode *registrations[kNumIrqs];
+        /// Whether a particular interrupt has been allocated for use as an MSI vector
+        bool isIrqMsi[kNumIrqs];
 };
 }
 

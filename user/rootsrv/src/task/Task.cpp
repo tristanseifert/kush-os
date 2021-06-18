@@ -53,12 +53,12 @@ uintptr_t Task::createFromFile(const std::string &elfPath, const std::vector<std
 
     // load the binary into the task's VM map
     auto loader = task->getLoaderFor(elfPath, fp);
-    LOG("Loader for %s: %p (id '%s'); task $%p'h", elfPath.c_str(), loader.get(),
+    if(kLogLoad) LOG("Loader for %s: %p (id '%s'); task $%p'h", elfPath.c_str(), loader.get(),
             loader->getLoaderId().data(), task->getHandle());
 
     loader->mapInto(task);
 
-    LOG("loading complete. binary is %s", loader->needsDyld() ? "dynamic" : "static");
+    if(kLogLoad) LOG("loading complete. binary is %s", loader->needsDyld() ? "dynamic" : "static");
 
     // load dynamic linker as well if needed
     if(loader->needsDyld()) {
@@ -89,7 +89,7 @@ Task::Task(const std::string &path, const uintptr_t parentTask) : binaryPath(pat
     int err;
 
     // create the task
-    LOG("Creating task '%s'", path.c_str());
+    if(kLogLoad) LOG("Creating task '%s'", path.c_str());
     err = TaskCreateWithParent(parentTask, &this->taskHandle);
     if(err) {
         throw std::system_error(err, std::generic_category(), "TaskCreate");
@@ -182,7 +182,7 @@ void Task::jumpTo(const uintptr_t pc, const uintptr_t sp) {
  * listed in the binary header.
  */
 void Task::loadDyld(const std::string &dyldPath, uintptr_t &pcOut) {
-    LOG("Loading dynamic linker: '%s'", dyldPath.c_str());
+    if(kLogDynamic) LOG("Loading dynamic linker: '%s'", dyldPath.c_str());
 
     // open a file handle to it
     FILE *fp = fopen(dyldPath.c_str(), "rb");

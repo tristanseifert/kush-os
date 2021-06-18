@@ -5,7 +5,7 @@
 #include "sched/Thread.h"
 
 #include <platform.h>
-
+#include <arch/critical.h>
 
 using namespace ipc;
 
@@ -69,3 +69,22 @@ rt::SharedPtr<IrqHandler> Interrupts::create(const uintptr_t irq,
     return info;
 }
 
+/**
+ * Updates the interrupt handler's target.
+ */
+void IrqHandler::setTarget(const rt::SharedPtr<sched::Thread> &newThread,
+        const uintptr_t bits) {
+    REQUIRE(newThread, "invalid thread ptr");
+    REQUIRE(bits, "invalid notification bits");
+
+    DECLARE_CRITICAL();
+
+    // copy the thread ptr so we don't deallocate in critical section
+    auto oldThread = this->thread;
+
+    // replace notification bits and interrupts (TODO: need to mask irq?)
+    CRITICAL_ENTER();
+    this->thread = newThread;
+    __atomic_store_n(&this->bits, bits, __ATOMIC_RELAXED);
+    CRITICAL_EXIT();
+}

@@ -52,6 +52,8 @@ enum sys::VmFlags: uintptr_t {
     kNoLazyAlloc                        = (1 << 0),
     /// Use large pages, if supported
     kUseLargePages                      = (1 << 1),
+    /// The region is locked into memory.
+    kLocked                             = (1 << 8),
 
     /// Allow the memory region to be read.
     kPermissionRead                     = (1 << 10),
@@ -683,6 +685,64 @@ intptr_t sys::VmAddrToRegion(const Handle taskHandle, const uintptr_t vmAddr) {
 }
 
 /**
+ * Translates the given array of virtual addresses to physical addresses.
+ *
+ * @param taskHandle Task whose virtual address space to query, or 0 for calling task
+ * @param inVirtAddrs Base of an array of `numAddresses` virtual addresses
+ * @param outPhysAddrs Base of an array of `numAddresses` physical addresses. Not written if the
+ *        translation for that particular virtual address fails.
+ * @param numAddresses Total number of virtual addresses to translate.
+ *
+ * @return 0 on success, or an error code.
+ */
+intptr_t sys::VmTranslateVirtToPhys(const Handle taskHandle, const uintptr_t *inVirtAddrs,
+        uintptr_t *outPhysAddrs, const size_t numAddresses) {
+    rt::SharedPtr<sched::Task> task;
+
+    // validate args and get the task
+    const size_t bufLen{sizeof(uintptr_t) * numAddresses};
+
+    if(!Syscall::validateUserPtr(inVirtAddrs, bufLen)) {
+        return Errors::InvalidPointer;
+    } else if(!Syscall::validateUserPtr(outPhysAddrs, bufLen)) {
+        return Errors::InvalidPointer;
+    }
+
+    if(!taskHandle) {
+        task = sched::Task::current();
+    } else {
+        task = handle::Manager::getTask(taskHandle);
+        if(!task) {
+            return Errors::InvalidHandle;
+        }
+    }
+
+    // process each of the entries
+    auto &vm = task->vm;
+    if(!vm) return Errors::GeneralError;
+
+    for(size_t i = 0; i < numAddresses; i++) {
+        uintptr_t virt, phys, offset{0};
+        rt::SharedPtr<vm::MapEntry> region;
+
+        // read the address and get the region (to verify it's locked in memory)
+        Syscall::copyIn(&inVirtAddrs[i], sizeof(uintptr_t), &virt, sizeof(virt));
+        if(virt >= kKernelVmBound) continue;
+
+        if(!vm->findRegion(virt, region, offset)) continue;
+        else if(!region) continue;
+
+        if(!TestFlags(region->getFlags() & vm::MappingFlags::Locked)) continue;
+
+        // translate the physical address in that region and write it out
+        if(vm->get(virt, phys)) continue;
+        Syscall::copyOut(&phys, sizeof(phys), &outPhysAddrs[i], sizeof(uintptr_t));
+    }
+
+    return Errors::Success;
+}
+
+/**
  * Converts the syscall VM flags to those required to create an anonymous mapping.
  */
 static vm::MappingFlags ConvertFlags(const uintptr_t f) {
@@ -699,6 +759,9 @@ static vm::MappingFlags ConvertFlags(const uintptr_t f) {
     }
     if(f & kMapTypeMmio) {
         flags |= vm::MappingFlags::MMIO;
+    }
+    if(f & kLocked) {
+        flags |= vm::MappingFlags::Locked;
     }
 
     return flags;

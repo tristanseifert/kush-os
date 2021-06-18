@@ -19,12 +19,21 @@ typedef struct TaskVmInfo {
  * Flags for AllocVirtual*Region
  */
 #define VM_REGION_FORCE_ALLOC           (1 << 0)
+/// Use large pages to satisfy all or a subset of the allocation, if possible.
 #define VM_REGION_USE_LARGEPAGE         (1 << 1)
+/// Satisfy page faults with blank pages of physical memory
 #define VM_REGION_ANON                  (1 << 7)
+/// Memory is used by hardware devices and cannot be moved or paged out
+#define VM_REGION_LOCKED                (1 << 8)
+/// Allow reads from the region
 #define VM_REGION_READ                  (1 << 10)
+/// Allow writes to the region
 #define VM_REGION_WRITE                 (1 << 11)
+/// Allow code execution from the region
 #define VM_REGION_EXEC                  (1 << 12)
+/// Treat the region as MMIO; this affects the cacheability of the region.
 #define VM_REGION_MMIO                  (1 << 13)
+/// Use writethrough caching for this region.
 #define VM_REGION_WRITETHRU             (1 << 14)
 #define VM_REGION_NOMAP                 (1 << 15)
 
@@ -75,5 +84,7 @@ LIBSYSTEM_EXPORT int VirtualGetHandleForAddr(const uintptr_t address, uintptr_t 
 LIBSYSTEM_EXPORT int VirtualGetHandleForAddrInTask(const uintptr_t taskHandle, 
         const uintptr_t address, uintptr_t *regionHandle);
 
+LIBSYSTEM_EXPORT int VirtualToPhysicalAddr(const uintptr_t *virtualAddrs, const size_t numAddrs,
+        uintptr_t *outPhysAddrs);
 
 #endif

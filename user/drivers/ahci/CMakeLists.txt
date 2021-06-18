@@ -7,6 +7,10 @@
 add_executable(ahcidrv
     src/main.cpp
     src/Log.cpp
+    # AHCI controller implementation
+    src/ControllerRegistry.cpp
+    src/Controller.cpp
+    src/Port.cpp
 )
 
 # allow link time optimization

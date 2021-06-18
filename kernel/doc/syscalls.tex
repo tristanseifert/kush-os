@@ -5,7 +5,7 @@
 \usepackage{amssymb}
 \usepackage{epstopdf}
 \usepackage{bytefield}
-\usepackage{xcolor}
+\usepackage[table,xcdraw]{xcolor}
 \usepackage{amsmath}
 \usepackage{hyperref}
 
@@ -401,7 +401,15 @@ Searches the given task's virtual address space to determine if there is a mappi
 
 We'll return either the handle of the region, a value of \texttt{0} to indicate that there is no mapping at the given address, or a negative error code.
 
+%%%%%
+\subsubsection{{\tt 0x1B}: Translate virtual to physical}
+\textbf{Arguments:} (4) Task handle, input virtual address array, output physical address array, number of addresses \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success, or error code ($\leq0$) \\
 
+Translates one or more virtual addresses to physical addresses, based on the memory map of the task identified by the given handle, or \texttt{0} for the calling task. If an address cannot be translated, the corresponding output slot is \textit{not} written by the kernel. This implies that callers should fill this array with some value they can use to identify the translation failed.
+
+Possible reasons for translation of a virtual address to fail are that it does not fall within a region in the task's virtual address space, the particular page in a region hasn't been faulted in yet, or because the region is not locked in memory (marked for hardware use.)
 
 %%%%%%%%%%
 \newpage
@@ -553,7 +561,7 @@ Waits for the specified task to exit, up to the specified the timeout, then retu
 %%%%%
 \subsubsection{{\tt 0x38}: Register IRQ handler}
 \textbf{Arguments:} (3) IRQ number, thread handle, notification bits \\
-\textbf{Returns:} Handler token on success ($> 0$) or error code ($\leq0$) \\
+\textbf{Returns:} Handle on success ($> 0$) or error code ($\leq0$) \\
 
 Installs an interrupt handler for the given platform-specific interrupt. When the interrupt fires, the specified thread will have the requested notification bit(s) set. The interrupt is unmasked and enabled in any associated interrupt controllers when the first registration is added for it.
 
@@ -564,7 +572,37 @@ Installs an interrupt handler for the given platform-specific interrupt. When th
 
 Removes a previously registered interrupt handler. If there are no other handlers for the interrupt this handler belongs to, it is masked and disabled in all relevant interrupt controllers. 
 
+%%%%%
+\subsubsection{{\tt 0x3A}: Update IRQ handler}
+\textbf{Arguments:} (3) IRQ handler token, thread handle, notification bits \\
+\textbf{Returns:} 0 on success or error code ($\leq0$) \\
 
+Changes the thread that is notified, and the bits that are set, when the interrupt fires.
+
+%%%%%
+\subsubsection{{\tt 0x3B}: Get IRQ handler information}
+\textbf{Arguments:} (2) IRQ handler token, information value \\
+\textbf{Returns:} Info value ($\geq 0$) or error code ($< 0$) \\
+
+Returns information about the interrupt handler, based on the second input argument. The following values of this argument are currently supported and will produce the defined output:
+
+\begin{table}[h]
+\begin{tabular}{|r|l|}
+\hline
+\rowcolor[HTML]{EFEFEF} 
+\cellcolor[HTML]{EFEFEF}\textbf{Value} & \textbf{Definition} \\ \hline
+0x01 & Gets the processor local interrupt vector number. \\ \hline
+\end{tabular}
+\end{table}
+
+%%%%%
+\subsubsection{{\tt 0x3C}: Allocate Processor Local IRQ handler}
+\textbf{Arguments:} (2) Thread handle, notification bits \\
+\textbf{Returns:} Handle on success ($> 0$) or error code ($\leq0$) \\
+
+Creates an interrupt handler for a processor local interrupt. An implementation defined vector number is allocated to the interrupt, which may be used by the caller to program hardware. The specified thread will be locked to the processor core from which it was called as a result.
+
+Use the \hyperlink{section.3.6.4}{get IRQ Handler information} call to retrieve the allocated vector number.
 
 %%%%%%%%%%%%%%%
 \newpage

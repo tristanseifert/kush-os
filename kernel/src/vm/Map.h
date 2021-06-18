@@ -105,7 +105,16 @@ class Map {
         bool handlePagefault(const uintptr_t virtAddr, const bool present, const bool write);
 
         /// Searches mappings to find one containing the given address.
-        bool findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &outOffset);
+        inline bool findRegion(const uintptr_t virtAddr, Handle &outHandle, uintptr_t &outOffset) {
+            rt::SharedPtr<MapEntry> e;
+            if(this->findRegion(virtAddr, e, outOffset)) {
+                outHandle = e->getHandle();
+                return true;
+            }
+            return false;
+        }
+        /// Searches mappings to find one containing the given address.
+        bool findRegion(const uintptr_t virtAddr, rt::SharedPtr<MapEntry> &outEntry, uintptr_t &outOffset);
         /// Determines the base address of a particular mapping
         const uintptr_t getRegionBase(const rt::SharedPtr<MapEntry> entry);
         /// Gets information about a VM region.

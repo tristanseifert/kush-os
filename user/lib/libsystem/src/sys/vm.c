@@ -47,6 +47,9 @@ static uintptr_t BuildSyscallFlags(const uintptr_t inFlags, bool create) {
     if(create && inFlags & VM_REGION_FORCE_ALLOC) {
         temp |= (1 << 0);
     }
+    if(create && (inFlags & VM_REGION_LOCKED)) {
+        temp |= (1 << 8);
+    }
 
     if(inFlags & VM_REGION_READ) {
         temp |= (1 << 10);
@@ -404,4 +407,18 @@ int VirtualGetHandleForAddrInTask(const uintptr_t taskHandle, const uintptr_t ad
 int VirtualRegionSetFlags(const uintptr_t regionHandle, const uintptr_t newFlags) {
     const uintptr_t flags = BuildSyscallFlags(newFlags, false);
     return __do_syscall2(regionHandle, flags, SYS_VM_UPDATE_FLAGS);
+}
+
+/**
+ * Translates a set of virtual addresses (in the current task's address space) to physical
+ * addresses. The input addresses are read from one array, while the output addresses are written
+ * to another, or unmodified if the virtual address could not be translated.
+ */
+int VirtualToPhysicalAddr(const uintptr_t *virtualAddrs, const size_t numAddrs,
+        uintptr_t *outPhysAddrs) {
+    // super basic validation
+    if(!virtualAddrs || !numAddrs || !outPhysAddrs) return -1;
+
+    return __do_syscall4(0, (uintptr_t) virtualAddrs, (uintptr_t) outPhysAddrs, numAddrs,
+            SYS_VM_VIRT_TO_PHYS);
 }

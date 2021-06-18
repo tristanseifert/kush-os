@@ -153,6 +153,30 @@ beach:;
     return 0;
 }
 
+/**
+ * Allocates a vector number for core-local use. This will find the first entry in our interrupt
+ * table that does _not_ have an allocated handler, then marks it as reserved in a bitmap so that
+ * later invocations won't try to allocate this.
+ *
+ * We'll start our search at interrupt number 0x10, as the first 16 interrupts are reserved for
+ * legacy ISA garbage.
+ *
+ * @return Interrupt number, or 0 if no suitable interrupts located
+ */
+uintptr_t CoreLocalIrqRegistry::allocateVector() {
+    for(size_t i = 0x10; i < kNumIrqs; i++) {
+        // skip if already got handlers
+        if(this->registrations[i]) continue;
+        // skip if marked as allocated in bitmap
+        if(__atomic_test_and_set(&this->isIrqMsi[i], __ATOMIC_RELAXED)) continue;
+
+        return i;
+    }
+
+    // failed to find a suitable interrupt
+    return 0;
+}
+
 
 
 /**

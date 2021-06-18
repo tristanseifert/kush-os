@@ -61,6 +61,10 @@ void RpcServer::implWriteCfgSpace32(const libpci::BusAddress &address, uint16_t 
             address.device, address.function, offset, value);
     }
 
-    Warn("TODO: implement %s", __PRETTY_FUNCTION__);
+    auto bus = BusRegistry::the()->get(address);
+    if(!bus) return;
+    auto cfg = bus->getConfigIo();
+
+    cfg->write(address, offset, PciConfig::Width::DWord, value);
 }
 

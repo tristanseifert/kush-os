@@ -63,6 +63,9 @@ intptr_t VmRegionGetInfo(const Handle vmHandle, const Handle taskHandle, VmInfo 
 intptr_t VmTaskGetInfo(const Handle taskHandle, VmTaskInfo *infoPtr, const size_t infoLen);
 /// Returns the handle for the region containing an address.
 intptr_t VmAddrToRegion(const Handle taskHandle, const uintptr_t vmAddr);
+/// Translates an array of one or more virtual addresses to physical.
+intptr_t VmTranslateVirtToPhys(const Handle taskHandle, const uintptr_t *inVirtAddrs,
+        uintptr_t *outPhysAddrs, const size_t numAddresses);
 
 
 /// Get thread handle of currently executing thread.
@@ -108,7 +111,12 @@ intptr_t IrqHandlerInstall(const uintptr_t irqNum, const Handle threadHandle,
         const uintptr_t bits);
 /// Removes an IRQ handler
 intptr_t IrqHandlerRemove(const Handle irqHandle);
-
+/// Updates an IRQ handler's thread and notification bits
+intptr_t IrqHandlerUpdate(const Handle irqHandle, const Handle threadHandle, const uintptr_t bits);
+/// Gets info on an IRQ handler.
+intptr_t IrqHandlerGetInfo(const Handle irqHandle, const uintptr_t what);
+/// Allocate a processor local IRQ handler.
+intptr_t IrqHandlerAllocCoreLocal(const Handle threadHandle, const uintptr_t bits);
 }
 
 #endif

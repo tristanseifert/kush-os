@@ -34,7 +34,7 @@ class RpcServer: public rpc::PciDriverUserServer {
         /// Whether config space reads are logged
         constexpr static const bool kLogCfgRead{false};
         /// Whether config space writes are logged
-        constexpr static const bool kLogCfgWrite{true};
+        constexpr static const bool kLogCfgWrite{false};
 
         /// shared RPC server instance
         static RpcServer *gShared;

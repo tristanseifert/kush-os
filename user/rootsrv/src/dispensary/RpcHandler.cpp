@@ -125,7 +125,7 @@ void RpcHandler::handleLookup(const struct MessageHeader *msg, const rpc::RpcPac
     uintptr_t handle = 0;
     bool found = Registry::gShared->lookupPort(name, handle);
 
-    LOG("Request for port '%s': resolved %d ($%p'h)", name.c_str(), found, handle);
+    if(kLogRequests) LOG("Request for port '%s': resolved %d ($%p'h)", name.c_str(), found,handle);
 
     // build response
     std::vector<uint8_t> replyBuf;
