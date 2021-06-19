@@ -9,6 +9,8 @@ class Controller;
 class ControllerRegistry {
     public:
         static void init();
+        static void deinit();
+
         /// Return the global controller registry
         static ControllerRegistry *the() {
             return gShared;

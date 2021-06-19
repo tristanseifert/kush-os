@@ -197,3 +197,56 @@ uint32_t Device::readCfg32(const size_t index) const {
 void Device::writeCfg32(const size_t index, const uint32_t value) {
     return UserClient::the()->WriteCfgSpace32(this->address, index, value);
 }
+
+
+
+/**
+ * Enables message signaled interrupts.
+ *
+ * @param cpu APIC ID of the processor to target with interrupts
+ * @param vector Vector to fire on the target processor
+ * @param numVectors Total number of MSI vectors to install (powers of 2 between 1 and 32)
+ *
+ * TODO: numVectors is ignored and defaults to 1
+ *
+ * TODO: This is very amd64 specific. Should it go elsewhere?
+ */
+void Device::enableMsi(const uintptr_t cpu, const uintptr_t vector, const size_t numVectors) {
+    const auto &cap = this->getMsiCap();
+    const auto base = cap.offset;
+
+    // read its config
+    uint32_t temp = this->readCfg32(base);
+    const bool is64Bit = (temp & (1 << 23));
+
+    // configure the message address and data
+    this->writeCfg32(base+4, (0xFEE00000 | (cpu << 12)));
+    if(is64Bit) {
+        this->writeCfg32(base+0x8, 0);
+    }
+
+    uint32_t msgData = vector & 0xFF; // (0 << 15) for edge trigger
+    if(is64Bit) {
+        this->writeCfg32(base+0xC, msgData);
+    } else {
+        this->writeCfg32(base+0x8, msgData);
+    }
+
+    // last, enable the interrupshione
+    temp &= ~(0b111 << 20);
+    temp |= (1 << 16);
+
+    this->writeCfg32(base, temp);
+}
+
+/**
+ * Disables message signaled interrupts.
+ */
+void Device::disableMsi() {
+    const auto &cap = this->getMsiCap();
+
+    // clear the enable bit in the MSI config space
+    uint32_t temp = this->readCfg32(cap.offset);
+    temp &= ~(1 << 16);
+    this->writeCfg32(cap.offset, temp);
+}

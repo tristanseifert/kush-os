@@ -36,7 +36,7 @@ struct AhciHbaPortRegisters {
     // 0x14, Interrupt enable
     uint32_t irqEnable;
     // 0x18, Command and status
-    uint32_t cmd;
+    uint32_t command;
     uint32_t reserved0;
 
     // 0x20, Task file data
@@ -65,6 +65,35 @@ struct AhciHbaPortRegisters {
     uint32_t vendor[4];
 } __attribute__((packed));
 static_assert(sizeof(AhciHbaPortRegisters) == 0x80, "AhciHbaPortRegisters struct is wrong size");
+
+/**
+ * Bit fields for the AhciHbaPortRegisters `irqStatus` and `irqEnable` fields
+ */
+enum AhciPortIrqs: uint32_t {
+    /// Descriptor processed interrupt
+    DescriptorProcessed                 = (1 << 5),
+    /// DMA setup FIS
+    DmaSetup                            = (1 << 2),
+    /// PIO setup FIS
+    PioSetup                            = (1 << 1),
+    /// Device to host register transfer
+    DeviceToHostReg                     = (1 << 0),
+};
+
+/**
+ * Bit fields for the AhciHbaPortRegisters `command` register
+ */
+enum AhciPortCommand: uint32_t {
+    /// Command engine for this port is running
+    CommandEngineRunning                = (1 << 15),
+    /// FIS receive is in progress
+    ReceiveFISRunning                   = (1 << 14),
+
+    /// Enable FIS reception
+    ReceiveFIS                          = (1 << 4),
+    /// Enable command processing
+    SendCommand                         = (1 << 0),
+};
 
 /**
  * Structure representing the register layout of an AHCI HBA's ABAR area.
@@ -124,11 +153,16 @@ enum AhciHostCaps: uint32_t {
     SNotification                       = (1U << 29),
     /// Devices can be spun up individually
     StaggeredSpinup                     = (1U << 28),
-
     /// Offset for the maximum supported HBA speed value
     HbaMaxSpeedOffset                   = 20,
     /// Bitmask for the maximum supported HBA speed
     HbaMaxSpeedMask                     = (0b1111 << HbaMaxSpeedOffset),
+    /// The HBA supports port multipliers.
+    PortMultipliers                     = (1U << 17),
+    /// Offset for the 0 based "number of command slots" value
+    NumCommandSlotsOffset               = 8,
+    /// Mask for the 0 based "number of command slots" value
+    NumCommandSlotsMask                 = (0b11111 << NumCommandSlotsOffset),
 };
 /// Bit flags for the extended capabilities (hostCapsExt) field
 enum AhciHostCaps2: uint32_t {

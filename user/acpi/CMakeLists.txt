@@ -235,6 +235,7 @@ target_link_libraries(acpisrv PRIVATE acpisrv_acpica)
 #####
 # allow link time optimization
 target_compile_options(acpisrv PRIVATE -flto)
+target_link_options(acpisrv PRIVATE -s)
 
 # search our codebase for includes
 target_include_directories(acpisrv PRIVATE include)

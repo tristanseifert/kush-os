@@ -82,11 +82,12 @@ int platform::IrqAck(const uintptr_t token) {
 /**
  * Allocates a core local interrupt vector.
  */
-uintptr_t platform::IrqAllocCoreLocal() {
+uintptr_t platform::IrqAllocCoreLocal(uintptr_t &outVector) {
     // get the core local registry
     auto &p = arch::GetProcLocal()->p;
     EnsureIrqRegistrar(p);
 
     // allocate vector number
-    return p.irqRegistrar->allocateVector();
+    const auto irq = p.irqRegistrar->allocateVector(outVector);
+    return irq;
 }

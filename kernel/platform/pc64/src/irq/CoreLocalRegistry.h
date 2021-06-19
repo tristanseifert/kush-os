@@ -33,7 +33,7 @@ class CoreLocalIrqRegistry {
         int remove(const uintptr_t token);
 
         /// Allocates a vector number for core-local use.
-        uintptr_t allocateVector();
+        uintptr_t allocateVector(uintptr_t &outVector);
 
     private:
         /// Converts an amd64 vector number to an irq number

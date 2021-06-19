@@ -108,9 +108,11 @@ int IrqUnregister(const uintptr_t token);
 /**
  * Allocates a core-local interrupt vector number.
  *
+ * @param outVector On success, the physical CPU local vector number for this interrupt
+ *
  * @return Vector number on success, or 0 if error.
  */
-uintptr_t IrqAllocCoreLocal();
+uintptr_t IrqAllocCoreLocal(uintptr_t &outVector);
 }
 
 /**

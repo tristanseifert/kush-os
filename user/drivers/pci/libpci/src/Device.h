@@ -1,6 +1,7 @@
 #ifndef LIBPCI_DEVICE_H
 #define LIBPCI_DEVICE_H
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -141,11 +142,29 @@ class Device {
             }
         }
 
+        // Returns whether the device supports message signeled interrupts.
+        inline bool supportsMsi() const {
+            return std::any_of(this->capabilities.begin(), this->capabilities.end(),
+                    [](const auto &cap) {
+                return cap.id == Capability::kIdMsi;
+            });
+        }
+        // Enables message signeled interrupts with the given base vector and count.
+        void enableMsi(const uintptr_t cpu, const uintptr_t vector, const size_t numVectors);
+        // If message signaled interrupts are enabled on the device, disables them.
+        void disableMsi();
+
     private:
         void probeConfigSpace();
         void readCapabilities();
         void readExtendedCapabilities();
         void readAddrRegions();
+
+        const auto &getMsiCap() {
+            return *std::find_if(this->capabilities.begin(), this->capabilities.end(), [](const auto &cap) {
+                return cap.id == Capability::kIdMsi;
+            });
+        }
 
     private:
         /// Forest path of this device

@@ -15,6 +15,7 @@ add_executable(ahcidrv
 
 # allow link time optimization
 target_compile_options(ahcidrv PRIVATE -flto -fno-rtti)
+target_link_options(ahcidrv PRIVATE -s)
 
 # search our codebase for includes
 target_include_directories(ahcidrv PRIVATE include)

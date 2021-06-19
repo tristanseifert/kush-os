@@ -54,7 +54,21 @@ int IrqHandlerGetInfo(const uintptr_t irqHandle, const uintptr_t info) {
  *
  * The `IrqHandlerGetInfo` call can be used to discover the assigned vector number.
  */
-int IrqHandlerInstallLocal(const uintptr_t threadHandle, const uintptr_t bits) {
-    return __do_syscall2(threadHandle, bits, SYS_ARCH_IRQ_GETINFO);
+int IrqHandlerInstallLocal(const uintptr_t threadHandle, const uintptr_t bits,
+        uintptr_t *outHandle) {
+    // validate args
+    if(!outHandle) {
+        return -1;
+    }
+
+    // do syscall
+    intptr_t err = __do_syscall2(threadHandle, bits, SYS_ARCH_ALLOC_LOCAL);
+
+    if(err > 0) {
+        *outHandle = err;
+        return 0;
+    } else {
+        return err;
+    }
 }
 

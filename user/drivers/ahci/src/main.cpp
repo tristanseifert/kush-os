@@ -31,5 +31,11 @@ int main(const int argc, const char **argv) {
     // start em
 
     // receive messages from driverman
+    while(1) {
+        ThreadUsleep(1000 * 500);
+    }
+
+    // clean up
+    ControllerRegistry::deinit();
     return 0;
 }

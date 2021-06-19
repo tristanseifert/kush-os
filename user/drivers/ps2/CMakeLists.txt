@@ -31,6 +31,7 @@ endif()
 
 # allow link time optimization
 target_compile_options(ps2drv PRIVATE -flto -fno-rtti)
+target_link_options(ps2drv PRIVATE -s)
 
 # search our codebase for includes
 target_include_directories(ps2drv PRIVATE include)

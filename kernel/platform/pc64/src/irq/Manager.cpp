@@ -144,6 +144,9 @@ void IrqManager::setMasked(const uintptr_t vector, const bool isMasked) {
             ioapic->setIrqMasked(vector, isMasked);
             return;
         }
+
+        // no IOAPIC handles it, assume it doesn't need masking
+        return;
     }
 
     // nobody handled this vector

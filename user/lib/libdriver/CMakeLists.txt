@@ -10,6 +10,8 @@ add_library(driver STATIC
     src/rpc/Client.cpp
     # serialization helpers
     src/serialize/base85.c
+    # DMA support
+    src/dma/ScatterGatherBuffer.cpp
 )
 
 # allow the library to have link time optimization

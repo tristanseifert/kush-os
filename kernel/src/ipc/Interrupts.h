@@ -10,6 +10,10 @@ namespace sched {
 struct Thread;
 }
 
+namespace sys {
+intptr_t IrqHandlerAllocCoreLocal(const Handle, const uintptr_t);
+};
+
 namespace ipc {
 /**
  * Wraps up an interrupt handler.
@@ -19,6 +23,7 @@ namespace ipc {
 class IrqHandler {
     friend class Interrupts;
     friend class rt::SharedPtr<IrqHandler>;
+    friend intptr_t sys::IrqHandlerAllocCoreLocal(const Handle, const uintptr_t);
 
     public:
         /// Return the handle for this irq handler.
@@ -29,9 +34,13 @@ class IrqHandler {
         auto getThread() const {
             return this->thread;
         }
-        /// Returns the vector number for this handler.
+        /// Returns the interrupt number for this handler.
         constexpr auto getIrqNum() const {
             return this->irqNum;
+        }
+        /// Returns the vector number for this handler.
+        constexpr auto getVecNum() const {
+            return this->irqVector;
         }
 
         /// Update the thread that is notified when the interrupt fires
@@ -49,14 +58,16 @@ class IrqHandler {
         Handle handle;
 
         /// platform irq handler token
-        uintptr_t platformToken = 0;
+        uintptr_t platformToken{0};
         /// platform irq number
-        uintptr_t irqNum = 0;
+        uintptr_t irqNum{0};
+        /// platform irq vector
+        uintptr_t irqVector{0};
 
         /// thread to notify when the irq fires
         rt::SharedPtr<sched::Thread> thread;
         /// notification bits to yeet on the thread
-        uintptr_t bits = 0;
+        uintptr_t bits{0};
 };
 
 

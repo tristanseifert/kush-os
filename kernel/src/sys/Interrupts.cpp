@@ -14,13 +14,13 @@ using namespace sys;
 
 /// Possible values for the irq handler get info call
 enum InfoKey: uintptr_t {
+    /// Return the interrupt number
+    InterruptNumber                     = 0x01,
     /// Return the vector number of the interrupt handler.
-    VectorNumber                        = 0x01,
+    VectorNumber                        = 0x02,
 };
 
 
-
-// TODO: all functions need to be tested again
 
 /**
  * Validate whether the calling task may access the provided interrupt handler object.
@@ -198,8 +198,10 @@ intptr_t sys::IrqHandlerGetInfo(const Handle irqHandle, const uintptr_t what) {
 
     // get the info value
     switch(what) {
-        case InfoKey::VectorNumber:
+        case InfoKey::InterruptNumber:
             return static_cast<intptr_t>(irq->getIrqNum());
+        case InfoKey::VectorNumber:
+            return static_cast<intptr_t>(irq->getVecNum());
 
         // unknown key
         default:
@@ -220,6 +222,7 @@ intptr_t sys::IrqHandlerGetInfo(const Handle irqHandle, const uintptr_t what) {
  */
 intptr_t sys::IrqHandlerAllocCoreLocal(const Handle threadHandle, const uintptr_t bits) {
     rt::SharedPtr<sched::Thread> thread;
+    uintptr_t vector{0};
 
     // validate some arguments
     if(!bits) {
@@ -238,13 +241,11 @@ intptr_t sys::IrqHandlerAllocCoreLocal(const Handle threadHandle, const uintptr_
     }
 
     // allocate a vector number
-    const auto irqNum = platform::IrqAllocCoreLocal();
+    const auto irqNum = platform::IrqAllocCoreLocal(vector);
     if(!irqNum) {
         // XXX: is there a better way to signal specifically we're out of IRQ resources?
         return Errors::GeneralError;
     }
-
-    log("Allocated irq number %lu", irqNum);
 
     // allocate irq handler
     RW_LOCK_WRITE_GUARD(thread->lock);
@@ -255,6 +256,7 @@ intptr_t sys::IrqHandlerAllocCoreLocal(const Handle threadHandle, const uintptr_
     }
 
     // TODO: lock thread to core
+    handler->irqVector = vector;
 
     // finish up
     thread->irqHandlers.append(handler);

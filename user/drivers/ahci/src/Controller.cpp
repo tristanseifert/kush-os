@@ -52,7 +52,7 @@ Controller::Controller(const std::shared_ptr<libpci::Device> &_dev) : dev(_dev) 
     this->abar = reinterpret_cast<volatile AhciHbaRegisters *>(base);
 
     // TODO: verify version?
-    Trace("AHCI version for %s: %08x", _dev->getPath().c_str(), this->abar->version);
+    if(kLogInit) Trace("AHCI version for %s: %08x", _dev->getPath().c_str(), this->abar->version);
 
     // grab ownership from BIOS/system firmware if needed and reset the HBA
     if(this->abar->hostCapsExt & AhciHostCaps2::BiosHandoffSupported) {
@@ -69,9 +69,25 @@ Controller::Controller(const std::shared_ptr<libpci::Device> &_dev) : dev(_dev) 
 
     this->sataGen = (hostCaps & (AhciHostCaps::HbaMaxSpeedMask)) >> AhciHostCaps::HbaMaxSpeedOffset;
 
+    // set up the interrupt handler and wait for it to allocate a vector; then register for MSI
+    if(!this->dev->supportsMsi()) {
+        throw std::runtime_error("AHCI controller requires MSI support");
+    }
+
+    this->irqHandlerThread = std::make_unique<std::thread>(&Controller::irqHandlerMain, this);
+
+    while(!this->irqHandlerReady) {
+        // this is kind of nasty but whatever
+        ThreadUsleep(1000 * 33);
+    }
+
     // put the controller into AHCI mode and read some info
     this->abar->ghc = this->abar->ghc | AhciGhc::AhciEnable;
     this->validPorts = this->abar->portsImplemented;
+
+    this->numCommandSlots = ((this->abar->hostCaps & AhciHostCaps::NumCommandSlotsMask)
+        >> AhciHostCaps::NumCommandSlotsOffset) + 1;
+    if(kLogInit) Trace("Have %lu command slots", this->numCommandSlots);
 
     // configure each of the implemented ports
     for(size_t i = 0; i < kMaxPorts; i++) {
@@ -79,6 +95,13 @@ Controller::Controller(const std::shared_ptr<libpci::Device> &_dev) : dev(_dev) 
         auto port = std::make_shared<Port>(this, i);
 
         this->ports[i] = std::move(port);
+    }
+
+    // enable interrupts
+    this->abar->ghc = this->abar->ghc | AhciGhc::IrqEnable;
+
+    if(this->abar->ghc & AhciGhc::MsiSingleMessage) {
+        Warn("AHCI HBA %s is using single MSI mode!", this->dev->getPath().c_str());
     }
 }
 
@@ -120,9 +143,78 @@ void Controller::reset() {
  * Cleans up the resources allocated by the AHCI controller.
  */
 Controller::~Controller() {
+    // shut down IRQ handler
+    this->irqHandlerRun = false;
+    NotificationSend(this->irqHandlerThreadHandle, kDeviceWillStopBit);
+    this->irqHandlerThread->join();
+
     // lastly, remove the ABAR mapping
     if(this->abarVmHandle) {
         UnmapVirtualRegion(this->abarVmHandle);
         DeallocVirtualRegion(this->abarVmHandle);
     }
+}
+
+
+
+/**
+ * Main loop for the interrupt handler
+ */
+void Controller::irqHandlerMain() {
+    int err;
+
+    // set up the IRQ handler object
+    err = ThreadGetHandle(&this->irqHandlerThreadHandle);
+    if(err) Abort("Failed to get irq handler thread handle: %d", err);
+
+    ThreadSetName(0, "AHCI irq handler");
+
+    err = IrqHandlerInstallLocal(0, kAhciIrqBit, &this->irqHandlerHandle);
+    if(err) Abort("%s failed: %d", "IrqHandlerInstallLocal", err);
+
+    err = IrqHandlerGetInfo(this->irqHandlerHandle, SYS_IRQ_INFO_VECTOR);
+    if(err < 0) Abort("%s failed: %d", "IrqHandlerGetInfo", err);
+    const uintptr_t vector = err;
+
+    // configure the PCI device to use MSI
+    // TODO: figure out CPU APIC id
+    this->dev->enableMsi(0, vector, 1);
+
+    // we're ready to process events
+    this->irqHandlerReady = true;
+    if(kLogInit) Trace("IRQ handler set up (vector %lu)", vector);
+
+    // await interrupts or events (via notifications)
+    while(this->irqHandlerRun) {
+        const uintptr_t bits = NotificationReceive(0, UINTPTR_MAX);
+
+        if(bits & kAhciIrqBit) {
+            this->handleAhciIrq();
+        }
+    }
+
+    // clean up
+    if(kLogCleanup) Trace("Cleaning up IRQ handler");
+    dev->disableMsi();
+
+    // XXX: there is not currently a way for us to release the allocated MSI vector...
+    IrqHandlerRemove(this->irqHandlerHandle);
+}
+
+/**
+ * Handles an AHCI interrupt.
+ */
+void Controller::handleAhciIrq() {
+    // figure out which ports have an interrupt pending
+    const auto is = this->abar->irqStatus;
+
+    for(size_t i = 0; i < kMaxPorts; i++) {
+        const uint32_t bit{1U << i};
+        if(is & bit) {
+            this->ports[i]->handleIrq();
+        }
+    }
+
+    // clear interrupshiones
+    this->abar->irqStatus = is;
 }

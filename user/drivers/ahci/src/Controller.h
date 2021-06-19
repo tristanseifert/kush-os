@@ -2,9 +2,12 @@
 #define AHCIDRV_CONTROLLER_H
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <cstddef>
+#include <thread>
 #include <memory>
+#include <mutex>
 
 #include <libpci/UserClient.h>
 
@@ -30,12 +33,34 @@ class Controller {
         Controller(const std::shared_ptr<libpci::Device> &);
         virtual ~Controller();
 
+        /// Whether the controller is 64 bit addressing capable
+        constexpr bool is64BitCapable() const {
+            return this->supports64Bit;
+        }
+        /// Maximum number of commands that may be pending at a given time
+        constexpr size_t getQueueDepth() const {
+            return this->numCommandSlots;
+        }
+
     private:
         void performBiosHandoff();
         void reset();
 
+        void irqHandlerMain();
+        void handleAhciIrq();
+
     private:
         static const uintptr_t kAbarMappingRange[2];
+
+        /// Whether various controller initialization parameters are logged
+        constexpr static const bool kLogInit{false};
+        /// Whether the process of cleaning up is logged
+        constexpr static const bool kLogCleanup{false};
+
+        /// Notification bit indicating the AHCI controller triggered an interrupt
+        constexpr static const uintptr_t kAhciIrqBit{(1 << 0)};
+        /// Notification bit indicating that the driver is shutting down and IRQ handler shall exit
+        constexpr static const uintptr_t kDeviceWillStopBit{(1 << 1)};
 
         /// PCI device behind which the controller is operated
         std::shared_ptr<libpci::Device> dev;
@@ -45,6 +70,8 @@ class Controller {
         /// Base address of the AHCI HBA registers
         volatile AhciHbaRegisters *abar{nullptr};
 
+        /// Number of command slots which may be used at once
+        uint8_t numCommandSlots{0};
         /// Bitmap of which ports are valid and implemented on the HBA
         uint32_t validPorts{0};
 
@@ -62,6 +89,17 @@ class Controller {
 
         /// Each implemented port has an allocated port object
         std::array<std::shared_ptr<Port>, kMaxPorts> ports;
+
+        /// Interrupt handler thread
+        std::unique_ptr<std::thread> irqHandlerThread;
+        /// Thread handle of the IRQ handler thread
+        uintptr_t irqHandlerThreadHandle{0};
+        /// Run the interrupt handler as long as this flag is set
+        std::atomic_bool irqHandlerRun{true};
+        /// Indicates the interrupt handler is ready
+        std::atomic_bool irqHandlerReady{false};
+        /// Handle for the IRQ handler object
+        uintptr_t irqHandlerHandle{0};
 };
 
 #endif

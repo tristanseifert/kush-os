@@ -161,15 +161,18 @@ beach:;
  * We'll start our search at interrupt number 0x10, as the first 16 interrupts are reserved for
  * legacy ISA garbage.
  *
+ * @param outVector On success, the physical IRQ vector is written to the field.
+ *
  * @return Interrupt number, or 0 if no suitable interrupts located
  */
-uintptr_t CoreLocalIrqRegistry::allocateVector() {
-    for(size_t i = 0x10; i < kNumIrqs; i++) {
+uintptr_t CoreLocalIrqRegistry::allocateVector(uintptr_t &outVector) {
+    for(size_t i = 0x20; i < kNumIrqs; i++) {
         // skip if already got handlers
         if(this->registrations[i]) continue;
         // skip if marked as allocated in bitmap
         if(__atomic_test_and_set(&this->isIrqMsi[i], __ATOMIC_RELAXED)) continue;
 
+        outVector = IrqToVector(i);
         return i;
     }
 
