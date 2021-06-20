@@ -19,7 +19,7 @@ class Port;
 class Device {
     public:
         /// Creates a new device attached to the given AHCI port.
-        Device(const std::shared_ptr<Port> _port) : port(_port) {}
+        Device(const std::shared_ptr<Port> &_port) : port(_port) {}
         virtual ~Device() = default;
 
     protected:

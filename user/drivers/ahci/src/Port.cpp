@@ -4,6 +4,7 @@
 #include "AtaCommands.h"
 #include "AhciRegs.h"
 #include "PortStructs.h"
+#include "device/AtaDisk.h"
 
 #include "Log.h"
 
@@ -204,13 +205,23 @@ void Port::probe() {
  * connected, and send either the ATA IDENTIFY DEVICE or the ATAPI command.
  */
 void Port::identDevice() {
+    int err;
     auto &regs = this->parent->abar->ports[this->port];
 
     switch(regs.signature) {
-        case AhciDeviceSignature::SATA:
-            Success("SATA device at port %u", this->port);
-            this->identSataDevice();
+        // Initialize a SATA disk.
+        case AhciDeviceSignature::SATA: {
+            std::shared_ptr<AtaDisk> disk;
+            err = AtaDisk::Alloc(this->shared_from_this(), disk);
+            if(err) {
+                Warn("Failed to allocate %s on port %u: %d", "ATA disk", this->port, err);
+            } else {
+                REQUIRE(disk, "No error but failed to allocate device");
+                this->portDevice = disk;
+            }
             break;
+        }
+
         case AhciDeviceSignature::SATAPI:
             Success("SATAPI device at port %u", this->port);
             this->identSatapiDevice();
@@ -230,40 +241,6 @@ void Port::identDevice() {
 }
 
 /**
- * Identifies a SATA device attached to the port; this should in basically all cases be a hard
- * drive.
- */
-void Port::identSataDevice() {
-    int err;
-
-    // Issue an ATA IDENTIFY DEVICE command
-    auto buf = libdriver::ScatterGatherBuffer::Alloc(512);
-
-    err = this->submitAtaCommand(AtaCommand::Identify, buf, [&, buf](const auto &res) {
-        if(res.isSuccess()) {
-            auto span = static_cast<std::span<std::byte>>(*buf);
-            auto model = std::string(reinterpret_cast<const char *>(span.subspan(54, 40).data()), 40);
-            util::ConvertAtaString(model);
-            util::TrimTrailingWhitespace(model);
-
-            auto serial = std::string(reinterpret_cast<const char *>(span.subspan(20, 20).data()), 20);
-            util::ConvertAtaString(serial);
-            util::TrimTrailingWhitespace(serial);
-
-            Trace("Model '%s', serial '%s'", model.c_str(), serial.c_str());
-        } else {
-            Warn("%s Identify for port %u failed: status %02x", "ATA", this->port,
-                    res.getAtaError());
-        }
-    });
-
-    if(err) {
-        Warn("Failed to identify %s device on port %u: %d", "SATA", this->port, err);
-        return;
-    }
-}
-
-/**
  * Identifies a SATAPI device attached to the port. ATAPI devices are any packed based SCSI style
  * devices, like optical drives, tape drives, and so forth.
  */
@@ -271,7 +248,9 @@ void Port::identSatapiDevice() {
     int err;
 
     // Issue an ATA IDENTIFY PACKET DEVICE command
-    auto buf = libdriver::ScatterGatherBuffer::Alloc(512);
+    std::shared_ptr<libdriver::ScatterGatherBuffer> buf;
+    err = libdriver::ScatterGatherBuffer::Alloc(512, buf);
+    REQUIRE(!err, "failed to initialize DMA buffer: %d", err);
 
     err = this->submitAtaCommand(AtaCommand::IdentifyPacket, buf, [&, buf](const auto &res) {
         if(res.isSuccess()) {

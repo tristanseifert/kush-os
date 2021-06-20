@@ -32,7 +32,7 @@ struct RegDevToHostFIS;
  *
  * TODO: This needs a _lot_ of locking and other multithreading support :)
  */
-class Port: std::enable_shared_from_this<Port> {
+class Port: public std::enable_shared_from_this<Port> {
     using DMABufferPtr = std::shared_ptr<libdriver::ScatterGatherBuffer>;
 
     public:
@@ -104,6 +104,15 @@ class Port: std::enable_shared_from_this<Port> {
         [[nodiscard]] int submitAtaCommand(const AtaCommand cmd, const DMABufferPtr &result,
                 const CommandCallback &callback);
 
+        /// Returns the controller to which this port belongs
+        constexpr auto getController() const {
+            return this->parent;
+        }
+        /// Returns the port number on the controller
+        constexpr auto getPortNumber() const {
+            return this->port;
+        }
+
     private:
         /**
          * Represents information on a command that's currently in flight. This includes references
@@ -125,7 +134,6 @@ class Port: std::enable_shared_from_this<Port> {
         void stopCommandProcessing();
 
         void identDevice();
-        void identSataDevice();
         void identSatapiDevice();
 
         size_t fillCmdTablePhysDescriptors(volatile PortCommandTable * _Nonnull table,

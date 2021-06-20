@@ -39,14 +39,16 @@ ScatterGatherBuffer::ScatterGatherBuffer(const size_t _size) : size(_size) {
              VM_REGION_FORCE_ALLOC),
             &this->vmHandle);
     if(err) {
-        throw std::system_error(errno, std::generic_category(), "AllocVirtualAnonRegion");
+        this->err = err;
+        return;
     }
 
     uintptr_t base{0};
     err = MapVirtualRegionRange(this->vmHandle, kMappingRange, size, 0, &base);
     kMappingRange[0] += size; // XXX: this seems like it shouldn't be necessary...
     if(err) {
-        throw std::system_error(err, std::generic_category(), "MapVirtualRegion");
+        this->err = err;
+        return;
     }
 
 #ifndef NDEBUG
@@ -68,9 +70,11 @@ ScatterGatherBuffer::ScatterGatherBuffer(const size_t _size) : size(_size) {
 
         err = VirtualToPhysicalAddr(&virtAddr, 1, &physAddr);
         if(err) {
-            throw std::system_error(err, std::generic_category(), "VirtualToPhysicalAddr");
+            this->err = err;
+            return;
         } else if(!physAddr) {
-            throw std::runtime_error("failed to get physical address for page");
+            this->err = Errors::PhysTranslationFailed;
+            return;
         }
 
         this->extents.emplace_back(physAddr, std::min(bytesLeft, pageSz));
@@ -91,8 +95,12 @@ ScatterGatherBuffer::~ScatterGatherBuffer() {
 /**
  * Allocates a new scatter/gather buffer
  */
-std::shared_ptr<ScatterGatherBuffer> ScatterGatherBuffer::Alloc(const size_t size) {
-    auto buf = std::make_shared<ScatterGatherBuffer>(size);
-    return buf;
+int ScatterGatherBuffer::Alloc(const size_t size, std::shared_ptr<ScatterGatherBuffer> &outPtr) {
+    std::shared_ptr<ScatterGatherBuffer> buf(new ScatterGatherBuffer(size));
+
+    if(!buf->err) {
+        outPtr = buf;
+    }
+    return buf->err;
 }
 

@@ -14,6 +14,8 @@ const char *gLogTag = "ahci";
  * that should be started.
  */
 int main(const int argc, const char **argv) {
+    int err;
+
     if(argc < 2) {
         Abort("You must specify at least one forest path of a device to attach to.");
     }
@@ -22,7 +24,12 @@ int main(const int argc, const char **argv) {
 
     // create the devices
     for(size_t i = 1; i < argc; i++) {
-        auto pciDev = std::make_shared<libpci::Device>(argv[i]);
+        std::shared_ptr<libpci::Device> pciDev;
+        err = libpci::Device::Alloc(argv[i], pciDev);
+        if(err) {
+            Abort("Failed to allocate PCIe device for '%s': %d", argv[i], err);
+        }
+
         auto controller = std::make_shared<Controller>(pciDev);
 
         ControllerRegistry::the()->addController(controller);

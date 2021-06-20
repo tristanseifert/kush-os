@@ -44,6 +44,7 @@ void CodeGenerator::generateClientStub() {
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <string_view>
 #include <vector>
 )" << std::endl;
     this->cppWriteIncludes(header);
@@ -57,8 +58,8 @@ void CodeGenerator::generateClientStub() {
        << R"(
 #include <algorithm>
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
-#include <stdexcept>
 
 #include <capnp/message.h>
 #include <capnp/serialize.h>
@@ -128,6 +129,8 @@ void CodeGenerator::clientWriteHeader(std::ofstream &os) {
     static_assert(!(offsetof(MessageHeader, payload) % sizeof(uintptr_t)),
         "message header's payload is not word aligned");
 
+    constexpr static const std::string_view kServiceName{")" << this->interface->getName() << R"("};
+
     protected:
         using IoStream = rt::ClientRpcIoStream;
 )";
@@ -155,6 +158,9 @@ void CodeGenerator::clientWriteHeader(std::ofstream &os) {
         constexpr inline auto &getIo() {
             return this->io;
         }
+
+        /// Handles errors occurring during client operations; typically terminates the task
+        virtual void _HandleError(const bool fatal, const std::string_view &what);
 
     // Implementation details; pretend this does not exist
     private:
@@ -220,7 +226,8 @@ uint32_t Client::_sendRequest(const uint64_t type, const std::span<std::byte> &p
 
     const std::span<std::byte> txBufSpan(reinterpret_cast<std::byte *>(this->txBuf), len);
     if(!this->io->sendRequest(txBufSpan)) {
-        throw std::runtime_error("Failed to send RPC request");
+        this->_HandleError(true, "Failed to send RPC request");
+        return 0;
     }
 
     return tag;
@@ -234,12 +241,23 @@ void Client::_ensureTxBuf(const size_t len) {
         }
         int err = posix_memalign(&this->txBuf, 16, len);
         if(err) {
-            throw std::runtime_error("Failed to allocate RPC send buffer");
+            return this->_HandleError(true, "Failed to allocate RPC send buffer");
         }
         this->txBufSize = len;
     }
 }
 
+/**
+ * Handles an error that occurred on the client connection. Implementations may override this
+ * method if they want to use exceptions, for example.
+ *
+ * @param fatal If set, the error precludes further operation on this RPC connection
+ * @param what Descriptive string for the error
+ */
+void Client::_HandleError(const bool fatal, const std::string_view &what) {
+    fprintf(stderr, "[RPC] %s: Encountered %s RPC error: %s\n", kServiceName.data(),
+        fatal ? "fatal" : "recoverable", what.data());
+}
 )";
 
     // write out the implementations for each of the calls
@@ -340,11 +358,11 @@ void CodeGenerator::clientWriteMarshallMethodReply(std::ofstream &os, const Meth
     // first, receive a message and validate the received buffer
     os << R"(    {
         std::span<std::byte> buf;
-        if(!this->io->receiveReply(buf)) throw std::runtime_error("Failed to receive RPC reply");
-        if(buf.size() < sizeof(MessageHeader)) throw std::runtime_error("Received message too small");
+        if(!this->io->receiveReply(buf)) this->_HandleError(false, "Failed to receive RPC reply");
+        if(buf.size() < sizeof(MessageHeader)) this->_HandleError(false, "Received message too small");
         const auto hdr = reinterpret_cast<const MessageHeader *>(buf.data());
-        if(hdr->tag != sentTag) throw std::runtime_error("Invalid tag in reply RPC packet");
-        else if(hdr->type != )" << GetMethodIdConst(m) << R"() throw std::runtime_error("Invalid type in reply RPC packet");
+        if(hdr->tag != sentTag) this->_HandleError(false, "Invalid tag in reply RPC packet");
+        else if(hdr->type != )" << GetMethodIdConst(m) << R"() this->_HandleError(false, "Invalid type in reply RPC packet");
         const auto payload = buf.subspan(offsetof(MessageHeader, payload));
 )";
 

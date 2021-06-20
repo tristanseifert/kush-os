@@ -44,7 +44,8 @@ endif()
 
 #####
 # allow link time optimization (strips C library functions we don't use)
-target_compile_options(rootsrv PRIVATE -flto)
+target_compile_options(rootsrv PRIVATE -flto -fno-rtti)
+target_link_options(rootsrv PRIVATE -s)
 
 # copy the bundle types include file
 file(COPY ${CMAKE_CURRENT_LIST_DIR}/../../tools/mkinit/src/BundleTypes.h DESTINATION ${CMAKE_CURRENT_LIST_DIR}/src/init)

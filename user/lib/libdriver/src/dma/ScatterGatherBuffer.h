@@ -36,13 +36,27 @@ class ScatterGatherBuffer {
             Extent(const uint64_t addr, const size_t size) : physAddr(addr), length(size) {}
         };
 
+        /// Scatter gather buffer errors
+        enum Errors: int {
+            /// Failed to translate physical address
+            PhysTranslationFailed               = -20000,
+            /// Allocating physical memory failed
+            AllocFailed                         = -20001,
+            /// Mapping the memory region failed
+            MapFailed                           = -20002,
+        };
+
     public:
-        ScatterGatherBuffer(const size_t size);
         ~ScatterGatherBuffer();
 
         /// Gets a span that encompasses the entire buffer.
         explicit operator std::span<std::byte>() const {
             return std::span<std::byte>(static_cast<std::byte *>(this->base), this->size);
+        }
+
+        /// Gets the status of the buffer; 0 is valid, any other value indicates an error
+        constexpr const bool getStatus() const {
+            return this->err;
         }
 
         /// Gets the pages that make up the buffer.
@@ -59,10 +73,17 @@ class ScatterGatherBuffer {
             return this->base;
         }
 
-        static std::shared_ptr<ScatterGatherBuffer> Alloc(const size_t size);
-
+        /// Allocate a new scatter gather buffer.
+        [[nodiscard]] static int Alloc(const size_t size,
+                std::shared_ptr<ScatterGatherBuffer> &outPtr);
 
     private:
+        ScatterGatherBuffer(const size_t size);
+
+    private:
+        /// Current error code of the buffer
+        int err{0};
+
         /// Length of the buffer in bytes
         size_t size{0};
         /// Handle to the VM object

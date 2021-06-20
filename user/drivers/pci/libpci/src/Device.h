@@ -18,6 +18,16 @@ class Device {
     constexpr static const std::string_view kPciExpressInfoPropertyName{"pcie.info"};
 
     public:
+        /// PCI device errors
+        enum Errors: int {
+            /// The bus address specified is invalid
+            InvalidAddress                      = -30000,
+            /// The forest path provided does not exist or is not a PCIe device
+            InvalidPath                         = -30001,
+            /// Failed to decode PCI address information on a forest device
+            InvalidAddressInfo                  = -30002,
+        };
+
         /// Represents an entry in the PCI capability list.
         struct Capability {
             /// ID of the capability
@@ -79,14 +89,24 @@ class Device {
                         supports64Bit(_is64Bit), base(_base), length(_length) {}
         };
 
-    public:
+    private:
         Device() = delete;
         /// Creates a new device at the given bus address
         Device(const BusAddress &addr);
         /// Creates a new device from the given forest path
         Device(const std::string_view &path);
 
+    public:
         virtual ~Device() = default;
+
+        [[nodiscard]] static int Alloc(const BusAddress &addr, std::shared_ptr<Device> &outDevice);
+        [[nodiscard]] static int Alloc(const std::string_view &path,
+                std::shared_ptr<Device> &outDevice);
+
+        /// Returns the status code of the device
+        constexpr const auto getStatus() const {
+            return this->status;
+        }
 
         /// Returns the path to this device in the forest
         constexpr const auto &getPath() const {
@@ -171,6 +191,9 @@ class Device {
         std::string path;
         /// Bus address of this device
         BusAddress address;
+
+        /// State of the device object
+        int status{0};
 
         /// vendor and product ids
         uint16_t vid{0}, pid{0};

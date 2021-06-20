@@ -19,12 +19,24 @@ Device::Device(const BusAddress &addr) : address(addr) {
     auto rpc = UserClient::the();
     const auto path = rpc->GetDeviceAt(addr);
     if(path.empty()) {
-        throw std::invalid_argument("Invalid PCIe address");
+        this->status = Errors::InvalidAddress;
+        return;
     }
 
     this->path = path;
 
     this->probeConfigSpace();
+}
+
+/**
+ * Helper to create a device based on a bus address.
+ */
+int Device::Alloc(const BusAddress &addr, std::shared_ptr<Device> &outDevice) {
+    std::shared_ptr<Device> dev(new Device(addr));
+    if(!dev->getStatus()) {
+        outDevice = dev;
+    }
+    return dev->getStatus();
 }
 
 /**
@@ -37,14 +49,27 @@ Device::Device(const std::string_view &_path) : path(_path) {
     // read the property out
     auto value = driverman->GetDeviceProperty(_path, kPciExpressInfoPropertyName);
     if(value.empty()) {
-        throw std::invalid_argument("Path does not exist or is not a valid PCIe device");
+        this->status = Errors::InvalidPath;
+        return;
     }
 
     if(!internal::DecodeAddressInfo(value, this->address)) {
-        throw std::runtime_error("Failed to decode PCIe address info");
+        this->status = Errors::InvalidAddressInfo;
+        return;
     }
 
     this->probeConfigSpace();
+}
+
+/**
+ * Helper to create a device based on a forest path.
+ */
+int Device::Alloc(const std::string_view &path, std::shared_ptr<Device> &outDevice) {
+    std::shared_ptr<Device> dev(new Device(path));
+    if(!dev->getStatus()) {
+        outDevice = dev;
+    }
+    return dev->getStatus();
 }
 
 /**

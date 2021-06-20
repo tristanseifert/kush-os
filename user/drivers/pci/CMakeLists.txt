@@ -53,7 +53,7 @@ set_target_properties(libpci PROPERTIES OUTPUT_NAME "pci")
 target_include_directories(libpci PUBLIC libpci/include)
 target_include_directories(libpci PRIVATE libpci/src)
 
-target_compile_options(libpci PRIVATE -flto)
+target_compile_options(libpci PRIVATE -flto -fno-rtti -fno-exceptions)
 target_link_libraries(libpci PUBLIC capnp driver rpc mpack_dynamic)
 
 # the PCI server needs to link against LibPci so it can get the RPC serialization functions

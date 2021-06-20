@@ -48,6 +48,9 @@ class Controller {
         /// Adds a new item to the work queue of the controller
         int addWorkItem(const std::function<void()> &);
 
+        /// Gets the forest path of this controller
+        const std::string &getForestPath() const;
+
         /// Whether the controller is 64 bit addressing capable
         constexpr bool is64BitCapable() const {
             return this->supports64Bit;

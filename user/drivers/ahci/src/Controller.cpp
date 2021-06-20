@@ -278,3 +278,10 @@ int Controller::addWorkItem(const std::function<void()> &f) {
 
     return success ? 0 : Errors::WorkEnqueueFailed;
 }
+
+/**
+ * Returns the forest path of the controller's PCI device.
+ */
+const std::string &Controller::getForestPath() const {
+    return this->dev->getPath();
+}

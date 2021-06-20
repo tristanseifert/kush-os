@@ -15,7 +15,7 @@ add_library(driver STATIC
 )
 
 # allow the library to have link time optimization
-target_compile_options(driver PRIVATE -flto)
+target_compile_options(driver PRIVATE -flto -fno-rtti -fno-exceptions)
 
 # specify the include directories
 target_include_directories(driver PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)

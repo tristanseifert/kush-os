@@ -54,8 +54,8 @@ target_include_directories(rpc_static_small PUBLIC include)
 target_link_libraries(rpc_static_small PUBLIC system_static)
 
 # Cap'n Proto provides our RPC mechanism
-target_link_libraries(rpc_static PRIVATE capnp)
-target_link_libraries(rpc_dynamic PRIVATE capnp)
+target_link_libraries(rpc_static PUBLIC capnp)
+target_link_libraries(rpc_dynamic PUBLIC capnp)
 
 # install the library to the sysroot
 install(TARGETS rpc_static LIBRARY)

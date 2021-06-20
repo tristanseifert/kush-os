@@ -11,6 +11,8 @@ add_executable(ahcidrv
     src/ControllerRegistry.cpp
     src/Controller.cpp
     src/Port.cpp
+    # device implementations
+    src/device/AtaDisk.cpp
     # helper functions
     src/util/String.cpp
 )
