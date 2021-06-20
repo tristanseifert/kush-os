@@ -1,5 +1,6 @@
 #include "Port.h"
 #include "Controller.h"
+#include "AtaCommands.h"
 #include "AhciRegs.h"
 #include "PortStructs.h"
 
@@ -93,12 +94,12 @@ Port::Port(Controller *controller, const uint8_t _port) : port(_port), parent(co
     if(kLogInit) Trace("Received FIS at $%p (%p), command list $%p (%p)", this->receivedFis,
             rxFisPhys, this->cmdList, cmdListPhys);
 
-    // enable port interrupts
-    regs.irqEnable = regs.irqEnable | AhciPortIrqs::DeviceToHostReg;
-
-    // enable FIS reception and command processing and identify device
+    // enable FIS reception and command processing
     this->startCommandProcessing();
-    this->identDevice();
+
+    // enable port interrupts
+    regs.irqEnable = AhciPortIrqs::DeviceToHostReg | AhciPortIrqs::TaskFileError |
+        AhciPortIrqs::ReceiveOverflow;// | AhciPortIrqs::DescriptorProcessed;
 }
 
 /**
@@ -131,10 +132,9 @@ void Port::initCommandTables(const uintptr_t vmBase) {
         }
 
         auto &hdr = this->cmdList->commands[i];
-        hdr.cmdTableBaseLow = address & 0xFFFFFFFF;
-
+        hdr.cmdTableBaseLow = physAddr & 0xFFFFFFFF;
         if(this->parent->is64BitCapable()) {
-            hdr.cmdTableBaseHigh = address >> 32;
+            hdr.cmdTableBaseHigh = physAddr >> 32;
         }
     }
 }
@@ -163,7 +163,8 @@ void Port::startCommandProcessing() {
     // wait for any current command processing to complete
     while(regs.command & AhciPortCommand::CommandEngineRunning) {};
     // enable FIS reception and command sending
-    regs.command = regs.command | AhciPortCommand::ReceiveFIS | AhciPortCommand::SendCommand;
+    regs.command = regs.command | AhciPortCommand::ReceiveFIS;
+    regs.command = regs.command | AhciPortCommand::SendCommand;
 }
 
 /**
@@ -186,6 +187,12 @@ void Port::stopCommandProcessing() {
 }
 
 
+/**
+ * Probes the device attached to the port.
+ */
+void Port::probe() {
+    this->identDevice();
+}
 
 /**
  * Identifies the attached device. We'll look at the port signature to see what kind of device is
@@ -199,12 +206,16 @@ void Port::identDevice() {
             Success("SATA device at port %u", this->port);
 
             auto buf = libdriver::ScatterGatherBuffer::Alloc(512);
-            this->submitAtaCommand(0xEC, buf);
+            this->submitAtaCommand(AtaCommand::Identify, buf);
             break;
         }
-        case AhciDeviceSignature::SATAPI:
+        case AhciDeviceSignature::SATAPI: {
             Success("SATAPI device at port %u", this->port);
+
+            auto buf = libdriver::ScatterGatherBuffer::Alloc(512);
+            this->submitAtaCommand(AtaCommand::IdentifyPacket, buf);
             break;
+        }
 
         case AhciDeviceSignature::PortMultiplier:
             Warn("%s on port %u is not supported", "Port multiplier", this->port);
@@ -226,12 +237,58 @@ void Port::identDevice() {
  */
 void Port::handleIrq() {
     auto &regs = this->parent->abar->ports[this->port];
-    const auto is = regs.irqStatus;
 
+    // get irq flags and acknowledge
+    const auto is = regs.irqStatus;
+    regs.irqStatus = is;
     if(kLogIrq) Trace("Port %u irq: %08x", this->port, is);
 
-    // acknowledge interrupts
-    regs.irqStatus = is;
+    // TODO: check for command errors
+    /**
+     * A task file error was raised.
+     */
+    if(is & AhciPortIrqs::TaskFileError) {
+        Warn("Port %lu task file error", this->port);
+    }
+    /**
+     * The device's register information has been updated. This usually indicates that a command
+     * has completed.
+     */
+    if(is & AhciPortIrqs::DeviceToHostReg) {
+        auto &rfis = this->receivedFis->rfis;
+
+        // are there any outstanding commands?
+        if(this->outstandingCommands) {
+            // figure out which command(s) just completed
+            const auto ci = regs.cmdIssue;
+            const auto completedCmds = ~ci & this->outstandingCommands;
+
+            // TODO: should this be a loop or is it a one off deal per irq?
+            for(size_t i = 0; i < this->parent->getQueueDepth(); i++) {
+                const uint32_t bit{1U << i};
+                if(!(completedCmds & bit)) continue;
+
+                // extract command information and call completion handler
+                if(!(rfis.status & AtaStatus::Busy) && (rfis.status & AtaStatus::Ready)) {
+                    this->completeCommand(i, rfis, true);
+                } else {
+                    this->completeCommand(i, rfis, false);
+                }
+            }
+        }
+        // the register FIS was unsolicited. we just ignore these
+        else {
+            if(kLogIrq) Trace("Unsolicted register FIS: status %02x error %02x", rfis.status,
+                    rfis.error);
+        }
+    }
+    /**
+     * A physical region descriptor completed transfering. We only enable interrupts for the last
+     * descriptor in a chain, so this indicates all data for a command has transfered.
+     */
+    if(is & AhciPortIrqs::DescriptorProcessed) {
+        Success("Finished descriptor");
+    }
 }
 
 
@@ -245,7 +302,7 @@ void Port::handleIrq() {
  * @param cmd Command byte to write to the device
  * @param result Buffer large enough to store the full response of this request
  */
-std::future<void> Port::submitAtaCommand(const uint8_t cmd,
+std::future<void> Port::submitAtaCommand(const AtaCommand cmd,
         const std::shared_ptr<libdriver::ScatterGatherBuffer> &result) {
     // find a command slot
     const auto slotIdx = this->allocCommandSlot();
@@ -253,32 +310,14 @@ std::future<void> Port::submitAtaCommand(const uint8_t cmd,
 
     // build the command (register, host to device) and copy to the table
     RegHostToDevFIS fis;
-    fis.command = cmd;
+    fis.type = FISType::RegisterHostToDevice;
+    fis.command = static_cast<uint8_t>(cmd);
     fis.c = 1; // write to command register
 
     memcpy((void *) &table->commandFIS, &fis, sizeof(fis)); // yikes
 
     // set up the result buffer descriptors
-    const auto &extents = result->getExtents();
-    if(extents.size() > kCommandTableNumPrds) {
-        throw std::runtime_error("Scatter/gather buffer has too many extents!");
-    }
-
-    for(size_t i = 0; i < extents.size(); i++) {
-        const auto &extent = extents[i];
-        auto &prd = table->descriptors[i];
-
-        prd.numBytes = extent.getSize();
-        const auto phys = extent.getPhysAddress();
-
-        prd.physAddrLow = phys & 0xFFFFFFFF;
-        if(this->parent->is64BitCapable()) {
-            prd.physAddrHigh = phys >> 32;
-        }
-
-        // if it's the last extent, we want an IRQ on completion
-        prd.irqOnCompletion = (i == (extents.size() - 1)) ? 1 : 0;
-    }
+    const auto numPrds = this->fillCmdTablePhysDescriptors(table, result, true);
 
     // update the command list entry
     auto &cmdListEntry = this->cmdList->commands[slotIdx];
@@ -286,13 +325,12 @@ std::future<void> Port::submitAtaCommand(const uint8_t cmd,
     cmdListEntry.atapi = 0;
     cmdListEntry.write = 0;
     cmdListEntry.prefetchable = 0;
-
-    cmdListEntry.clearBusy = 0;
-
+    cmdListEntry.prdByteCount = 0;
+    cmdListEntry.clearBusy = 1;
     cmdListEntry.reset = 0;
     cmdListEntry.bist = 0;
 
-    cmdListEntry.prdEntries = extents.size();
+    cmdListEntry.prdEntries = numPrds;
 
     // lastly, submit the command (so it begins executing)
     std::promise<void> p;
@@ -304,6 +342,44 @@ std::future<void> Port::submitAtaCommand(const uint8_t cmd,
     this->submitCommand(slotIdx, std::move(i));
 
     return fut;
+}
+
+/**
+ * Updates the physical region descriptors (PRDs) of the given command table so that they map to
+ * the physical pages of the given scatter/gather buffer.
+ *
+ * @param table Command table whose PRDs are to be updated
+ * @param buf Scatter/gather buffer to insert mappings for
+ * @param irq If set, we'll set the PRD's "irq on completion" bit for the last one.
+ *
+ * @return Total number of PRDs written.
+ */
+size_t Port::fillCmdTablePhysDescriptors(volatile PortCommandTable *table,
+    const std::shared_ptr<libdriver::ScatterGatherBuffer> &buf, const bool irq) {
+    // ensure the buffer can fit in the number of PRDs we have
+    const auto &extents = buf->getExtents();
+    if(extents.size() > kCommandTableNumPrds) {
+        throw std::runtime_error("Scatter/gather buffer has too many extents!");
+    }
+
+    // fill a PRD for each extent
+    for(size_t i = 0; i < extents.size(); i++) {
+        const auto &extent = extents[i];
+        auto &prd = table->descriptors[i];
+
+        prd.numBytes = extent.getSize() - 1; // always set bit 0
+        const auto phys = extent.getPhysAddress();
+
+        prd.physAddrLow = phys & 0xFFFFFFFF;
+        if(this->parent->is64BitCapable()) {
+            prd.physAddrHigh = phys >> 32;
+        }
+
+        // if it's the last extent, we want an IRQ on completion
+        prd.irqOnCompletion = (irq && i == (extents.size() - 1)) ? 1 : 0;
+    }
+
+    return extents.size();
 }
 
 /**
@@ -342,8 +418,29 @@ void Port::submitCommand(const uint8_t slot, CommandInfo info) {
     this->inFlightCommands[slot].emplace(std::move(info));
 
     // start command
-    Trace("CmdIssue %u", slot);
-    regs.cmdIssue = regs.cmdIssue | (1 << slot);
+    regs.cmdIssue = (1 << slot);
 }
 
+/**
+ * Marks the given command as completed, whether that is with a success or a failure.
+ */
+void Port::completeCommand(const uint8_t slot, const volatile RegDevToHostFIS &rfis,
+        const bool success) {
+    // get the command
+    auto &cmd = this->inFlightCommands[slot];
+    if(!cmd) throw std::runtime_error("Provided slot has no pending command");
 
+    // update the promise
+    if(success) {
+        cmd->promise.set_value();
+    } else {
+        cmd->promise.set_exception(std::make_exception_ptr(std::runtime_error("command failed")));
+    }
+
+    // release it and mark the command slot as available again
+    cmd.reset();
+
+    const uint32_t bit{1U << slot};
+    this->outstandingCommands &= ~bit;
+    this->busyCommands &= ~bit;
+}

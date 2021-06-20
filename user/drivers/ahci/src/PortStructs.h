@@ -324,11 +324,11 @@ struct PortCommandTablePrd {
 
     uint32_t reserved0;
 
-    /// When set, generate an interrupt when the transfer completes
-    uint32_t irqOnCompletion:1;
-    uint32_t reserved1:9;
     /// Total number of bytes to transfer for this descriptor
     uint32_t numBytes:22;
+    uint32_t reserved1:9;
+    /// When set, generate an interrupt when the transfer completes
+    uint32_t irqOnCompletion:1;
 } __attribute__((packed));
 static_assert(sizeof(PortCommandTablePrd) == 0x10, "Invalid size for PortCommandTablePrd");
 

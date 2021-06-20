@@ -158,6 +158,20 @@ Controller::~Controller() {
 
 
 /**
+ * Probes for connected devices on all ports.
+ */
+void Controller::probe() {
+    for(size_t i = 0; i < kMaxPorts; i++) {
+        auto &port = this->ports[i];
+        if(!port) continue;
+
+        port->probe();
+    }
+}
+
+
+
+/**
  * Main loop for the interrupt handler
  */
 void Controller::irqHandlerMain() {
@@ -207,6 +221,7 @@ void Controller::irqHandlerMain() {
 void Controller::handleAhciIrq() {
     // figure out which ports have an interrupt pending
     const auto is = this->abar->irqStatus;
+    this->abar->irqStatus = is;
 
     for(size_t i = 0; i < kMaxPorts; i++) {
         const uint32_t bit{1U << i};
@@ -214,7 +229,4 @@ void Controller::handleAhciIrq() {
             this->ports[i]->handleIrq();
         }
     }
-
-    // clear interrupshiones
-    this->abar->irqStatus = is;
 }

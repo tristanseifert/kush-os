@@ -1,6 +1,8 @@
 #ifndef AHCIDRV_PORT_H
 #define AHCIDRV_PORT_H
 
+#include "AtaCommands.h"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -15,6 +17,7 @@ class Controller;
 struct PortReceivedFIS;
 struct PortCommandTable;
 struct PortCommandList;
+struct RegDevToHostFIS;
 
 /**
  * Handles transactions for a single port on an AHCI controller.
@@ -32,11 +35,13 @@ class Port {
         Port(Controller * _Nonnull controller, const uint8_t port);
         virtual ~Port();
 
+        /// Identifies the device attached to the port.
+        void probe();
         /// Handle interrupts for this port.
         void handleIrq();
 
         /// Submit an ATA command with a fixed size response.
-        std::future<void> submitAtaCommand(const uint8_t cmd,
+        std::future<void> submitAtaCommand(const AtaCommand cmd,
                 const std::shared_ptr<libdriver::ScatterGatherBuffer> &result);
 
     private:
@@ -65,8 +70,13 @@ class Port {
 
         void identDevice();
 
+        size_t fillCmdTablePhysDescriptors(volatile PortCommandTable * _Nonnull table,
+                const std::shared_ptr<libdriver::ScatterGatherBuffer> &buf, const bool irq);
+
         size_t allocCommandSlot();
         void submitCommand(const uint8_t slot, CommandInfo);
+        void completeCommand(const uint8_t slot, const volatile RegDevToHostFIS &regs,
+                const bool success);
 
     private:
         static uintptr_t kPrivateMappingRange[2];

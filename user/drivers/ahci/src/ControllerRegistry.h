@@ -18,6 +18,10 @@ class ControllerRegistry {
 
         /// Adds a new controller to the registry.
         void addController(const std::shared_ptr<Controller> &controller);
+        /// Returns a reference to all controllers.
+        const auto &get() const {
+            return this->controllers;
+        }
 
     private:
         ControllerRegistry() = default;

@@ -33,6 +33,9 @@ class Controller {
         Controller(const std::shared_ptr<libpci::Device> &);
         virtual ~Controller();
 
+        /// Probes all attached ports.
+        void probe();
+
         /// Whether the controller is 64 bit addressing capable
         constexpr bool is64BitCapable() const {
             return this->supports64Bit;

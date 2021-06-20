@@ -28,7 +28,11 @@ int main(const int argc, const char **argv) {
         ControllerRegistry::the()->addController(controller);
     }
 
-    // start em
+    // detect attached disks/drives
+    Trace("Starting device probe");
+    for(const auto &controller : ControllerRegistry::the()->get()) {
+        controller->probe();
+    }
 
     // receive messages from driverman
     while(1) {

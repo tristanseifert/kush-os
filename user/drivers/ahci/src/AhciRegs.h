@@ -70,6 +70,12 @@ static_assert(sizeof(AhciHbaPortRegisters) == 0x80, "AhciHbaPortRegisters struct
  * Bit fields for the AhciHbaPortRegisters `irqStatus` and `irqEnable` fields
  */
 enum AhciPortIrqs: uint32_t {
+    /// An error occurred while processing a task file
+    TaskFileError                       = (1 << 30),
+    /// HBA received more bytes than there are PRDs for
+    ReceiveOverflow                     = (1 << 24),
+    /// Port connectivity state changed
+    PortStateChanged                    = (1 << 6),
     /// Descriptor processed interrupt
     DescriptorProcessed                 = (1 << 5),
     /// DMA setup FIS

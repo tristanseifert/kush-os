@@ -36,7 +36,8 @@ ScatterGatherBuffer::ScatterGatherBuffer(const size_t _size) : size(_size) {
     // allocate a region and map it
     err = AllocVirtualAnonRegion(size,
             (VM_REGION_RW | VM_REGION_WRITETHRU | VM_REGION_MMIO | VM_REGION_LOCKED |
-             VM_REGION_FORCE_ALLOC), &this->vmHandle);
+             VM_REGION_FORCE_ALLOC),
+            &this->vmHandle);
     if(err) {
         throw std::system_error(errno, std::generic_category(), "AllocVirtualAnonRegion");
     }
@@ -47,6 +48,12 @@ ScatterGatherBuffer::ScatterGatherBuffer(const size_t _size) : size(_size) {
     if(err) {
         throw std::system_error(err, std::generic_category(), "MapVirtualRegion");
     }
+
+#ifndef NDEBUG
+    // Fill the buffer with a test pattern for debugging
+    memset(reinterpret_cast<void *>(base), 0xAA, size);
+    memset(reinterpret_cast<void *>(base), 0xFF, _size);
+#endif
 
     // build up the extent map for each page
     const size_t numPages = size / pageSz;
@@ -73,13 +80,10 @@ ScatterGatherBuffer::ScatterGatherBuffer(const size_t _size) : size(_size) {
  * Releases the allocated memory for the buffer.
  */
 ScatterGatherBuffer::~ScatterGatherBuffer() {
-    fprintf(stderr, "deleshione\n");
-
     // destroy the region
     if(this->vmHandle) {
-        DeallocVirtualRegion(this->vmHandle);
+        UnmapVirtualRegion(this->vmHandle);
     }
-    fprintf(stderr, "deleshione 2\n");
 }
 
 /**
