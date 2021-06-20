@@ -7,6 +7,8 @@
 #include <sys/syscalls.h>
 #include <libpci/UserClient.h>
 
+#include <threads.h>
+
 #include <stdexcept>
 #include <system_error>
 
@@ -21,7 +23,8 @@ const uintptr_t Controller::kAbarMappingRange[2] = {
  * Initializes an AHCI controller attached to the given PCI device. We'll start off by mapping the
  * register areas, then perform the actual AHCI controller initialization.
  */
-Controller::Controller(const std::shared_ptr<libpci::Device> &_dev) : dev(_dev) {
+Controller::Controller(const std::shared_ptr<libpci::Device> &_dev) : dev(_dev),
+    workConsumerToken(this->workItems) {
     int err;
 
     // find ABAR (this is always BAR5)
@@ -34,19 +37,19 @@ Controller::Controller(const std::shared_ptr<libpci::Device> &_dev) : dev(_dev) 
         err = AllocVirtualPhysRegion(a.base, abarSize,
                 (VM_REGION_RW | VM_REGION_MMIO | VM_REGION_WRITETHRU), &this->abarVmHandle);
         if(err) {
-            throw std::system_error(errno, std::generic_category(), "AllocVirtualPhysRegion");
+            Abort("%s failed: %d", "AllocVirtualPhysRegion", err);
         }
     }
 
     if(!this->abarVmHandle) {
-        throw std::runtime_error("Failed to find ABAR");
+        Abort("Failed to locate AHCI ABAR");
     }
 
     // map ABAR
     uintptr_t base{0};
     err = MapVirtualRegionRange(this->abarVmHandle, kAbarMappingRange, abarSize, 0, &base);
     if(err) {
-        throw std::system_error(err, std::generic_category(), "MapVirtualRegion");
+        Abort("%s failed: %d", "MapVirtualRegion", errno);
     }
 
     this->abar = reinterpret_cast<volatile AhciHbaRegisters *>(base);
@@ -71,12 +74,14 @@ Controller::Controller(const std::shared_ptr<libpci::Device> &_dev) : dev(_dev) 
 
     // set up the interrupt handler and wait for it to allocate a vector; then register for MSI
     if(!this->dev->supportsMsi()) {
-        throw std::runtime_error("AHCI controller requires MSI support");
+        Abort("AHCI controller requires MSI support");
     }
 
-    this->irqHandlerThread = std::make_unique<std::thread>(&Controller::irqHandlerMain, this);
+    this->workLoop = std::make_unique<std::thread>(&Controller::workLoopMain, this);
+    auto workLoopThrd = reinterpret_cast<thrd_t>(this->workLoop->native_handle());
+    this->workLoopThreadHandle = thrd_get_handle_np(workLoopThrd);
 
-    while(!this->irqHandlerReady) {
+    while(!this->workLoopReady) {
         // this is kind of nasty but whatever
         ThreadUsleep(1000 * 33);
     }
@@ -144,9 +149,9 @@ void Controller::reset() {
  */
 Controller::~Controller() {
     // shut down IRQ handler
-    this->irqHandlerRun = false;
-    NotificationSend(this->irqHandlerThreadHandle, kDeviceWillStopBit);
-    this->irqHandlerThread->join();
+    this->workLoopRun = false;
+    NotificationSend(this->workLoopThreadHandle, kDeviceWillStopBit);
+    this->workLoop->join();
 
     // lastly, remove the ABAR mapping
     if(this->abarVmHandle) {
@@ -172,17 +177,40 @@ void Controller::probe() {
 
 
 /**
- * Main loop for the interrupt handler
+ * Main loop for the interrupt handler/work loop
  */
-void Controller::irqHandlerMain() {
+void Controller::workLoopMain() {
+    // perform work loop setup
+    ThreadSetName(0, "AHCI work loop");
+    this->initWorkLoopIrq();
+
+    // loop waiting for events
+    this->workLoopReady = true;
+
+    while(this->workLoopRun) {
+        const uintptr_t bits = NotificationReceive(0, UINTPTR_MAX);
+
+        if(bits & kAhciIrqBit) {
+            this->handleAhciIrq();
+        }
+        if(bits & kWorkBit) {
+            this->handleWorkQueue();
+        }
+    }
+
+    // clean up
+    if(kLogCleanup) Trace("Cleaning up IRQ handler");
+
+    this->deinitWorkLoopIrq();
+}
+
+/**
+ * Initializes the IRQ handler on the work loop.
+ */
+void Controller::initWorkLoopIrq() {
     int err;
 
     // set up the IRQ handler object
-    err = ThreadGetHandle(&this->irqHandlerThreadHandle);
-    if(err) Abort("Failed to get irq handler thread handle: %d", err);
-
-    ThreadSetName(0, "AHCI irq handler");
-
     err = IrqHandlerInstallLocal(0, kAhciIrqBit, &this->irqHandlerHandle);
     if(err) Abort("%s failed: %d", "IrqHandlerInstallLocal", err);
 
@@ -194,22 +222,14 @@ void Controller::irqHandlerMain() {
     // TODO: figure out CPU APIC id
     this->dev->enableMsi(0, vector, 1);
 
-    // we're ready to process events
-    this->irqHandlerReady = true;
     if(kLogInit) Trace("IRQ handler set up (vector %lu)", vector);
+}
 
-    // await interrupts or events (via notifications)
-    while(this->irqHandlerRun) {
-        const uintptr_t bits = NotificationReceive(0, UINTPTR_MAX);
-
-        if(bits & kAhciIrqBit) {
-            this->handleAhciIrq();
-        }
-    }
-
-    // clean up
-    if(kLogCleanup) Trace("Cleaning up IRQ handler");
-    dev->disableMsi();
+/**
+ * Releases interrupt resources when the work loop is being torn down.
+ */
+void Controller::deinitWorkLoopIrq() {
+    this->dev->disableMsi();
 
     // XXX: there is not currently a way for us to release the allocated MSI vector...
     IrqHandlerRemove(this->irqHandlerHandle);
@@ -229,4 +249,32 @@ void Controller::handleAhciIrq() {
             this->ports[i]->handleIrq();
         }
     }
+}
+
+
+/**
+ * Handles all pending work items on the work queue.
+ */
+void Controller::handleWorkQueue() {
+    WorkItem i;
+    while(this->workItems.try_dequeue(this->workConsumerToken, i)) {
+        i.f();
+    }
+}
+
+/**
+ * Enqueues a new work item.
+ *
+ * @return 0 if successfully added, negative error code otherwise.
+ */
+int Controller::addWorkItem(const std::function<void()> &f) {
+    WorkItem i{f};
+
+    const bool success = this->workItems.enqueue(i);
+
+    if(success) {
+        NotificationSend(this->workLoopThreadHandle, kWorkBit);
+    }
+
+    return success ? 0 : Errors::WorkEnqueueFailed;
 }

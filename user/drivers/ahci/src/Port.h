@@ -6,13 +6,15 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <future>
+#include <functional>
 #include <mutex>
 #include <optional>
+#include <variant>
 
 #include <driver/ScatterGatherBuffer.h>
 
 class Controller;
+class Device;
 
 struct PortReceivedFIS;
 struct PortCommandTable;
@@ -30,7 +32,65 @@ struct RegDevToHostFIS;
  *
  * TODO: This needs a _lot_ of locking and other multithreading support :)
  */
-class Port {
+class Port: std::enable_shared_from_this<Port> {
+    using DMABufferPtr = std::shared_ptr<libdriver::ScatterGatherBuffer>;
+
+    public:
+        /**
+         * Error codes specific to port operations
+         */
+        enum Errors: int {
+            /// The provided buffer has too many distinct physical regions.
+            TooManyExtents                      = -11000,
+        };
+
+        /**
+         * Encapsulates the completion state of a command sent to the device. A command can either
+         * complete successfully or fail; in both cases, there are unique pieces of information
+         * available.
+         */
+        class CommandResult {
+            friend class Port;
+
+            private:
+                /// Information about a successful command
+                struct Success {
+
+                };
+                /// Information about a failed command
+                struct Failure {
+                    /// ATA error register
+                    uint8_t ataError{0};
+                };
+
+                /// Creates a new command result object
+                CommandResult(const uint8_t status) : ataStatus(status) {};
+
+            public:
+                /// Is the result successful?
+                constexpr bool isSuccess() const {
+                    return std::holds_alternative<Success>(this->storage);
+                }
+
+                /// Returns the ATA status code
+                constexpr uint8_t getAtaStatus() const {
+                    return this->ataStatus;
+                }
+                /// Returns the ATA error code, if the command ended in error
+                constexpr uint8_t getAtaError() const {
+                    return std::get_if<Failure>(&this->storage)->ataError;
+                }
+
+            private:
+                /// ATA status register
+                uint8_t ataStatus{0};
+
+                /// Stores success and failure specific information
+                std::variant<Success, Failure> storage;
+        };
+
+        using CommandCallback = std::function<void(const CommandResult&)>;
+
     public:
         Port(Controller * _Nonnull controller, const uint8_t port);
         virtual ~Port();
@@ -41,8 +101,8 @@ class Port {
         void handleIrq();
 
         /// Submit an ATA command with a fixed size response.
-        std::future<void> submitAtaCommand(const AtaCommand cmd,
-                const std::shared_ptr<libdriver::ScatterGatherBuffer> &result);
+        [[nodiscard]] int submitAtaCommand(const AtaCommand cmd, const DMABufferPtr &result,
+                const CommandCallback &callback);
 
     private:
         /**
@@ -52,14 +112,10 @@ class Port {
         struct CommandInfo {
             /// All buffers referenced by this command
             std::vector<std::shared_ptr<libdriver::ScatterGatherBuffer>> buffers;
-            /**
-             * Promise that is completed when the command completes; it will either be assigned a
-             * void value if it completed successfully, or an exception if there was some sort of
-             * issue with the command.
-             */
-            std::promise<void> promise;
+            /// callback invoked with command completion info
+            CommandCallback callback;
 
-            CommandInfo(std::promise<void> _promise) : promise(std::move(_promise)) {}
+            CommandInfo(const CommandCallback &_callback) : callback(_callback) {}
         };
 
     private:
@@ -69,12 +125,14 @@ class Port {
         void stopCommandProcessing();
 
         void identDevice();
+        void identSataDevice();
+        void identSatapiDevice();
 
         size_t fillCmdTablePhysDescriptors(volatile PortCommandTable * _Nonnull table,
                 const std::shared_ptr<libdriver::ScatterGatherBuffer> &buf, const bool irq);
 
         size_t allocCommandSlot();
-        void submitCommand(const uint8_t slot, CommandInfo);
+        int submitCommand(const uint8_t slot, CommandInfo);
         void completeCommand(const uint8_t slot, const volatile RegDevToHostFIS &regs,
                 const bool success);
 
@@ -85,6 +143,10 @@ class Port {
         constexpr static const bool kLogInit{false};
         /// Whether port IRQs are logged
         constexpr static const bool kLogIrq{false};
+        /// Enable to dump command headers of about to be submitted commands to the console
+        constexpr static const bool kLogCmdHeaders{false};
+        /// Enable to dump all written PRDs to the console
+        constexpr static const bool kLogPrds{false};
 
         /// Offset of command list into the port's private physical memory region
         constexpr static const size_t kCmdListOffset{0};
@@ -103,6 +165,8 @@ class Port {
 
         /// AHCI controller on which this port is
         Controller * _Nonnull parent;
+        /// Device attached to this port
+        std::shared_ptr<Device> portDevice;
 
         /// Received FIS structure for this port
         volatile PortReceivedFIS * _Nonnull receivedFis;
@@ -127,7 +191,7 @@ class Port {
          * they use, and the promise that is to be completed with the result of the command.
          */
         std::array<std::optional<CommandInfo>, 32> inFlightCommands;
-        /// Lock protecting the in flight commands list
+        /// Lock on the list of in flight commands
         std::mutex inFlightCommandsLock;
 };
 

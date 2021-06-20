@@ -55,6 +55,8 @@ ScatterGatherBuffer::ScatterGatherBuffer(const size_t _size) : size(_size) {
     memset(reinterpret_cast<void *>(base), 0xFF, _size);
 #endif
 
+    this->base = reinterpret_cast<void *>(base);
+
     // build up the extent map for each page
     const size_t numPages = size / pageSz;
     this->extents.reserve(numPages);

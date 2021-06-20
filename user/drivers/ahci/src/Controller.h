@@ -5,10 +5,12 @@
 #include <atomic>
 #include <cstdint>
 #include <cstddef>
+#include <functional>
 #include <thread>
 #include <memory>
 #include <mutex>
 
+#include <concurrentqueue.h>
 #include <libpci/UserClient.h>
 
 struct AhciHbaRegisters;
@@ -29,12 +31,22 @@ class Controller {
     constexpr static const size_t kMaxPorts{32};
 
     public:
+        /// AHCI controller specific error codes
+        enum Errors: int {
+            /// Failed to enqueue work item
+            WorkEnqueueFailed                   = -10000,
+        };
+
+    public:
         /// Create an AHCI controller attached to the given PCI device.
         Controller(const std::shared_ptr<libpci::Device> &);
         virtual ~Controller();
 
         /// Probes all attached ports.
         void probe();
+
+        /// Adds a new item to the work queue of the controller
+        int addWorkItem(const std::function<void()> &);
 
         /// Whether the controller is 64 bit addressing capable
         constexpr bool is64BitCapable() const {
@@ -46,11 +58,25 @@ class Controller {
         }
 
     private:
+        /**
+         * Encapsulates an arbitrary function to execute from the context of the work loop.
+         */
+        struct WorkItem {
+            /// Function to invoke
+            std::function<void()> f;
+        };
+
+    private:
         void performBiosHandoff();
         void reset();
 
-        void irqHandlerMain();
+        void workLoopMain();
+
+        void initWorkLoopIrq();
+        void deinitWorkLoopIrq();
         void handleAhciIrq();
+
+        void handleWorkQueue();
 
     private:
         static const uintptr_t kAbarMappingRange[2];
@@ -64,6 +90,8 @@ class Controller {
         constexpr static const uintptr_t kAhciIrqBit{(1 << 0)};
         /// Notification bit indicating that the driver is shutting down and IRQ handler shall exit
         constexpr static const uintptr_t kDeviceWillStopBit{(1 << 1)};
+        /// Notification bit indicating that work items are available to process
+        constexpr static const uintptr_t kWorkBit{(1 << 2)};
 
         /// PCI device behind which the controller is operated
         std::shared_ptr<libpci::Device> dev;
@@ -94,15 +122,21 @@ class Controller {
         std::array<std::shared_ptr<Port>, kMaxPorts> ports;
 
         /// Interrupt handler thread
-        std::unique_ptr<std::thread> irqHandlerThread;
+        std::unique_ptr<std::thread> workLoop;
         /// Thread handle of the IRQ handler thread
-        uintptr_t irqHandlerThreadHandle{0};
+        uintptr_t workLoopThreadHandle{0};
         /// Run the interrupt handler as long as this flag is set
-        std::atomic_bool irqHandlerRun{true};
+        std::atomic_bool workLoopRun{true};
         /// Indicates the interrupt handler is ready
-        std::atomic_bool irqHandlerReady{false};
+        std::atomic_bool workLoopReady{false};
+
         /// Handle for the IRQ handler object
         uintptr_t irqHandlerHandle{0};
+
+        /// Work items for the work loop
+        moodycamel::ConcurrentQueue<WorkItem> workItems;
+        /// Queue consumer token for the work loop
+        moodycamel::ConsumerToken workConsumerToken;
 };
 
 #endif

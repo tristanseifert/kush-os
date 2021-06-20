@@ -19,3 +19,6 @@
 [submodule "user/lib/external/HppOnly/tomlplusplus"]
 	path = user/lib/external/HppOnly/tomlplusplus
 	url = git@github.com:marzer/tomlplusplus.git
+[submodule "user/lib/external/HppOnly/concurrentqueue"]
+	path = user/lib/external/HppOnly/concurrentqueue
+	url = git@github.com:cameron314/concurrentqueue.git

@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <vector>
 
 namespace libdriver {
@@ -39,6 +40,11 @@ class ScatterGatherBuffer {
         ScatterGatherBuffer(const size_t size);
         ~ScatterGatherBuffer();
 
+        /// Gets a span that encompasses the entire buffer.
+        explicit operator std::span<std::byte>() const {
+            return std::span<std::byte>(static_cast<std::byte *>(this->base), this->size);
+        }
+
         /// Gets the pages that make up the buffer.
         constexpr const auto &getExtents() const {
             return this->extents;
@@ -46,6 +52,11 @@ class ScatterGatherBuffer {
         /// Gets the size of the buffer
         constexpr size_t getSize() const {
             return this->size;
+        }
+
+        /// Return the underlying virtual memory of the buffer.
+        constexpr void * _Nonnull data() const {
+            return this->base;
         }
 
         static std::shared_ptr<ScatterGatherBuffer> Alloc(const size_t size);

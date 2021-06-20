@@ -1,10 +1,13 @@
 #include "Port.h"
 #include "Controller.h"
+#include "Device.h"
 #include "AtaCommands.h"
 #include "AhciRegs.h"
 #include "PortStructs.h"
 
 #include "Log.h"
+
+#include "util/String.h"
 
 #include <algorithm>
 #include <cstring>
@@ -40,14 +43,14 @@ Port::Port(Controller *controller, const uint8_t _port) : port(_port), parent(co
             (VM_REGION_RW | VM_REGION_WRITETHRU | VM_REGION_MMIO | VM_REGION_LOCKED),
             &this->privRegionVmHandle);
     if(err) {
-        throw std::system_error(errno, std::generic_category(), "AllocVirtualAnonRegion");
+        Abort("%s failed: %d", "AllocVirtualAnonRegion", err);
     }
 
     uintptr_t base{0};
     err = MapVirtualRegionRange(this->privRegionVmHandle, kPrivateMappingRange, allocSize, 0, &base);
     kPrivateMappingRange[0] += allocSize; // XXX: this seems like it shouldn't be necessary...
     if(err) {
-        throw std::system_error(err, std::generic_category(), "MapVirtualRegion");
+        Abort("%s failed: %d", "MapVirtualRegion", err);
     }
 
     if(kLogInit) Trace("Mapped port %lu FIS/command list at $%p ($%p'h)", _port, base,
@@ -60,7 +63,7 @@ Port::Port(Controller *controller, const uint8_t _port) : port(_port), parent(co
 
     err = VirtualToPhysicalAddr(&base, 1, &physAddr);
     if(err) {
-        throw std::system_error(err, std::generic_category(), "VirtualToPhysicalAddr");
+        Abort("%s failed: %d", "VirtualToPhysicalAddr", err);
     }
 
     // program the command list base register
@@ -72,7 +75,8 @@ Port::Port(Controller *controller, const uint8_t _port) : port(_port), parent(co
         regs.cmdListBaseHigh = cmdListPhys >> 32;
     } else {
         if(cmdListPhys >> 32) {
-            throw std::runtime_error("Command list base above 4G, but controller doesn't support 64-bit");
+            Abort("Allocated %s above 4G but controller doesn't support 64-bit addressing",
+                    "command list");
         }
     }
 
@@ -87,7 +91,8 @@ Port::Port(Controller *controller, const uint8_t _port) : port(_port), parent(co
         regs.fisBaseHigh = rxFisPhys >> 32;
     } else {
         if(rxFisPhys >> 32) {
-            throw std::runtime_error("FIS base above 4G, but controller doesn't support 64-bit");
+            Abort("Allocated %s above 4G but controller doesn't support 64-bit addressing",
+                    "received FIS buffer");
         }
     }
 
@@ -115,7 +120,7 @@ void Port::initCommandTables(const uintptr_t vmBase) {
         const size_t offset{kCommandTableOffset + (i * commandTableSize)};
         const auto address{vmBase + offset};
         if(address & 0b1111111) {
-            throw std::runtime_error("Failed to maintain 128 byte alignment for command tables");
+            Abort("Failed to maintain 128 byte alignment for command tables");
         }
 
         this->cmdTables[i] = reinterpret_cast<volatile PortCommandTable *>(address);
@@ -128,7 +133,7 @@ void Port::initCommandTables(const uintptr_t vmBase) {
 
         err = VirtualToPhysicalAddr(&address, 1, &physAddr);
         if(err) {
-            throw std::system_error(err, std::generic_category(), "VirtualToPhysicalAddr");
+            Abort("%s failed: %d", "VirtualToPhysicalAddr", err);
         }
 
         auto &hdr = this->cmdList->commands[i];
@@ -202,20 +207,14 @@ void Port::identDevice() {
     auto &regs = this->parent->abar->ports[this->port];
 
     switch(regs.signature) {
-        case AhciDeviceSignature::SATA: {
+        case AhciDeviceSignature::SATA:
             Success("SATA device at port %u", this->port);
-
-            auto buf = libdriver::ScatterGatherBuffer::Alloc(512);
-            this->submitAtaCommand(AtaCommand::Identify, buf);
+            this->identSataDevice();
             break;
-        }
-        case AhciDeviceSignature::SATAPI: {
+        case AhciDeviceSignature::SATAPI:
             Success("SATAPI device at port %u", this->port);
-
-            auto buf = libdriver::ScatterGatherBuffer::Alloc(512);
-            this->submitAtaCommand(AtaCommand::IdentifyPacket, buf);
+            this->identSatapiDevice();
             break;
-        }
 
         case AhciDeviceSignature::PortMultiplier:
             Warn("%s on port %u is not supported", "Port multiplier", this->port);
@@ -229,6 +228,75 @@ void Port::identDevice() {
             break;
     }
 }
+
+/**
+ * Identifies a SATA device attached to the port; this should in basically all cases be a hard
+ * drive.
+ */
+void Port::identSataDevice() {
+    int err;
+
+    // Issue an ATA IDENTIFY DEVICE command
+    auto buf = libdriver::ScatterGatherBuffer::Alloc(512);
+
+    err = this->submitAtaCommand(AtaCommand::Identify, buf, [&, buf](const auto &res) {
+        if(res.isSuccess()) {
+            auto span = static_cast<std::span<std::byte>>(*buf);
+            auto model = std::string(reinterpret_cast<const char *>(span.subspan(54, 40).data()), 40);
+            util::ConvertAtaString(model);
+            util::TrimTrailingWhitespace(model);
+
+            auto serial = std::string(reinterpret_cast<const char *>(span.subspan(20, 20).data()), 20);
+            util::ConvertAtaString(serial);
+            util::TrimTrailingWhitespace(serial);
+
+            Trace("Model '%s', serial '%s'", model.c_str(), serial.c_str());
+        } else {
+            Warn("%s Identify for port %u failed: status %02x", "ATA", this->port,
+                    res.getAtaError());
+        }
+    });
+
+    if(err) {
+        Warn("Failed to identify %s device on port %u: %d", "SATA", this->port, err);
+        return;
+    }
+}
+
+/**
+ * Identifies a SATAPI device attached to the port. ATAPI devices are any packed based SCSI style
+ * devices, like optical drives, tape drives, and so forth.
+ */
+void Port::identSatapiDevice() {
+    int err;
+
+    // Issue an ATA IDENTIFY PACKET DEVICE command
+    auto buf = libdriver::ScatterGatherBuffer::Alloc(512);
+
+    err = this->submitAtaCommand(AtaCommand::IdentifyPacket, buf, [&, buf](const auto &res) {
+        if(res.isSuccess()) {
+            auto span = static_cast<std::span<std::byte>>(*buf);
+            auto model = std::string(reinterpret_cast<const char *>(span.subspan(54, 40).data()), 40);
+            util::ConvertAtaString(model);
+            util::TrimTrailingWhitespace(model);
+
+            auto serial = std::string(reinterpret_cast<const char *>(span.subspan(20, 20).data()), 20);
+            util::ConvertAtaString(serial);
+            util::TrimTrailingWhitespace(serial);
+
+            Trace("Model '%s', serial '%s'", model.c_str(), serial.c_str());
+        } else {
+            Warn("%s Identify for port %u failed: status %02x", "ATAPI", this->port,
+                    res.getAtaError());
+        }
+    });
+
+    if(err) {
+        Warn("Failed to identify %s device on port %u: %d", "SATAPI", this->port, err);
+        return;
+    }
+}
+
 
 
 
@@ -245,10 +313,26 @@ void Port::handleIrq() {
 
     // TODO: check for command errors
     /**
-     * A task file error was raised.
+     * A task file error was raised; this means that a command we issued likely failed. We should
+     * shortly receive a device-to-host register FIS as well, so there's not actually that much
+     * for us to do here.
      */
     if(is & AhciPortIrqs::TaskFileError) {
-        Warn("Port %lu task file error", this->port);
+        const auto &rfis = this->receivedFis->rfis;
+
+        // find which command caused this error
+        if(this->outstandingCommands) {
+            const auto ci = regs.cmdIssue;
+            const auto completedCmds = ~ci & this->outstandingCommands;
+            const size_t slot = __builtin_ffsl(completedCmds) - 1;
+
+            if(kLogIrq) Warn("Task file error %08x %02x (%lu)", completedCmds, rfis.status, slot);
+        }
+        // XXX: is there any reason for task file errors if there's no outstanding commands?
+        else {
+            Warn("Port %u nexpected task file error: status %02x error %02x", this->port,
+                    rfis.status, rfis.error);
+        }
     }
     /**
      * The device's register information has been updated. This usually indicates that a command
@@ -269,7 +353,8 @@ void Port::handleIrq() {
                 if(!(completedCmds & bit)) continue;
 
                 // extract command information and call completion handler
-                if(!(rfis.status & AtaStatus::Busy) && (rfis.status & AtaStatus::Ready)) {
+                if(!(rfis.status & AtaStatus::Busy) && !(rfis.status & AtaStatus::Error) &&
+                    (rfis.status & AtaStatus::Ready)) {
                     this->completeCommand(i, rfis, true);
                 } else {
                     this->completeCommand(i, rfis, false);
@@ -301,9 +386,12 @@ void Port::handleIrq() {
  *
  * @param cmd Command byte to write to the device
  * @param result Buffer large enough to store the full response of this request
+ * @param cb Callback to invoke when the command completes.
+ *
+ * @return 0 if the command was submitted successfully, otherwise a negative error code.
  */
-std::future<void> Port::submitAtaCommand(const AtaCommand cmd,
-        const std::shared_ptr<libdriver::ScatterGatherBuffer> &result) {
+int Port::submitAtaCommand(const AtaCommand cmd, const DMABufferPtr &result,
+        const CommandCallback &cb) {
     // find a command slot
     const auto slotIdx = this->allocCommandSlot();
     auto table = this->cmdTables[slotIdx];
@@ -318,6 +406,9 @@ std::future<void> Port::submitAtaCommand(const AtaCommand cmd,
 
     // set up the result buffer descriptors
     const auto numPrds = this->fillCmdTablePhysDescriptors(table, result, true);
+    if(numPrds == -1) {
+        return Errors::TooManyExtents;
+    }
 
     // update the command list entry
     auto &cmdListEntry = this->cmdList->commands[slotIdx];
@@ -332,16 +423,16 @@ std::future<void> Port::submitAtaCommand(const AtaCommand cmd,
 
     cmdListEntry.prdEntries = numPrds;
 
-    // lastly, submit the command (so it begins executing)
-    std::promise<void> p;
-    auto fut = p.get_future();
+    if(kLogCmdHeaders) {
+        auto ptr = (volatile uint32_t *) &cmdListEntry;
+        Trace("Command header is %08x %08x %08x %08x", ptr[0], ptr[1], ptr[2], ptr[3]);
+    }
 
-    CommandInfo i(std::move(p));
+    // lastly, submit the command (so it begins executing)
+    CommandInfo i(cb);
     i.buffers.emplace_back(result);
 
-    this->submitCommand(slotIdx, std::move(i));
-
-    return fut;
+    return this->submitCommand(slotIdx, std::move(i));
 }
 
 /**
@@ -359,7 +450,7 @@ size_t Port::fillCmdTablePhysDescriptors(volatile PortCommandTable *table,
     // ensure the buffer can fit in the number of PRDs we have
     const auto &extents = buf->getExtents();
     if(extents.size() > kCommandTableNumPrds) {
-        throw std::runtime_error("Scatter/gather buffer has too many extents!");
+        return -1;
     }
 
     // fill a PRD for each extent
@@ -377,6 +468,11 @@ size_t Port::fillCmdTablePhysDescriptors(volatile PortCommandTable *table,
 
         // if it's the last extent, we want an IRQ on completion
         prd.irqOnCompletion = (irq && i == (extents.size() - 1)) ? 1 : 0;
+
+        if(kLogPrds) {
+            auto ptr = (volatile uint32_t *) &prd;
+            Trace("PRD is %08x %08x %08x %08x", ptr[0], ptr[1], ptr[2], ptr[3]);
+        }
     }
 
     return extents.size();
@@ -403,22 +499,28 @@ size_t Port::allocCommandSlot() {
     }
 
     // TODO: block on some condition variable and retry
-    throw std::runtime_error("failed to find available command");
+    Abort("Failed to find available command (TODO: wait for command availability)");
 }
 
 /**
  * Submits the given command. This will insert it into the outstanding commands map, then notify
  * the HBA that this command is ready to execute.
+ *
+ * @return 0 on success, negative error code otherwise.
  */
-void Port::submitCommand(const uint8_t slot, CommandInfo info) {
+int Port::submitCommand(const uint8_t slot, CommandInfo info) {
     auto &regs = this->parent->abar->ports[this->port];
 
     // record keeping
-    this->outstandingCommands |= (1 << slot);
-    this->inFlightCommands[slot].emplace(std::move(info));
+    {
+        std::lock_guard<std::mutex> lg(this->inFlightCommandsLock);
+        this->outstandingCommands |= (1 << slot);
+        this->inFlightCommands[slot].emplace(std::move(info));
+    }
 
     // start command
     regs.cmdIssue = (1 << slot);
+    return 0;
 }
 
 /**
@@ -426,21 +528,38 @@ void Port::submitCommand(const uint8_t slot, CommandInfo info) {
  */
 void Port::completeCommand(const uint8_t slot, const volatile RegDevToHostFIS &rfis,
         const bool success) {
-    // get the command
-    auto &cmd = this->inFlightCommands[slot];
-    if(!cmd) throw std::runtime_error("Provided slot has no pending command");
+    std::lock_guard<std::mutex> lg(this->inFlightCommandsLock);
+    const uint32_t bit{1U << slot};
 
-    // update the promise
+    // get the command and build result structure
+    auto &cmd = this->inFlightCommands[slot];
+    if(!cmd) Abort("Requested completion for slot %u but no command in flight!", slot);
+
+    CommandResult res(rfis.status);
+
     if(success) {
-        cmd->promise.set_value();
+        CommandResult::Success s;
+        res.storage = s;
     } else {
-        cmd->promise.set_exception(std::make_exception_ptr(std::runtime_error("command failed")));
+        CommandResult::Failure f{rfis.error};
+        res.storage = f;
     }
 
-    // release it and mark the command slot as available again
-    cmd.reset();
+    /*
+     * Push the callback to the work queue of the controller. We'll then release the command object
+     * (since we expect whoever invoked the command to still hold a reference to the appropriate
+     * DMA buffers, which contain the actual data) and mark the device resources as reusable.
+     *
+     * We wait to actually mark the command slot as no longer busy until after the callback returns
+     * so that the callback can peruse through received FISes, registers, etc.
+     */
+    auto callback = cmd->callback;
+    this->parent->addWorkItem([callback, res, bit, this]() {
+        callback(res);
 
-    const uint32_t bit{1U << slot};
+        this->busyCommands &= ~bit;
+    });
+
+    cmd.reset();
     this->outstandingCommands &= ~bit;
-    this->busyCommands &= ~bit;
 }

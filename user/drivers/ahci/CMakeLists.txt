@@ -11,10 +11,12 @@ add_executable(ahcidrv
     src/ControllerRegistry.cpp
     src/Controller.cpp
     src/Port.cpp
+    # helper functions
+    src/util/String.cpp
 )
 
 # allow link time optimization
-target_compile_options(ahcidrv PRIVATE -flto -fno-rtti)
+target_compile_options(ahcidrv PRIVATE -flto -fno-rtti -fno-exceptions)
 target_link_options(ahcidrv PRIVATE -s)
 
 # search our codebase for includes
@@ -23,7 +25,7 @@ target_include_directories(ahcidrv PRIVATE src)
 
 # required libraries
 add_dependencies(ahcidrv c_dynamic system_dynamic)
-target_link_libraries(ahcidrv PRIVATE capnp driver libpci rpc mpack_dynamic)
+target_link_libraries(ahcidrv PRIVATE capnp driver libpci rpc mpack_dynamic concurrentqueue)
 
 # install it to boot directory in sysroot
 install(TARGETS ahcidrv RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)

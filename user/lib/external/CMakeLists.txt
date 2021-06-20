@@ -18,6 +18,7 @@ add_subdirectory(fmtlib EXCLUDE_FROM_ALL)
 
 # header only libraries
 add_subdirectory(HppOnly/tomlplusplus EXCLUDE_FROM_ALL)
+add_subdirectory(HppOnly/concurrentqueue EXCLUDE_FROM_ALL)
 
 # OpenLibm (math library)
 ExternalProject_Add(openlibm
