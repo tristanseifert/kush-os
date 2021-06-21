@@ -3,14 +3,6 @@
 #
 # Provides interfaces to some RPC services.
 ###############################################################################
-find_package(CapnProto)
-
-# compile all Cap'n Proto schemas
-capnp_generate_cpp(CAPNP_SRCS CAPNP_HDRS
-    # task endpoint
-    rpc/rootsrv/TaskEndpoint.capnp
-)
-
 add_library(rpc_objs_small OBJECT
     src/helpers/Send.cpp
     src/rpc/Dispensary.cpp
@@ -25,9 +17,9 @@ add_library(rpc_objs OBJECT
     src/task/Connection.cpp
     src/task/Create.cpp
     # generated Cap'n Proto files
-    ${CAPNP_SRCS}
+    rpc/rootsrv/TaskEndpoint.capnp.c++
 )
-target_include_directories(rpc_objs PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(rpc_objs PRIVATE rpc)
 
 # allow the library to have link time optimization
 target_compile_options(rpc_objs PRIVATE -fPIC -flto -fno-exceptions -fno-rtti)

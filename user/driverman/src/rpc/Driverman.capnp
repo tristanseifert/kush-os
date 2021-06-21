@@ -1,5 +1,5 @@
 # This is an automatically generated file (by idlc). Do not edit.
-# Generated from Driverman.idl for interface Driverman at 2021-06-20T13:46:05-0500
+# Generated from Driverman.idl for interface Driverman at 2021-06-20T22:50:57-0500
 @0x9c46a74e95804d52;
 using Cxx = import "/capnp/c++.capnp";
 $Cxx.namespace("rpc::_proto::messages");

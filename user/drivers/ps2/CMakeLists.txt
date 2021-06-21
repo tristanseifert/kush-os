@@ -30,7 +30,7 @@ target_sources(ps2drv PRIVATE
 endif()
 
 # allow link time optimization
-target_compile_options(ps2drv PRIVATE -flto -fno-rtti)
+target_compile_options(ps2drv PRIVATE -flto -fno-rtti -fno-exceptions)
 target_link_options(ps2drv PRIVATE -s)
 
 # search our codebase for includes

@@ -12,4 +12,7 @@ void Warn(const char * _Nonnull format, ...) __attribute__ ((format (printf, 1, 
 /// Outputs an error message and exits the task.
 [[noreturn]] void Abort(const char * _Nonnull format, ...) __attribute__ ((format (printf, 1, 2)));
 
+/// Ensure the given condition is true, otherwise aborts.
+#define REQUIRE(cond, ...) {if(!(cond)) { Abort(__VA_ARGS__); }}
+
 #endif

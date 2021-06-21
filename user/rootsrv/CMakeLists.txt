@@ -2,13 +2,6 @@
 # Root server (init task)
 ###############################################################################
 # compile all Cap'n Proto schemas
-find_package(CapnProto)
-set(CAPNP_INCLUDE_DIRECTORY "${SYSROOT_DIR}/usr/include/capnp")
-
-capnp_generate_cpp(CAPNP_SRCS CAPNP_HDRS
-    rpc/TaskEndpoint.capnp
-)
-
 add_executable(rootsrv
     src/main.cpp
     src/log.c
@@ -19,6 +12,7 @@ add_executable(rootsrv
     src/task/Task.cpp
     src/task/Registry.cpp
     src/task/RpcHandler.cpp
+    src/task/TaskEndpoint.capnp.c++
     src/task/InfoPage.cpp
     src/task/loader/ElfCommon.cpp
     src/task/loader/Elf32.cpp
@@ -26,7 +20,6 @@ add_executable(rootsrv
     src/dispensary/Dispensary.cpp
     src/dispensary/Registry.cpp
     src/dispensary/RpcHandler.cpp
-    ${CAPNP_SRCS}
 )
 
 #### arch specific ELF loader code
@@ -53,7 +46,7 @@ file(COPY ${CMAKE_CURRENT_LIST_DIR}/../../tools/mkinit/src/BundleTypes.h DESTINA
 # search our codebase for includes
 target_include_directories(rootsrv PRIVATE include)
 target_include_directories(rootsrv PRIVATE src)
-target_include_directories(rootsrv PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(rootsrv PRIVATE rpc)
 
 # required libraries
 add_dependencies(rootsrv c_static)

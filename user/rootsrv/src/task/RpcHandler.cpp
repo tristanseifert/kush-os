@@ -11,7 +11,7 @@
 #include "log.h"
 #include "dispensary/Dispensary.h"
 
-#include "rpc/TaskEndpoint.capnp.h"
+#include "TaskEndpoint.capnp.h"
 
 #include <rpc/RpcPacket.hpp>
 #include <rpc/Helpers.hpp>

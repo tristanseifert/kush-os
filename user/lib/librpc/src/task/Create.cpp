@@ -6,7 +6,7 @@
 #include <cstdio>
 
 #include <rpc/RpcPacket.hpp>
-#include "rpc/rootsrv/TaskEndpoint.capnp.h"
+#include "rootsrv/TaskEndpoint.capnp.h"
 
 #include <capnp/message.h>
 #include <capnp/serialize.h>
