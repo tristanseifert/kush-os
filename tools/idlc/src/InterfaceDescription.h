@@ -117,6 +117,10 @@ class InterfaceDescription {
                 constexpr auto &getReturns() const {
                     return this->returns;
                 }
+                /// Does this method have multiple return values?
+                constexpr bool hasMultipleReturns() const {
+                    return this->returns.size() > 1;
+                }
 
                 friend std::ostream& operator<<(std::ostream& os, const Method& m);
 

@@ -35,9 +35,13 @@ void CodeGenerator::generateClientStub() {
               << std::endl;
 
     // generate the header first
+    std::string includeGuardName("RPC_CLIENT_GENERATED_");
+    includeGuardName.append(std::to_string(this->interface->getIdentifier()));
+
     std::ofstream header(fileNameH.string(), std::ofstream::trunc);
     this->clientWriteInfoBlock(header);
-    header << R"(#pragma once
+    header << R"(#ifndef )" << includeGuardName << R"(
+#define )" << includeGuardName << R"(
 
 #include <string>
 #include <cstddef>
@@ -49,6 +53,7 @@ void CodeGenerator::generateClientStub() {
 )" << std::endl;
     this->cppWriteIncludes(header);
     this->clientWriteHeader(header);
+    header << "#endif // defined(" << includeGuardName << ")" << std::endl;
 
     // and then the implementation
     std::ofstream implementation(fileNameCpp.string(), std::ofstream::trunc);
@@ -111,7 +116,8 @@ void CodeGenerator::clientWriteHeader(std::ofstream &os) {
 
     /*
      * Define the types, including the MessageHeader, which is the structure we expect to receive
-     * from whatever input/output stream we're provided.
+     * from whatever input/output stream we're provided. Also define the return type structs for
+     * any methods with multiple returns.
      */
     os << R"(
     struct MessageHeader {
@@ -133,7 +139,15 @@ void CodeGenerator::clientWriteHeader(std::ofstream &os) {
 
     protected:
         using IoStream = rt::ClientRpcIoStream;
+
+    public:
 )";
+
+    for(const auto &m : this->interface->getMethods()) {
+        if(!m.hasMultipleReturns()) continue;
+        this->cppWriteReturnStruct(os, m);
+    }
+
 
     // public methods
     os << R"(
@@ -257,6 +271,7 @@ void Client::_ensureTxBuf(const size_t len) {
 void Client::_HandleError(const bool fatal, const std::string_view &what) {
     fprintf(stderr, "[RPC] %s: Encountered %s RPC error: %s\n", kServiceName.data(),
         fatal ? "fatal" : "recoverable", what.data());
+    if(fatal) exit(-1);
 }
 )";
 
@@ -276,7 +291,7 @@ void CodeGenerator::clientWriteMarshallMethod(std::ofstream &os, const Method &m
  * Have )" << m.getParameters().size() << R"( parameter(s), )" << m.getReturns().size() << R"( return(s); method is )" << (m.isAsync() ? "async" : "sync") << R"(
  */
 )";
-    this->cppWriteMethodDef(os, m, "Client::");
+    this->cppWriteMethodDef(os, m, "Client::", "Client::");
     os << " {";
 
     if(!m.isAsync()) {
@@ -403,9 +418,39 @@ void CodeGenerator::clientWriteMarshallMethodReply(std::ofstream &os, const Meth
         else {
             throw std::runtime_error("Serializing non-builtin type (for return) not yet supported");
         }
-
     } else if(!returns.empty()) {
-        throw std::runtime_error("Methods with more than one return value are not yet supported");
+        os << "        " << m.getName() << "Return r;" << std::endl;
+
+        for(const auto &a : returns) {
+            if(a.isBuiltinType()) {
+                if(a.isPrimitiveType()) {
+                    os << "        r." << a.getName() << " =  reply." << GetterNameFor(a)
+                       << "();" << std::endl;
+                }
+                else {
+                    auto lowerName = a.getTypeName();
+                    std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
+
+                    if(lowerName == "string") {
+                        os << "        r." << a.getName() << " =  reply." << GetterNameFor(a)
+                           << "();" << std::endl;
+                    } else if(lowerName == "blob") {
+                        os << "        const auto retBlob = reply." << GetterNameFor(a) << "();" << std::endl
+                           << "        r." << a.getName() << " = std::vector<std::byte>("
+                           << "reinterpret_cast<const std::byte *>(retBlob.begin()),"
+                           << "reinterpret_cast<const std::byte *>(retBlob.end()));"
+                           << std::endl;
+                    } else {
+                        throw std::runtime_error("Unknown non-primitive builtin type");
+                    }
+                }
+            }
+            else {
+                throw std::runtime_error("Serializing non-builtin type (for return) not yet supported");
+            }
+        }
+
+        os << "        return r;" << std::endl;
     }
 
     // end the method

@@ -54,7 +54,8 @@ class CodeGenerator {
         void clientWriteMarshallMethod(std::ofstream &, const Method &);
         void clientWriteMarshallMethodReply(std::ofstream &, const Method &);
 
-        void cppWriteMethodDef(std::ofstream &, const Method &, const std::string &prefix = "");
+        void cppWriteMethodDef(std::ofstream &, const Method &, const std::string &prefix = "", const std::string &classPrefix = "");
+        void cppWriteReturnStruct(std::ofstream &, const Method &);
         void cppWriteIncludes(std::ofstream &);
         void cppWriteCustomTypeHelpers(std::ofstream &);
         static std::string CppTypenameForArg(const Argument &, const bool isArg);

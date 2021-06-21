@@ -36,19 +36,25 @@ void CodeGenerator::generateServerStub() {
               << std::endl;
 
     // generate the header first
+    std::string includeGuardName("RPC_SERVER_GENERATED_");
+    includeGuardName.append(std::to_string(this->interface->getIdentifier()));
+
     std::ofstream header(fileNameH.string(), std::ofstream::trunc);
     this->serverWriteInfoBlock(header);
-    header << R"(#pragma once
+    header << R"(#ifndef )" << includeGuardName << R"(
+#define )" << includeGuardName << R"(
 
 #include <string>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <string_view>
 #include <vector>
 )" << std::endl;
     this->cppWriteIncludes(header);
     this->serverWriteHeader(header);
+    header << "#endif // defined(" << includeGuardName << ")" << std::endl;
 
     // and then the implementation
     std::ofstream implementation(fileNameCpp.string(), std::ofstream::trunc);
@@ -113,7 +119,8 @@ void CodeGenerator::serverWriteHeader(std::ofstream &os) {
 
     /*
      * Define the types, including the MessageHeader, which is the structure we expect to receive
-     * from whatever input/output stream we're provided.
+     * from whatever input/output stream we're provided. Also define the return type structs for
+     * any methods with multiple returns.
      */
     os << R"(
     struct MessageHeader {
@@ -131,9 +138,16 @@ void CodeGenerator::serverWriteHeader(std::ofstream &os) {
     static_assert(!(offsetof(MessageHeader, payload) % sizeof(uintptr_t)),
         "message header's payload is not word aligned");
 
+    constexpr static const std::string_view kServiceName{")" << this->interface->getName() << R"("};
+
     protected:
         using IoStream = rt::ServerRpcIoStream;
 )";
+
+    for(const auto &m : this->interface->getMethods()) {
+        if(!m.hasMultipleReturns()) continue;
+        this->cppWriteReturnStruct(os, m);
+    }
 
     // public methods
     os << R"(
@@ -165,6 +179,9 @@ void CodeGenerator::serverWriteHeader(std::ofstream &os) {
         constexpr inline auto &getIo() {
             return this->io;
         }
+
+        /// Handles errors occurring during server operations
+        virtual void _HandleError(const bool fatal, const std::string_view &what);
 
     // Implementation details; pretend this does not exist
     private:
@@ -230,8 +247,6 @@ bool Server::run(const bool block) {
 /**
  * Reads a single message from the RPC connection and attempts to process it.
  *
- * @throws If the received message is malformed.
- *
  * @return Whether a message was able to be received and processed.
  */
 bool Server::runOne(const bool block) {
@@ -240,7 +255,10 @@ bool Server::runOne(const bool block) {
     if(!this->io->receive(buf, block)) return false;
 
     // get the message header and its payload
-    if(buf.size() < sizeof(MessageHeader)) throw std::runtime_error("Received message too small");
+    if(buf.size() < sizeof(MessageHeader)) {
+        this->_HandleError(false, "Received message too small");
+        return false;
+    }
     const auto hdr = reinterpret_cast<const MessageHeader *>(buf.data());
 
     const auto payload = buf.subspan(offsetof(MessageHeader, payload));
@@ -280,7 +298,7 @@ void Server::_doSendReply(const MessageHeader &inHdr, const std::span<std::byte>
 
     const std::span<std::byte> txBufSpan(reinterpret_cast<std::byte *>(this->txBuf), len);
     if(!this->io->reply(txBufSpan)) {
-        throw std::runtime_error("Failed to send RPC reply");
+        this->_HandleError(false, "Failed to send RPC reply");
     }
 }
 
@@ -292,10 +310,23 @@ void Server::_ensureTxBuf(const size_t len) {
         }
         int err = posix_memalign(&this->txBuf, 16, len);
         if(err) {
-            throw std::runtime_error("Failed to allocate RPC send buffer");
+            this->_HandleError(true, "Failed to allocate RPC send buffer");
         }
         this->txBufSize = len;
     }
+}
+
+/**
+ * Handles an error that occurred on the server connection. Implementations may override this
+ * method if they want to use exceptions, for example.
+ *
+ * @param fatal If set, the error precludes further operation on this RPC connection
+ * @param what Descriptive string for the error
+ */
+void Server::_HandleError(const bool fatal, const std::string_view &what) {
+    fprintf(stderr, "[RPC] %s: Encountered %s RPC error: %s\n", kServiceName.data(),
+        fatal ? "fatal" : "recoverable", what.data());
+    if(fatal) exit(-1);
 }
 )";
 
@@ -410,15 +441,19 @@ void CodeGenerator::serverWriteMarshallMethodReply(std::ofstream &os, const Meth
 )";
 
     // set the values
-    if(m.getReturns().size() > 1) {
-        throw std::runtime_error("Methods with more than one return value are not yet supported");
-    }
-
     for(const auto &a : m.getReturns()) {
+        // get the name of the variable to read the value out of (for multiple return values)
+        std::string varName{"retVal"};
+        if(m.hasMultipleReturns()) {
+            varName.append(".");
+            varName.append(a.getName());
+        }
+
+        // write out the appropriate setter code
         if(a.isBuiltinType()) {
             // primitive types are easy
             if(a.isPrimitiveType()) {
-                os << "    reply." << SetterNameFor(a) << "(retVal);" << std::endl;
+                os << "    reply." << SetterNameFor(a) << "(" << varName << ");" << std::endl;
             }
             // strings and blobs have special handling to convert them to our desired types
             else {
@@ -426,10 +461,11 @@ void CodeGenerator::serverWriteMarshallMethodReply(std::ofstream &os, const Meth
                 std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
 
                 if(lowerName == "string") {
-                    os << "    reply." << SetterNameFor(a) << "(retVal);" << std::endl;
+                    os << "    reply." << SetterNameFor(a) << "(" << varName << ");" << std::endl;
                 } else if(lowerName == "blob") {
                     os << "    capnp::Data::Reader blobReader_" << a.getName()
-                       << "(reinterpret_cast<const kj::byte *>(retVal.data()), retVal.size());"
+                       << "(reinterpret_cast<const kj::byte *>(" << varName << ".data()), "
+                       << varName << ".size());"
                        << std::endl
                        << "    reply." << SetterNameFor(a) << "(blobReader_" << a.getName()
                        << ");" << std::endl;

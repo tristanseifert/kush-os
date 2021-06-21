@@ -33,7 +33,7 @@ const std::unordered_map<std::string, std::string> CodeGenerator::gCppReturnType
  * Writes the server method definition for the given method.
  */
 void CodeGenerator::cppWriteMethodDef(std::ofstream &os, const Method &m,
-        const std::string &namePrefix) {
+        const std::string &namePrefix, const std::string &classPrefix) {
     // return type
     if(m.isAsync()) {
         os << "void ";
@@ -48,7 +48,7 @@ void CodeGenerator::cppWriteMethodDef(std::ofstream &os, const Method &m,
             }
             // more than one; we have to define a struct type
             else {
-                throw std::runtime_error("multiple return types not yet implemented");
+                os << classPrefix << m.getName() << "Return" << ' ';
             }
         }
     }
@@ -119,6 +119,22 @@ inline bool serialize(std::vector<std::byte> &, const T &) {
     static_assert(TemplatedFalseFlag<T>, "rpc::serialize not implemented for custom type");
 }
 )";
+}
+
+/**
+ * Writes out a structure definition for the return types of the given method, if the method has
+ * more than one return.
+ */
+void CodeGenerator::cppWriteReturnStruct(std::ofstream &os, const Method &m) {
+    os << "        // Return types for method '" << m.getName() << '\'' << std::endl
+       << "        struct " << m.getName() << "Return {" << std::endl;
+
+    for(const auto &a : m.getReturns()) {
+        os << "            " << CppTypenameForArg(a, false) << ' ' << a.getName() << ';'
+           << std::endl;
+    }
+
+    os << "        };" << std::endl;
 }
 
 /**

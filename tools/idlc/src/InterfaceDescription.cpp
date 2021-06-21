@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <iomanip>
 #include <sstream>
 #include <string>
@@ -58,7 +59,13 @@ std::ostream& operator<<(std::ostream& os, const InterfaceDescription::Argument&
  * Initializes a new method; if the identifier is not provided, it's automatically generated from
  * the name by hashing it.
  */
-Method::Method(const std::string &_name, const uint64_t identifier) : name(_name) {
+Method::Method(const std::string &_name, const uint64_t identifier) {
+    // uppercase the first character of the name
+    auto name = _name;
+    name[0] = toupper(name[0]);
+    this->name = _name;
+
+    // calculate an identifier from hashing the name
     if(!identifier) {
         this->identifier = MurmurHash64A(this->name.data(), this->name.size(), kMethodNameHashSeed);
     }
