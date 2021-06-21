@@ -155,7 +155,7 @@ add_library(c_objs OBJECT
     ${c_objs_files}
 )
 
-target_compile_options(c_objs PRIVATE -flto -fno-exceptions -fno-rtti)
+target_compile_options(c_objs PRIVATE -flto -fno-exceptions -fno-rtti -fno-asynchronous-unwind-tables)
 target_compile_definitions(c_objs PRIVATE BUILDING_LIBC=1)
 
 # additional objects for the "full" (aka not the "NO_TLS")  libc
@@ -167,7 +167,7 @@ add_library(c_extra_objs OBJECT
     src/file/fd/close.c
 )
 
-target_compile_options(c_extra_objs PRIVATE -flto -fno-exceptions -fno-rtti)
+target_compile_options(c_extra_objs PRIVATE -flto -fno-exceptions -fno-rtti -fno-asynchronous-unwind-tables)
 target_compile_definitions(c_extra_objs PRIVATE BUILDING_LIBC=1)
 
 # gdtoa: for floating point conversions
@@ -214,7 +214,7 @@ add_library(c_gdtoa OBJECT
     src/gdtoa/sum.c
     src/gdtoa/ulp.c
 )
-target_compile_options(c_gdtoa PRIVATE -flto)
+target_compile_options(c_gdtoa PRIVATE -flto -fno-rtti -fno-exceptions -fno-asynchronous-unwind-tables)
 target_compile_definitions(c_gdtoa PRIVATE BUILDING_LIBC=1)
 
 # copy launch info headers

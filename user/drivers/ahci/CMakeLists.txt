@@ -13,6 +13,7 @@ add_executable(ahcidrv
     src/Port.cpp
     # device implementations
     src/device/AtaDisk.cpp
+    src/device/AtaDiskRpcServer.cpp
     # helper functions
     src/util/String.cpp
 )
@@ -27,7 +28,7 @@ target_include_directories(ahcidrv PRIVATE src)
 
 # required libraries
 add_dependencies(ahcidrv c_dynamic system_dynamic)
-target_link_libraries(ahcidrv PRIVATE capnp driver libpci rpc mpack_dynamic concurrentqueue)
+target_link_libraries(ahcidrv PRIVATE capnp driver libpci DriverSupport::Disk rpc mpack_dynamic concurrentqueue)
 
 # install it to boot directory in sysroot
 install(TARGETS ahcidrv RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)

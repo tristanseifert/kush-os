@@ -72,6 +72,21 @@ struct RegHostToDevFIS {
 
     /// Reserved; initialize to 0
     uint8_t reserved1[4] {0, 0, 0, 0};
+
+    /// Sets the count fiend to the given number of sectors
+    inline void setCount(const uint16_t numSectors) {
+        this->countl = numSectors & 0xFF;
+        this->counth = numSectors >> 8;
+    }
+    /// Sets the LBA fields.
+    inline void setLba(const uint64_t lba) {
+        this->lba0 = lba & 0xFF;
+        this->lba1 = lba >> 8;
+        this->lba2 = lba >> 16;
+        this->lba3 = lba >> 24;
+        this->lba4 = lba >> 32;
+        this->lba5 = lba >> 40;
+    }
 } __attribute__((packed));
 
 /**

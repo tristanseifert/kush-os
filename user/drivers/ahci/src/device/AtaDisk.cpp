@@ -2,6 +2,8 @@
 #include "AtaCommands.h"
 #include "Controller.h"
 #include "Port.h"
+#include "PortStructs.h"
+#include "AtaDiskRpcServer.h"
 
 #include "Log.h"
 #include "util/String.h"
@@ -23,23 +25,15 @@ AtaDisk::AtaDisk(const std::shared_ptr<Port> &port) : Device(port) {
         this->status = err;
         return;
     }
-
-    // send the ATA IDENTIFY DEVICE command
-    using namespace std::placeholders;
-    err = port->submitAtaCommand(AtaCommand::Identify, this->smallBuf,
-            std::bind(&AtaDisk::handleIdentifyResponse, this, _1));
-    if(err) {
-        this->status = err;
-        return;
-    }
 }
 
 /**
  * Helper method to allocate an ATA disk
  */
 int AtaDisk::Alloc(const std::shared_ptr<Port> &port, std::shared_ptr<AtaDisk> &outDisk) {
-    std::shared_ptr<AtaDisk> disk(new AtaDisk(port));
+    auto disk = std::make_shared<AtaDisk>(port);
     if(!disk->getStatus()) {
+        disk->identify();
         outDisk = disk;
     }
     return disk->getStatus();
@@ -49,7 +43,23 @@ int AtaDisk::Alloc(const std::shared_ptr<Port> &port, std::shared_ptr<AtaDisk> &
  * Cleans up resources belonging to the ATA disk.
  */
 AtaDisk::~AtaDisk() {
+    this->stopRpc();
+}
 
+/**
+ * Sends the identify command to the disk.
+ */
+void AtaDisk::identify() {
+    int err;
+
+    // send the ATA IDENTIFY DEVICE command
+    using namespace std::placeholders;
+    err = this->port.lock()->submitAtaCommand(AtaCommand::Identify, this->smallBuf,
+            std::bind(&AtaDisk::handleIdentifyResponse, this, _1));
+    if(err) {
+        this->status = err;
+        return;
+    }
 }
 
 /**
@@ -82,6 +92,7 @@ void AtaDisk::handleIdentifyResponse(const Port::CommandResult &res) {
     this->identifyExtractStrings(span);
 
     // the device is ready for use :D
+    this->startRpc();
     this->registerDisk();
 }
 
@@ -104,7 +115,8 @@ void AtaDisk::identifyExtractStrings(const std::span<std::byte> &span) {
     util::TrimTrailingWhitespace(fw);
     this->firmwareVersion = fw;
 
-    Trace("Model '%s', serial '%s'. Firmware %s", model.c_str(), serial.c_str(), fw.c_str());
+    if(kLogInfo) Trace("Model '%s', serial '%s'. Firmware %s", model.c_str(), serial.c_str(),
+            fw.c_str());
 }
 
 /**
@@ -125,7 +137,7 @@ void AtaDisk::identifyDetermineSize(const std::span<std::byte> &span) {
     memcpy(&temp, span.subspan(166, 2).data(), sizeof(temp));
     const bool supports48Bit = (temp & (1 << 10));
 
-    Trace("48 bit support: %d", supports48Bit);
+    if(kLogInfo) Trace("48 bit support: %d", supports48Bit);
 
     // read out the appropriate size value
     if(supports48Bit) {
@@ -140,7 +152,7 @@ void AtaDisk::identifyDetermineSize(const std::span<std::byte> &span) {
         this->numSectors = smallSize - 1;
     }
 
-    Trace("Have %lu sectors at %lu bytes each", this->numSectors, this->sectorSize);
+    if(kLogInfo) Trace("Have %lu sectors at %lu bytes each", this->numSectors, this->sectorSize);
 }
 
 
@@ -157,7 +169,8 @@ void AtaDisk::registerDisk() {
     this->serializeConnectionData(connection, port);
 
     const auto controllerPath = port->getController()->getForestPath();
-    std::string name("AtaDisk@");
+    std::string name(kDeviceName);
+    name.append("@");
     name.append(std::to_string(port->getPortNumber()));
 
     // register that dude
@@ -229,11 +242,11 @@ void AtaDisk::serializeConnectionData(std::vector<std::byte> &out, const std::sh
 
     // write the IDs
     mpack_write_cstr(&writer, "id");
-    mpack_write_u32(&writer, -1);
+    mpack_write_u32(&writer, this->rpcId);
 
     // write port name
     mpack_write_cstr(&writer, "port");
-    mpack_write_u64(&writer, -1);
+    mpack_write_u64(&writer, AtaDiskRpcServer::the()->getPortHandle());
 
     // copy to output buffer
     mpack_finish_map(&writer);
@@ -247,5 +260,52 @@ void AtaDisk::serializeConnectionData(std::vector<std::byte> &out, const std::sh
     out.resize(size);
     out.assign(reinterpret_cast<std::byte *>(data), reinterpret_cast<std::byte *>(data + size));
     free(data);
+}
+
+
+
+/**
+ * If not already running, the disk RPC handler shared by all disks in this driver is started, and
+ * this disk registered with it.
+ */
+void AtaDisk::startRpc() {
+    this->rpcId = AtaDiskRpcServer::the()->add(this->shared_from_this());
+}
+
+/**
+ * Unregisters this disk from the RPC handler. If there are no remaining disks registered with the
+ * handler, it will be deallocated.
+ */
+void AtaDisk::stopRpc() {
+    AtaDiskRpcServer::the()->remove(this->rpcId);
+}
+
+
+
+/**
+ * Reads from the disk into the given buffer.
+ */
+int AtaDisk::read(const uint64_t start, const size_t numSectors, const DMABufferPtr &to,
+        const std::function<void(bool)> &callback) {
+    // validate arguments
+    if(numSectors > 65536) return -1;
+
+    // build the request
+    RegHostToDevFIS fis;
+    fis.command = static_cast<uint8_t>(AtaCommand::ReadDma48);
+    fis.c = 1; // write to command register
+    fis.device = (1 << 6);
+
+    fis.setLba(start);
+    fis.setCount(static_cast<uint16_t>(numSectors));
+
+    // submit the command
+    return this->port.lock()->submitAtaCommand(fis, to, [callback](const auto &res) {
+        if(res.isSuccess()) {
+            callback(true);
+        } else {
+            callback(false);
+        }
+    });
 }
 

@@ -15,3 +15,4 @@ if(BUILD_SYSTEM_SERVERS)
 endif()
 
 add_subdirectory(dyldo)
+add_subdirectory(ipc)

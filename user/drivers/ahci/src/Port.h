@@ -20,6 +20,7 @@ struct PortReceivedFIS;
 struct PortCommandTable;
 struct PortCommandList;
 struct RegDevToHostFIS;
+struct RegHostToDevFIS;
 
 /**
  * Handles transactions for a single port on an AHCI controller.
@@ -102,6 +103,9 @@ class Port: public std::enable_shared_from_this<Port> {
 
         /// Submit an ATA command with a fixed size response.
         [[nodiscard]] int submitAtaCommand(const AtaCommand cmd, const DMABufferPtr &result,
+                const CommandCallback &callback);
+        /// Submit an ATA command with the given register state and a fixed size response.
+        [[nodiscard]] int submitAtaCommand(const RegHostToDevFIS &regs, const DMABufferPtr &result,
                 const CommandCallback &callback);
 
         /// Returns the controller to which this port belongs

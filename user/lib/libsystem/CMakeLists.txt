@@ -20,8 +20,7 @@ add_library(system_objs OBJECT
 target_compile_options(system_objs PRIVATE -fPIC)
 
 # allow the library to have link time optimization
-target_compile_options(system_objs PRIVATE -flto)
-target_compile_options(system_objs PRIVATE -fno-exceptions -fno-rtti)
+target_compile_options(system_objs PRIVATE -flto -fno-exceptions -fno-rtti -fno-asynchronous-unwind-tables)
 # set required compiler flags
 target_compile_definitions(system_objs PRIVATE BUILDING_LIBSYSTEM=1)
 # specify the include directories
@@ -36,12 +35,6 @@ target_include_directories(system_static PUBLIC include)
 add_library(system_dynamic SHARED $<TARGET_OBJECTS:system_objs>)
 set_target_properties(system_dynamic PROPERTIES OUTPUT_NAME "system")
 target_include_directories(system_dynamic PUBLIC include)
-
-# Link against libunwind.
-# This is required for building pretty backtraces, and also has the benefit that it'll make sure
-# that C++ exceptions will always work.
-#target_link_libraries(system_static PUBLIC unwind)
-# target_link_libraries(system_dynamic PUBLIC unwind)
 
 # build the correct platform-specific code
 if(${KERNEL_ARCH} STREQUAL "x86")

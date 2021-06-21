@@ -23,6 +23,14 @@ enum AtaStatus: uint8_t {
  */
 enum class AtaCommand: uint8_t {
     /**
+     * 0x25: READ DMA EXT
+     *
+     * Performs a read from the device, using 48-bit LBA addressing, which is then transfered to
+     * the host using DMA.
+     */
+    ReadDma48                           = 0x25,
+
+    /**
      * 0xEC: IDENTIFY DEVICE
      *
      * Returns a 512-byte block of information to the host about this device. If the device is an

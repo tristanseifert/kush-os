@@ -34,3 +34,8 @@ class = 0x01
 subclass = 0x06
 # TODO: we should really match on vid/pid as well
 
+# File system driver (matches on raw disks)
+[[drivers]]
+path = "/sbin/fsdrv"
+[[drivers.match]]
+name = "GenericDisk"

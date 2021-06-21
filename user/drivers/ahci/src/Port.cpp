@@ -217,7 +217,7 @@ void Port::identDevice() {
                 Warn("Failed to allocate %s on port %u: %d", "ATA disk", this->port, err);
             } else {
                 REQUIRE(disk, "No error but failed to allocate device");
-                this->portDevice = disk;
+                this->portDevice = std::move(disk);
             }
             break;
         }
@@ -358,28 +358,23 @@ void Port::handleIrq() {
 
 
 /**
- * Submits an ATA command to the device on this port.
+ * Submits an ATA command (built in the provided host-to-device register FIS) to the device.
  *
- * @note You should only invoke this when the device is confirmed to be an ATA device once the
- * signature is checked. ATAPI devices may not respond well to many ATA commands.
- *
- * @param cmd Command byte to write to the device
+ * @param fis Registers to write to the device. You're responsible for setting all registers for
+ *        the given command.
  * @param result Buffer large enough to store the full response of this request
  * @param cb Callback to invoke when the command completes.
  *
  * @return 0 if the command was submitted successfully, otherwise a negative error code.
  */
-int Port::submitAtaCommand(const AtaCommand cmd, const DMABufferPtr &result,
+int Port::submitAtaCommand(const RegHostToDevFIS &fis, const DMABufferPtr &result,
         const CommandCallback &cb) {
     // find a command slot
     const auto slotIdx = this->allocCommandSlot();
     auto table = this->cmdTables[slotIdx];
 
-    // build the command (register, host to device) and copy to the table
-    RegHostToDevFIS fis;
-    fis.type = FISType::RegisterHostToDevice;
-    fis.command = static_cast<uint8_t>(cmd);
-    fis.c = 1; // write to command register
+    // copy the command structure
+    //fis.c = 1; // write to command register
 
     memcpy((void *) &table->commandFIS, &fis, sizeof(fis)); // yikes
 
@@ -412,6 +407,29 @@ int Port::submitAtaCommand(const AtaCommand cmd, const DMABufferPtr &result,
     i.buffers.emplace_back(result);
 
     return this->submitCommand(slotIdx, std::move(i));
+}
+
+/**
+ * Submits an ATA command to the device on this port.
+ *
+ * @note You should only invoke this when the device is confirmed to be an ATA device once the
+ * signature is checked. ATAPI devices may not respond well to many ATA commands.
+ *
+ * @param cmd Command byte to write to the device
+ * @param result Buffer large enough to store the full response of this request
+ * @param cb Callback to invoke when the command completes.
+ *
+ * @return 0 if the command was submitted successfully, otherwise a negative error code.
+ */
+int Port::submitAtaCommand(const AtaCommand cmd, const DMABufferPtr &result,
+        const CommandCallback &cb) {
+    // build the register FIS
+    RegHostToDevFIS fis;
+    fis.command = static_cast<uint8_t>(cmd);
+    fis.c = 1; // write to command register
+
+    // then submit command
+    return this->submitAtaCommand(fis, result, cb);
 }
 
 /**

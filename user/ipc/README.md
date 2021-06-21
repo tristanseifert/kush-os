@@ -1,0 +1,1 @@
+This directory contains the various interface descriptions (and the generated C++ code stubs) for various RPC interfaces used by drivers. Each of these interfaces is compiled into a static library, which interested drivers and clients can use. The same library contains both the server/client stubs, and concrete client implementation.

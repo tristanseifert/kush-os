@@ -5,6 +5,7 @@
 #include "Port.h"
 
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -15,8 +16,11 @@
  * Provides an interface for an ATA hard drive type device, whether it is connected via parallel
  * or SATA.
  */
-class AtaDisk: public Device {
+class AtaDisk: public Device, public std::enable_shared_from_this<AtaDisk> {
     using DMABufferPtr = std::shared_ptr<libdriver::ScatterGatherBuffer>;
+
+    /// Device name for ATA disk
+    constexpr static const std::string_view kDeviceName{"AtaDisk,GenericDisk"};
 
     /// Name of the device property that contains information about the disk
     constexpr static const std::string_view kInfoPropertyName{"disk.ata.info"};
@@ -28,6 +32,10 @@ class AtaDisk: public Device {
                 std::shared_ptr<AtaDisk> &outDisk);
 
         virtual ~AtaDisk();
+
+        /// Performs a read that fills the given buffer.
+        [[nodiscard]] int read(const uint64_t start, const size_t numSectors, const DMABufferPtr &to,
+                const std::function<void(bool)> &callback);
 
         /// Current status of the disk; 0 if valid
         constexpr auto getStatus() const {
@@ -60,11 +68,16 @@ class AtaDisk: public Device {
             return this->sectorSize;
         }
 
-    private:
+        // don't use this
         AtaDisk(const std::shared_ptr<Port> &port);
 
+    private:
+        void identify();
         void invalidate();
         void registerDisk();
+
+        void startRpc();
+        void stopRpc();
 
         void handleIdentifyResponse(const Port::CommandResult &);
         void identifyExtractStrings(const std::span<std::byte> &);
@@ -76,6 +89,9 @@ class AtaDisk: public Device {
     private:
         /// Desired size for the scatter gather buffer
         constexpr static const size_t kSmallBufSize{2048};
+
+        /// Whether info read from the device during initialization is logged
+        constexpr static const bool kLogInfo{false};
 
         /// status code (if an error occurred)
         int status{0};
@@ -91,9 +107,12 @@ class AtaDisk: public Device {
         std::string model;
 
         /// Sector size, in bytes
-        size_t sectorSize{512};
+        uint32_t sectorSize{512};
         /// Total number of user accessible sectors on the device
         uint64_t numSectors{0};
+
+        /// RPC disk identifier
+        uint64_t rpcId{~0U};
 
         /// DMA buffer for small device commands
         DMABufferPtr smallBuf;

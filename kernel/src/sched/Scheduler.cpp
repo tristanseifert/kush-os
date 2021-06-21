@@ -574,9 +574,12 @@ void Scheduler::processUnblockedThreads() {
             case Thread::State::NotifyWait:
                 break;
 
+            // if thread died while waiting to be unblocked, ignore it
+            case Thread::State::Zombie:
+                continue;
+
             case Thread::State::Paused:
             case Thread::State::Runnable:
-            case Thread::State::Zombie:
                 panic("thread $%p'h (%lu) in unblocked list, but has invalid state %d",
                         thread->getHandle(), thread->tid, static_cast<int>(thread->state));
         }
