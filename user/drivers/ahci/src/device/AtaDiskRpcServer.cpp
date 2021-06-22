@@ -10,6 +10,7 @@
 
 #include <unistd.h>
 #include <sys/syscalls.h>
+#include <driver/BufferPool.h>
 #include <rpc/rt/ServerPortRpcStream.h>
 #include <DriverSupport/disk/Types.h>
 
@@ -18,7 +19,7 @@ static uintptr_t kCommandRegionMappingRange[2] = {
     // start
     0x67808000000,
     // end
-    0x67810000000,
+    0x67809000000,
 };
 AtaDiskRpcServer *AtaDiskRpcServer::gShared{nullptr};
 
@@ -193,10 +194,41 @@ int32_t AtaDiskRpcServer::implCloseSession(uint64_t token) {
  *
  * The caller should map this region as read-only.
  */
-AtaDiskRpcServer::CreateReadBufferReturn AtaDiskRpcServer::implCreateReadBuffer(uint64_t session,
+AtaDiskRpcServer::CreateReadBufferReturn AtaDiskRpcServer::implCreateReadBuffer(uint64_t token,
         uint64_t requested) {
-    Trace("Create read buffer for $%lx: requested %lu bytes", session, requested);
-    return {Errors::Unsupported};
+    int err;
+
+    // get the session
+    std::lock_guard<std::mutex> lg(this->sessionsLock);
+    if(!this->sessions.contains(token)) return {Errors::InvalidSession};
+    auto &session = this->sessions[token];
+
+    // return the info for the existing read buffer if we have one already
+    if(session.readBuf) {
+        const auto &buf = session.readBuf;
+        return {0, buf->getHandle(), buf->getMaxSize()};
+    }
+
+    // figure out initial allocation and create the buffer
+    const auto pageSz = sysconf(_SC_PAGESIZE);
+    if(!pageSz) return {Errors::InternalError};
+
+    size_t initialSize = std::min(std::max(requested, kReadBufferMinSize), kReadBufferMaxSize);
+    initialSize = ((initialSize + pageSz - 1) / pageSz) * pageSz;
+    Trace("Create read buffer for $%lx: requested %lu bytes, got %lu", token, requested, initialSize);
+
+    err = libdriver::BufferPool::Alloc(initialSize, kReadBufferMaxSize, session.readBuf);
+    if(err) {
+        return {err};
+    }
+
+    // return buffer information
+    const auto &buf = session.readBuf;
+    if(!buf) {
+        return {Errors::InternalError};
+    }
+
+    return {0, buf->getHandle(), buf->getMaxSize()};
 }
 
 /**
@@ -213,8 +245,34 @@ AtaDiskRpcServer::CreateWriteBufferReturn AtaDiskRpcServer::implCreateWriteBuffe
  * Indicates that the given command slot has been fully built up in the shared memory region by the
  * caller, and we should queue it to the associated device.
  */
-void AtaDiskRpcServer::implExecuteCommand(uint64_t session, uint32_t slot) {
-    Trace("Session $%lx: Execute command %lu", session, slot);
+void AtaDiskRpcServer::implExecuteCommand(uint64_t token, uint32_t slot) {
+    // get the session
+    this->sessionsLock.lock();
+    if(!this->sessions.contains(token)) {
+        Warn("%s: Session $%lx %s (slot %lu)", __FUNCTION__, token, "invalid session token", slot);
+        return this->sessionsLock.unlock();
+    }
+    auto &session = this->sessions[token];
+    this->sessionsLock.unlock();
+
+    // check its command buffer and validate the command
+    if(slot >= session.numCommands) {
+        Warn("%s: Session $%lx %s (slot %lu)", __FUNCTION__, token, "invalid command slot", slot);
+        return;
+    }
+    auto &command = session.commandList[slot];
+
+    if(!command.allocated || command.completed) {
+        Warn("%s: Session $%lx %s (slot %lu)", __FUNCTION__, token, "invalid command state", slot);
+        return;
+    }
+    if(__atomic_test_and_set(&command.busy, __ATOMIC_ACQUIRE)) {
+        Warn("%s: Session $%lx %s (slot %lu)", __FUNCTION__, token, "command already busy", slot);
+        return;
+    }
+
+    // begin processing it
+    this->processCommand(session, slot, command);
 }
 
 /**
@@ -222,8 +280,42 @@ void AtaDiskRpcServer::implExecuteCommand(uint64_t session, uint32_t slot) {
  * buffer, and the command slot (and its associated read buffer allocation) may be reused for
  * another operation.
  */
-void AtaDiskRpcServer::implReleaseReadCommand(uint64_t session, uint32_t slot) {
-    Trace("Session $%lx: Release read command %lu", session, slot);
+void AtaDiskRpcServer::implReleaseReadCommand(uint64_t token, uint32_t slot) {
+    // get the session
+    this->sessionsLock.lock();
+    if(!this->sessions.contains(token)) {
+        Warn("%s: Session $%lx %s (slot %lu)", __FUNCTION__, token, "invalid session token", slot);
+        return this->sessionsLock.unlock();
+    }
+    auto &session = this->sessions[token];
+    this->sessionsLock.unlock();
+
+    // validate slot index and get reference to command
+    if(slot >= session.numCommands) {
+        Warn("%s: Session $%lx %s (slot %lu)", __FUNCTION__, token, "invalid command slot", slot);
+        return;
+    }
+    auto &command = session.commandList[slot];
+
+    if(command.type != DriverSupport::disk::CommandType::Read) {
+        Warn("%s: Session $%lx %s (slot %lu)", __FUNCTION__, token, "invalid type", slot);
+        return;
+    }
+
+    // release the buffer and the command slot
+    session.readCommandBuffers.erase(slot);
+
+    command.notifyThread = 0;
+    command.notifyBits = 0;
+    command.diskId = 0;
+    command.sector = 0;
+    command.bufferOffset = 0;
+    command.numSectors = 0;
+    command.bytesTransfered = 0;
+
+    __atomic_clear(&command.busy, __ATOMIC_RELAXED);
+    __atomic_clear(&command.completed, __ATOMIC_RELAXED);
+    __atomic_clear(&command.allocated, __ATOMIC_RELEASE);
 }
 
 /**
@@ -235,3 +327,108 @@ AtaDiskRpcServer::AllocWriteMemoryReturn AtaDiskRpcServer::implAllocWriteMemory(
     Trace("Session $%lx: Allocate write %lu bytes write buffer", session, bytesRequested);
     return {Errors::Unsupported};
 }
+
+
+
+/**
+ * Attempts to process the given command.
+ */
+void AtaDiskRpcServer::processCommand(Session &session, const size_t slot,
+        volatile DriverSupport::disk::Command &cmd) {
+    using namespace DriverSupport::disk;
+
+    switch(cmd.type) {
+        // start a read request
+        case CommandType::Read:
+            if(!cmd.numSectors || !cmd.notifyThread || !cmd.notifyBits) {
+                Warn("%s: Invalid %s command in slot %lu", __FUNCTION__, "read", slot);
+            }
+
+            // we can do the read now
+            this->doCmdRead(session, slot, cmd);
+            break;
+
+        // other types currently unsupported
+        default:
+            Warn("%s: Unsupported command type $%02x in slot %lu", __FUNCTION__, cmd.type, slot);
+            break;
+    }
+}
+
+/**
+ * Processes a read command. We assume that the contents of the command have been validated when we
+ * are called.
+ */
+void AtaDiskRpcServer::doCmdRead(Session &session, const size_t slot,
+        volatile DriverSupport::disk::Command &cmd) {
+    int err;
+
+    // get the disk
+    std::shared_ptr<AtaDisk> disk;
+    {
+        const uint64_t diskId = cmd.diskId;
+        std::lock_guard<std::mutex> lg(this->disksLock);
+        if(this->disks.contains(diskId)) {
+            disk = this->disks[diskId].lock();
+        }
+    }
+    if(!disk) {
+        Warn("%s: Invalid disk id ($%lx) in %s command at %lu", __FUNCTION__, cmd.diskId, "read",
+                slot);
+        return;
+    }
+
+    // allocate the buffer
+    const size_t readBytes = disk->getSectorSize() * cmd.numSectors;
+    Trace("Read request is %lu bytes", readBytes);
+
+    std::shared_ptr<libdriver::BufferPool::Buffer> buffer;
+    err = session.readBuf->getBuffer(readBytes, buffer);
+
+    if(err) {
+        Warn("%s: Failed to get %s buffer (%lu bytes)", __FUNCTION__, "read", readBytes);
+        return this->notifyCmdFailure(cmd, err);
+    }
+
+    session.readCommandBuffers[slot] = buffer;
+    cmd.bufferOffset = buffer->getPoolOffset();
+
+    // perform the read
+    err = disk->read(cmd.sector, cmd.numSectors, buffer, [this, readBytes, &cmd](bool success) {
+        if(success) {
+            cmd.bytesTransfered = readBytes;
+
+            this->notifyCmdSuccess(cmd);
+        } else {
+            this->notifyCmdFailure(cmd, Errors::IoError);
+        }
+    });
+
+    if(err) {
+        Warn("%s: Failed to submit %s request (start %lu x %lu sectors)", __FUNCTION__, "read",
+                cmd.sector, cmd.numSectors);
+        return this->notifyCmdFailure(cmd, err);
+    }
+}
+
+
+
+/**
+ * Updates the command object with the given status code and and signals the remote thread.
+ */
+void AtaDiskRpcServer::notifyCmdCompletion(volatile DriverSupport::disk::Command &cmd,
+        const int status) {
+    int err;
+
+    // update command object
+    __atomic_store_n(&cmd.status, status, __ATOMIC_RELAXED);
+    __atomic_store_n(&cmd.completed, true, __ATOMIC_RELAXED);
+    __atomic_clear(&cmd.busy, __ATOMIC_RELEASE);
+
+    // notify the thread
+    err = NotificationSend(cmd.notifyThread, cmd.notifyBits);
+    if(err) {
+        Warn("%s: %s failed: %d", __FUNCTION__, "NotificationSend", err);
+    }
+}
+

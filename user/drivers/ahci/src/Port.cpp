@@ -437,13 +437,13 @@ int Port::submitAtaCommand(const AtaCommand cmd, const DMABufferPtr &result,
  * the physical pages of the given scatter/gather buffer.
  *
  * @param table Command table whose PRDs are to be updated
- * @param buf Scatter/gather buffer to insert mappings for
+ * @param buf Buffer to insert mappings for
  * @param irq If set, we'll set the PRD's "irq on completion" bit for the last one.
  *
  * @return Total number of PRDs written.
  */
 size_t Port::fillCmdTablePhysDescriptors(volatile PortCommandTable *table,
-    const std::shared_ptr<libdriver::ScatterGatherBuffer> &buf, const bool irq) {
+    const std::shared_ptr<libdriver::DmaBuffer> &buf, const bool irq) {
     // ensure the buffer can fit in the number of PRDs we have
     const auto &extents = buf->getExtents();
     if(extents.size() > kCommandTableNumPrds) {

@@ -22,9 +22,9 @@ static void PrintSector(const std::vector<std::byte> &data) {
             str << std::setw(4) << std::hex << i << ": ";
         }
 
-        str << std::hex << static_cast<uint32_t>(data[i]) << " ";
+        str << std::hex << std::setw(2) << std::setfill('0') << static_cast<uint32_t>(data[i]) << " ";
 
-        if(!(i % 32) && i) {
+        if((i % 32) == 31) {
             str << std::endl;
         }
     }

@@ -18,12 +18,17 @@ class Disk: public rpc::DiskDriverClient {
     /// Name of the device property that contains information on how to talk to the disk
     constexpr static const std::string_view kConnectionPropertyName{"disk.ata.connection"};
 
+    /// Notification bits to be used for command completion waits
+    constexpr static const uintptr_t kCommandCompletionBits{1U << 29};
+
     public:
         enum Errors: int {
             /// The specified path is invalid
-            InvalidPath                         = -40001,
+            InvalidPath                         = -40000,
             /// Failed to decode the connection info
-            InvalidConnectionInfo               = -40002,
+            InvalidConnectionInfo               = -40001,
+            /// All command slots have been allocated.
+            NoCommandsAvailable                 = -40002,
         };
 
     public:
@@ -43,9 +48,16 @@ class Disk: public rpc::DiskDriverClient {
 
         static std::pair<uintptr_t, uint64_t> DecodeConnectionInfo(const std::span<std::byte> &);
 
+        int ensureReadBuffer();
+
+        size_t allocCommandSlot();
+        void submit(const size_t slot);
+
         using DiskDriverClient::GetCapacity;
         using DiskDriverClient::OpenSession;
         using DiskDriverClient::CloseSession;
+        using DiskDriverClient::CreateReadBuffer;
+        using DiskDriverClient::CreateWriteBuffer;
 
     private:
         int status{0};
@@ -64,6 +76,13 @@ class Disk: public rpc::DiskDriverClient {
         volatile Command *commandList{nullptr};
         /// Total number of available commands
         size_t numCommands{0};
+
+        /// Read buffer VM object handle
+        uintptr_t readBufVmRegion{0};
+        /// Read buffer pointer
+        void *readBuf{nullptr};
+        /// Maximum size the read buffer can grow to
+        size_t readBufMaxSize{0};
 };
 };
 

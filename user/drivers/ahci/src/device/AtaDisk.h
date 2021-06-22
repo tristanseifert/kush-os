@@ -10,6 +10,7 @@
 #include <string_view>
 #include <vector>
 
+#include <driver/DmaBuffer.h>
 #include <driver/ScatterGatherBuffer.h>
 
 /**
@@ -17,7 +18,7 @@
  * or SATA.
  */
 class AtaDisk: public Device, public std::enable_shared_from_this<AtaDisk> {
-    using DMABufferPtr = std::shared_ptr<libdriver::ScatterGatherBuffer>;
+    using DMABufferPtr = std::shared_ptr<libdriver::DmaBuffer>;
 
     /// Device name for ATA disk
     constexpr static const std::string_view kDeviceName{"AtaDisk,GenericDisk"};
@@ -115,7 +116,7 @@ class AtaDisk: public Device, public std::enable_shared_from_this<AtaDisk> {
         uint64_t rpcId{~0U};
 
         /// DMA buffer for small device commands
-        DMABufferPtr smallBuf;
+        std::shared_ptr<libdriver::ScatterGatherBuffer> smallBuf;
 };
 
 #endif

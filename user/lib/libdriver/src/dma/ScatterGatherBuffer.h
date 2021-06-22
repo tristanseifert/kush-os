@@ -7,50 +7,19 @@
 #include <span>
 #include <vector>
 
+#include <driver/DmaBuffer.h>
+
 namespace libdriver {
 /**
  * Encapsulates a buffer in physical memory (locked) that can be used to perform scatter-gather
  * type DMA transfers. The buffer will always be page aligned, and allocate whole pages of memory.
  */
-class ScatterGatherBuffer {
-    public:
-        /**
-         * Describes a single extent of the scatter/gather buffer, aka an individual contiguous
-         * chunk of physical memory to be transfered.
-         */
-        struct Extent {
-            friend class ScatterGatherBuffer;
-
-            /// Physical address of the extent
-            uint64_t physAddr{0};
-            /// Length of the extent, in bytes
-            size_t length{0};
-
-            constexpr uint64_t getPhysAddress() const {
-                return this->physAddr;
-            }
-            constexpr size_t getSize() const {
-                return this->length;
-            }
-
-            Extent(const uint64_t addr, const size_t size) : physAddr(addr), length(size) {}
-        };
-
-        /// Scatter gather buffer errors
-        enum Errors: int {
-            /// Failed to translate physical address
-            PhysTranslationFailed               = -20000,
-            /// Allocating physical memory failed
-            AllocFailed                         = -20001,
-            /// Mapping the memory region failed
-            MapFailed                           = -20002,
-        };
-
+class ScatterGatherBuffer: public DmaBuffer {
     public:
         ~ScatterGatherBuffer();
 
         /// Gets a span that encompasses the entire buffer.
-        explicit operator std::span<std::byte>() const {
+        explicit operator std::span<std::byte>() const override {
             return std::span<std::byte>(static_cast<std::byte *>(this->base), this->size);
         }
 
@@ -60,16 +29,16 @@ class ScatterGatherBuffer {
         }
 
         /// Gets the pages that make up the buffer.
-        constexpr const auto &getExtents() const {
+        const std::vector<Extent> &getExtents() const override {
             return this->extents;
         }
         /// Gets the size of the buffer
-        constexpr size_t getSize() const {
+        size_t getSize() const override {
             return this->size;
         }
 
         /// Return the underlying virtual memory of the buffer.
-        constexpr void * _Nonnull data() const {
+        void * _Nonnull data() const override {
             return this->base;
         }
 

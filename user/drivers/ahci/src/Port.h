@@ -11,6 +11,7 @@
 #include <optional>
 #include <variant>
 
+#include <driver/DmaBuffer.h>
 #include <driver/ScatterGatherBuffer.h>
 
 class Controller;
@@ -34,7 +35,7 @@ struct RegHostToDevFIS;
  * TODO: This needs a _lot_ of locking and other multithreading support :)
  */
 class Port: public std::enable_shared_from_this<Port> {
-    using DMABufferPtr = std::shared_ptr<libdriver::ScatterGatherBuffer>;
+    using DMABufferPtr = std::shared_ptr<libdriver::DmaBuffer>;
 
     public:
         /**
@@ -124,7 +125,7 @@ class Port: public std::enable_shared_from_this<Port> {
          */
         struct CommandInfo {
             /// All buffers referenced by this command
-            std::vector<std::shared_ptr<libdriver::ScatterGatherBuffer>> buffers;
+            std::vector<DMABufferPtr> buffers;
             /// callback invoked with command completion info
             CommandCallback callback;
 
@@ -141,7 +142,7 @@ class Port: public std::enable_shared_from_this<Port> {
         void identSatapiDevice();
 
         size_t fillCmdTablePhysDescriptors(volatile PortCommandTable * _Nonnull table,
-                const std::shared_ptr<libdriver::ScatterGatherBuffer> &buf, const bool irq);
+                const DMABufferPtr &buf, const bool irq);
 
         size_t allocCommandSlot();
         int submitCommand(const uint8_t slot, CommandInfo);

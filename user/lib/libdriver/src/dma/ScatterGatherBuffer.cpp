@@ -5,8 +5,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <stdexcept>
-#include <system_error>
 
 using namespace libdriver;
 

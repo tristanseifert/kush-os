@@ -9,6 +9,7 @@
 #include <unordered_map>
 
 #include <DriverSupport/disk/Server_DiskDriver.hpp>
+#include <driver/BufferPool.h>
 
 class AtaDisk;
 
@@ -30,6 +31,10 @@ class AtaDiskRpcServer: rpc::DiskDriverServer {
             Unsupported                 = -50003,
             /// An invalid session token was specified
             InvalidSession              = -50004,
+            /// Some generic error occurred while processing the request.
+            InternalError               = -50005,
+            /// An IO error occurred during the request
+            IoError                     = -50006,
         };
 
     public:
@@ -60,6 +65,11 @@ class AtaDiskRpcServer: rpc::DiskDriverServer {
         /// Maximum number of commands to allocate per session
         constexpr static const size_t kMaxCommands{64};
 
+        /// Minimum size for the initial read buffer allocation
+        constexpr static const size_t kReadBufferMinSize{1024 * 512};
+        /// Maximum size of the read buffer allocation
+        constexpr static const size_t kReadBufferMaxSize{1024 * 1024 * 8};
+
         /**
          * Information on a particular session.
          */
@@ -71,6 +81,11 @@ class AtaDiskRpcServer: rpc::DiskDriverServer {
 
             /// Total number of commands allocated
             size_t numCommands{kMaxCommands};
+
+            /// Buffer pool to use for read buffer allocations
+            std::shared_ptr<libdriver::BufferPool> readBuf;
+            /// Sub-buffers in the read allocation that are active
+            std::unordered_map<size_t, std::shared_ptr<libdriver::DmaBuffer>> readCommandBuffers;
         };
 
     private:
@@ -78,6 +93,19 @@ class AtaDiskRpcServer: rpc::DiskDriverServer {
         virtual ~AtaDiskRpcServer();
 
         void main();
+
+        void processCommand(Session &, const size_t, volatile DriverSupport::disk::Command &);
+        void doCmdRead(Session &, const size_t, volatile DriverSupport::disk::Command &);
+
+        /// Mark command as successfully completed and notify remote thread
+        inline void notifyCmdSuccess(volatile DriverSupport::disk::Command &cmd) {
+            this->notifyCmdCompletion(cmd, 0);
+        }
+        /// Mark command as failed (with given error code) and notify remote thread
+        inline void notifyCmdFailure(volatile DriverSupport::disk::Command &cmd, const int status) {
+            return this->notifyCmdCompletion(cmd, status);
+        }
+        void notifyCmdCompletion(volatile DriverSupport::disk::Command &, const int);
 
     private:
         /// Shared instance ATA server: created as needed

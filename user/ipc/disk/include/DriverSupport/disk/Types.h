@@ -19,8 +19,8 @@ enum class CommandType: uint8_t {
  * memory region.
  */
 struct Command {
-    /// whether the command is available
-    bool available{true};
+    /// set to mark the command as allocated
+    bool allocated{false};
     /// whether the command is busy (being executed or is queued)
     bool busy{false};
     /// whether the command has completed
@@ -29,12 +29,15 @@ struct Command {
     CommandType type{CommandType::None};
 
     /// completion status code for the command; 0 = success
-    int status{0};
+    int __attribute((aligned(4))) status{0};
 
     /// Thread to notify when command completes
     uintptr_t notifyThread;
     /// Notification bits to set when command completes
     uintptr_t notifyBits;
+
+    /// disk id to access
+    uint64_t diskId{0};
 
     /// Starting sector for command
     uint64_t sector;
@@ -43,10 +46,10 @@ struct Command {
 
     /// Total number of sectors to read/write
     uint32_t numSectors;
-    /// Total sectors that were actually transfered
-    uint32_t numSectorsTransfered;
+    /// Total bytes that were actually transfered
+    uint32_t bytesTransfered;
 
-    uint8_t reserved[16];
+    uint8_t reserved[8];
 } __attribute__((packed));
 
 static_assert(sizeof(Command) == 0x40, "Invalid size for command descriptor");

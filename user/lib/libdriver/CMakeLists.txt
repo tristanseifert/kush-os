@@ -11,6 +11,7 @@ add_library(driver STATIC
     # serialization helpers
     src/serialize/base85.c
     # DMA support
+    src/dma/BufferPool.cpp
     src/dma/ScatterGatherBuffer.cpp
 )
 
