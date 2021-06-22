@@ -37,6 +37,26 @@ ExternalProject_Add(openlibm
     INSTALL_COMMAND make DESTDIR=${CMAKE_SYSROOT} libdir=/lib includedir=/usr/include install
 )
 
+# libcrc
+add_library(libcrc SHARED
+    libcrc/src/crc8.c
+    libcrc/src/crc16.c
+    libcrc/src/crc32.c
+    libcrc/src/crcdnp.c
+    libcrc/src/crcsick.c
+    libcrc/src/crcccitt.c
+    libcrc/src/crckrmit.c
+    libcrc/src/nmea-chk.c
+)
+target_compile_options(libcrc PRIVATE -flto -fPIC)
+set_target_properties(libcrc PROPERTIES OUTPUT_NAME "crc")
+target_include_directories(libcrc PRIVATE libcrc/include)
+target_include_directories(libcrc PUBLIC libcrc/include)
+
+install(TARGETS libcrc LIBRARY)
+add_custom_command(TARGET libcrc POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/libcrc.so ${SYSROOT_DIR}/boot/lib/libcrc.so)
+
 # MessagePack lib
 add_library(mpack_objs OBJECT
     mpack/src/mpack/mpack-common.c

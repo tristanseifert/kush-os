@@ -108,6 +108,16 @@ Disk::Disk(const std::shared_ptr<IoStream> &io, const std::string_view &_forestP
     }
 
     this->commandList = reinterpret_cast<volatile Command *>(base);
+
+    // get the size information
+    auto ret2 = this->GetCapacity(this->id);
+    if(ret2.status) {
+        this->status = ret2.status;
+        return;
+    }
+
+    this->sectorSize = ret2.sectorSize;
+    this->numSectors = ret2.numSectors;
 }
 
 /**
@@ -186,8 +196,6 @@ int Disk::Read(const uint64_t sector, const size_t numSectors, std::vector<std::
     // copy out from buffer if command was successful
     const int status = command.status;
     if(!status) {
-        fprintf(stderr, "[%s] Command completed successfully; copy out data\n", "disk");
-
         // copy the data
         auto ptr = reinterpret_cast<std::byte *>(reinterpret_cast<uintptr_t>(this->readBuf) +
                 command.bufferOffset);
@@ -195,8 +203,6 @@ int Disk::Read(const uint64_t sector, const size_t numSectors, std::vector<std::
 
         out.reserve(numBytes);
         out.insert(out.end(), ptr, ptr+numBytes);
-
-        // release buffer segment
     } else {
         fprintf(stderr, "[%s] Command failed! %d\n", "disk", status);
     }

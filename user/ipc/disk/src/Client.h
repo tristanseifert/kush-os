@@ -37,6 +37,15 @@ class Disk: public rpc::DiskDriverClient {
 
         virtual ~Disk();
 
+        /// Gets the cached sector size of the disk.
+        constexpr auto getSectorSize() const {
+            return this->sectorSize;
+        }
+        /// Gets the cached number of sectors of the disk.
+        constexpr auto getNumSectors() const {
+            return this->numSectors;
+        }
+
         /// Return the capacity of the disk.
         int GetCapacity(std::pair<uint32_t, uint64_t> &outCapacity);
         /// Performs a read from disk
@@ -83,6 +92,11 @@ class Disk: public rpc::DiskDriverClient {
         void *readBuf{nullptr};
         /// Maximum size the read buffer can grow to
         size_t readBufMaxSize{0};
+
+        /// Size of the sectors on the disk
+        size_t sectorSize{0};
+        /// Number of sectors on the disk
+        uint64_t numSectors{0};
 };
 };
 

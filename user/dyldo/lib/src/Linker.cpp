@@ -366,6 +366,7 @@ void Linker::printImageBases() {
 /**
  * Logs a trace message.
  */
+#ifdef DYLDO_VERBOSE
 void Linker::Trace(const char *str, ...) {
     if(!gLogTraceEnabled) return;
     fputs("\e[34m[dyldo] ", stderr);
@@ -377,6 +378,7 @@ void Linker::Trace(const char *str, ...) {
 
     fputs("\e[0m\n", stderr);
 }
+#endif
 
 /**
  * Logs an informational message.

@@ -70,8 +70,12 @@ class Linker {
             return gShared;
         }
 
+#ifdef DYLDO_VERBOSE
         /// Outputs a message if trace logging is enabled
         static void Trace(const char * _Nonnull format, ...) __attribute__ ((format (printf, 1, 2)));
+#else
+        static void Trace(const char * _Nonnull, ...) __attribute__ ((format (printf, 1, 2))) {};
+#endif
         /// Outputs an informational message
         static void Info(const char * _Nonnull format, ...) __attribute__ ((format (printf, 1, 2)));
         /// Outputs an error message and exits the task.

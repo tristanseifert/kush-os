@@ -108,6 +108,13 @@ class AtaDiskRpcServer: rpc::DiskDriverServer {
         void notifyCmdCompletion(volatile DriverSupport::disk::Command &, const int);
 
     private:
+        /// Whether session open/close operations are logged
+        constexpr static const bool kLogSessionLifecycle{false};
+        /// Whether IO requests are logged
+        constexpr static const bool kLogIoRequests{false};
+        /// Whether buffer requests are logged
+        constexpr static const bool kLogBufferRequests{false};
+
         /// Shared instance ATA server: created as needed
         static AtaDiskRpcServer *gShared;
 

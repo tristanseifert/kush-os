@@ -7,58 +7,59 @@
 #include <driver/DrivermanClient.h>
 #include <DriverSupport/disk/Client.h>
 
+#include "partition/GPT.h"
 #include "Log.h"
 
 const char *gLogTag = "fs";
-
-/**
- * Prints a sector of 512 bytes.
- */
-static void PrintSector(const std::vector<std::byte> &data) {
-    std::stringstream str;
-
-    for(size_t i = 0; i < data.size(); i++) {
-        if(!(i % 32)) {
-            str << std::setw(4) << std::hex << i << ": ";
-        }
-
-        str << std::hex << std::setw(2) << std::setfill('0') << static_cast<uint32_t>(data[i]) << " ";
-
-        if((i % 32) == 31) {
-            str << std::endl;
-        }
-    }
-
-    Trace("Sector is:\n%s", str.str().c_str());
-}
 
 /**
  * Entry point for the filesystem server, attached to a disk. The arguments to the function are
  * paths to disks to attach to.
  */
 int main(const int argc, const char **argv) {
+    int err;
     if(argc < 2) {
-        Abort("must have exactly one argument");
+        Abort("You must specify at least one forest path of a disk.");
     }
 
-    std::shared_ptr<DriverSupport::disk::Disk> outDisk;
-    int err = DriverSupport::disk::Disk::Alloc(argv[1], outDisk);
-    if(err) Abort("Failed to allocate disk from '%s': %d", argv[1], err);
+    // for each argument, create a disk and probe the partition table
+    for(size_t i = 1; i < argc; i++) {
+        const auto path = argv[i];
 
-    // size disk
-    std::pair<uint32_t, uint64_t> cap;
-    err = outDisk->GetCapacity(cap);
-    if(err) Abort("Failed to size disk: %d", err);
+        // create disk object
+        std::shared_ptr<DriverSupport::disk::Disk> disk;
+        err = DriverSupport::disk::Disk::Alloc(path, disk);
+        if(err) {
+            Warn("Failed to allocate disk from '%s': %d", path, err);
+            continue;
+        }
 
-    Success("Disk size is %lu bytes (%lu sectors x %u bytes)", cap.first * cap.second, cap.second, cap.first);
+        // probe to see the partition table of this disk
+        std::shared_ptr<PartitionTable> tab;
 
-    // read some data
-    std::vector<std::byte> data;
-    err = outDisk->Read(0, 1, data);
-    if(err) Abort("ReadSlow failed: %d", err);
+        err = GPT::Probe(disk, tab);
+        if(err) {
+            Warn("Failed to detect GPT on '%s': %d", path, err);
+            continue;
+        }
 
-    Success("Read %lu bytes", data.size());
-    PrintSector(data);
+        // read the partition tables
+        const auto &tabs = tab->getPartitions();
+        Success("Got %lu partitions", tabs.size());
+
+        for(const auto &p : tabs) {
+            const auto &i = p.typeId;
+            Trace("%10lu (%10lu sectors): %02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X - %s",
+                    p.startLba, p.size, i[0],i[1],i[2],i[3],i[4],i[5],i[6],i[7],i[8],i[9],i[10],
+                    i[11],i[12],i[13],i[14],i[15], p.name.value_or("(no name)").c_str());
+        }
+
+        std::pair<uint32_t, uint64_t> cap;
+        err = disk->GetCapacity(cap);
+        if(err) Abort("Failed to size disk: %d", err);
+
+        Success("Disk size is %lu bytes (%lu sectors x %u bytes)", cap.first * cap.second, cap.second, cap.first);
+    }
 
     return 1;
 }

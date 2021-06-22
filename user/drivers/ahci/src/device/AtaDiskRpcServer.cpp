@@ -154,6 +154,8 @@ AtaDiskRpcServer::OpenSessionReturn AtaDiskRpcServer::implOpenSession() {
         this->sessions.emplace(id, s);
     }
 
+    if(kLogSessionLifecycle) Trace("Open session $%lx", id);
+
     // return info on it
     return {0, id, s.commandVmRegion, commandRegionSize, s.numCommands};
 }
@@ -168,7 +170,7 @@ AtaDiskRpcServer::OpenSessionReturn AtaDiskRpcServer::implOpenSession() {
  * without problems.
  */
 int32_t AtaDiskRpcServer::implCloseSession(uint64_t token) {
-    Trace("Close session $%lx", token);
+    if(kLogSessionLifecycle) Trace("Close session $%lx", token);
 
     // get the session
     std::lock_guard<std::mutex> lg(this->sessionsLock);
@@ -176,8 +178,8 @@ int32_t AtaDiskRpcServer::implCloseSession(uint64_t token) {
     auto &session = this->sessions[token];
 
     // TODO: check for outstanding commands
-    // TODO: unmap regions
-    Trace("Need to unmap region $%p'h", session.commandVmRegion);
+    // unmap command region
+    UnmapVirtualRegion(session.commandVmRegion);
 
     // remove session
     this->sessions.erase(token);
@@ -215,7 +217,8 @@ AtaDiskRpcServer::CreateReadBufferReturn AtaDiskRpcServer::implCreateReadBuffer(
 
     size_t initialSize = std::min(std::max(requested, kReadBufferMinSize), kReadBufferMaxSize);
     initialSize = ((initialSize + pageSz - 1) / pageSz) * pageSz;
-    Trace("Create read buffer for $%lx: requested %lu bytes, got %lu", token, requested, initialSize);
+    if(kLogBufferRequests) Trace("Create read buffer for $%lx: requested %lu bytes, got %lu",
+            token, requested, initialSize);
 
     err = libdriver::BufferPool::Alloc(initialSize, kReadBufferMaxSize, session.readBuf);
     if(err) {
@@ -237,7 +240,8 @@ AtaDiskRpcServer::CreateReadBufferReturn AtaDiskRpcServer::implCreateReadBuffer(
  */
 AtaDiskRpcServer::CreateWriteBufferReturn AtaDiskRpcServer::implCreateWriteBuffer(uint64_t session,
         uint64_t requested) {
-    Trace("Create write buffer for $%lx: requested %lu bytes", session, requested);
+    if(kLogBufferRequests) Trace("Create write buffer for $%lx: requested %lu bytes", session,
+            requested);
     return {Errors::Unsupported};
 }
 
@@ -380,7 +384,7 @@ void AtaDiskRpcServer::doCmdRead(Session &session, const size_t slot,
 
     // allocate the buffer
     const size_t readBytes = disk->getSectorSize() * cmd.numSectors;
-    Trace("Read request is %lu bytes", readBytes);
+    if(kLogIoRequests) Trace("Read request is %lu bytes", readBytes);
 
     std::shared_ptr<libdriver::BufferPool::Buffer> buffer;
     err = session.readBuf->getBuffer(readBytes, buffer);

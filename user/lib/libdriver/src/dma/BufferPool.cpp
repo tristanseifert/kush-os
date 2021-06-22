@@ -112,7 +112,7 @@ success:;
  */
 void BufferPool::freeRange(const uintptr_t offset, const size_t size) {
     // TODO: we should ensure the item is in order
-    this->freeList.push_back({offset, size});
+    this->freeList.push_front({offset, size});
 
     // TODO: we should coalesce adjacent blocks
 }

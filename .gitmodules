@@ -22,3 +22,6 @@
 [submodule "user/lib/external/HppOnly/concurrentqueue"]
 	path = user/lib/external/HppOnly/concurrentqueue
 	url = git@github.com:cameron314/concurrentqueue.git
+[submodule "user/lib/external/libcrc"]
+	path = user/lib/external/libcrc
+	url = git@github.com:lammertb/libcrc.git

@@ -41,6 +41,13 @@ else()
     message(FATAL_ERROR "dyldo runtime does not know how architecture '${KERNEL_ARCH}'")
 endif()
 
+# define how verbose the linker is
+option(DYLDO_ALWAYS_VERBOSE "Whether the dynamic linker is always very verbose" OFF)
+
+if(DYLDO_ALWAYS_VERBOSE)
+    target_compile_definitions(dyldo PRIVATE DYLDO_VERBOSE)
+endif()
+
 # turn off a bunch of C++ features and disable C library startup cruft
 target_compile_options(dyldo PRIVATE -static)
 target_compile_options(dyldo PRIVATE -flto -fno-rtti -fno-exceptions)
