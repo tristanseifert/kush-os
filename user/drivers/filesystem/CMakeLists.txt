@@ -7,8 +7,13 @@
 add_executable(fsdrv
     src/main.cpp
     src/Log.cpp
+    src/FilesystemRegistry.cpp
+    src/fs/Supported.cpp
     # partition table support
     src/partition/GPT.cpp
+    # FAT
+    src/fs/fat/FAT.cpp
+    src/fs/fat/FAT32.cpp
 )
 
 # allow link time optimization

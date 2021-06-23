@@ -1,12 +1,11 @@
 #include <cstddef>
 #include <vector>
 
-#include <iomanip>
-#include <sstream>
-
 #include <driver/DrivermanClient.h>
 #include <DriverSupport/disk/Client.h>
 
+#include "Filesystem.h"
+#include "FilesystemRegistry.h"
 #include "partition/GPT.h"
 #include "Log.h"
 
@@ -21,6 +20,8 @@ int main(const int argc, const char **argv) {
     if(argc < 2) {
         Abort("You must specify at least one forest path of a disk.");
     }
+
+    FilesystemRegistry::Init();
 
     // for each argument, create a disk and probe the partition table
     for(size_t i = 1; i < argc; i++) {
@@ -43,23 +44,31 @@ int main(const int argc, const char **argv) {
             continue;
         }
 
-        // read the partition tables
+        // read the partition tables and try to initialize a filesystem for each
         const auto &tabs = tab->getPartitions();
         Success("Got %lu partitions", tabs.size());
 
         for(const auto &p : tabs) {
-            const auto &i = p.typeId;
-            Trace("%10lu (%10lu sectors): %02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X - %s",
-                    p.startLba, p.size, i[0],i[1],i[2],i[3],i[4],i[5],i[6],i[7],i[8],i[9],i[10],
-                    i[11],i[12],i[13],i[14],i[15], p.name.value_or("(no name)").c_str());
+            std::shared_ptr<Filesystem> fs;
+            err = FilesystemRegistry::the()->start(p.typeId, p, disk, fs);
+
+            if(!err) {
+                Trace("Initialized fs: %p", fs.get());
+            } else {
+                const auto &i = p.typeId;
+                Trace("Failed to initialize fs (%d) %10lu (%10lu sectors): %02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X - %s", err,
+                        p.startLba, p.size, i[0],i[1],i[2],i[3],i[4],i[5],i[6],i[7],i[8],i[9],i[10],
+                        i[11],i[12],i[13],i[14],i[15], p.name.value_or("(no name)").c_str());
+            }
+
         }
-
-        std::pair<uint32_t, uint64_t> cap;
-        err = disk->GetCapacity(cap);
-        if(err) Abort("Failed to size disk: %d", err);
-
-        Success("Disk size is %lu bytes (%lu sectors x %u bytes)", cap.first * cap.second, cap.second, cap.first);
     }
 
-    return 1;
+    // TODO: enter message loop
+    while(1) {
+        ThreadUsleep(1000 * 500);
+    }
+
+    FilesystemRegistry::Deinit();
+    return 0;
 }
