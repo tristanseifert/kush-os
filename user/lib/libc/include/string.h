@@ -39,6 +39,9 @@ size_t	 strxfrm(char * __restrict, const char * __restrict, size_t);
 size_t strlcpy(char * __restrict dst, const char * __restrict src, size_t dstsize);
 size_t strlcat(char * __restrict dst, const char * __restrict src, size_t dstsize);
 
+int strcasecmp(const char *s1, const char *s2);
+int strncasecmp(const char *s1, const char *s2, size_t n);
+
 #ifdef __cplusplus
 }
 #endif

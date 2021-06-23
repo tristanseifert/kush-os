@@ -38,6 +38,7 @@ list(APPEND c_objs_files
     src/string/strcat.c
     src/string/strcpy.c
     src/string/strstr.c
+    src/string/strcasecmp.c
     # wide strings
     src/string/wcpcpy.c
     src/string/wcpncpy.c
