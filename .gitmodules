@@ -25,3 +25,6 @@
 [submodule "user/lib/external/libcrc"]
 	path = user/lib/external/libcrc
 	url = git@github.com:lammertb/libcrc.git
+[submodule "user/lib/external/icu"]
+	path = user/lib/external/icu
+	url = git@github.com:unicode-org/icu.git

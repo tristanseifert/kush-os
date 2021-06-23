@@ -22,6 +22,7 @@ list(APPEND c_objs_files
     src/string/sscanf.c
     # string manipulation
     src/string/strchr.c
+    src/string/strrchr.c
     src/string/strdup.c
     src/string/strlen.c
     src/string/strncat.c
@@ -36,6 +37,7 @@ list(APPEND c_objs_files
     src/string/strxfrm.c
     src/string/strcat.c
     src/string/strcpy.c
+    src/string/strstr.c
     # wide strings
     src/string/wcpcpy.c
     src/string/wcpncpy.c
@@ -75,8 +77,15 @@ list(APPEND c_objs_files
     src/stdlib/ldiv.c
     src/stdlib/llabs.c
     src/stdlib/lldiv.c
+    src/stdlib/atoX.c
+    # sorting and searches
+    src/stdlib/bsearch.c
+    src/stdlib/heapsort.c
+    src/stdlib/merge.c
+    src/stdlib/qsort.c
     # stdio
     src/stdio/printf.c
+    src/stdio/puts.c
     # locale
     src/locale/locale.c
     src/locale/strto.c

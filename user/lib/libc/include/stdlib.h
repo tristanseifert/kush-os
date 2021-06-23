@@ -82,9 +82,13 @@ int	 atexit(void (* _Nonnull)(void));
 
 char	*getenv(const char *);
 
-void	 qsort(void *, size_t, size_t,
+LIBC_EXPORT int heapsort(void *base, size_t nel, size_t width,
+        int (*compare)(const void *, const void *));
+LIBC_EXPORT int mergesort(void *base, size_t nel, size_t width,
+        int (*compare)(const void *, const void *));
+LIBC_EXPORT void	 qsort(void *, size_t, size_t,
 	    int (* _Nonnull)(const void *, const void *));
-void	*bsearch(const void *, const void *, size_t,
+LIBC_EXPORT void	*bsearch(const void *, const void *, size_t,
 	    size_t, int (*)(const void * _Nonnull, const void *));
 
 /// executes a system command; not currently implemented
