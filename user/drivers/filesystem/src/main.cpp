@@ -4,7 +4,6 @@
 #include <driver/DrivermanClient.h>
 #include <DriverSupport/disk/Client.h>
 
-#include "Filesystem.h"
 #include "FilesystemRegistry.h"
 #include "partition/GPT.h"
 #include "Log.h"
@@ -53,7 +52,15 @@ int main(const int argc, const char **argv) {
             err = FilesystemRegistry::the()->start(p.typeId, p, disk, fs);
 
             if(!err) {
-                Trace("Initialized fs: %p", fs.get());
+                Trace("Initialized - Volume label %s (%p)",
+                        fs->getVolumeLabel().value_or("(null)").c_str(), fs.get());
+                auto root = fs->getRootDirectory();
+
+                for(const auto &ent : root->getEntries()) {
+                    Trace("%70s: %c %8lu bytes", ent->getName().c_str(),
+                            (ent->getType() == DirectoryEntryBase::Type::File) ? 'F' : 'D',
+                            ent->getFileSize());
+                }
             } else {
                 const auto &i = p.typeId;
                 Trace("Failed to initialize fs (%d) %10lu (%10lu sectors): %02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X - %s", err,

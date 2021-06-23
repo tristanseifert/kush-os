@@ -5,7 +5,7 @@
 #include <functional>
 #include <memory>
 
-#include "Filesystem.h"
+#include "fs/Filesystem.h"
 #include "partition/PartitionTable.h"
 
 class FilesystemRegistry {

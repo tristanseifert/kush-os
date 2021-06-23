@@ -14,6 +14,9 @@ add_executable(fsdrv
     # FAT
     src/fs/fat/FAT.cpp
     src/fs/fat/FAT32.cpp
+    src/fs/fat/Directory.cpp
+    # Helpers
+    src/util/String.cpp
 )
 
 # allow link time optimization

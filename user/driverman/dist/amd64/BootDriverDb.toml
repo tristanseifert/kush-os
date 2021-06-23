@@ -18,12 +18,6 @@ priority = 1000
 name = "AcpiPciExpressRootBridge"
 priority = 1000
 
-# PS/2 keyboard and mouse
-[[drivers]]
-path = "/sbin/ps2drv"
-[[drivers.match]]
-name = "AcpiPs2Controller"
-
 # AHCI driver
 [[drivers]]
 path = "/sbin/ahcidrv"

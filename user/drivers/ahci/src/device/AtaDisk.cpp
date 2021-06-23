@@ -304,6 +304,7 @@ int AtaDisk::read(const uint64_t start, const size_t numSectors, const DMABuffer
         if(res.isSuccess()) {
             callback(true);
         } else {
+            Warn("Read failed! status $%02x err $%02x", res.getAtaStatus(), res.getAtaError());
             callback(false);
         }
     });

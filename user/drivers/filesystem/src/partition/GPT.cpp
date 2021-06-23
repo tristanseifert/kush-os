@@ -1,6 +1,7 @@
 #include "GPT.h"
 
 #include "Log.h"
+#include "util/String.h"
 
 #include <algorithm>
 #include <cstring>
@@ -140,7 +141,7 @@ int GPT::readPartitionTable(const std::shared_ptr<DriverSupport::disk::Disk> &di
             entry->partitionUniqueGuid};
 
         const std::span<uint16_t> ucs2Name(entry->name, 32);
-        p.name = ConvertUcs2ToUtf8(ucs2Name);
+        p.name = util::ConvertUcs2ToUtf8(ucs2Name);
 
         this->partitions.emplace_back(std::move(p));
     }
@@ -149,27 +150,3 @@ int GPT::readPartitionTable(const std::shared_ptr<DriverSupport::disk::Disk> &di
     return 0;
 }
 
-
-
-/**
- * Very quick and dirty UCS-2 to UTF-8 conversion.
- */
-std::string GPT::ConvertUcs2ToUtf8(const std::span<uint16_t> &ucs2Str) {
-    std::string str;
-
-    for(const auto c : ucs2Str) {
-        if(!c) break;
-
-        if (c<0x80) str.push_back(c);
-        else if (c<0x800) str.push_back(192+c/64), str.push_back(128+c%64);
-        else if (c-0xd800u<0x800) goto error;
-        else str.push_back(224+c/4096), str.push_back(128+c/64%64), str.push_back(128+c%64);
-    }
-
-    return str;
-
-    // Invalid codepoint
-error:;
-    Warn("Invalid UCS-2 codepoint encountered");
-    return "";
-}

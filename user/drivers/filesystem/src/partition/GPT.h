@@ -163,8 +163,6 @@ class GPT: public PartitionTable {
         int readPartitionTable(const std::shared_ptr<DriverSupport::disk::Disk> &,
                 const GptHeader &);
 
-        static std::string ConvertUcs2ToUtf8(const std::span<uint16_t> &ucs2Str);
-
     private:
         /// Initialization status; nonzero indicates error
         int status{0};

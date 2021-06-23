@@ -43,5 +43,4 @@ target_link_libraries(ps2drv PRIVATE capnp driver rpc mpack_dynamic acpisrv_seri
 
 # install it to boot directory in sysroot
 install(TARGETS ps2drv RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)
-install(TARGETS ps2drv RUNTIME DESTINATION ${SYSROOT_DIR}/boot/sbin)
 

@@ -345,7 +345,9 @@ void AtaDiskRpcServer::processCommand(Session &session, const size_t slot,
         // start a read request
         case CommandType::Read:
             if(!cmd.numSectors || !cmd.notifyThread || !cmd.notifyBits) {
-                Warn("%s: Invalid %s command in slot %lu", __FUNCTION__, "read", slot);
+                Warn("%s: Invalid %s command in slot %lu (%lu sectors, notify %p:%p)",
+                        __FUNCTION__, "read", slot, cmd.numSectors, cmd.notifyThread, cmd.notifyBits);
+                return;
             }
 
             // we can do the read now
@@ -384,7 +386,7 @@ void AtaDiskRpcServer::doCmdRead(Session &session, const size_t slot,
 
     // allocate the buffer
     const size_t readBytes = disk->getSectorSize() * cmd.numSectors;
-    if(kLogIoRequests) Trace("Read request is %lu bytes", readBytes);
+    if(kLogIoRequests) Trace("Read request is %lu bytes (sector $%lx)", readBytes, cmd.sector);
 
     std::shared_ptr<libdriver::BufferPool::Buffer> buffer;
     err = session.readBuf->getBuffer(readBytes, buffer);

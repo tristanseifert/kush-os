@@ -540,6 +540,8 @@ void Port::completeCommand(const uint8_t slot, const volatile RegDevToHostFIS &r
     } else {
         CommandResult::Failure f{rfis.error};
         res.storage = f;
+
+        Warn("LBA that failed is: %02x%02x%02x%02x%02x%02x", rfis.lba5, rfis.lba4, rfis.lba3, rfis.lba2, rfis.lba1, rfis.lba0);
     }
 
     /*
