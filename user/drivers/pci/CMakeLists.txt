@@ -27,7 +27,7 @@ target_include_directories(pcisrv PRIVATE src)
 
 # required libraries
 add_dependencies(pcisrv c_dynamic)
-target_link_libraries(pcisrv PRIVATE capnp driver rpc mpack_dynamic fmt::fmt)
+target_link_libraries(pcisrv PRIVATE capnp_dynamic driver rpc mpack_dynamic fmt::fmt)
 
 # install it to boot directory in sysroot
 install(TARGETS pcisrv RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)
@@ -54,7 +54,7 @@ target_include_directories(libpci PUBLIC libpci/include)
 target_include_directories(libpci PRIVATE libpci/src)
 
 target_compile_options(libpci PRIVATE -flto -fno-rtti -fno-exceptions)
-target_link_libraries(libpci PUBLIC capnp driver rpc mpack_dynamic)
+target_link_libraries(libpci PUBLIC capnp_dynamic driver rpc mpack_dynamic)
 
 # the PCI server needs to link against LibPci so it can get the RPC serialization functions
 target_link_libraries(pcisrv PRIVATE libpci)

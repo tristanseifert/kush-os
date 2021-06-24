@@ -221,8 +221,12 @@ void Thread::die() {
  *
  * If not active, we'll set it as a zombie and deal with it accordingly. Otherwise, we'll set some
  * flags, then context switch and the deferred work will occur then.
+ *
+ * @param inIsr If set, and the calling thread is the one to be terminate, do not yield; instead,
+ *        a scheduler invocation is requested. This will then effectively perform a yield when the
+ *        exception handler (or other interrupt) returns.
  */
-void Thread::terminate(bool release) {
+void Thread::terminate(const bool release, const bool inIsr) {
     DECLARE_CRITICAL();
 
     bool no = false, yes = true;
@@ -246,10 +250,15 @@ void Thread::terminate(bool release) {
 
     CRITICAL_EXIT();
 
-    // if running, context switch away
-    if(isRunning) {
+    // if running, _and not_ in ISR, context switch away
+    if(isRunning && !inIsr) {
         yield();
     } 
+    // if running, but in ISR, request a scheduler invocation
+    else if(isRunning && inIsr) {
+        Scheduler::get()->sendIpi();
+        if(release) Scheduler::get()->idle->queueDestroyThread(this->sharedFromThis());
+    }
     // not running so we can enqueue deletion right away
     else {
         if(release) Scheduler::get()->idle->queueDestroyThread(this->sharedFromThis());
@@ -563,7 +572,7 @@ unhandled:;
     }
 #endif
 
-    this->task->terminate(-1);
+    this->task->terminate(-1, true);
 }
 
 

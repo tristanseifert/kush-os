@@ -118,6 +118,8 @@ void Linker::doFixups() {
         auto lib = reinterpret_cast<Library *>(value);
         PaddedArray<Elf_Rel> rels;
 
+        if(kLogLibraryFixups) Info("Processing library %s (base %p)", lib->soname, lib->vmBase);
+
         // update its dynamic relocs
         if(lib->reader->getDynRels(rels)) {
             lib->reader->processRelocs(rels);

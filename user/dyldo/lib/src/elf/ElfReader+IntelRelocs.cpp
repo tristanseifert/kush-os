@@ -220,6 +220,11 @@ void ElfReader::patchRelocsAmd64(const PaddedArray<Elf_Rela> &rels, const uintpt
                 const auto symIdx = ELF64_R_SYM(rel.r_info);
                 const auto sym = this->symtab[symIdx];
 
+                if(symIdx == STN_UNDEF) {
+                    symbol = nullptr;
+                    break;
+                }
+
                 const auto name = this->readStrtab(sym.st_name);
                 if(!name) {
                     Linker::Info("failed to resolve name for symbol %lu (off %lx info %lx base %lx)",
@@ -300,17 +305,31 @@ void ElfReader::patchRelocsAmd64(const PaddedArray<Elf_Rela> &rels, const uintpt
              */
             case R_X86_64_TPOFF64: {
                 auto dest = reinterpret_cast<void *>(base + rel.r_offset);
+                uint64_t value;
 
-                // add to it the library's TLS offset
                 auto tls = Linker::the()->getTls();
-                auto off = tls->getLibTlsOffset(symbol->library);
-                if(!off) {
-                    Linker::Abort("Invalid TLS offset for '%s' in %s: %d", symbol->name,
-                            symbol->library->soname, off);
+
+                /*
+                 * It's possible that there's a TPOFF64 relocation that does NOT have a symbol that
+                 * is associated with it. In that case, we just have to get the base address of
+                 * the executable's TLS segment.
+                 */
+                if(!symbol) {
+                    value = tls->getExecSize() + rel.r_addend;
+                }
+                else {
+                    // add to it the library's TLS offset
+                    auto off = tls->getLibTlsOffset(symbol->library);
+                    if(!off) {
+                        Linker::Abort("Invalid TLS offset for '%s' in %s: %d", symbol->name,
+                                symbol->library->soname, off);
+                    }
+
+                    // calculate offset and write back
+                    value = off - tls->getExecSize() + symbol->address + rel.r_addend;\
                 }
 
-                // calculate offset and write back
-                uint64_t value = off - tls->getExecSize() + symbol->address + rel.r_addend;
+                // write offset
                 memcpy(dest, &value, sizeof(value));
                 break;
             }

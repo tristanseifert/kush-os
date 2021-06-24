@@ -15,7 +15,7 @@ target_include_directories(libdiskdriver PUBLIC include)
 target_include_directories(libdiskdriver PRIVATE src)
 
 target_compile_options(libdiskdriver PRIVATE -flto -fno-rtti -fno-exceptions)
-target_link_libraries(libdiskdriver PUBLIC capnp driver rpc mpack_dynamic)
+target_link_libraries(libdiskdriver PUBLIC capnp_dynamic driver rpc mpack_dynamic)
 
 # export it under the DriverSupport space
 add_library(DriverSupport::Disk ALIAS libdiskdriver)

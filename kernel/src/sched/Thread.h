@@ -269,7 +269,7 @@ struct Thread: public rt::SharedFromThis<Thread> {
         /// Waits for the thread to be terminated.
         int waitOn(const uint64_t waitUntil = 0);
         /// Terminates this thread.
-        void terminate(bool release = true);
+        void terminate(const bool release = true, const bool inIsr = false);
 
         /// Handles a fault of the given type. Called from fault handlers.
         void handleFault(const FaultType type, const uintptr_t pc, void *context, const void *arch);

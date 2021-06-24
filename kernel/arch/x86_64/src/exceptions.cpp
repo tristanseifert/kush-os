@@ -142,38 +142,24 @@ int amd64_exception_format_info(char *outBuf, const size_t outBufLen,
     gsKernBase = (tempLo) | (static_cast<uint64_t>(tempHi) << 32);
 
     // format
-    err = snprintf(outBuf, outBufLen, "Exception %3llu ($%016llx)\n"
-            "CR0 $%016llx CR2 $%016llx CR3 $%016llx CR4 $%016llx\n"
-            " CS $%04x SS $%04x RFLAGS $%016llx\n"
+    err = snprintf(outBuf, outBufLen, "Exception %3lu ($%016lx)\n"
+            "CR0 $%016lx CR2 $%016lx CR3 $%016lx CR4 $%016lx\n"
+            " CS $%04lx SS $%04lx RFLAGS $%016lx\n"
             " FS $%016llx  GS $%016llx KGS $%016llx\n"
             "RAX $%016llx RBX $%016llx RCX $%016llx RDX $%016llx\n"
             "RDI $%016llx RSI $%016llx RBP $%016llx RSP $%016llx\n"
             " R8 $%016llx  R9 $%016llx R10 $%016llx R11 $%016llx\n"
             "R12 $%016llx R13 $%016llx R14 $%016llx R15 $%016llx\n"
-            "RIP $%016llx\n"
-            /*"XMM0 $%016llx%016llx\n"
-            "XMM1 $%016llx%016llx\n"
-            "XMM2 $%016llx%016llx\n"
-            "XMM3 $%016llx%016llx\n"
-            "XMM4 $%016llx%016llx\n"
-            "XMM5 $%016llx%016llx\n"
-            "XMM6 $%016llx%016llx\n"
-            "XMM7 $%016llx%016llx\n"*/
-            ,
+            "RIP $%016llx\n",
             info->intNo, info->errCode,
             cr0, cr2, cr3, cr4,
             info->cs, info->ss, info->rflags,
-            fsBase, gsBase,
+            fsBase, gsBase, gsKernBase,
             info->rax, info->rbx, info->rcx, info->rdx,
             info->rdi, info->rsi, info->rbp, info->rsp,
             info->r8, info->r9, info->r10, info->r11,
             info->r12, info->r13, info->r14, info->r15,
-            info->rip/*,
-            xmm[0][1], xmm[0][0], xmm[1][1], xmm[1][0],
-            xmm[2][1], xmm[2][0], xmm[3][1], xmm[3][0],
-            xmm[4][1], xmm[4][0], xmm[5][1], xmm[5][0],
-            xmm[6][1], xmm[6][0], xmm[7][1], xmm[7][0]*/
-    );
+            info->rip);
 
     // specicial cases
     switch(info->intNo) {
@@ -192,6 +178,12 @@ int amd64_exception_format_info(char *outBuf, const size_t outBufLen,
  * Handles a page fault exception.
  */
 void amd64_handle_pagefault(amd64_exception_info_t *info) {
+    static bool inFault{false};
+
+    if(__atomic_test_and_set(&inFault, __ATOMIC_RELAXED)) {
+        panic("nested page fault detected!");
+    }
+
     // get some info on the fault
     uint64_t faultAddr;
     asm volatile("mov %%cr2, %0" : "=r" (faultAddr));
@@ -208,6 +200,7 @@ void amd64_handle_pagefault(amd64_exception_info_t *info) {
         bool handled = vm->handlePagefault(faultAddr, (info->errCode & 0x01), (info->errCode & 0x02));
 
         if(handled) {
+            __atomic_clear(&inFault, __ATOMIC_RELAXED);
             return;
         }
 
@@ -215,6 +208,7 @@ void amd64_handle_pagefault(amd64_exception_info_t *info) {
         auto thread = sched::Thread::current();
         if(thread) {
             thread->handleFault(sched::Thread::FaultType::UnhandledPagefault, faultAddr, &info->rip, &info);
+            __atomic_clear(&inFault, __ATOMIC_RELAXED);
             return;
         }
     }

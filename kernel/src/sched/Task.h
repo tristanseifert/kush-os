@@ -126,7 +126,7 @@ struct Task: public rt::SharedFromThis<Task> {
         bool ownsPort(const rt::SharedPtr<ipc::Port> &port);
 
         /// Terminates this task with the given return code
-        int terminate(int status);
+        int terminate(int status, const bool inIsr = false);
 
         /// Sets the critical flag, which when set, will panic the kernel if the task temrinates
         inline void setCritical(bool critical) {

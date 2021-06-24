@@ -210,34 +210,12 @@ amd64_exception_pagefault:
     pushq        %r14
     pushq        %r15
 
-/*
-    sub         $16, %rsp
-    movdqu      %xmm7, (%rsp)
-    sub         $16, %rsp
-    movdqu      %xmm6, (%rsp)
-    sub         $16, %rsp
-    movdqu      %xmm5, (%rsp)
-    sub         $16, %rsp
-    movdqu      %xmm4, (%rsp)
-    sub         $16, %rsp
-    movdqu      %xmm3, (%rsp)
-    sub         $16, %rsp
-    movdqu      %xmm2, (%rsp)
-    sub         $16, %rsp
-    movdqu      %xmm1, (%rsp)
-    sub         $16, %rsp
-    movdqu      %xmm0, (%rsp)
-*/
-
     // set up a NULL stack frame, so stack unwinding can stop here
     xor         %rbp, %rbp
 
     // invoke page fault handler
     mov         %rsp, %rdi
     call        amd64_handle_pagefault
-
-    // the XMM registers don't need to be restored
-    //add         $(16*8), %rsp
 
     // restore registers
     popq         %r15

@@ -215,7 +215,7 @@ void Task::detachThread(const rt::SharedPtr<Thread> &t) {
  * This will terminate all threads. If anyone is waiting on the task, they're notified of the
  * status code; otherwise, it's discarded
  */
-int Task::terminate(int status) {
+int Task::terminate(int status, const bool inIsr) {
     // notify anyone blocking on us
     this->notifyExit(status);
 
@@ -235,7 +235,7 @@ int Task::terminate(int status) {
         }
 
         __atomic_store(&thread->attachedToTask, &no, __ATOMIC_RELEASE);
-        thread->terminate();
+        thread->terminate(true, inIsr);
         i++;
     }
 
@@ -252,7 +252,7 @@ int Task::terminate(int status) {
     // finally, terminate calling thread, if it is also in this task
     if(current->task.get() == this) {
         __atomic_store(&current->attachedToTask, &no, __ATOMIC_RELEASE);
-        current->terminate();
+        current->terminate(true, inIsr);
     }
 
     // success! the task was terminated

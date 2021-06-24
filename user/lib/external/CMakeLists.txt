@@ -12,6 +12,8 @@ set(CAPNP_LITE ON CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 add_subdirectory(capnproto/c++)
 
+# build a dynamic cap'n proto library
+add_library(capnp_dynamic ALIAS capnp)
 # string formatting
 SET(FMT_OS OFF CACHE BOOL "disable fmtlib OS component" FORCE)
 add_subdirectory(fmtlib EXCLUDE_FROM_ALL)

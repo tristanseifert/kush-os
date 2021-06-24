@@ -141,6 +141,9 @@ class Linker {
         /// are we logging thread-local info
         static bool gLogTls;
 
+        /// Whether we output logs for each library we fix up
+        constexpr static const bool kLogLibraryFixups{false};
+
     private:
         /// path from which the file is loaded
         const char * _Nonnull path;
