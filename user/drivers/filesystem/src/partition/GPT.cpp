@@ -137,7 +137,7 @@ int GPT::readPartitionTable(const std::shared_ptr<DriverSupport::disk::Disk> &di
         if(entry->partitionTypeGuid.isNil()) continue;
 
         // construct partition entry
-        Partition p{entry->partitionTypeGuid, entry->lbaStart, (entry->lbaEnd - entry->lbaStart),
+        Partition p{i, entry->partitionTypeGuid, entry->lbaStart, (entry->lbaEnd - entry->lbaStart),
             entry->partitionUniqueGuid};
 
         const std::span<uint16_t> ucs2Name(entry->name, 32);

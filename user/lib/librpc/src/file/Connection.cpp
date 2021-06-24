@@ -160,3 +160,13 @@ bool fileio::UpdateServerPort() {
     return true;
 }
 
+/**
+ * Secret undocumented method that resets the RPC connection to the file io service.
+ */
+extern "C" {
+
+LIBSYSTEM_EXPORT void __librpc__FileIoResetConnection() {
+    fileio::UpdateServerPort();
+}
+}
+

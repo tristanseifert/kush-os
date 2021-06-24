@@ -45,6 +45,10 @@ class Disk: public rpc::DiskDriverClient {
         constexpr auto getNumSectors() const {
             return this->numSectors;
         }
+        /// Returns the forest path from which the disk was initialized.
+        const auto &getForestPath() const {
+            return this->forestPath;
+        }
 
         /// Return the capacity of the disk.
         int GetCapacity(std::pair<uint32_t, uint64_t> &outCapacity);

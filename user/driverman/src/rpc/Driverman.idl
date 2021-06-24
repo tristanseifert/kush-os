@@ -17,4 +17,10 @@ interface Driverman {
     StartDevice(path: String) => (status: Int32)
     // Stop the given device.
     StopDevice(path: String) => (status: Int32)
+
+    /**
+     * Sends a notification to the given device. If the path is an empty string, the notification
+     * is delivered to the driver manager itself.
+     */
+    Notify(path: String, key: UInt64) => (status: Int32)
 }

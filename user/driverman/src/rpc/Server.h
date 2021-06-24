@@ -28,6 +28,8 @@ class RpcServer: public rpc::DrivermanServer {
         int32_t implStartDevice(const std::string &path) override;
         int32_t implStopDevice(const std::string &path) override;
 
+        int32_t implNotify(const std::string &path, uint64_t key) override;
+
     private:
         /// Sets up the RPC server with the given IO stream.
         RpcServer(const std::shared_ptr<IoStream> &strm) : DrivermanServer(strm) {};

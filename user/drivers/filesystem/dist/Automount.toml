@@ -1,0 +1,18 @@
+###############################################################################
+# Automount configuration
+###############################################################################
+[automount]
+# Whether automounting filesystems is allowed
+enabled = true
+
+# Array of all filesystems to mount
+[[filesystem]]
+# Path in the virtual file system
+path = "/"
+
+# Define the physical filesystem to attach to
+[filesystem.match]
+# Forest path of disk
+disk = "/AcpiGenericPc/AcpiPciExpressRootBridge/PciExpress8086.2922@0.1f.2/GenericDisk@0"
+# Partition on that disk
+partition = 2

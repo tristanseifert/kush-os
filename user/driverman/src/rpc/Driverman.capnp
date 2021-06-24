@@ -1,5 +1,5 @@
 # This is an automatically generated file (by idlc). Do not edit.
-# Generated from Driverman.idl for interface Driverman at 2021-06-20T22:50:57-0500
+# Generated from Driverman.idl for interface Driverman at 2021-06-24T01:09:39-0500
 @0x9c46a74e95804d52;
 using Cxx = import "/capnp/c++.capnp";
 $Cxx.namespace("rpc::_proto::messages");
@@ -63,6 +63,18 @@ struct StopDeviceRequest {
                             path @0: Text;
 }
 struct StopDeviceResponse {
+                          status @0: Int32;
+}
+
+############################################################
+# Structures for message 'Notify'
+const messageIdNotify:UInt64 = 0x63ce1044c4349828;
+
+struct NotifyRequest {
+                            path @0: Text;
+                             key @1: UInt64;
+}
+struct NotifyResponse {
                           status @0: Int32;
 }
 

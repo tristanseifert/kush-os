@@ -5,7 +5,9 @@
 #include <DriverSupport/disk/Client.h>
 
 #include "FilesystemRegistry.h"
+#include "auto/Automount.h"
 #include "partition/GPT.h"
+#include "rpc/MessageLoop.h"
 #include "Log.h"
 
 const char *gLogTag = "fs";
@@ -20,7 +22,11 @@ int main(const int argc, const char **argv) {
         Abort("You must specify at least one forest path of a disk.");
     }
 
+    // perform initialization
     FilesystemRegistry::Init();
+    Automount::Init();
+
+    MessageLoop ml;
 
     // for each argument, create a disk and probe the partition table
     for(size_t i = 1; i < argc; i++) {
@@ -33,6 +39,8 @@ int main(const int argc, const char **argv) {
             Warn("Failed to allocate disk from '%s': %d", path, err);
             continue;
         }
+
+        Success("Opened drive: %s", disk->getForestPath().c_str());
 
         // probe to see the partition table of this disk
         std::shared_ptr<PartitionTable> tab;
@@ -48,12 +56,16 @@ int main(const int argc, const char **argv) {
         Success("Got %lu partitions", tabs.size());
 
         for(const auto &p : tabs) {
+            // try to create FS
             std::shared_ptr<Filesystem> fs;
             err = FilesystemRegistry::the()->start(p.typeId, p, disk, fs);
 
             if(!err) {
-                Trace("Initialized - Volume label %s (%p)",
-                        fs->getVolumeLabel().value_or("(null)").c_str(), fs.get());
+                // add to automounter
+                Automount::the()->startedFs(disk, p, fs);
+
+                /*
+                // test reading root directory
                 auto root = fs->getRootDirectory();
 
                 for(const auto &ent : root->getEntries()) {
@@ -61,6 +73,7 @@ int main(const int argc, const char **argv) {
                             (ent->getType() == DirectoryEntryBase::Type::File) ? 'F' : 'D',
                             ent->getFileSize());
                 }
+                */
             } else {
                 const auto &i = p.typeId;
                 Trace("Failed to initialize fs (%d) %10lu (%10lu sectors): %02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X - %s", err,
@@ -71,10 +84,9 @@ int main(const int argc, const char **argv) {
         }
     }
 
-    // TODO: enter message loop
-    while(1) {
-        ThreadUsleep(1000 * 500);
-    }
+    // start RPC server and enter the message loop
+    err = ml.run();
+    Warn("Message loop returned: %d", err);
 
     FilesystemRegistry::Deinit();
     return 0;

@@ -20,6 +20,8 @@ class PartitionTable {
          * system to use.
          */
         struct Partition {
+            /// Partition index
+            size_t index;
             /// Partition type (UUID)
             Guid typeId;
             /// First sector of the partition

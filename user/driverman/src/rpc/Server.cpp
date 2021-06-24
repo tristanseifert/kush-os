@@ -6,6 +6,7 @@
 
 #include "util/String.h"
 
+#include <driver/DrivermanClient.h>
 #include <rpc/rt/ServerPortRpcStream.h>
 
 RpcServer *RpcServer::gShared{nullptr};
@@ -124,4 +125,36 @@ int32_t RpcServer::implStopDevice(const std::string &path) {
 
     // send stop request
     return device->stop();
+}
+
+/**
+ * Handle notifications.
+ */
+extern "C" void __librpc__FileIoResetConnection();
+
+int32_t RpcServer::implNotify(const std::string &path, uint64_t key) {
+    using NK = libdriver::RpcClient::NoteKeys;
+
+    // driverman internal notification
+    if(path.empty()) {
+        switch(key) {
+            /**
+             * Root fs has updated; read the updated driver db and re-probe.
+             */
+            case static_cast<uint64_t>(NK::RootFsUpdated): {
+                __librpc__FileIoResetConnection();
+                break;
+            }
+
+            default:
+                Warn("Unknown driverman notify key: $%p", key);
+                break;
+        }
+    }
+    else {
+        Warn("Device notify (%s) %p not implemented!", path.c_str(), key);
+        return Status::NoDevice;
+    }
+
+    return Status::Success;
 }
