@@ -69,6 +69,3 @@ install(TARGETS rootsrv RUNTIME DESTINATION ${SYSROOT_DIR}/boot)
 # copy the rpc headers
 FILE(GLOB ROOTSRV_RPC_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/rpc/*.hpp")
 install(FILES ${ROOTSRV_RPC_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/rpc)
-
-# copy some data files as well
-install(FILES data/x86_pc.init DESTINATION ${SYSROOT_DIR}/etc RENAME default.init)

@@ -17,7 +17,7 @@ namespace fat {
  */
 class DirectoryEntry: public ::DirectoryEntryBase {
     public:
-        DirectoryEntry(const FAT::DirEnt &ent, const std::string &name);
+        DirectoryEntry(const FAT::DirEnt &ent, const std::string &name, const bool hasLfn);
 
         /**
          * FAT filesystems can only contain files or directories. There is no support for any other
@@ -40,12 +40,22 @@ class DirectoryEntry: public ::DirectoryEntryBase {
             return this->size;
         }
 
+        /// Return the FAT cluster this directory starts at
+        constexpr inline auto getFirstCluster() const {
+            return this->firstCluster;
+        }
+
+        /// Perform FAT name comparison
+        bool compareName(const std::string_view &in) const override;
+
     private:
         /// Full long filename (if available)
         std::string name;
 
         /// Is this file pointing to a directory?
         bool isDirectory{false};
+        /// Did we have a long file name for this item?
+        bool hasLfn{false};
         /// Size of file (4GB max on FAT)
         uint32_t size{0};
 
@@ -70,6 +80,8 @@ class Directory: public ::DirectoryBase {
         const std::vector<DirectoryEntryBase *> &getEntries() const override {
             return this->entries;
         }
+
+        DirectoryEntryBase *getEntry(const std::string_view &name) const override;
 
     private:
         /// Starting cluster of the directory

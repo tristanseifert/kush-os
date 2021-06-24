@@ -1,6 +1,7 @@
 #include "FAT.h"
 #include "FAT32.h"
 #include "Directory.h"
+#include "File.h"
 
 #include <algorithm>
 #include <vector>
@@ -235,6 +236,7 @@ int FAT::readDirectory(const uint32_t start, std::shared_ptr<fat::Directory> &ou
             // otherwise, it's a regular file entry
             else {
                 std::string name;
+                bool hasLfn{false};
 
                 // get LFN name if available
                 if(lfn) {
@@ -253,6 +255,7 @@ int FAT::readDirectory(const uint32_t start, std::shared_ptr<fat::Directory> &ou
                         auto temp = util::ConvertUcs2ToUtf8(l.charBuf);
                         util::TrimTrailingWhitespace(temp);
                         name = temp;
+                        hasLfn = true;
                     }
                     // missing entries so force us to use the short filename
                     else {
@@ -271,6 +274,7 @@ int FAT::readDirectory(const uint32_t start, std::shared_ptr<fat::Directory> &ou
                     if(memcmp(&kSpaces, &dirEnt.extension, 3)) {
                         // XXX: is it allowed to skip this dot if name[0] is a dot?
                         if(dirEnt.name[0] != '.') {
+                            util::TrimTrailingWhitespace(name);
                             name.push_back('.');
                         }
 
@@ -281,7 +285,7 @@ int FAT::readDirectory(const uint32_t start, std::shared_ptr<fat::Directory> &ou
                 }
 
                 // create the directory entry
-                auto ent = new fat::DirectoryEntry(dirEnt, name);
+                auto ent = new fat::DirectoryEntry(dirEnt, name, hasLfn);
                 dir->entries.push_back(ent);
 
                 // prepare for next entry
@@ -298,3 +302,45 @@ int FAT::readDirectory(const uint32_t start, std::shared_ptr<fat::Directory> &ou
     outDir = dir;
     return 0;
 }
+
+
+
+/**
+ * Read the directory referenced by the given directory entry.
+ *
+ * @param _dent Directory entry; must be the directort type.
+ * @param outDir Pointer to store the read directory in
+ *
+ * @return 0 on success, error code otherwise
+ */
+int FAT::readDirectory(DirectoryEntryBase *_dent, std::shared_ptr<DirectoryBase> &outDir) {
+    // validate entry
+    if(_dent->getType() != DirectoryEntryBase::Type::Directory) return Errors::InvalidDirectoryEntry;
+
+    auto dent = static_cast<fat::DirectoryEntry *>(_dent);
+    if(!dent) return Errors::InvalidDirectoryEntry;
+
+    // read it out
+    std::shared_ptr<fat::Directory> dir;
+    int err = this->readDirectory(dent->getFirstCluster(), dir);
+    if(!err) outDir = dir;
+    return err;
+}
+
+/**
+ * Opens a file.
+ */
+int FAT::openFile(DirectoryEntryBase *_dent, std::shared_ptr<FileBase> &outFile) {
+    // validate entry
+    if(_dent->getType() != DirectoryEntryBase::Type::File) return Errors::InvalidDirectoryEntry;
+
+    auto dent = static_cast<fat::DirectoryEntry *>(_dent);
+    if(!dent) return Errors::InvalidDirectoryEntry;
+
+    // try to create a file object from it
+    std::shared_ptr<fat::File> file;
+    int err = fat::File::Alloc(dent, this, file);
+    if(!err) outFile = file;
+    return err;
+}
+

@@ -30,6 +30,8 @@ target_sources(driverman PRIVATE
 )
 install(FILES ${CMAKE_CURRENT_LIST_DIR}/dist/amd64/BootDriverDb.toml DESTINATION
     ${SYSROOT_DIR}/boot/config RENAME DriverDb.toml)
+install(FILES ${CMAKE_CURRENT_LIST_DIR}/dist/amd64/DriverDb.toml DESTINATION
+    ${SYSROOT_DIR}/config RENAME DriverDb.toml)
 endif()
 
 #####

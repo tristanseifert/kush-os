@@ -1,0 +1,13 @@
+###############################################################################
+# Driver database for amd64, once filesystems have been mounted and the full
+# disk is accessible.
+#
+# We'll automatically load this database and re-probe any devices that do not
+# have attached drivers when the boot drive is mounted.
+###############################################################################
+# PS/2 keyboard and mouse
+[[drivers]]
+path = "/sbin/ps2drv"
+[[drivers.match]]
+name = "AcpiPs2Controller"
+

@@ -32,6 +32,12 @@ class DirectoryEntryBase {
     public:
         virtual ~DirectoryEntryBase() = default;
 
+        /**
+         * Check if this directory entry matches the given name. This is should be implemented to
+         * handle the filesystem's specific name comparison algorithms.
+         */
+        virtual bool compareName(const std::string_view &in) const = 0;
+
         /// Gets the type of entry
         virtual Type getType() const = 0;
         /// Gets the name of the entry
@@ -52,4 +58,12 @@ class DirectoryBase {
 
         /// Returns a reference to all entries in this directory
         virtual const std::vector<DirectoryEntryBase *> &getEntries() const = 0;
+
+        /**
+         * Look up the directory entry with the given name. This is done according to the name
+         * comparison rules implemented by the directory entry items.
+         *
+         * @return Matching directory entry, or `nullptr` if not found
+         */
+        virtual DirectoryEntryBase *getEntry(const std::string_view &name) const = 0;
 };

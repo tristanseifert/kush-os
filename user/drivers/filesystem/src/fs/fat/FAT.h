@@ -13,6 +13,7 @@
 namespace fat {
 class DirectoryEntry;
 class Directory;
+class File;
 }
 
 /**
@@ -21,6 +22,7 @@ class Directory;
  */
 class FAT: public Filesystem {
     friend class fat::DirectoryEntry;
+    friend class fat::File;
 
     /**
      * Information associated with a long file name; this is information we build up as we read
@@ -236,9 +238,11 @@ class FAT: public Filesystem {
         /// FAT specific error codes
         enum Errors: int {
             /// The type of FAT is not supported
-            UnsupportedFatType          = -66100,
+            UnsupportedFatType          = -66200,
             /// FAT sector number is out of range
-            FatSectorOutOfRange         = -66101,
+            FatSectorOutOfRange         = -66201,
+            /// Provided directory entry is invalid
+            InvalidDirectoryEntry       = -66202,
         };
 
     public:
@@ -256,6 +260,9 @@ class FAT: public Filesystem {
         std::optional<std::string> getVolumeLabel() const override {
             return this->volumeLabel;
         }
+
+        int readDirectory(DirectoryEntryBase *dent, std::shared_ptr<DirectoryBase> &out) override;
+        int openFile(DirectoryEntryBase *dent, std::shared_ptr<FileBase> &out) override;
 
     protected:
         /// Converts a cluster to a device absolute LBA

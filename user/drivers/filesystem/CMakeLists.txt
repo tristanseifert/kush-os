@@ -15,6 +15,7 @@ add_executable(fsdrv
     src/fs/fat/FAT.cpp
     src/fs/fat/FAT32.cpp
     src/fs/fat/Directory.cpp
+    src/fs/fat/File.cpp
     # Helpers
     src/util/String.cpp
 )
