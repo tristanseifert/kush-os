@@ -47,6 +47,8 @@ class LegacyIo {
         void reply(const rpc::RpcPacket *packet, const rpc::FileIoEpType type,
             const std::span<uint8_t> &buf);
 
+        /// Ensures the read reply buffer is at least large enough to fit the given message.
+        void ensureReadReplyBufferSize(const size_t payloadBytes);
 
     private:
         /// Message loop that implements the actual behaviors
@@ -58,4 +60,9 @@ class LegacyIo {
         std::unique_ptr<std::thread> worker;
         /// port handle for the legacy worker
         uintptr_t workerPort{0};
+
+        /// Aligned buffer to assemble read request packets in
+        void *readReplyBuffer{nullptr};
+        /// Size of the read reply buffer, in bytes
+        size_t readReplyBufferSize{0};
 };

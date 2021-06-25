@@ -52,7 +52,7 @@ void LegacyIo::main() {
     }
 
     // allocate buffers
-    void *rxBuf = nullptr;
+    void *rxBuf{nullptr};
     err = posix_memalign(&rxBuf, 16, kMaxMsgLen);
     if(err) {
         Abort("%s failed: %d", "posix_memalign", err);
@@ -114,14 +114,12 @@ void LegacyIo::main() {
         else {
             Warn("Legacy io port rx error: %d", err);
         }
-
     }
 
     // clean up
     Trace("Legacy worker exiting");
 
     PortDestroy(this->workerPort);
-
     free(rxBuf);
 }
 
@@ -148,11 +146,11 @@ void LegacyIo::handleGetCaps(const struct MessageHeader *msg, const RpcPacket *p
 void LegacyIo::reply(const RpcPacket *packet, const FileIoEpType type,
         const std::span<uint8_t> &buf) {
     int err;
-    void *txBuf = nullptr;
+    void *txBuf{nullptr};
 
     // allocate the reply buffer
     const auto replySize = buf.size() + sizeof(RpcPacket);
-    err = posix_memalign(&txBuf, 16, replySize);
+    err = posix_memalign(&txBuf, 16, replySize + 16);
     if(err) {
         Abort("%s failed: %d", "posix_memalign", err);
     }
@@ -252,14 +250,16 @@ void LegacyIo::handleClose(const struct MessageHeader *msg, const RpcPacket *pac
  */
 void LegacyIo::handleReadDirect(const struct MessageHeader *msg, const RpcPacket *packet,
         const size_t msgLen) {
+    int err;
+
     // deserialize the request and ensure length is ok
-    auto data = std::span(packet->payload, msgLen - sizeof(RpcPacket));
-    if(data.size() < sizeof(FileIoReadReq)) {
+    auto reqData = std::span(packet->payload, msgLen - sizeof(RpcPacket));
+    if(reqData.size() < sizeof(FileIoReadReq)) {
         // XXX: can we get the file handle?
         return this->readFailed(0, EINVAL, packet);
     }
 
-    auto req = reinterpret_cast<const FileIoReadReq *>(data.data());
+    auto req = reinterpret_cast<const FileIoReadReq *>(reqData.data());
 
     if(req->length > kMaxBlockSize) {
         return this->readFailed(req->file, EINVAL, packet);
@@ -272,19 +272,53 @@ void LegacyIo::handleReadDirect(const struct MessageHeader *msg, const RpcPacket
         return this->readFailed(req->file, ret.status, packet);
     }
 
-    // allocate the reply buffer and fill it out
-    std::span<uint8_t> range(reinterpret_cast<uint8_t *>(ret.data.data()), ret.data.size());
+    // fill out the reply buffer
+    const auto &data = ret.data;
+    this->ensureReadReplyBufferSize(data.size());
 
-    std::vector<uint8_t> replyBuf;
-    replyBuf.resize(sizeof(FileIoReadReqReply) + range.size(), 0);
-    auto reply = reinterpret_cast<FileIoReadReqReply *>(replyBuf.data());
+    auto txPacket = reinterpret_cast<RpcPacket *>(this->readReplyBuffer);
+    auto reply = reinterpret_cast<FileIoReadReqReply *>(txPacket->payload);
+
+    memset(txPacket, 0, sizeof(RpcPacket));
+    memset(reply, 0, sizeof(FileIoReadReqReply));
 
     reply->status = 0;
     reply->file = req->file;
-    reply->dataLen = range.size();
-    memcpy(reply->data, range.data(), range.size());
+    reply->dataLen = data.size();
+    memcpy(reply->data, data.data(), data.size());
 
-    this->reply(packet, FileIoEpType::ReadFileDirectReply, replyBuf);
+    txPacket->type = static_cast<uint32_t>(FileIoEpType::ReadFileDirectReply);
+    txPacket->replyPort = 0;
+
+    // send it
+    const auto replyPort = packet->replyPort;
+    const size_t replySize = sizeof(RpcPacket) + sizeof(FileIoReadReqReply) + data.size();
+    err = PortSend(replyPort, txPacket, replySize);
+
+    if(err) {
+        Warn("%s failed: %d", "PortSend", err);
+    }
+}
+
+/**
+ * Ensures the reply buffer is at least large enough to handle a message with a payload of the
+ * given size.
+ */
+void LegacyIo::ensureReadReplyBufferSize(const size_t payloadBytes) {
+    // calculate total size required and bail if we've got this much
+    const size_t total = sizeof(RpcPacket) + sizeof(FileIoReadReqReply) + 16 + payloadBytes;
+    if(this->readReplyBufferSize >= total) return;
+
+    // release old buffer and allocate new
+    if(this->readReplyBuffer) {
+        free(this->readReplyBuffer);
+    }
+
+    int err = posix_memalign(&this->readReplyBuffer, 16, total);
+    if(err) {
+        Abort("%s failed: %d", "posix_memalign", err);
+    }
+    this->readReplyBufferSize = total;
 }
 
 /**

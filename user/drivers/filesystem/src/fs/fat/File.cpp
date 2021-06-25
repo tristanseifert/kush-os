@@ -64,9 +64,8 @@ int File::read(const uint64_t offset, const size_t numBytes, std::vector<std::by
 
     const auto startingCluster{offset / bytesPerCluster};
     if(startingCluster) {
-        const size_t cacheOff = startingCluster-1;
         bool isLast{false};
-        for(size_t i = 0; i < cacheOff; i++) {
+        for(size_t i = 0; i < startingCluster; i++) {
             // XXX: handle better :)
             if(isLast) Abort("Got to end of cluster chain (%lu) for %lu byte read at %lu from %u byte file",
                     i, numBytes, offset, this->fileSize);
