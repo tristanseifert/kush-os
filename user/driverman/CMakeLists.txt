@@ -31,12 +31,12 @@ target_sources(driverman PRIVATE
 install(FILES ${CMAKE_CURRENT_LIST_DIR}/dist/amd64/BootDriverDb.toml DESTINATION
     ${SYSROOT_DIR}/boot/config RENAME DriverDb.toml)
 install(FILES ${CMAKE_CURRENT_LIST_DIR}/dist/amd64/DriverDb.toml DESTINATION
-    ${SYSROOT_DIR}/config RENAME DriverDb.toml)
+    ${SYSROOT_DIR}/config RENAME FullDriverDb.toml)
 endif()
 
 #####
 # allow link time optimization
-target_compile_options(driverman PRIVATE -flto)
+target_compile_options(driverman PRIVATE -flto -fno-rtti -fno-exceptions)
 target_link_options(driverman PRIVATE -s)
 
 # search our codebase for includes

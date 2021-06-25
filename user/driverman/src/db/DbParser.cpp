@@ -12,14 +12,18 @@
  * database for later matching.
  */
 bool DbParser::parse(const std::string_view &path, DriverDb *db) {
-    toml::table tbl;
-    try {
-        Trace("Parsing driver DB: %s", path.data());
-        tbl = toml::parse_file(path);
-    } catch(const toml::parse_error &err) {
-        Warn("Failed to parse driver DB at %s: %s", path.data(), err.what());
+    // parse the file
+    toml::parse_result res = toml::parse_file(path);
+
+    if(!res) {
+        const auto &err = res.error();
+        auto &beg = err.source().begin;
+        Warn("Failed to parse automount config at %s %lu:%lu: %s", path.data(), beg.line,
+                beg.column, err.description());
         return false;
     }
+
+    const toml::table &tbl = res;
 
     // process the entries contained within
     auto drivers = tbl["drivers"];
@@ -46,7 +50,7 @@ bool DbParser::parse(const std::string_view &path, DriverDb *db) {
     }
 
     // if all entries were successfully processed, yeet them into driver db
-    Trace("Read %lu drivers from %s", temp.size(), path.data());
+    Trace("Read %lu driver(s) from %s", temp.size(), path.data());
     for(const auto &driver : temp) {
         db->addDriver(driver);
     }

@@ -42,6 +42,9 @@ class Automount {
         int getFsFor(const std::string_view &path, std::shared_ptr<Filesystem> &outFs,
                 std::string &outFsPath);
 
+        /// Sends any mount notifications once all filesystems have been automounted.
+        void postMount();
+
     private:
         /**
          * Describes information on a filesystem to automount.
@@ -71,6 +74,8 @@ class Automount {
 
         /// Set when automounting is enabled
         bool enable{true};
+        /// When set, we need to notify that the root fs has become available
+        bool needsRootFsNotify{false};
 
         /// Mapping of vfs path -> automount info. Checked for every new fs
         std::unordered_map<std::string, AutoInfo> autos;

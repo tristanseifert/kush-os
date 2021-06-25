@@ -1,6 +1,7 @@
 #include "Server.h"
 #include "Log.h"
 
+#include "db/DriverDb.h"
 #include "forest/Forest.h"
 #include "forest/Device.h"
 
@@ -60,11 +61,11 @@ std::string RpcServer::implAddDevice(const std::string &_parent, const std::stri
  * @param key Name of the property to set
  * @param data Data to set under this key; a zero byte value will delete the key.
  */
-void RpcServer::implSetDeviceProperty(const std::string &path, const std::string &key, const std::span<std::byte> &data) {
+int32_t RpcServer::implSetDeviceProperty(const std::string &path, const std::string &key, const std::span<std::byte> &data) {
     auto device = Forest::the()->getDevice(path);
     if(!device) {
         Warn("Failed to get device at '%s' to set property '%s'", path.c_str(), key.c_str());
-        throw std::invalid_argument("Invalid path");
+        return Errors::NoSuchDevice;
     }
 
     if(kLogProperties) Trace("%s: Set %s = (%lu bytes)", path.c_str(), key.c_str(), data.size());
@@ -73,6 +74,8 @@ void RpcServer::implSetDeviceProperty(const std::string &path, const std::string
     } else {
         device->setProperty(key, data);
     }
+
+    return 0;
 }
 
 /**
@@ -83,19 +86,19 @@ void RpcServer::implSetDeviceProperty(const std::string &path, const std::string
  *
  * @return Data associated with the key, or an zero byte blob if not found.
  */
-std::vector<std::byte> RpcServer::implGetDeviceProperty(const std::string &path,
+RpcServer::GetDevicePropertyReturn RpcServer::implGetDeviceProperty(const std::string &path,
         const std::string &key) {
     auto device = Forest::the()->getDevice(path);
     if(!device) {
         Warn("Failed to get device at '%s' to set property '%s'", path.c_str(), key.c_str());
-        throw std::invalid_argument("Invalid path");
+        return { Errors::NoSuchDevice };
     }
 
     if(kLogProperties) Trace("%s: Get %s", path.c_str(), key.c_str());
     if(device->hasProperty(key)) {
-        return device->getProperty(key);
+        return {0, device->getProperty(key)};
     }
-    return {};
+    return {0, {}};
 }
 
 
@@ -143,6 +146,10 @@ int32_t RpcServer::implNotify(const std::string &path, uint64_t key) {
              */
             case static_cast<uint64_t>(NK::RootFsUpdated): {
                 __librpc__FileIoResetConnection();
+
+                // reload the driver database and match any devices without a driver
+                DriverDb::the()->loadFullDb();
+                Forest::the()->startDeviceDrivers();
                 break;
             }
 

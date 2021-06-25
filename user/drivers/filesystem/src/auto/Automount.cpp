@@ -5,6 +5,9 @@
 
 #include <toml++/toml.h>
 #include <driver/DrivermanClient.h>
+#include <rpc/dispensary.h>
+#include <rpc/RpcPacket.hpp>
+#include <sys/syscalls.h>
 
 Automount *Automount::gShared{nullptr};
 
@@ -134,7 +137,7 @@ void Automount::startedFs(const std::shared_ptr<DriverSupport::disk::Disk> &disk
 
         // send out notifications for root fs mount
         if(vfsPath == "/") {
-            this->sendRootMountedNotes();
+            this->needsRootFsNotify = true;
         }
     }
 }
@@ -147,6 +150,41 @@ void Automount::startedFs(const std::shared_ptr<DriverSupport::disk::Disk> &disk
 void Automount::sendRootMountedNotes() {
     int err;
 
+    // shut down the init file handler
+    constexpr static const uint32_t kInitFileShutdownMessage{0x48b9ef0a};
+    constexpr static const std::string_view kInitFilePortName{"me.blraaz.rpc.rootsrv.initfileio"};
+
+    uintptr_t initPort{0};
+
+    err = LookupService(kInitFilePortName.data(), &initPort);
+    if(err == 1) {
+        // allocate a temporary buffer
+        void *buf{nullptr};
+        err = posix_memalign(&buf, 16, sizeof(rpc::RpcPacket) + 16);
+        if(err) {
+            Warn("%s failed: %d", "posix_memalign", err);
+            goto next;
+        }
+
+        // set it and send it
+        memset(buf, 0, sizeof(rpc::RpcPacket));
+        auto packet = reinterpret_cast<rpc::RpcPacket *>(buf);
+        packet->type = kInitFileShutdownMessage;
+
+        err = PortSend(initPort, buf, sizeof(rpc::RpcPacket));
+        if(err) {
+            Warn("%s failed: %d", "PortSend", err);
+        }
+
+        // free it
+        free(buf);
+    } else {
+        Warn("Failed to resolve init file port: %d", err);
+    }
+
+    ThreadUsleep(1000 * 100);
+
+next:;
     // notify driverman
     auto driverman = libdriver::RpcClient::the();
     err = driverman->NotifyDriverman(libdriver::RpcClient::NoteKeys::RootFsUpdated);
@@ -185,5 +223,17 @@ int Automount::getFsFor(const std::string_view &path, std::shared_ptr<Filesystem
     outFsPath = path;
 
     return 0;
+}
+
+/**
+ * Sends the root fs available notifications if needed. This is done after all filesystems have
+ * been automounted, so that if there are any secondary data filesystems, they'll also have been
+ * mounted.
+ */
+void Automount::postMount() {
+    if(this->needsRootFsNotify) {
+        this->sendRootMountedNotes();
+        this->needsRootFsNotify = false;
+    }
 }
 

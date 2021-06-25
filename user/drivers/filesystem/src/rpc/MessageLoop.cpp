@@ -40,7 +40,7 @@ MessageLoop::~MessageLoop() {
  */
 MessageLoop::OpenFileReturn MessageLoop::implOpenFile(const std::string &path, uint32_t mode) {
     int err;
-    Trace("File to open: '%s' (mode $%x)", path.c_str(), mode);
+    if(kLogOpen) Trace("File to open: '%s' (mode $%x)", path.c_str(), mode);
 
     // get fs and fs relative path
     std::shared_ptr<Filesystem> fs;
@@ -112,6 +112,8 @@ MessageLoop::OpenFileReturn MessageLoop::implOpenFile(const std::string &path, u
  * Closes a previously opened file.
  */
 int32_t MessageLoop::implCloseFile(uint64_t handle) {
+    if(kLogOpen) Trace("Closing file handle $%08x", handle);
+
     std::lock_guard<std::mutex> lg(this->openFilesLock);
 
     // ensure handle exists
@@ -132,6 +134,8 @@ int32_t MessageLoop::implCloseFile(uint64_t handle) {
  */
 MessageLoop::SlowReadReturn MessageLoop::implSlowRead(uint64_t handle, uint64_t offset,
         uint16_t numBytes) {
+    if(kLogIo) Trace("Read from file $%08x: offset %lu, %lu bytes", handle, offset, numBytes);
+
     // ensure handle exists
     std::shared_ptr<FileBase> file;
     {

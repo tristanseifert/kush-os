@@ -2,6 +2,8 @@
 
 #include <rpc/rt/ClientPortRpcStream.h>
 
+#include <cstdio>
+
 using namespace libdriver;
 
 RpcClient *RpcClient::gShared{nullptr};
@@ -34,6 +36,13 @@ void RpcClient::SetDeviceProperty(const std::string_view &_path, const std::stri
 RpcClient::ByteVec RpcClient::GetDeviceProperty(const std::string_view &_path,
         const std::string_view &_key) {
     const std::string path(_path), key(_key);
-    return this->GetDeviceProperty(path, key);
+    auto ret = this->GetDeviceProperty(path, key);
+
+    // TODO: handle error codes
+    if(ret.status) {
+        fprintf(stderr, "%s failed: %d\n", __PRETTY_FUNCTION__, ret.status);
+    }
+
+    return ret.data;
 }
 

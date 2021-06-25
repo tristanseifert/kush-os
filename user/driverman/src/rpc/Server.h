@@ -14,6 +14,14 @@ class RpcServer: public rpc::DrivermanServer {
             NoDevice                    = -1,
         };
 
+        /// Error codes
+        enum Errors: int {
+            /// The provided device path is invalid
+            InvalidPath                 = -90000,
+            /// No device was found at the given path
+            NoSuchDevice                = -90001,
+        };
+
         /// Initialize the global RPC server instance
         static void init();
         /// Return the global shared instance
@@ -22,8 +30,8 @@ class RpcServer: public rpc::DrivermanServer {
         }
 
         std::string implAddDevice(const std::string &parent, const std::string &driverId) override;
-        void implSetDeviceProperty(const std::string &path, const std::string &key, const std::span<std::byte> &data) override;
-        std::vector<std::byte> implGetDeviceProperty(const std::string &path, const std::string &key) override;
+        int32_t implSetDeviceProperty(const std::string &path, const std::string &key, const std::span<std::byte> &data) override;
+        GetDevicePropertyReturn implGetDeviceProperty(const std::string &path, const std::string &key) override;
 
         int32_t implStartDevice(const std::string &path) override;
         int32_t implStopDevice(const std::string &path) override;

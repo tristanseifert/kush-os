@@ -73,7 +73,7 @@ struct AddDeviceResponse {
   };
 };
 
-static constexpr  ::uint64_t MESSAGE_ID_SET_DEVICE_PROPERTY = 11230231943713784923llu;
+static constexpr  ::uint64_t MESSAGE_ID_SET_DEVICE_PROPERTY = 5755769805028394428llu;
 struct SetDevicePropertyRequest {
   SetDevicePropertyRequest() = delete;
 
@@ -97,14 +97,14 @@ struct SetDevicePropertyResponse {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(b48140abe5701eca, 0, 0)
+    CAPNP_DECLARE_STRUCT_HEADER(b48140abe5701eca, 1, 0)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
   };
 };
 
-static constexpr  ::uint64_t MESSAGE_ID_GET_DEVICE_PROPERTY = 7148186367562781089llu;
+static constexpr  ::uint64_t MESSAGE_ID_GET_DEVICE_PROPERTY = 18062887411523671328llu;
 struct GetDevicePropertyRequest {
   GetDevicePropertyRequest() = delete;
 
@@ -128,7 +128,7 @@ struct GetDevicePropertyResponse {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(f2796aac61f4c5f5, 0, 1)
+    CAPNP_DECLARE_STRUCT_HEADER(f2796aac61f4c5f5, 1, 1)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -520,6 +520,8 @@ public:
   }
 #endif  // !CAPNP_LITE
 
+  inline  ::int32_t getStatus() const;
+
 private:
   ::capnp::_::StructReader _reader;
   template <typename, ::capnp::Kind>
@@ -547,6 +549,9 @@ public:
 #if !CAPNP_LITE
   inline ::kj::StringTree toString() const { return asReader().toString(); }
 #endif  // !CAPNP_LITE
+
+  inline  ::int32_t getStatus();
+  inline void setStatus( ::int32_t value);
 
 private:
   ::capnp::_::StructBuilder _builder;
@@ -682,6 +687,8 @@ public:
   }
 #endif  // !CAPNP_LITE
 
+  inline  ::int32_t getStatus() const;
+
   inline bool hasData() const;
   inline  ::capnp::Data::Reader getData() const;
 
@@ -712,6 +719,9 @@ public:
 #if !CAPNP_LITE
   inline ::kj::StringTree toString() const { return asReader().toString(); }
 #endif  // !CAPNP_LITE
+
+  inline  ::int32_t getStatus();
+  inline void setStatus( ::int32_t value);
 
   inline bool hasData();
   inline  ::capnp::Data::Builder getData();
@@ -1428,6 +1438,20 @@ inline ::capnp::Orphan< ::capnp::Data> SetDevicePropertyRequest::Builder::disown
       ::capnp::bounded<2>() * ::capnp::POINTERS));
 }
 
+inline  ::int32_t SetDevicePropertyResponse::Reader::getStatus() const {
+  return _reader.getDataField< ::int32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline  ::int32_t SetDevicePropertyResponse::Builder::getStatus() {
+  return _builder.getDataField< ::int32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void SetDevicePropertyResponse::Builder::setStatus( ::int32_t value) {
+  _builder.setDataField< ::int32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
 inline bool GetDevicePropertyRequest::Reader::hasPath() const {
   return !_reader.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
@@ -1494,6 +1518,20 @@ inline void GetDevicePropertyRequest::Builder::adoptKey(
 inline ::capnp::Orphan< ::capnp::Text> GetDevicePropertyRequest::Builder::disownKey() {
   return ::capnp::_::PointerHelpers< ::capnp::Text>::disown(_builder.getPointerField(
       ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+
+inline  ::int32_t GetDevicePropertyResponse::Reader::getStatus() const {
+  return _reader.getDataField< ::int32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline  ::int32_t GetDevicePropertyResponse::Builder::getStatus() {
+  return _builder.getDataField< ::int32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void GetDevicePropertyResponse::Builder::setStatus( ::int32_t value) {
+  _builder.setDataField< ::int32_t>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
 }
 
 inline bool GetDevicePropertyResponse::Reader::hasData() const {

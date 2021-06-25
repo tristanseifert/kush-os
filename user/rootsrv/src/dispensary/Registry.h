@@ -17,6 +17,7 @@ class RpcHandler;
 class Registry {
     friend class RpcHandler;
     friend void RegisterPort(const std::string_view &, const uintptr_t);
+    friend void UnregisterPort(const std::string_view &);
 
     public:
         static void init() {
@@ -36,6 +37,10 @@ class Registry {
         /// Looks up a port, waiting for up to the given amount of time for it to be registered.
         bool lookupPort(const std::string &key, uintptr_t &outHandle,
                 const std::chrono::microseconds wait);
+        /// Unregisters the given port
+        bool unregisterPort(const std::string &key) {
+            return this->storage.erase(key);
+        }
 
     private:
         static Registry *gShared;

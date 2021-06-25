@@ -49,6 +49,11 @@ class MessageLoop: public rpc::FilesystemServer {
         void legacyWorkerMain();
 
     private:
+        /// Whether file open/close is logged
+        constexpr static const bool kLogOpen{false};
+        /// Whether file IO is logged
+        constexpr static const bool kLogIo{false};
+
         /// Value for the next file handle
         std::atomic_uint64_t nextFileHandle{1};
 

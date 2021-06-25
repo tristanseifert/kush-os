@@ -73,7 +73,30 @@ std::shared_ptr<Device> Forest::getDevice(const std::string_view &path) {
 
 
 
+/**
+ * Iterates the tree in a breadth-first fashion to start drivers for devices that do not yet have
+ * any drivers associated with them.
+ */
+void Forest::startDeviceDrivers() {
+    this->startDriversOn(this->root);
+}
 
+/**
+ * Starts drivers for all devices attached to this leaf, before recursing to its children.
+ */
+void Forest::startDriversOn(const std::shared_ptr<Leaf> &leaf) {
+    if(leaf->device) {
+        const auto &dev = leaf->device;
+        if(!dev->hasDriver()) {
+            dev->findAndLoadDriver();
+        }
+    }
+
+    // recurse to children
+    for(const auto &c : *leaf) {
+        this->startDriversOn(c);
+    }
+}
 
 /**
  * Searches the forest for a node with the given path.

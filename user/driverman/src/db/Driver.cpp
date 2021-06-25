@@ -126,7 +126,8 @@ std::shared_ptr<DriverInstance> Driver::makeInstance(const std::shared_ptr<Devic
     err = RpcTaskCreate(this->path.c_str(), params, &handle);
 
     if(err) {
-        throw std::system_error(err, std::system_category(), "RpcTaskCreate");
+        Warn("Failed to launch driver %s: %d", this->path.c_str(), err);
+        return nullptr;
     }
 
     // create the instance object

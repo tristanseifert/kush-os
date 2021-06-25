@@ -100,6 +100,7 @@ int File::read(const uint64_t offset, const size_t numBytes, std::vector<std::by
 
         // update bookkeeping
         bytesLeft -= clusterBytes;
+        currentOff += clusterBytes;
 
         // read next cluster if needed
         if(bytesLeft) {

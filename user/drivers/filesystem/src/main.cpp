@@ -84,6 +84,9 @@ int main(const int argc, const char **argv) {
         }
     }
 
+    // perform post-mount notifications
+    Automount::the()->postMount();
+
     // start RPC server and enter the message loop
     err = ml.run();
     Warn("Message loop returned: %d", err);

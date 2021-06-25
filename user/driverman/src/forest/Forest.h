@@ -41,6 +41,9 @@ class Forest {
         /// Gets the device associated with the node at the given path.
         std::shared_ptr<Device> getDevice(const std::string_view &path);
 
+        /// Attempt to load drivers for all devices without one.
+        void startDeviceDrivers();
+
     private:
         Forest();
 
@@ -78,6 +81,8 @@ class Forest {
     private:
         /// Finds the device at a particular path
         bool find(const std::string_view &, std::shared_ptr<Forest::Leaf> &);
+
+        void startDriversOn(const std::shared_ptr<Leaf> &ptr);
 
         /// Associates the given device to the given leaf.
         static void UpdateLeafDev(const std::shared_ptr<Device> &, const std::shared_ptr<Leaf> &);

@@ -18,8 +18,6 @@ using namespace std::literals;
 using namespace init;
 using namespace rpc;
 
-// declare the constants for the handler
-const std::string_view BundleFileRpcHandler::kPortName = "me.blraaz.rpc.rootsrv.initfileio"sv;
 // shared instance of the bundle file IO handler
 BundleFileRpcHandler *BundleFileRpcHandler::gShared = nullptr;
 
@@ -73,8 +71,7 @@ void BundleFileRpcHandler::main() {
         if(err > 0) {
             // read out the type
             if(msg->receivedBytes < sizeof(RpcPacket)) {
-                LOG("Port $%08x'h received too small message (%u)", this->portHandle,
-                        msg->receivedBytes);
+                LOG("Init file io received too small message (%lu)", msg->receivedBytes);
                 continue;
             }
 
@@ -101,6 +98,10 @@ void BundleFileRpcHandler::main() {
                     this->handleReadDirect(msg, packet, err);
                     break;
 
+                case kShutdownMessage:
+                    this->shutdown();
+                    break;
+
                 default:
                     LOG("Init file RPC invalid msg type: $%08x", packet->type);
                     break;
@@ -114,6 +115,7 @@ void BundleFileRpcHandler::main() {
 
     // clean up
     free(rxBuf);
+    LOG("Init file io service shutting down");
 }
 
 /**
@@ -324,4 +326,21 @@ void BundleFileRpcHandler::reply(const RpcPacket *packet, const FileIoEpType typ
     if(err) {
         throw std::system_error(err, std::generic_category(), "PortSend");
     }
+}
+
+/**
+ * Clean up and shut down the handler.
+ */
+extern "C" void __librpc__FileIoResetConnection();
+
+void BundleFileRpcHandler::shutdown() {
+    // unregister port and deallocate it
+    dispensary::UnregisterPort(kPortName);
+    PortDestroy(this->portHandle);
+
+    // ensure worker exits
+    this->run = false;
+
+    // make future file IO use the filesystem
+    __librpc__FileIoResetConnection();
 }

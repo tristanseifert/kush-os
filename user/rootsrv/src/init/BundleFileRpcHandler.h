@@ -29,12 +29,15 @@ namespace init {
 class BundleFileRpcHandler {
     public:
         /// Name of the service to register
-        static const std::string_view kPortName;
+        constexpr static const std::string_view kPortName{"me.blraaz.rpc.rootsrv.initfileio"};
         /// maximum length of messages to be received by this handler; this includes headers
         constexpr static const size_t kMaxMsgLen = (1024 * 16);
 
         /// maximum IO block size
         constexpr static const size_t kMaxBlockSize = (4096 * 8);
+
+        /// Message type that when received will shut down the init file IO
+        constexpr static const uint32_t kShutdownMessage{0x48b9ef0a};
 
     public:
         BundleFileRpcHandler(std::shared_ptr<Bundle> &_bundle);
@@ -72,6 +75,8 @@ class BundleFileRpcHandler {
         void reply(const rpc::RpcPacket *packet, const rpc::FileIoEpType type,
         const std::span<uint8_t> &buf);
 
+        void shutdown();
+
     private:
         static BundleFileRpcHandler *gShared;
 
@@ -79,14 +84,14 @@ class BundleFileRpcHandler {
         std::shared_ptr<Bundle> bundle;
 
         /// message port
-        uintptr_t portHandle = 0;
+        uintptr_t portHandle{0};
         /// as long as this set, the worker will continue execute
         std::atomic_bool run;
         /// runloop thread
         std::unique_ptr<std::thread> worker;
 
         /// next file handle
-        std::atomic_uintptr_t nextHandle = 1;
+        std::atomic_uintptr_t nextHandle{1};
         /// file handles
         std::unordered_map<uintptr_t, OpenedFile> openFiles;
 };

@@ -22,10 +22,21 @@ DriverDb::DriverDb() {
     DbParser p;
 
     if(!p.parse(kBootDbPath, this)) {
-        Abort("Failed to load initial driver database");
+        Abort("Failed to load %s driver database", "initial");
     }
 }
 
+/**
+ * Reloads the driver database with the drivers in the "full" driver database. This should be
+ * called when the root filesystem has become available.
+ */
+void DriverDb::loadFullDb() {
+    DbParser p;
+
+    if(!p.parse(kFullDbPath, this)) {
+        Abort("Failed to load %s driver database", "full");
+    }
+}
 
 /**
  * Finds a driver that can match to the given device. If there are multiple drivers that match,

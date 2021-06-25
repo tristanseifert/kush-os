@@ -19,8 +19,10 @@ class Driver;
  * to load for a particular device.
  */
 class DriverDb {
-    /// Filesystem path to the early boot 
+    /// Filesystem path to the early boot driver database
     constexpr static const std::string_view kBootDbPath{"/config/DriverDb.toml"};
+    /// Filesystem path to the driver database with the full system booted
+    constexpr static const std::string_view kFullDbPath{"/config/FullDriverDb.toml"};
 
     public:
         /**
@@ -55,6 +57,9 @@ class DriverDb {
         /// Find a driver that matches the device.
         std::shared_ptr<Driver> findDriver(const std::shared_ptr<Device> &device,
                 MatchInfo * _Nullable driver = nullptr);
+
+        /// Loads the full driver database.
+        void loadFullDb();
 
         /// Registers a new driver.
         uintptr_t addDriver(const std::shared_ptr<Driver> &driver);

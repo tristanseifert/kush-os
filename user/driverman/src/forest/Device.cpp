@@ -18,7 +18,7 @@
  */
 void Device::SplitDriverName(const std::string_view &str, std::vector<std::string> &out) {
     if(str.empty()) {
-        throw std::invalid_argument("driver name may not be empty");
+        Abort("Invalid driver name");
     }
 
     // early exit if no comma
@@ -43,7 +43,7 @@ void Device::SplitDriverName(const std::string_view &str, std::vector<std::strin
  */
 void Device::willDeforest(const std::shared_ptr<Forest::Leaf> &leaf) {
     if(this->leaf.lock() != leaf) {
-        throw std::runtime_error("invalid deforestation leaf");
+        Abort("Invalid deforestation leaf");
     }
 
     this->leaf.reset();

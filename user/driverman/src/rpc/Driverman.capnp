@@ -1,5 +1,5 @@
 # This is an automatically generated file (by idlc). Do not edit.
-# Generated from Driverman.idl for interface Driverman at 2021-06-24T01:09:39-0500
+# Generated from Driverman.idl for interface Driverman at 2021-06-24T17:16:46-0500
 @0x9c46a74e95804d52;
 using Cxx = import "/capnp/c++.capnp";
 $Cxx.namespace("rpc::_proto::messages");
@@ -21,8 +21,8 @@ struct AddDeviceResponse {
 }
 
 ############################################################
-# Structures for message 'setDeviceProperty'
-const messageIdSetDeviceProperty:UInt64 = 0x9bd9cc73d64e045b;
+# Structures for message 'SetDeviceProperty'
+const messageIdSetDeviceProperty:UInt64 = 0x4fe09a246da305bc;
 
 struct SetDevicePropertyRequest {
                             path @0: Text;
@@ -30,18 +30,20 @@ struct SetDevicePropertyRequest {
                             data @2: Data;
 }
 struct SetDevicePropertyResponse {
+                          status @0: Int32;
 }
 
 ############################################################
-# Structures for message 'getDeviceProperty'
-const messageIdGetDeviceProperty:UInt64 = 0x633375a0eade91a1;
+# Structures for message 'GetDeviceProperty'
+const messageIdGetDeviceProperty:UInt64 = 0xfaac446645be5520;
 
 struct GetDevicePropertyRequest {
                             path @0: Text;
                              key @1: Text;
 }
 struct GetDevicePropertyResponse {
-                            data @0: Data;
+                          status @0: Int32;
+                            data @1: Data;
 }
 
 ############################################################
