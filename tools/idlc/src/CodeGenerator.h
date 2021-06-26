@@ -54,6 +54,11 @@ class CodeGenerator {
         void clientWriteMarshallMethod(std::ofstream &, const Method &);
         void clientWriteMarshallMethodReply(std::ofstream &, const Method &);
 
+        void cppWriteStructs(std::ofstream &);
+        void serWriteMethod(std::ofstream &, const Method &);
+        void serWriteArgs(std::ofstream &, const std::vector<Argument> &);
+        void serWriteSerializers(std::ofstream &, const std::vector<Argument> &, const std::string &);
+
         void cppWriteMethodDef(std::ofstream &, const Method &, const std::string &prefix = "", const std::string &classPrefix = "");
         void cppWriteReturnStruct(std::ofstream &, const Method &);
         void cppWriteIncludes(std::ofstream &);
@@ -61,6 +66,11 @@ class CodeGenerator {
         static std::string CppTypenameForArg(const Argument &, const bool isArg);
 
     private:
+        /// mapping of IDL types to wire format sizes
+        static const std::unordered_map<std::string, size_t> gWireSizes;
+        /// Whether a particular IDL type is encoded as a blob
+        static const std::unordered_map<std::string, bool> gWireIsBlob;
+
         // mapping of the type names defined in the IDL to Cap'n Proto names
         static const std::unordered_map<std::string, std::string> gProtoTypeNames;
         // mapping of the type names defined in the IDL to C++ type names

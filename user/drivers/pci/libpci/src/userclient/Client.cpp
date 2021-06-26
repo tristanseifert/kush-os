@@ -27,9 +27,8 @@ UserClient *UserClient::the() {
 /**
  * Serializes a device address; this just packs the address values sequentially.
  */
-void rpc::serialize(std::vector<std::byte> &outData, const BusAddress &addr) {
-    // reserve space
-    outData.resize(5, std::byte{0});
+void rpc::serialize(std::span<std::byte> &outData, const BusAddress &addr) {
+    assert(outdData.size() >= 5);
     auto bytes = outData.data();
 
     // copy the variables
@@ -47,5 +46,12 @@ void rpc::deserialize(const std::span<std::byte> &bytes, BusAddress &addr) {
     memcpy(&addr.bus, &bytes[2], sizeof(addr.bus));
     memcpy(&addr.device, &bytes[3], sizeof(addr.device));
     memcpy(&addr.function, &bytes[4], sizeof(addr.function));
+}
+
+/**
+ * The PCI bus address is always packed into a five byte long structure.
+ */
+size_t rpc::bytesFor(const libpci::BusAddress &) {
+    return 5;
 }
 

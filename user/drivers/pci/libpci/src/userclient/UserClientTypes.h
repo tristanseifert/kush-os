@@ -36,7 +36,8 @@ struct BusAddress {
 }
 
 namespace rpc {
-void serialize(std::vector<std::byte> &, const libpci::BusAddress &);
+void serialize(std::span<std::byte> &, const libpci::BusAddress &);
 void deserialize(const std::span<std::byte> &, libpci::BusAddress &);
+size_t bytesFor(const libpci::BusAddress &);
 }
 #endif

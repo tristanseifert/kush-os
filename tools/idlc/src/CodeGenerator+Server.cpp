@@ -63,6 +63,8 @@ void CodeGenerator::generateServerStub() {
        << "#include \"" << this->protoFileName.filename().generic_string() << ".h\"" << std::endl
        << R"(
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
@@ -217,6 +219,8 @@ void CodeGenerator::serverWriteImpl(std::ofstream &os) {
 
     this->cppWriteCustomTypeHelpers(os);
 
+    this->cppWriteStructs(os);
+
     // constructors and run method
     os << R"(/**
  * Creates a new server instance, with the given IO stream.
@@ -228,9 +232,7 @@ Server::)" << className << R"((const std::shared_ptr<IoStream> &stream) : io(str
  * Releases any allocated resources.
  */
 Server::~)" << className << R"(() {
-    if(this->txBuf) {
-        free(this->txBuf);
-    }
+    free(this->txBuf);
 }
 
 /**
@@ -285,8 +287,7 @@ bool Server::runOne(const bool block) {
 
 // Helper method to build and send a reply message
 void Server::_doSendReply(const MessageHeader &inHdr, const std::span<std::byte> &payload) {
-    const size_t len = sizeof(MessageHeader) + payload.size();
-    this->_ensureTxBuf(len);
+    this->_ensureTxBuf(payload.size());
 
     auto hdr = reinterpret_cast<MessageHeader *>(this->txBuf);
     memset(hdr, 0, sizeof(*hdr));
@@ -303,7 +304,9 @@ void Server::_doSendReply(const MessageHeader &inHdr, const std::span<std::byte>
 }
 
 // Allocates an aligned transmit buffer of the given size
-void Server::_ensureTxBuf(const size_t len) {
+void Server::_ensureTxBuf(const size_t _len) {
+    const auto len = sizeof(MessageHeader) + _len;
+
     if(len > this->txBufSize) {
         if(this->txBuf) {
             free(this->txBuf);

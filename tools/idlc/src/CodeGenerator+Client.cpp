@@ -62,8 +62,10 @@ void CodeGenerator::generateClientStub() {
        << "#include \"" << this->protoFileName.filename().generic_string() << ".h\"" << std::endl
        << R"(
 #include <algorithm>
-#include <cstdlib>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include <capnp/message.h>
@@ -206,6 +208,8 @@ void CodeGenerator::clientWriteImpl(std::ofstream &os) {
 
     this->cppWriteCustomTypeHelpers(os);
 
+    this->cppWriteStructs(os);
+
     // define the constructor and destructors, as well as internal helpers
     os << R"(/**
  * Creates a new client instance, with the given IO stream.
@@ -217,9 +221,7 @@ Client::)" << className << R"((const std::shared_ptr<IoStream> &stream) : io(str
  * Shuts down the RPC client, releasing any allocated resources.
  */
 Client::~)" << className << R"(() {
-    if(this->txBuf) {
-        free(this->txBuf);
-    }
+    free(this->txBuf);
 }
 )";
 

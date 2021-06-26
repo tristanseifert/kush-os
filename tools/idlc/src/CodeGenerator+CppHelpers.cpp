@@ -110,12 +110,19 @@ void CodeGenerator::cppWriteCustomTypeHelpers(std::ofstream &os) {
 template<typename... _blah>
 constexpr auto TemplatedFalseFlag = false;
 
+/// Given a byte range, decodes the given type
 template<typename T>
 inline bool deserialize(const std::span<std::byte> &, T &) {
     static_assert(TemplatedFalseFlag<T>, "rpc::deserialize not implemented for custom type");
 }
+/// Determine how many bytes of memory are required to serialize the given type.
 template<typename T>
-inline bool serialize(std::vector<std::byte> &, const T &) {
+inline size_t bytesFor(const T &) {
+    static_assert(TemplatedFalseFlag<T>, "rpc::bytesFor not implemented for custom type");
+}
+/// Encodes the given type into the provided region of memory
+template<typename T>
+inline bool serialize(std::span<std::byte> &, const T &) {
     static_assert(TemplatedFalseFlag<T>, "rpc::serialize not implemented for custom type");
 }
 )";
