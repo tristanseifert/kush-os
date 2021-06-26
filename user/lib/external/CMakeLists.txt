@@ -10,17 +10,11 @@ add_subdirectory(lzfse)
 set(EXTERNAL_CAPNP ON CACHE BOOL "" FORCE)
 set(CAPNP_LITE ON CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-add_subdirectory(capnproto/c++)
+add_subdirectory(capnproto/c++ EXCLUDE_FROM_ALL)
 
 # build a dynamic cap'n proto library
 add_library(capnp_dynamic ALIAS capnp)
-#add_library(capnp_dynamic SHARED $<TARGET_OBJECTS:capnp>)
-#target_link_libraries(capnp_dynamic PRIVATE kj)
-#set_target_properties(capnp_dynamic PROPERTIES OUTPUT_NAME "capnp")
 
-#install(TARGETS capnp_dynamic LIBRARY)
-#add_custom_command(TARGET capnp_dynamic POST_BUILD
-#    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/libcapnp.so ${SYSROOT_DIR}/boot/lib/libcapnp.so)
 # string formatting
 SET(FMT_OS OFF CACHE BOOL "disable fmtlib OS component" FORCE)
 add_subdirectory(fmtlib EXCLUDE_FROM_ALL)

@@ -85,8 +85,7 @@ void PciExpressBus::decodeEcamInfo(const std::span<std::byte> &range) {
     // clean up
     auto status = mpack_tree_destroy(&tree);
     if(status != mpack_ok) {
-        Warn("%s failed: %d", "mpack_tree_destroy", status);
-        return;
+        Abort("%s failed: %d", "mpack_tree_destroy", status);
     }
 }
 

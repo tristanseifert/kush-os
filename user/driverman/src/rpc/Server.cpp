@@ -61,7 +61,7 @@ std::string RpcServer::implAddDevice(const std::string &_parent, const std::stri
  * @param key Name of the property to set
  * @param data Data to set under this key; a zero byte value will delete the key.
  */
-int32_t RpcServer::implSetDeviceProperty(const std::string &path, const std::string &key, const std::span<std::byte> &data) {
+int32_t RpcServer::implSetDeviceProperty(const std::string &path, const std::string &key, const std::vector<std::byte> &data) {
     auto device = Forest::the()->getDevice(path);
     if(!device) {
         Warn("Failed to get device at '%s' to set property '%s'", path.c_str(), key.c_str());

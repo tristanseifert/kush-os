@@ -35,7 +35,7 @@ class RpcClient: public rpc::DrivermanClient {
         static RpcClient *the();
 
         virtual void SetDeviceProperty(const std::string_view &path, const std::string_view &key,
-                const ByteSpan &data);
+                const ByteVec &data);
         virtual ByteVec GetDeviceProperty(const std::string_view &path,
                 const std::string_view &key);
 

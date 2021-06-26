@@ -13,7 +13,6 @@ add_executable(driverman
     src/forest/Device.cpp
     src/rpc/Server.cpp
     src/rpc/Server_Driverman.cpp
-    src/rpc/Driverman.capnp.c++
     src/db/Driver.cpp
     src/db/DriverDb.cpp
     src/db/DbParser.cpp
@@ -48,7 +47,7 @@ target_link_libraries(driverman PRIVATE tomlplusplus::tomlplusplus)
 
 # required libraries
 add_dependencies(driverman c_dynamic system_dynamic)
-target_link_libraries(driverman PRIVATE capnp_dynamic rpc driver mpack_dynamic)
+target_link_libraries(driverman PRIVATE rpc driver mpack_dynamic)
 
 # install it to boot directory in sysroot
 install(TARGETS driverman RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)

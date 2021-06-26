@@ -5,7 +5,6 @@
 ###############################################################################
 add_library(driver STATIC
     # RPC implementations
-    src/rpc/Driverman.capnp.c++
     src/rpc/Client_Driverman.cpp
     src/rpc/Client.cpp
     # serialization helpers

@@ -30,7 +30,7 @@ class RpcServer: public rpc::DrivermanServer {
         }
 
         std::string implAddDevice(const std::string &parent, const std::string &driverId) override;
-        int32_t implSetDeviceProperty(const std::string &path, const std::string &key, const std::span<std::byte> &data) override;
+        int32_t implSetDeviceProperty(const std::string &path, const std::string &key, const std::vector<std::byte> &data) override;
         GetDevicePropertyReturn implGetDeviceProperty(const std::string &path, const std::string &key) override;
 
         int32_t implStartDevice(const std::string &path) override;

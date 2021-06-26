@@ -21,7 +21,6 @@ add_executable(fsdrv
     # RPC service
     src/rpc/MessageLoop.cpp
     src/rpc/LegacyIo.cpp
-    rpc/Filesystem.capnp.c++
     rpc/Server_Filesystem.cpp
     # Helpers
     src/util/Path.cpp
@@ -39,7 +38,7 @@ target_include_directories(fsdrv PRIVATE src)
 # required libraries
 add_dependencies(fsdrv c_dynamic system_dynamic)
 target_link_libraries(fsdrv PRIVATE tomlplusplus::tomlplusplus)
-target_link_libraries(fsdrv PRIVATE libcrc capnp_dynamic driver DriverSupport::Disk rpc)
+target_link_libraries(fsdrv PRIVATE libcrc driver DriverSupport::Disk rpc)
 
 # copy the example automount configuration file
 install(FILES ${CMAKE_CURRENT_LIST_DIR}/dist/Automount.toml DESTINATION
