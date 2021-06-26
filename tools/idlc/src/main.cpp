@@ -145,7 +145,7 @@ int main(int argc, char **argv) {
             CodeGenerator gen(outDir, intf);
 
             // create the protocol files
-            gen.generateProto();
+            gen.generateSerialization();
 
             // and the server and client stubs
             gen.generateServerStub();

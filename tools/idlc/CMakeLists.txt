@@ -7,7 +7,6 @@ add_executable(idlc
     src/InterfaceDescription.cpp
     src/InterfaceDescriptionBuilder.cpp
     src/CodeGenerator.cpp
-    src/CodeGenerator+Proto.cpp
     src/CodeGenerator+Serialization.cpp
     src/CodeGenerator+Server.cpp
     src/CodeGenerator+Client.cpp

@@ -27,19 +27,14 @@ class CodeGenerator {
     public:
         CodeGenerator(const std::filesystem::path &outDir, const IDPointer &interface);
 
-        /// Generates the Cap'n Proto messages for each method's params and reply.
-        void generateProto();
+        /// Generates the serialization wire format header
+        void generateSerialization();
         /// Generates the server stub for the interface
         void generateServerStub();
         /// Generates the client stub for the interface
         void generateClientStub();
 
     private:
-        void protoWriteMethod(std::ofstream &, const Method &);
-        void protoWriteArgs(std::ofstream &, const std::vector<Argument> &);
-
-        static std::string ProtoTypenameForArg(const Argument &);
-
         void serverWriteInfoBlock(std::ofstream &);
         void serverWriteHeader(std::ofstream &);
 
@@ -54,10 +49,14 @@ class CodeGenerator {
         void clientWriteMarshallMethod(std::ofstream &, const Method &);
         void clientWriteMarshallMethodReply(std::ofstream &, const Method &);
 
-        void cppWriteStructs(std::ofstream &);
+        void serWriteInfoBlock(std::ofstream &);
+        void serWriteStructs(std::ofstream &);
         void serWriteMethod(std::ofstream &, const Method &);
         void serWriteArgs(std::ofstream &, const std::vector<Argument> &);
         void serWriteSerializers(std::ofstream &, const std::vector<Argument> &, const std::string &);
+        static std::string SerGetMessageIdEnumName(const InterfaceDescription::Method &,
+                const bool = true);
+        static std::string SerGetMessageStructName(const InterfaceDescription::Method &,const bool);
 
         void cppWriteMethodDef(std::ofstream &, const Method &, const std::string &prefix = "", const std::string &classPrefix = "");
         void cppWriteReturnStruct(std::ofstream &, const Method &);
@@ -68,8 +67,6 @@ class CodeGenerator {
     private:
         /// mapping of IDL types to wire format sizes
         static const std::unordered_map<std::string, size_t> gWireSizes;
-        /// Whether a particular IDL type is encoded as a blob
-        static const std::unordered_map<std::string, bool> gWireIsBlob;
 
         // mapping of the type names defined in the IDL to Cap'n Proto names
         static const std::unordered_map<std::string, std::string> gProtoTypeNames;
@@ -85,8 +82,8 @@ class CodeGenerator {
         // directory into which output files are written
         std::filesystem::path outDir;
 
-        // filename for the Cap'n Proto file
-        std::filesystem::path protoFileName;
+        // filename for the serialization file
+        std::filesystem::path serializationFile;
 };
 
 #endif
