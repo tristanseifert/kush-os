@@ -19,7 +19,8 @@ bool ElfReader::gLogSegments = false;
 /**
  * Creates an ELF reader for an already opened file.
  */
-ElfReader::ElfReader(FILE * _Nonnull fp) : file(fp) {
+ElfReader::ElfReader(FILE * _Nonnull fp, const char *_path) : file(fp),
+    path(strdup(_path)) {
     this->ownsFile = false;
 
     this->getFilesize();
@@ -30,11 +31,11 @@ ElfReader::ElfReader(FILE * _Nonnull fp) : file(fp) {
 /**
  * Opens the file at the provided path. If unable, the program is terminated.
  */
-ElfReader::ElfReader(const char *path) {
+ElfReader::ElfReader(const char *_path) : path(strdup(_path)) {
     // open the file
-    FILE *fp = fopen(path, "rb");
+    FILE *fp = fopen(_path, "rb");
     if(!fp) {
-        fprintf(stderr, "Failed to open executable '%s': %d", path, errno);
+        fprintf(stderr, "Failed to open executable '%s': %d", _path, errno);
         _Exit(-1);
     }
 
@@ -52,6 +53,8 @@ ElfReader::~ElfReader() {
     if(this->ownsFile) {
         fclose(this->file);
     }
+
+    free(this->path);
 }
 
 /**
@@ -226,7 +229,8 @@ void ElfReader::parseDynamicInfo() {
     }
 
     if(!strtabAddr || !strtabLen) {
-        Linker::Abort("missing strtab");
+        Linker::Abort("%s: missing strtab (addr $%x len %lu, %lu dynents)", this->path ? this->path : "?",
+                strtabAddr, strtabLen, this->dynInfo.size());
     }
     this->strtab = std::span<char>(reinterpret_cast<char *>(strtabAddr), strtabLen);
 

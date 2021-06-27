@@ -215,7 +215,7 @@ void Linker::loadSharedLib(const char *soname) {
 
     // open the library
     const auto base = this->soBase;
-    auto loader = new ElfLibReader(base, file);
+    auto loader = new ElfLibReader(base, file, libPath);
 
     // store its info
     auto info = new Library;
@@ -229,7 +229,7 @@ void Linker::loadSharedLib(const char *soname) {
 
     err = hashmap_put(&this->loaded, info->soname, strlen(info->soname), info);
     if(err) {
-        Abort("hashmap_put failed: %d", err);
+        Abort("%s failed: %d", "hashmap_put", err);
     }
 
     /*
@@ -407,7 +407,7 @@ void Linker::Abort(const char *str, ...) {
     va_end(va);
 
     fputs("\e[0m\n", stderr);
-    _Exit(-69);
+    abort();
 }
 #pragma clang diagnostic pop
 

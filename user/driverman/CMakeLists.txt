@@ -47,7 +47,7 @@ target_link_libraries(driverman PRIVATE tomlplusplus::tomlplusplus)
 
 # required libraries
 add_dependencies(driverman c_dynamic system_dynamic)
-target_link_libraries(driverman PRIVATE rpc driver mpack_dynamic)
+target_link_libraries(driverman PRIVATE rpc driver mpack)
 
 # install it to boot directory in sysroot
 install(TARGETS driverman RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)

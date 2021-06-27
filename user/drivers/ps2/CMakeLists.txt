@@ -39,7 +39,7 @@ target_include_directories(ps2drv PRIVATE src)
 
 # required libraries
 add_dependencies(ps2drv c_dynamic system_dynamic)
-target_link_libraries(ps2drv PRIVATE capnp_dynamic driver rpc mpack_dynamic acpisrv_serialization)
+target_link_libraries(ps2drv PRIVATE driver rpc mpack acpisrv_serialization)
 
 # install it to boot directory in sysroot
 install(TARGETS ps2drv RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)

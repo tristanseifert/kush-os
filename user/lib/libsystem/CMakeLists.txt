@@ -56,6 +56,7 @@ elseif(${KERNEL_ARCH} STREQUAL "x86_64")
         src/x86_64/thread_start.S
         src/x86_64/syscall_arch.c
         src/x86_64/syscall_impl.S
+        src/x86_64/backtrace.c
     )
 
     target_compile_definitions(system_objs PRIVATE LIBC_ARCH_X86_64=1)
@@ -68,8 +69,8 @@ else()
 endif()
 
 # install the library to the sysroot
-install(TARGETS system_static LIBRARY)
 install(TARGETS system_dynamic LIBRARY)
+add_library(system ALIAS system_dynamic)
 
 add_custom_command(TARGET system_dynamic POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/libsystem.so ${SYSROOT_DIR}/boot/lib/libsystem.so)

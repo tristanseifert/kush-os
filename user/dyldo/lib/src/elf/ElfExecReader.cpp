@@ -9,7 +9,7 @@ using namespace dyldo;
 /**
  * Initializes an executable ELF reader with a pre-opened file descriptor.
  */
-ElfExecReader::ElfExecReader(FILE * _Nonnull file) : ElfReader(file) {
+ElfExecReader::ElfExecReader(FILE *file, const char *_path) : ElfReader(file, _path) {
     this->ensureExec();
 }
 

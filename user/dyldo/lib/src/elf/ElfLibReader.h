@@ -16,7 +16,7 @@ class ElfLibReader: public ElfReader {
     friend class SymbolMap;
 
     public:
-        ElfLibReader(const uintptr_t vmBase, FILE * _Nonnull file);
+        ElfLibReader(const uintptr_t vmBase, FILE * _Nonnull file, const char * _Nonnull path);
         ElfLibReader(const uintptr_t vmBase, const char * _Nonnull path);
         virtual ~ElfLibReader();
 

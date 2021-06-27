@@ -82,8 +82,8 @@ set_target_properties(mpack_dynamic PROPERTIES OUTPUT_NAME "mpack")
 target_include_directories(mpack_dynamic PUBLIC mpack/src/)
 
 # install the library to the sysroot
-install(TARGETS mpack_static LIBRARY)
 install(TARGETS mpack_dynamic LIBRARY)
+add_library(mpack ALIAS mpack_dynamic)
 
 add_custom_command(TARGET mpack_dynamic POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/libmpack.so ${SYSROOT_DIR}/boot/lib/libmpack.so)

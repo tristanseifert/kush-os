@@ -14,7 +14,7 @@ namespace dyldo {
  */
 class ElfExecReader: public ElfReader {
     public:
-        ElfExecReader(FILE * _Nonnull file);
+        ElfExecReader(FILE * _Nonnull file, const char * _Nonnull path);
         ElfExecReader(const char * _Nonnull path);
         virtual ~ElfExecReader();
 

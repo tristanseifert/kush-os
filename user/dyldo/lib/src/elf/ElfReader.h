@@ -37,7 +37,7 @@ enum class SegmentProtection: uint8_t {
 class ElfReader {
     public:
         /// Creates an ELF reader for a file that's already been opened.
-        ElfReader(FILE * _Nonnull fp);
+        ElfReader(FILE * _Nonnull fp, const char * _Nonnull path);
         /// Creates an ELF reader for the given file; if it doesn't exist, we abort.
         ElfReader(const char * _Nonnull path);
         virtual ~ElfReader();
@@ -184,6 +184,9 @@ class ElfReader {
         std::list<DependentLibrary> deps;
         /// segments we loaded from the file
         std::list<Segment> segments;
+
+        // copy of the path this file was read from
+        char * _Nullable path{nullptr};
 
     private:
         static bool gLogSegments;

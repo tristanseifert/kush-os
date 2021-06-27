@@ -27,8 +27,8 @@ set_target_properties(lzfse_dynamic PROPERTIES OUTPUT_NAME "lzfse")
 target_include_directories(lzfse_dynamic PUBLIC include)
 
 # installation
-install(TARGETS lzfse_static LIBRARY DESTINATION)
 install(TARGETS lzfse_dynamic LIBRARY DESTINATION)
+add_library(lzfse ALIAS lzfse_dynamic)
 
 FILE(GLOB LZFSE_HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
 install(FILES ${LZFSE_HEADERS} DESTINATION ${SYSROOT_DIR}/usr/include/compress)

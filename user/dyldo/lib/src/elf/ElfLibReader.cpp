@@ -13,7 +13,8 @@ using namespace dyldo;
 /**
  * Initializes a shared library ELF reader with a pre-opened file descriptor.
  */
-ElfLibReader::ElfLibReader(const uintptr_t _base, FILE * _Nonnull file) : ElfReader(file), base(_base) {
+ElfLibReader::ElfLibReader(const uintptr_t _base, FILE *file, const char *path) :
+    ElfReader(file, path), base(_base) {
     this->ensureLib();
 }
 

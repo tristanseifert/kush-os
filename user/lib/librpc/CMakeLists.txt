@@ -50,8 +50,8 @@ target_link_libraries(rpc_static PUBLIC capnp)
 target_link_libraries(rpc_dynamic PRIVATE capnp_dynamic)
 
 # install the library to the sysroot
-install(TARGETS rpc_static LIBRARY)
 install(TARGETS rpc_dynamic LIBRARY)
+#add_library(rpc ALIAS rpc_dynamic)
 
 add_custom_command(TARGET rpc_dynamic POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/librpc.so ${SYSROOT_DIR}/boot/lib/librpc.so)

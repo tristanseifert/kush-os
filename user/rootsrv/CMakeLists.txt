@@ -49,14 +49,12 @@ target_include_directories(rootsrv PRIVATE src)
 target_include_directories(rootsrv PRIVATE rpc)
 
 # required libraries
-add_dependencies(rootsrv c_static)
-target_link_libraries(rootsrv PRIVATE c_static)
-target_link_libraries(rootsrv PRIVATE system_static rpc_static lzfse_static unwind)
-target_link_libraries(rootsrv PRIVATE fmt::fmt-header-only)
-target_link_libraries(rootsrv PRIVATE capnp)
+target_link_libraries(rootsrv PRIVATE c_static system_static rpc_static)
+target_link_libraries(rootsrv PRIVATE lzfse_static fmt::fmt-header-only capnp)
 
-# we have to compile the root server as standalone
-target_link_options(rootsrv PRIVATE -static)
+# we have to compile the root server as standalone; pull in required runtime libs
+target_link_options(rootsrv PRIVATE -static -nostdlib++ -lopenlibm)
+target_link_libraries(rootsrv PRIVATE unwind c++ c++abi)
 
 # use the correct linker script
 set_target_properties(rootsrv PROPERTIES LINK_DEPENDS ${C_STATIC_LINKER_SCRIPT})
