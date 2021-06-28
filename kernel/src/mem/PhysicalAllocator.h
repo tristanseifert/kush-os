@@ -42,11 +42,7 @@ class PhysicalAllocator {
         }
 
         /// Returns the total number of pages
-        static size_t getTotalPages() {
-            size_t ret = 0;
-            __atomic_load(&gShared->totalPages, &ret, __ATOMIC_RELAXED);
-            return ret;
-        }
+        static size_t getTotalPages();
         /// Returns the number of allocated pages
         static size_t getAllocPages() {
             size_t ret = 0;
@@ -88,16 +84,14 @@ class PhysicalAllocator {
         static bool gLogRegions;
 
     private:
-        size_t numRegions = 0;
+        size_t numRegions{0};
         /// regions from which ~ memory ~ can be acquired
         PhysRegion *regions[kMaxRegions];
 
-        /// total number of available pages
-        size_t totalPages = 0;
         /// number of allocated a pges
-        size_t allocatedPages = 0;
+        size_t allocatedPages{0};
         /// number of reserved pages
-        size_t reservedPages = 0;
+        size_t reservedPages{0};
 };
 
 };

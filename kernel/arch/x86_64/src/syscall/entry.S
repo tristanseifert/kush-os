@@ -93,9 +93,11 @@ arch_syscall_table:
     .quad       _ZN3sys14VmAddrToRegionE6Handlem
     // 0x1B: Convert virtual addresses to physical
     .quad       _ZN3sys21VmTranslateVirtToPhysE6HandlePKmPmm
+    // 0x1C: Query memory subsystem information
+    .quad       _ZN3sys13VmQueryParamsENS_10VmQueryKeyEPvm
 
-    // 0x1B-0x1F: VM calls (reserved)
-    .rept       4
+    // 0x1D-0x1F: VM calls (reserved)
+    .rept       3
     .quad       _ZN3sys7Syscall20UnimplementedSyscallEv
     .endr
 

@@ -99,6 +99,3 @@ void arch::TaskWillStart(rt::SharedPtr<sched::Task> &task) {
 
 
 
-void arch::Tick() {
-    Handler::gShared->updateTime();
-}

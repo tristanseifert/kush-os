@@ -1,6 +1,7 @@
 #include "Handlers.h"
 
 #include "handle/Manager.h"
+#include "mem/PhysicalAllocator.h"
 #include "sched/Task.h"
 #include "sched/Thread.h"
 #include "vm/Map.h"
@@ -71,6 +72,15 @@ enum sys::VmFlags: uintptr_t {
 
     /// permission flags
     kPermissionFlags                    = (kPermissionRead | kPermissionWrite | kPermissionExecute)
+};
+
+/**
+ * Keys for information queries via VmQueryParams.
+ */
+enum sys::VmQueryKey: uintptr_t {
+    kPhysTotalPages                     = 0x01,
+    kPhysUsedPages                      = 0x02,
+    kPhysReservedPages                  = 0x03,
 };
 
 /**
@@ -741,6 +751,36 @@ intptr_t sys::VmTranslateVirtToPhys(const Handle taskHandle, const uintptr_t *in
 
     return Errors::Success;
 }
+
+/**
+ * Gets information from the memory subsystem.
+ */
+intptr_t sys::VmQueryParams(const VmQueryKey what, void *outPtr, const size_t outPtrBytes) {
+    switch(what) {
+        case kPhysTotalPages: {
+            uint64_t temp = mem::PhysicalAllocator::getTotalPages();
+            Syscall::copyOut(&temp, sizeof(temp), outPtr, outPtrBytes);
+            break;
+        }
+        case kPhysUsedPages: {
+            uint64_t temp = mem::PhysicalAllocator::getAllocPages();
+            Syscall::copyOut(&temp, sizeof(temp), outPtr, outPtrBytes);
+            break;
+        }
+        case kPhysReservedPages: {
+            uint64_t temp = mem::PhysicalAllocator::getReservedPages();
+            Syscall::copyOut(&temp, sizeof(temp), outPtr, outPtrBytes);
+            break;
+        }
+
+        // unknown key
+        default:
+            return Errors::InvalidArgument;
+    }
+
+    return Errors::Success;
+}
+
 
 /**
  * Converts the syscall VM flags to those required to create an anonymous mapping.

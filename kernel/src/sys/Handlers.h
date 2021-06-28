@@ -37,6 +37,7 @@ struct VmInfo;
 struct VmTaskInfo;
 struct VmMapRequest;
 enum VmFlags: uintptr_t;
+enum VmQueryKey: uintptr_t;
 
 /// Allocates a virtual memory region backed by physical memory
 intptr_t VmAllocPhysRegion(const uintptr_t physAddr, const size_t length, const VmFlags flags);
@@ -66,7 +67,8 @@ intptr_t VmAddrToRegion(const Handle taskHandle, const uintptr_t vmAddr);
 /// Translates an array of one or more virtual addresses to physical.
 intptr_t VmTranslateVirtToPhys(const Handle taskHandle, const uintptr_t *inVirtAddrs,
         uintptr_t *outPhysAddrs, const size_t numAddresses);
-
+/// Gets information from the memory subsystem.
+intptr_t VmQueryParams(const VmQueryKey what, void *outPtr, const size_t outPtrBytes);
 
 /// Get thread handle of currently executing thread.
 intptr_t ThreadGetHandle();

@@ -27,6 +27,9 @@ class PhysRegion {
         /// Create a new physical region
         PhysRegion(const uint64_t base, const uint64_t len);
 
+        /// Returns the number of allocatable bytes in the physical region and its children
+        uint64_t getAvailableBytes() const;
+
         /// allocate further chunks for additional memory beyond the first 24k pages
         void initNextIfNeeded();
 

@@ -145,3 +145,21 @@ void PhysicalAllocator::freePage(const uint64_t physAddr) {
     panic("failed to free phys page $%p", physAddr);
 }
 
+
+
+/**
+ * Iterates over all physical regions and sums up their allocatable byte count.
+ */
+size_t PhysicalAllocator::getTotalPages() {
+    uint64_t bytes{0};
+
+    for(size_t i = 0; i < kMaxRegions; i++) {
+        auto region = gShared->regions[i];
+        if(!region) continue;
+
+        bytes += region->getAvailableBytes();
+    }
+
+    // convert the bytes to pages
+    return bytes / arch_page_size();
+}

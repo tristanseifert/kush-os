@@ -422,3 +422,10 @@ int VirtualToPhysicalAddr(const uintptr_t *virtualAddrs, const size_t numAddrs,
     return __do_syscall4(0, (uintptr_t) virtualAddrs, (uintptr_t) outPhysAddrs, numAddrs,
             SYS_VM_VIRT_TO_PHYS);
 }
+
+/**
+ * Performs a request into the kernel to get some information from the virtual memory subsystem.
+ */
+int QueryVirtualParams(const VirtualParams_t what, void *outPtr, const size_t outBytes) {
+    return __do_syscall3(what, (uintptr_t) outPtr, outBytes, SYS_VM_QUERY);
+}

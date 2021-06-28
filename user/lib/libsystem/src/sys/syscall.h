@@ -48,6 +48,7 @@ LIBSYSTEM_INTERNAL intptr_t __do_syscall5(const uintptr_t arg0, const uintptr_t 
 #define SYS_VM_GET_TASK_INFO            0x19
 #define SYS_VM_ADDR_TO_HANDLE           0x1A
 #define SYS_VM_VIRT_TO_PHYS             0x1B
+#define SYS_VM_QUERY                    0x1C
 
 #define SYS_THREAD_GET_HANDLE           0x20
 #define SYS_THREAD_YIELD                0x21

@@ -227,3 +227,20 @@ void PhysRegion::zero(const uint64_t physAddr) {
         memset(ptr, 0, arch_page_size());
     }
 }
+
+
+
+/**
+ * Sums the number of available allocatable bytes in this region and all subsequent children.
+ */
+uint64_t PhysRegion::getAvailableBytes() const {
+    uint64_t sum{this->allocatable};
+    auto next = this->next;
+
+    while(next) {
+        sum += next->allocatable;
+        next = next->next;
+    }
+
+    return sum;
+}

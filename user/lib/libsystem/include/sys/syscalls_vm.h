@@ -48,6 +48,15 @@ typedef struct TaskVmInfo {
 
 #define VM_MAP_ADOPT                    (1 << 24)
 
+/**
+ * Keys for the `QueryVirtualParams` call
+ */
+typedef enum VirtualParams {
+    kPhysTotalPages                     = 0x01,
+    kPhysAllocatedPages                 = 0x02,
+    kPhysReservedPages                  = 0x03,
+} VirtualParams_t;
+
 
 LIBSYSTEM_EXPORT int AllocVirtualAnonRegion(const uintptr_t size, const uintptr_t inFlags,
         uintptr_t *outHandle);
@@ -86,5 +95,8 @@ LIBSYSTEM_EXPORT int VirtualGetHandleForAddrInTask(const uintptr_t taskHandle,
 
 LIBSYSTEM_EXPORT int VirtualToPhysicalAddr(const uintptr_t *virtualAddrs, const size_t numAddrs,
         uintptr_t *outPhysAddrs);
+
+LIBSYSTEM_EXPORT int QueryVirtualParams(const VirtualParams_t what, void *outPtr,
+        const size_t outBytes);
 
 #endif

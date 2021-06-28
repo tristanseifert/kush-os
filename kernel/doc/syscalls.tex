@@ -411,6 +411,28 @@ Translates one or more virtual addresses to physical addresses, based on the mem
 
 Possible reasons for translation of a virtual address to fail are that it does not fall within a region in the task's virtual address space, the particular page in a region hasn't been faulted in yet, or because the region is not locked in memory (marked for hardware use.)
 
+%%%%%
+\subsubsection{{\tt 0x1C}: Query memory parameters}
+\textbf{Arguments:} (3) Parameter to query, output value pointer, size of output value \\
+\textbf{Flags:} None \\
+\textbf{Returns:} 0 on success, or error code ($\leq0$) \\
+
+Retrieves information about the virtual (or physical) memory allocation system and copies it to the user provided buffer.
+
+Supported parameters are:
+
+\begin{table}[h]
+\begin{tabular}{|r|l|l|}
+\hline
+\rowcolor[HTML]{EFEFEF}
+\textbf{Value} & \textbf{Definition} & \textbf{Output Size} \\ \hline
+0x01 & Gets the total number of available pages of physical memory. & \texttt{uint64\_t} \\ \hline
+0x02 & Gets the number of allocated pages of physical memory. & \texttt{uint64\_t} \\ \hline
+0x03 & Gets the number of reserved pages of physical memory. & \texttt{uint64\_t} \\ \hline
+\end{tabular}
+\end{table}
+
+
 %%%%%%%%%%
 \newpage
 \subsection{Scheduler}

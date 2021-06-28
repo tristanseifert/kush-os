@@ -28,7 +28,6 @@ struct TimeInfo {
  */
 class Handler {
     friend void ::arch_vm_available();
-    friend void arch::Tick();
 
     private:
         /// Kernel VM address for the system time page
