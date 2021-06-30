@@ -144,6 +144,5 @@ amd64_ring3_return:
     xor         %r15, %r15
 
     // return, and ensure we swap back to the userspace %gs base
-    swapgs
     iretq
 

@@ -192,7 +192,7 @@ arch_syscall_table_end:
 .align 0x40 // align to cache line
 arch_syscall_entry:
     // acquire the per-CPU information and get stack
-    swapgs
+    //swapgs
     movq        %gs:PROCI_OFF_SYSCALL_STACK, %rsp
 
     sti
@@ -227,7 +227,7 @@ arch_syscall_exit:
 
     // restore gs
     cli
-    swapgs
+    //swapgs
 
     // return from syscall: R11 and RCX are the SYSCALL values
     sysretq

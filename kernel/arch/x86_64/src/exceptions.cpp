@@ -217,7 +217,7 @@ unhandled:;
 
     // page fault is unhandled (or in kernel)
     constexpr static const size_t kBufSz = 1024;
-    char buf[kBufSz] = {0};
+    static char buf[kBufSz] = {0};
     amd64_exception_format_info(buf, kBufSz, info);
     panic("unhandled page fault: %s%s %s (%s) at $%016llx\n%s", 
             ((info->errCode & 0x08) ? "reserved bit violation on " : ""),

@@ -33,6 +33,10 @@ intptr_t syscall::UpdateThreadTlsBase(const uintptr_t threadHandle, const bool g
         const uintptr_t base) {
     auto thread = sched::Thread::current();
 
+    if(gs) {
+        return Errors::InvalidArgument;
+    }
+
     // get the thread
     if(threadHandle) {
         thread = handle::Manager::getThread(static_cast<Handle>(threadHandle));

@@ -2,12 +2,12 @@
 #include "PhysRegion.h"
 
 #include <arch.h>
+#include <arch/critical.h>
 #include <platform.h>
 #include <string.h>
 #include <log.h>
 
 #include "sched/Task.h"
-
 #include "vm/Mapper.h"
 #include "vm/Map.h"
 
@@ -98,9 +98,13 @@ void PhysicalAllocator::notifyRegionsVm() {
  * @return Physical address of an allocated page, or 0 if allocation failed
  */
 uint64_t PhysicalAllocator::allocPage(const PhysFlags flags) {
+    DECLARE_CRITICAL();
+
     // TODO: check per-CPU free list cache
 
     // ask each region
+    CRITICAL_ENTER();
+
     for(size_t i = 0; i < this->numRegions; i++) {
         auto region = this->regions[i];
 
@@ -108,6 +112,7 @@ uint64_t PhysicalAllocator::allocPage(const PhysFlags flags) {
             // try to allocate a page
             if(auto page = region->alloc()) {
                 __atomic_fetch_add(&this->allocatedPages, 1, __ATOMIC_RELAXED);
+                CRITICAL_EXIT();
                 return page;
             }
 
@@ -117,6 +122,7 @@ uint64_t PhysicalAllocator::allocPage(const PhysFlags flags) {
     }
 
     // no region had available memory
+    CRITICAL_EXIT();
     return 0;
 }
 

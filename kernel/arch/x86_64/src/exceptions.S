@@ -4,31 +4,10 @@
 
 .section .text
 
-/**
- * Swap the current GS and the value of the KernelGSBase MSR, if the code segment pushed on the
- * stack (this assumes it's called right at the start of an ISR) and will only perform the swap
- * if it's NOT the kernel code segment.
- *
- * Note that in the case of "super atomic" interrupts (debug, NMI, MCE, etc.) you will have to
- * instead read the MSR to make the determination on whether we need to swap GS or not, so this
- * macro cannot be used.
- *
- * First arg to this macro is the stack offset to the code segment.
- *
- * TODO: fix this
- */
-.macro MaybeSwapGs off
-    cmpq        $GDT_KERN_CODE_SEG, \off(%rsp)
-    je          1f
-    swapgs
-1:
-.endm
-
 /// divide-by-zero
 .globl  amd64_exception_div0
 amd64_exception_div0:
     cli
-    MaybeSwapGs 8
     // push error code and interrupt number
     pushq       $0x00
     pushq       $X86_EXC_DIVIDE
@@ -38,7 +17,6 @@ amd64_exception_div0:
 .globl amd64_exception_debug
 amd64_exception_debug:
     cli
-    MaybeSwapGs 8
     pushq       $0x00
     pushq       $X86_EXC_DEBUG
     jmp         error_common_stub
@@ -47,7 +25,6 @@ amd64_exception_debug:
 .globl amd64_exception_nmi
 amd64_exception_nmi:
     cli
-    MaybeSwapGs 8
     pushq       $0x00
     pushq       $X86_EXC_NMI
     jmp         error_common_stub
@@ -56,7 +33,6 @@ amd64_exception_nmi:
 .globl amd64_exception_breakpoint
 amd64_exception_breakpoint:
     cli
-    MaybeSwapGs 8
     pushq       $0x00
     pushq       $X86_EXC_BREAKPOINT
     jmp         error_common_stub
@@ -65,7 +41,6 @@ amd64_exception_breakpoint:
 .globl amd64_exception_overflow
 amd64_exception_overflow:
     cli
-    MaybeSwapGs 8
     pushq       $0x00
     pushq       $X86_EXC_OVERFLOW
     jmp         error_common_stub
@@ -74,7 +49,6 @@ amd64_exception_overflow:
 .globl amd64_exception_bounds
 amd64_exception_bounds:
     cli
-    MaybeSwapGs 8
     pushq       $0x00
     pushq       $X86_EXC_BOUNDS
     jmp         error_common_stub
@@ -83,7 +57,6 @@ amd64_exception_bounds:
 .globl amd64_exception_invalid_instruction
 amd64_exception_invalid_instruction:
     cli
-    MaybeSwapGs 8
     pushq       $0x00
     pushq       $X86_EXC_ILLEGAL_OPCODE
     jmp         error_common_stub
@@ -92,7 +65,6 @@ amd64_exception_invalid_instruction:
 .globl amd64_exception_device_unavailable
 amd64_exception_device_unavailable:
     cli
-    MaybeSwapGs 8
     pushq       $0x00
     pushq       $X86_EXC_DEVICE_UNAVAIL
     jmp         error_common_stub
@@ -101,7 +73,6 @@ amd64_exception_device_unavailable:
 .globl amd64_exception_double_fault
 amd64_exception_double_fault:
     cli
-    MaybeSwapGs 16
     pushq       $X86_EXC_DOUBLE_FAULT
     jmp         error_common_stub
 
@@ -109,7 +80,6 @@ amd64_exception_double_fault:
 .globl amd64_exception_tss_invalid
 amd64_exception_tss_invalid:
     cli
-    MaybeSwapGs 16
     pushq       $X86_EXC_INVALID_TSS
     jmp         error_common_stub
 
@@ -117,7 +87,6 @@ amd64_exception_tss_invalid:
 .globl amd64_exception_segment_missing
 amd64_exception_segment_missing:
     cli
-    MaybeSwapGs 16
     pushq       $X86_EXC_SEGMENT_NP
     jmp         error_common_stub
 
@@ -125,7 +94,6 @@ amd64_exception_segment_missing:
 .globl amd64_exception_ss_invalid
 amd64_exception_ss_invalid:
     cli
-    MaybeSwapGs 16
     pushq       $X86_EXC_SS
     jmp         error_common_stub
 
@@ -133,7 +101,6 @@ amd64_exception_ss_invalid:
 .globl amd64_exception_gpf
 amd64_exception_gpf:
     cli
-    MaybeSwapGs 16
     pushq       $X86_EXC_GPF
     jmp         error_common_stub
 
@@ -141,7 +108,6 @@ amd64_exception_gpf:
 .globl amd64_exception_float
 amd64_exception_float:
     cli
-    MaybeSwapGs 8
     pushq       $0x00
     pushq       $X86_EXC_FP
     jmp         error_common_stub
@@ -150,7 +116,6 @@ amd64_exception_float:
 .globl amd64_exception_alignment_check
 amd64_exception_alignment_check:
     cli
-    MaybeSwapGs 16
     pushq       $X86_EXC_ALIGNMENT
     jmp         error_common_stub
 
@@ -158,7 +123,6 @@ amd64_exception_alignment_check:
 .globl amd64_exception_machine_check
 amd64_exception_machine_check:
     cli
-    MaybeSwapGs 8
     pushq       $0x00
     pushq       $X86_EXC_MCE
     jmp         error_common_stub
@@ -167,7 +131,6 @@ amd64_exception_machine_check:
 .globl amd64_exception_simd
 amd64_exception_simd:
     cli
-    MaybeSwapGs 8
     pushq       $0x00
     pushq       $X86_EXC_SIMD_FP
     jmp         error_common_stub
@@ -176,7 +139,6 @@ amd64_exception_simd:
 .globl amd64_exception_virtualization
 amd64_exception_virtualization:
     cli
-    MaybeSwapGs 8
     pushq       $0x00
     pushq       $X86_EXC_VIRT
     jmp         error_common_stub
@@ -190,7 +152,6 @@ amd64_exception_virtualization:
 amd64_exception_pagefault:
     // disable IRQs and push the interrupt number, and all regs
     cli
-    MaybeSwapGs 16
     pushq       $X86_EXC_PAGING
 
     // save registers pls
@@ -238,7 +199,6 @@ amd64_exception_pagefault:
     add         $0x10, %rsp
 
     // return; this will restore the interrupt flag too
-    MaybeSwapGs 8
     iretq
 
 .extern amd64_handle_exception
@@ -307,8 +267,6 @@ error_common_stub:
     // clear the error code and interrupt number
     add         $0x10, %rsp
 
-    // XXX: is this right?
-    MaybeSwapGs 8
     // return; this will restore the interrupt flag too
     iretq
 

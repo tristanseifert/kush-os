@@ -4,20 +4,13 @@
 
 .section .text
 
-/// Allow swapping the %gs base as needed
-.macro MaybeSwapGs
-    cmpq        $GDT_KERN_CODE_SEG, 0x08(%rsp)
-    je          1f
-    swapgs
-1:
-.endm
 
 /// Generates an irq handler stub for the given irq number.
 .macro GenerateIrqStub vec
 .global pc64_irq_stub_\vec
 .align 0x20
 pc64_irq_stub_\vec:
-    MaybeSwapGs
+    cli
     pushq       $\vec
     pushq       $X86_EXC_IRQ
     jmp         irq_common_stub
@@ -297,7 +290,6 @@ irq_common_stub:
     // clear the error code and interrupt number
     add         $0x10, %rsp
 
-    MaybeSwapGs
     // return; this will restore the interrupt flag too
     iretq
 

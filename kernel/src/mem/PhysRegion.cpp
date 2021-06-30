@@ -152,7 +152,7 @@ void PhysRegion::initNextIfNeeded() {
 uint64_t PhysRegion::alloc() {
     SPIN_LOCK_GUARD(this->lock);
 
-    const size_t maxIdx = ((this->bitmapMax + 63) / 64) * 64;
+    const size_t maxIdx = ((this->bitmapMax + 63) / 64);
     for(size_t i = 0; i < maxIdx; i++) {
         // bail if all 64 pages are allocated
         if(!this->bitmap[i]) continue;
