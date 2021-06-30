@@ -96,7 +96,9 @@ class PhysRegion {
         uint64_t allocatable = 0;
 
         /// highest valid bit index in bitmap
-        size_t bitmapMax = 0;
+        size_t bitmapMax{0};
+        /// last bitmap index we allocated from
+        size_t lastAllocIdx{0};
         /// allocation bitmap: 1 is free, 0 is allocated
         uint64_t bitmap[kMaxPages / 8 / sizeof(uint64_t)] {0};
 

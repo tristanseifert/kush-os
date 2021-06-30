@@ -153,7 +153,9 @@ uint64_t PhysRegion::alloc() {
     SPIN_LOCK_GUARD(this->lock);
 
     const size_t maxIdx = ((this->bitmapMax + 63) / 64);
-    for(size_t i = 0; i < maxIdx; i++) {
+
+again:;
+    for(size_t i = this->lastAllocIdx; i < maxIdx; i++) {
         // bail if all 64 pages are allocated
         if(!this->bitmap[i]) continue;
 
@@ -174,7 +176,14 @@ uint64_t PhysRegion::alloc() {
         // zero the page
         this->zero(pageAddr);
 
+        this->lastAllocIdx = i;
         return pageAddr;
+    }
+
+    // repeat if we didn't start searching at the start of the region
+    if(this->lastAllocIdx) {
+        this->lastAllocIdx = 0;
+        goto again;
     }
 
     // no memory available

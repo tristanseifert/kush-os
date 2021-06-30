@@ -133,6 +133,9 @@ class MapEntry {
         static void free(MapEntry *entry);
 
     private:
+        /// Maximum number of sequential pages to fault in
+        constexpr static const size_t kMaxSequentialPrefault{64};
+
         /**
          * Tree node representing a single physical page backing some page of this mapping.
          */
@@ -165,11 +168,36 @@ class MapEntry {
         };
 
         /**
+         * Detection of access patterns is handled by a simple state machine; the states are
+         * described in detail below.
+         */
+        enum class SequenceDetectorState {
+            /**
+             * Await the first fault. Record its information and advance to the first sequence
+             * detection stage.
+             */
+            Idle,
+
+            /**
+             * Detects whether the current fault is sequential from the previous fault. This will
+             * record the stride (in pages) if it's below a threshold. If above, we return to the
+             * idle state; otherwise, to second detection state.
+             */
+            Detect1,
+
+            /**
+             * Check whether the stride between the last access and this access is the same. If so,
+             * fault in two pages with the given stride and repeat.
+             */
+            Detect2,
+        };
+
+        /**
          * Information on a view that's added to a virtual memory map.
          */
         struct ViewInfo {
             rt::SharedPtr<sched::Task> task;
-            uintptr_t base = 0;
+            uintptr_t base{0};
             const MappingFlags flags = MappingFlags::None;
 
             ViewInfo() = default;
@@ -201,7 +229,12 @@ class MapEntry {
                 const size_t);
 
         /// Faults in an anonymous memory page.
-        void faultInPage(const uintptr_t base, const uintptr_t offset, Map *map);
+        void faultInPage(const uintptr_t base, const uintptr_t offset, Map *map,
+                const bool runDetector);
+        /// Handles the page fault sequence detection.
+        void detectFaultSequence(const uintptr_t base, const uintptr_t offset, Map *map,
+                const size_t pageOff);
+
         /// Frees a physical page and updates the caller's "pages owned" counter
         static void freePage(const AnonInfoLeaf &info);
 
@@ -212,17 +245,26 @@ class MapEntry {
         /// handle referencing this map entry
         Handle handle;
         /// allocated length (in bytes)
-        size_t length = 0;
+        size_t length{0};
 
         /// flags for the mapping
-        MappingFlags flags;
+        MappingFlags flags{MappingFlags::None};
 
         /// whether the map entry belongs to the kernel
-        bool isKernel = false;
+        bool isKernel{false};
         /// when set, this is an anonymous mapping and is backed by anonymous phys mem
-        bool isAnon = false;
+        bool isAnon{false};
         /// if not an anonymous map, the physical address base
-        uint64_t physBase = 0;
+        uint64_t physBase{0};
+
+        /// state of the sequence detector
+        SequenceDetectorState seqState;
+        /// page offset at which the last page fault took place
+        uintptr_t lastFaultOffset{0};
+        /// stride (in pages) between faults
+        size_t lastFaultStride{0};
+        /// number of sequential faults encountered
+        size_t numSeqFaults{0};
 
         /**
          * All physical memory pages owned by this map

@@ -174,17 +174,21 @@ bool MapEntry::handlePagefault(Map *map, const uintptr_t base, const uintptr_t o
     }
 
     // fault it in
-    this->faultInPage(base, offset, map);
+    RW_LOCK_WRITE(&this->lock);
+    this->faultInPage(base, offset, map, true);
+    RW_UNLOCK_WRITE(&this->lock);
 
     return true;
 }
 
 /**
  * Faults in a page.
+ *
+ * @param runDetector When set, the sequence state detector state machine is run.
+ *
+ * @note You must hold the rwlock for the map entry when invoking the method.
  */
-void MapEntry::faultInPage(const uintptr_t base, const uintptr_t offset, Map *map) {
-    RW_LOCK_WRITE_GUARD(this->lock);
-
+void MapEntry::faultInPage(const uintptr_t base, const uintptr_t offset, Map *map, const bool runDetector) {
     int err;
     const auto pageSz = arch_page_size();
     const auto pageOff = offset / pageSz; 
@@ -217,6 +221,11 @@ void MapEntry::faultInPage(const uintptr_t base, const uintptr_t offset, Map *ma
         __atomic_add_fetch(&task->physPagesOwned, 1, __ATOMIC_RELEASE);
     }
 
+    // handle sequence detection state machine
+    if(runDetector) {
+        this->detectFaultSequence(base, offset, map, pageOff);
+    }
+
     // insert page info
     auto info = new AnonInfoLeaf(pageOff, page);
     this->pages.insert(info);
@@ -230,6 +239,81 @@ void MapEntry::faultInPage(const uintptr_t base, const uintptr_t offset, Map *ma
 
     // invalidate TLB entry
     arch::InvalidateTlb(destAddr);
+}
+
+/**
+ * Runs a step of the page fault sequence detection machinery. This will wait for two consecutive
+ * page faults with the same stride, then fault in one page. If the sequence continues, each fault
+ * will allocate double the number of pages.
+ */
+void MapEntry::detectFaultSequence(const uintptr_t base, const uintptr_t offset, Map *map,
+                const size_t pageOff) {
+    const auto pageSz = arch_page_size();
+
+    switch(this->seqState) {
+        case SequenceDetectorState::Idle:
+            this->lastFaultOffset = pageOff;
+            this->lastFaultStride = 0;
+            this->seqState = SequenceDetectorState::Detect1;
+            break;
+
+        case SequenceDetectorState::Detect1:
+            // TODO: support negative offsets
+            if(pageOff <= this->lastFaultOffset) {
+                this->seqState = SequenceDetectorState::Idle;
+                break;
+            }
+            // calculate stride
+            this->lastFaultStride = pageOff - this->lastFaultOffset;
+            this->lastFaultOffset = pageOff;
+            this->seqState = SequenceDetectorState::Detect2;
+            break;
+
+        case SequenceDetectorState::Detect2:
+            // TODO: support negative offsets
+            if(pageOff <= this->lastFaultOffset) {
+                this->seqState = SequenceDetectorState::Idle;
+            }
+            // calculate stride and map pages in
+            else {
+                size_t i{0};
+                const auto stride = pageOff - this->lastFaultOffset;
+                if(stride != this->lastFaultStride) {
+                    this->numSeqFaults = 0;
+                    this->seqState = SequenceDetectorState::Idle;
+                    break;
+                }
+                this->lastFaultOffset = pageOff;
+                this->numSeqFaults++;
+
+                // figure out how many pages to fault in
+                const auto numFault = (this->numSeqFaults < kMaxSequentialPrefault) ?
+                    this->numSeqFaults : kMaxSequentialPrefault;
+
+                for(i = 0; i < numFault; i++) {
+                    // ensure it's in bounds
+                    const size_t byteOff = (i + 1) * pageSz;
+                    if((offset + byteOff) >= this->length) goto exit;
+
+                    // yeet it out
+                    this->faultInPage(base, offset + byteOff, map, false);
+                }
+
+exit:;
+                // update the faulting info
+                if(i == numFault) {
+                    this->lastFaultOffset += numFault;
+                }
+                // part of the pages were after the end of the map; reset the sequence detector
+                else {
+                    this->numSeqFaults = 0;
+                    this->seqState = SequenceDetectorState::Idle;
+                    break;
+                }
+            }
+
+            break;
+    }
 }
 
 /**
