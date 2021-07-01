@@ -21,13 +21,13 @@ static size_t gHeapMaxSize = 0;
  * Default base addresses and max lengths of the heap
  *
  * - i386: 1 gig at 0x30000000
- * - amd64: 64 gigs at 0x1000000000
+ * - amd64: 64 gigs at 0x700000000000
  */
 #if defined(__i386__)
 #define HEAP_DEFAULT_BASE       0x30000000
 #define HEAP_MAX_SIZE           0x10000000 
 #elif defined(__amd64__)
-#define HEAP_DEFAULT_BASE       0x1000000000
+#define HEAP_DEFAULT_BASE       0x700000000000
 #define HEAP_MAX_SIZE           0x1000000000
 #endif
 

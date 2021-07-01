@@ -1,0 +1,7 @@
+# latex temp files
+**/*.pdf
+**/*.gz
+**/*.log
+**/*.aux
+**/*.toc
+**/*.out

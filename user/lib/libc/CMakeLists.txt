@@ -84,6 +84,8 @@ list(APPEND c_objs_files
     src/stdlib/heapsort.c
     src/stdlib/merge.c
     src/stdlib/qsort.c
+    # crypto routines (hashing, random)
+    src/crypto/arc4random.c
     # stdio
     src/stdio/printf.c
     src/stdio/puts.c
@@ -123,7 +125,6 @@ list(APPEND c_objs_files
     # floating point c onversions
     src/gdtoa/kludge.c
     # memory allocation
-    src/mem/malloc.c
     src/mem/fake_sbrk.c
     src/mem/dlmalloc.cpp
     # environment handling

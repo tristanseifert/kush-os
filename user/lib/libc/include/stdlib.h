@@ -113,6 +113,13 @@ LIBC_EXPORT void *dlmemalign(const size_t alignment, const size_t size);
 /// Aligned malloc
 LIBC_EXPORT int posix_memalign(void **outPtr, const size_t alignment, const size_t size);
 
+/// Returns a random 32-bit value
+LIBC_EXPORT uint32_t arc4random(void);
+/// Fills the buffer with random data
+LIBC_EXPORT void arc4random_buf(void *buf, size_t nBytes);
+/// Generates an uniformly distributed random number between 0 and bound
+LIBC_EXPORT uint32_t arc4random_uniform(uint32_t upperBound);
+
 #ifdef __cplusplus
 }
 #endif
