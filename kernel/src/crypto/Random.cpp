@@ -1,4 +1,5 @@
 #include "Random.h"
+#include "RandomPool.h"
 #include "sha2.h"
 
 #include <log.h>
@@ -24,6 +25,8 @@ Random *Random::gShared{nullptr};
 void Random::Init() {
     auto ptr = reinterpret_cast<Random *>(&gSharedBuf);
     gShared = new(ptr) Random;
+
+    RandomPool::Init();
 }
 
 /**
@@ -86,27 +89,25 @@ void Random::operator++() {
 void Random::operator()(void *outData, const size_t outDataBytes) {
     uint8_t scratch[AES_BLOCKLEN];
 
+    SPIN_LOCK_GUARD(this->lock);
+
     REQUIRE(this->isReady, "RNG not ready");
+    REQUIRE(outDataBytes, "RNG request invalid");
+    REQUIRE(outDataBytes < kMaxRequest, "RNG request too large: %lu (max %lu)", outDataBytes,
+            kMaxRequest);
+
+    this->reseedIfNeeded();
 
     // calculate number of 16 byte blocks
-    if(!outDataBytes) return;
     const auto numBlocks = (outDataBytes + 15) / 16;
 
     size_t writeBytesRemaining = outDataBytes;
     auto writePtr = reinterpret_cast<uint8_t *>(outData);
 
     for(size_t i = 0; i < numBlocks; i++) {
-        // generate data
-        memcpy(scratch, this->counter, AES_BLOCKLEN);
-        AES_CTR_xcrypt_buffer(&this->aesCtx, scratch, AES_BLOCKLEN);
-
-        // copy out data
         const auto nb = (writeBytesRemaining > AES_BLOCKLEN) ? AES_BLOCKLEN : writeBytesRemaining;
-        memcpy(writePtr, scratch, nb);
+        this->generateBlock(scratch, writePtr, nb);
         writePtr += nb;
-
-        // update state for next round
-        ++(*this);
     }
 
     // rekey and clean up
@@ -115,12 +116,42 @@ void Random::operator()(void *outData, const size_t outDataBytes) {
     this->rekey();
 }
 
+/*
+ * Check if the generator needs to be reseeded. This will take place when it's been at least as
+ * long as the minimum reseed interval, AND the entropy pool has sufficient entropy in P_0.
+ *
+ * @note The generator must be locked when invoked.
+ */
+void Random::reseedIfNeeded() {
+    auto rp = RandomPool::the();
+
+    // check time and state
+    const auto now = platform_timer_now();
+    const auto delta = (now - lastReseed);
+
+    if(delta < kMinReseedInterval) return;
+    if(!rp->isReady()) return;
+
+    // perform the reseed
+    uint8_t newSeed[32];
+
+    if(!rp->get(newSeed, sizeof(newSeed))) return;
+    this->seed(newSeed, sizeof(newSeed));
+
+    memset(newSeed, 0, sizeof(newSeed));
+
+    // ensure we don't do this again until needed
+    this->lastReseed = now;
+}
+
 /**
  * Seeds the generator. This hashes the provided seed, uses it as the new round key, and increments
  * the counter.
  *
  * XXX: Is doing a single round of SHA-256 a good way of computing the initial key, or is there a
  * key derivation function that's better suited?
+ *
+ * @note The generator must be locked when invoked.
  */
 void Random::seed(const void *data, const size_t dataBytes) {
     sha256_ctx ctx;
@@ -131,6 +162,7 @@ void Random::seed(const void *data, const size_t dataBytes) {
     // generate new key
     uint8_t digest[SHA256_DIGEST_SIZE]{0};
 
+    sha256_update(&ctx, this->key, sizeof(this->key));
     sha256_update(&ctx, reinterpret_cast<const uint8_t *>(data), dataBytes);
     sha256_final(&ctx, digest);
 
@@ -146,21 +178,16 @@ void Random::seed(const void *data, const size_t dataBytes) {
 
 /**
  * Rekey the generator.
+ *
+ * @note The generator must be locked when invoked.
  */
 void Random::rekey() {
     uint8_t scratch[AES_BLOCKLEN], newKey[32];
 
     // generate first 16 bytes
-    memcpy(scratch, this->counter, AES_BLOCKLEN);
-    AES_CTR_xcrypt_buffer(&this->aesCtx, scratch, AES_BLOCKLEN);
-    memcpy(newKey, scratch, AES_BLOCKLEN);
-    ++(*this);
-
+    this->generateBlock(scratch, newKey, AES_BLOCKLEN);
     // generate second 16 bytes
-    memcpy(scratch, this->counter, AES_BLOCKLEN);
-    AES_CTR_xcrypt_buffer(&this->aesCtx, scratch, AES_BLOCKLEN);
-    memcpy(newKey+AES_BLOCKLEN, scratch, AES_BLOCKLEN);
-    ++(*this);
+    this->generateBlock(scratch, newKey+AES_BLOCKLEN, AES_BLOCKLEN);
 
     // copy the key and clean up
     memcpy(this->key, newKey, sizeof(newKey));

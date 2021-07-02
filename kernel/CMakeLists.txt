@@ -63,6 +63,7 @@ add_executable(kernel
     src/crypto/aes.c
     src/crypto/sha2.c
     src/crypto/Random.cpp
+    src/crypto/RandomPool.cpp
     ${version_file}
 )
 

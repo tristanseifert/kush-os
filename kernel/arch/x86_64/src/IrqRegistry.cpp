@@ -8,6 +8,8 @@
 
 #include "PerCpuInfo.h"
 
+#include <crypto/RandomPool.h>
+
 #include <new>
 #include <log.h>
 #include <string.h>
@@ -66,6 +68,17 @@ void IrqRegistry::handle(const uintptr_t vector) {
     else {
         log("got irq %3u, but no handlers installed!", vector);
     }
+
+    // send the timestamp to entropy pool
+    uint32_t tscLow, tscHigh;
+    asm volatile("rdtsc" : "=a"(tscLow), "=d"(tscHigh));
+
+    uint8_t data[5];
+    data[0] = vector>>8; data[1] = vector & 0xFF;
+    data[2] = tscLow >> 16; data[3] = tscLow >> 8; data[4] = tscLow;
+
+    crypto::RandomPool::the()->add(crypto::RandomPool::SourceId::Interrupt,
+            (this->entropyPool++ & 0x1F), &data, sizeof(data));
 
     // restore irql
     platform_lower_irql(oldIrql);

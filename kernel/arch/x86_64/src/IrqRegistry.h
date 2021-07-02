@@ -64,6 +64,9 @@ class IrqRegistry {
 
         /// registration information
         HandlerRegistration registrations[kNumVectors];
+
+        /// Entropy pool to which the next irq event is delivered
+        uint8_t entropyPool{0};
 };
 
 extern IrqRegistry *gBspIrqRegistry;
