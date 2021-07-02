@@ -90,6 +90,32 @@ int platform_core_distance(const uintptr_t a, const uintptr_t b) {
 
 
 /**
+ * Generates entropy via the RDRAND instruction. We've guaranteed that it's available via the
+ * amd64 architecture setup code (it checks CPUID for this)
+ */
+int platform::GetEntropy(void *out, const size_t outBytes) {
+    const auto blocks = (outBytes + 3) / 4;
+    auto writePtr = reinterpret_cast<uint8_t *>(out);
+    auto writeBytes = outBytes;
+
+    for(size_t i = 0; i < blocks; i++) {
+        uint32_t temp, status;
+        asm volatile("rdrand %0" : "=r"(temp), "=@ccc"(status));
+        if(!status) {
+            return -1;
+        }
+
+        const auto nb = (writeBytes > sizeof(temp)) ? sizeof(temp) : writeBytes;
+        memcpy(writePtr, &temp, nb);
+        writePtr += nb;
+    }
+
+    return 0;
+}
+
+
+
+/**
  * Initialize the global framebuffer console
  */
 static void InitFbCons() {

@@ -163,17 +163,25 @@ arch_syscall_table:
     .quad       _ZN3sys7Syscall20UnimplementedSyscallEv
     .endr
 
-    // 0x40: amd64: Set thread local base address
+    // 0x40: Get kernel entropy
+    .quad       _ZN3sys10GetEntropyEPvm
+
+    // 0x41-0x47: Reserved
+    .rept       7
+    .quad       _ZN3sys7Syscall20UnimplementedSyscallEv
+    .endr
+
+    // 0x48: amd64: Set thread local base address
     .quad       _ZN4arch7syscall19UpdateThreadTlsBaseEmbm
-    // 0x41: amd64: Get bootloader info
+    // 0x49: amd64: Get bootloader info
     .quad       _ZN4arch7syscall13GetLoaderInfoEPvm
-    // 0x42: amd64: Update IO permission bitmap
+    // 0x4A: amd64: Update IO permission bitmap
     .quad       _ZN4arch7syscall18UpdateIoPermissionE6HandlePKhmmm
-    // 0x43: amd64: Lock IO permission bitmap
+    // 0x4B: amd64: Lock IO permission bitmap
     .quad       _ZN4arch7syscall16LockIoPermissionE6Handle
-    // 0x44: amd64: Read from IO port
+    // 0x4C: amd64: Read from IO port
     .quad       _ZN4arch7syscall10IoPortReadEmmPj
-    // 0x45: amd64: Write to IO port
+    // 0x4D: amd64: Write to IO port
     .quad       _ZN4arch7syscall11IoPortWriteEmmj
 
 arch_syscall_table_end:

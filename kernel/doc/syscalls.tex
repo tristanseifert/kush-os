@@ -626,6 +626,21 @@ Creates an interrupt handler for a processor local interrupt. An implementation 
 
 Use the \hyperlink{section.3.6.4}{get IRQ Handler information} call to retrieve the allocated vector number.
 
+
+
+%%%%%%%%%%%%%%%
+\newpage
+\subsection{Miscellaneous}
+
+%%%%%
+\subsubsection{{\tt 0x40}: Get kernel entropy}
+\textbf{Arguments:} (2) Output buffer pointer, number of bytes to get \\
+\textbf{Returns:} Total number of bytes of entropy copied on success, or error code ($\leq0$) \\
+
+Copies up to the requested number of bytes out of the kernel's randomness buffer. The kernel is not required to satisfy the complete request; this could happen if the random pool is exhausted, for example. Therefore, the call returns the actual number of bytes copied into the output buffer.
+
+
+
 %%%%%%%%%%%%%%%
 \newpage
 \section{Architecture Specific Calls}
@@ -634,7 +649,7 @@ Architecture code may expose its own system calls to userspace applications, for
 %%%%%%%%%%
 \subsection{x86}
 %%%%%
-\subsubsection{{\tt 0x40}: Set IO permission bitmap}
+\subsubsection{{\tt 0x48}: Set IO permission bitmap}
 \textbf{Arguments:} (3) Task handle, IO bitmap buffer, IO bitmap offset/length \\
 \textbf{Returns:} 0 on success, or a negative error code \\
 
@@ -652,7 +667,7 @@ Its length is specified as a number of ports (i.e. bits) but it will always be r
 If the task does not already have a TSS associated with it, this will allocate one. This TSS has the full 8K (plus one byte) allocated to map all 64K IO ports on the platform. This is a little wasteful, but avoids several common bugs resulting from partial TSS IO permission bitmaps.
 
 %%%%%
-\subsubsection{{\tt 0x41}: Set thread-local base}
+\subsubsection{{\tt 0x49}: Set thread-local base}
 \textbf{Arguments:} (2) Thread handle, Thread-local base address \\
 \textbf{Returns:} 0 on success, or a negative error code \\
 
@@ -662,7 +677,7 @@ Sets the thread-local base to the given address. This updates the value of \text
 \subsection{amd64}
 
 %%%%%
-\subsubsection{{\tt 0x40}: Set thread-local base}
+\subsubsection{{\tt 0x48}: Set thread-local base}
 \textbf{Arguments:} (3) Thread handle, Base register index, Thread-local base address \\
 \textbf{Returns:} 0 on success, or a negative error code \\
 
@@ -671,28 +686,28 @@ Sets the thread-local base to the given address. This updates the value of \text
 An index of $1$ writes to \texttt{\%gs}, and $0$ to \texttt{\%fs}.
 
 %%%%%
-\subsubsection{{\tt 0x41}: Get bootloader info struct}
+\subsubsection{{\tt 0x49}: Get bootloader info struct}
 \textbf{Arguments:} (2) Output buffer address, output buffer size \\
 \textbf{Returns:} Positive number of bytes copied on success, or a negative error code \\
 
 Copies the information structure provided by the bootloader (if any) into the provided userspace buffer. On all current amd64 implementations, this is the \href{https://gitlab.com/bztsrc/bootboot/}{BOOTBOOT} loader.
 
 %%%%%
-\subsubsection{{\tt 0x42}: Update port access list}
+\subsubsection{{\tt 0x4A}: Update port access list}
 \textbf{Arguments:} (4) Task handle, bitmap pointer, number of bits, port offset \\
 \textbf{Returns:} 0, or a negative error code \\
 
 Updates the task's IO permission bitmap to allow access to the ports referenced by the given bitmap; each bit represents one port. The provided offset is added to each bit's index in the bitmap to produce the final bit number.
 
 %%%%%
-\subsubsection{{\tt 0x43}: Lock port access list}
+\subsubsection{{\tt 0x4B}: Lock port access list}
 \textbf{Arguments:} (1) Task handle \\
 \textbf{Returns:} 0, or a negative error code \\
 
 Locks the IO permission bitmap of the specified task (0 meaning the calling task,) ensuring no further changes can be made to it.
 
 %%%%%
-\subsubsection{{\tt 0x44}: Perform IO port read}
+\subsubsection{{\tt 0x4C}: Perform IO port read}
 \textbf{Arguments:} (3) IO port number, flags, output pointer \\
 \textbf{Returns:} 0, or a negative error code \\
 
@@ -706,7 +721,7 @@ The flags field is used to specify the size of the IO operation. The following v
 \end{itemize}
 
 %%%%%
-\subsubsection{{\tt 0x45}: Perform IO port write}
+\subsubsection{{\tt 0x4D}: Perform IO port write}
 \textbf{Arguments:} (3) IO port number, flags, value to write \\
 \textbf{Returns:} 0, or a negative error code \\
 

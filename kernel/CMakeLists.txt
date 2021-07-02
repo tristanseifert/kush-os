@@ -53,12 +53,16 @@ add_executable(kernel
     src/sys/Task.cpp
     src/sys/Thread.cpp
     src/sys/VM.cpp
+    src/sys/Misc.cpp
     src/handle/Manager.cpp
     src/ipc/Interrupts.cpp
     src/ipc/Port.cpp
     src/debug/FramebufferConsole.cpp
     src/debug/BitmapFonts.cpp
     src/debug/SchedulerState.cpp
+    src/crypto/aes.c
+    src/crypto/sha2.c
+    src/crypto/Random.cpp
     ${version_file}
 )
 

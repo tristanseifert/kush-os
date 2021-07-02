@@ -119,6 +119,10 @@ intptr_t IrqHandlerUpdate(const Handle irqHandle, const Handle threadHandle, con
 intptr_t IrqHandlerGetInfo(const Handle irqHandle, const uintptr_t what);
 /// Allocate a processor local IRQ handler.
 intptr_t IrqHandlerAllocCoreLocal(const Handle threadHandle, const uintptr_t bits);
+
+
+/// Get entropy from kernel buffer
+intptr_t GetEntropy(void *outPtr, const size_t outBytes);
 }
 
 #endif

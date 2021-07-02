@@ -1,6 +1,6 @@
 .extern kernel_init
 .extern kernel_main
-
+.extern _ZN6crypto6Random4InitEv
 .extern arch_init
 .extern platform_init
 
@@ -53,6 +53,7 @@ _osentry:
     // perform initializations
     call        arch_init
     call        platform_init
+    call        _ZN6crypto6Random4InitEv
     call        kernel_init
 
     // jump into kernel

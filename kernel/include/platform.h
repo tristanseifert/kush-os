@@ -113,6 +113,14 @@ int IrqUnregister(const uintptr_t token);
  * @return Vector number on success, or 0 if error.
  */
 uintptr_t IrqAllocCoreLocal(uintptr_t &outVector);
+
+/**
+ * Retrieve the given number of bytes of entropy. This can be from a hardware random number
+ * generator, or some other small area of memory.
+ *
+ * @return 0 on success, error code otherwise
+ */
+int GetEntropy(void *out, const size_t outBytes);
 }
 
 /**

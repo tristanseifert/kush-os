@@ -135,7 +135,10 @@ static void update_supports_nx() {
 
 
 
-/// Information on required CPU features
+/**
+ * Required CPU features. The biggest requirements are SSE 4.1/4.2 and the RDRAND instruction; this
+ * means we need an Intel chip that's Ivy Bridge or newer, or an AMD chip released after 2015.
+ */
 static const struct {
     /// CPUID leaf to query
     uint32_t leaf = 0;
@@ -167,6 +170,12 @@ static const struct {
         .leaf   = 0x01,
         .ecx    = (1 << 19) | (1 << 20),
         .name   = "SSE 4.1 and SSE 4.2"
+    },
+   // Hardware RNG
+    {
+        .leaf   = 0x01,
+        .ecx    = (1 << 30),
+        .name   = "Hardware RNG (RDRAND)"
     },
     // supervisor mode access protection
     /*{
