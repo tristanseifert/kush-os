@@ -12,6 +12,7 @@ add_library(system_objs OBJECT
     src/sys/scheduler.c
     src/sys/task.c
     src/sys/vm.c
+    src/sys/misc.c
     src/sys/infopage.c
     # stack stuff
     src/stack/stack_guard.c

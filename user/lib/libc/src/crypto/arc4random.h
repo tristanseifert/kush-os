@@ -32,8 +32,9 @@
  * Invoked when we fail to get more random entropy. This terminates the task.
  */
 static inline void
-_getentropy_fail(void)
+_getentropy_fail(int err)
 {
+    fprintf(stderr, "[libc] failed to get entropy: %d\n", err);
     TaskExit(0, -1);
 }
 

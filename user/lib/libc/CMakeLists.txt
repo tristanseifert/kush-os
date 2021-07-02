@@ -86,6 +86,7 @@ list(APPEND c_objs_files
     src/stdlib/qsort.c
     # crypto routines (hashing, random)
     src/crypto/arc4random.c
+    src/crypto/arc4random_uniform.c
     # stdio
     src/stdio/printf.c
     src/stdio/puts.c

@@ -24,6 +24,8 @@ extern "C" {
 // task syscalls
 #include <sys/syscalls_task.h>
 
+#include <sys/syscalls_misc.h>
+
 #ifdef __cplusplus
 }
 #endif

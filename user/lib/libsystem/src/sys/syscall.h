@@ -77,8 +77,10 @@ LIBSYSTEM_INTERNAL intptr_t __do_syscall5(const uintptr_t arg0, const uintptr_t 
 #define SYS_ARCH_IRQ_GETINFO            0x3B
 #define SYS_ARCH_ALLOC_LOCAL            0x3C
 
+#define SYS_MISC_GET_ENTROPY            0x40
+
 // first architecture specific syscall number
-#define SYS_ARCH                        0x40
+#define SYS_ARCH                        0x48
 
 #define SYS_ARCH_X86_UPDATE_IOPB        (SYS_ARCH + 0x00)
 #define SYS_ARCH_X86_SET_TLS_BASE       (SYS_ARCH + 0x01)

@@ -29,9 +29,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/time.h>
 #include <_libc.h>
+
+#include <sys/syscalls.h>
 
 #define KEYSTREAM_ONLY
 #include "chacha_private.h"
@@ -87,22 +87,25 @@ _rs_stir(void)
 {
     unsigned char rnd[KEYSZ + IVSZ];
 
-    // TODO: acquire entropy
-    //if (getentropy(rnd, sizeof rnd) == -1)
-    //	_getentropy_fail();
+    // acquire entropy
+    int err = GetEntropy(rnd, sizeof rnd);
+    if(err != sizeof rnd) {
+        _getentropy_fail(err);
+    }
 
     // initialize random context
-    if (!rs)
-        _rs_init(rnd, sizeof(rnd));
-    else
-        _rs_rekey(rnd, sizeof(rnd));
+    if (!rs) {
+        _rs_init(rnd,  sizeof rnd);
+    } else {
+        _rs_rekey(rnd, sizeof rnd);
+    }
 
     // discard source seed
-    memset(rnd, 0, sizeof(rnd));
+    memset(rnd, 0, sizeof rnd);
 
     /* invalidate rs_buf */
     rs->rs_have = 0;
-    memset(rsx->rs_buf, 0, sizeof(rsx->rs_buf));
+    memset(rsx->rs_buf, 0, sizeof rsx->rs_buf);
 
     rs->rs_count = 1600000;
 }
