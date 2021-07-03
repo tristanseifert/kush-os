@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <utility>
 #include <span>
+#include <string_view>
 #include <list>
 
 #include <errno.h>
@@ -35,6 +36,11 @@ enum class SegmentProtection: uint8_t {
  * Base class for a ELF reader
  */
 class ElfReader {
+    /// Dynamic link server port name
+    constexpr static const std::string_view kDyldosrvPortName{"me.blraaz.rpc.dyldosrv"};
+    /// Maximum receive message size
+    constexpr static const size_t kMaxMsgLen{2048};
+
     public:
         /// Creates an ELF reader for a file that's already been opened.
         ElfReader(FILE * _Nonnull fp, const char * _Nonnull path);
@@ -131,22 +137,30 @@ class ElfReader {
          */
         struct Segment {
             /// Offset into the ELF at which data for the segment begins
-            uintptr_t offset = 0;
+            uintptr_t offset{0};
             /// Length of valid data
-            size_t length = 0;
+            size_t length{0};
 
             /// Virtual memory base
-            uintptr_t vmStart = 0;
+            uintptr_t vmStart{0};
             /// Ending virtual memory address
-            uintptr_t vmEnd = 0;
+            uintptr_t vmEnd{0};
             /// corresponding VM handle
-            uintptr_t vmRegion = 0;
+            uintptr_t vmRegion{0};
 
             /// desired protection level for the memory this segment represents
-            SegmentProtection protection = SegmentProtection::None;
+            SegmentProtection protection{SegmentProtection::None};
             /// Whether the VM protections have been restricted
-            bool vmPermissionsRestricted = false;
+            bool vmPermissionsRestricted{false};
+            /// When set, the segment is shared
+            bool shared{false};
         };
+
+    private:
+        /// Checks if the dynamic link server is available.
+        bool hasDyldosrv();
+        /// Loads a shareable segment
+        void loadSegmentShared(const Elf_Phdr &phdr, const uintptr_t base, Segment &seg);
 
     protected:
         /// ELF class
@@ -189,6 +203,13 @@ class ElfReader {
         char * _Nullable path{nullptr};
 
     private:
+        /// DyldoServer remote request port
+        static uintptr_t gRpcServerPort;
+        /// Port used to receive replies to RPC requests
+        static uintptr_t gRpcReplyPort;
+        /// Receive buffer for RPC replies
+        static void * _Nullable gRpcReceiveBuf;
+
         static bool gLogSegments;
 };
 }

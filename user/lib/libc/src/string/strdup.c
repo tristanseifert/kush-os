@@ -8,7 +8,22 @@ char *strdup(const char *in) {
     if(!dest) {
         return NULL;
     }
-    
+
     memcpy(dest, in, len);
     return dest;
+}
+
+/**
+ * Same as strdup but with a maximum length
+ */
+char *strndup(const char *in, size_t maxlen) {
+    size_t len = strnlen(in, maxlen);
+    char *copy = malloc(len + 1);
+
+    if(copy) {
+        memcpy(copy, in, len);
+        copy[len] = '\0';
+    }
+
+    return copy;
 }

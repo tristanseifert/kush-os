@@ -14,6 +14,13 @@ enum class DyldosrvMessageType: uint32_t {
 };
 
 /**
+ * Error codes for the Dyldosrv interface
+ */
+enum DyldosrvErrors: int {
+    InternalError                       = -48400,
+};
+
+/**
  * Request to map a particular shared library's segment.
  *
  * This will look up if we've already loaded this segment, and if so, simply maps it into the

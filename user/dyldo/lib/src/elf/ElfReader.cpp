@@ -3,15 +3,26 @@
 #include "Linker.h"
 #include "runtime/ThreadLocal.h"
 
+#include <PacketTypes.h>
+
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
 
 #include <errno.h>
 #include <unistd.h>
+#include <rpc/dispensary.h>
+#include <rpc/RpcPacket.hpp>
 #include <sys/elf.h>
 
 using namespace dyldo;
+
+/// Port used to receive replies from the RPC server
+uintptr_t ElfReader::gRpcReplyPort{0};
+/// Port of the dynamic link server's RPC endpoint
+uintptr_t ElfReader::gRpcServerPort{0};
+/// Dynamically allocated buffer for RPC responses
+void *ElfReader::gRpcReceiveBuf;
 
 /// whether we output logging information about loaded segments
 bool ElfReader::gLogSegments = false;
@@ -229,8 +240,9 @@ void ElfReader::parseDynamicInfo() {
     }
 
     if(!strtabAddr || !strtabLen) {
-        Linker::Abort("%s: missing strtab (addr $%x len %lu, %lu dynents)", this->path ? this->path : "?",
-                strtabAddr, strtabLen, this->dynInfo.size());
+        Linker::Abort("%s: missing strtab (addr $%x len %lu, %lu dynents at $%p)",
+                this->path ? this->path : "?", strtabAddr, strtabLen, this->dynInfo.size(),
+                this->dynInfo.data());
     }
     this->strtab = std::span<char>(reinterpret_cast<char *>(strtabAddr), strtabLen);
 
@@ -437,6 +449,10 @@ void ElfReader::readDeps() {
  *
  * TODO: Share text segments!
  *
+ * If the segment is marked as R^W (that is, read-only or execute-only) then we fire off a request
+ * to the dynamic link server (if available) and request it provides the shared segment handle or
+ * performs the initial load for us.
+ *
  * @param base An offset to add to all virtual address offsets in the file. Should be 0 if the file
  * is an executable, otherwise the load address of the dynamic library.
  */
@@ -475,40 +491,153 @@ void ElfReader::loadSegment(const Elf_Phdr &phdr, const uintptr_t base) {
                 phdr.p_vaddr, seg.vmStart, seg.vmEnd);
     }
 
-    // allocate the region
-    const size_t regionLen = (seg.vmEnd - seg.vmStart) + 1;
-
-    err = AllocVirtualAnonRegion(regionLen, VM_REGION_RW, &vmRegion);
-    if(err) {
-        Linker::Abort("failed to %s anon region: %d", "allocate", err);
+    // check if segment is shareable
+    if(this->hasDyldosrv() && !(phdr.p_flags & PF_W)) {
+        this->loadSegmentShared(phdr, base, seg);
     }
-    seg.vmRegion = vmRegion;
+    // otherwise, manually map it
+    else {
+        // allocate the region
+        const size_t regionLen = (seg.vmEnd - seg.vmStart) + 1;
 
-    // map region
-    err = MapVirtualRegion(vmRegion, seg.vmStart, regionLen, 0);
-    if(err) {
-        Linker::Abort("failed to %s anon region: %d", "map", err);
-    }
+        err = AllocVirtualAnonRegion(regionLen, VM_REGION_RW, &vmRegion);
+        if(err) {
+            Linker::Abort("failed to %s anon region (for %s): %d", "allocate", this->path, err);
+        }
+        seg.vmRegion = vmRegion;
 
-    // copy into the page
-    if(phdr.p_filesz) {
-        auto copyTo = reinterpret_cast<void *>(seg.vmStart + (phdr.p_offset % pageSz));
-        this->read(phdr.p_filesz, copyTo, phdr.p_offset);
-    }
-    // zero remaining area (XXX: technically, we can skip this as anon pages are faulted in zeroed)
-    if(phdr.p_memsz > phdr.p_filesz) {
-        auto zeroStart = reinterpret_cast<void *>(seg.vmStart + (phdr.p_offset % pageSz) + phdr.p_filesz);
-        const auto numZeroBytes = phdr.p_memsz - phdr.p_filesz;
-
-        if(gLogSegments) {
-            Linker::Trace("Zeroing %lu bytes at %p", numZeroBytes, zeroStart);
+        // map region
+        err = MapVirtualRegion(vmRegion, seg.vmStart, regionLen, 0);
+        if(err) {
+            Linker::Abort("failed to %s anon region (for %s) at $%p ($%x bytes): %d", "map", this->path, seg.vmStart, regionLen, err);
         }
 
-        memset(zeroStart, 0, numZeroBytes);
+        // copy into the page
+        if(phdr.p_filesz) {
+            auto copyTo = reinterpret_cast<void *>(seg.vmStart + (phdr.p_offset % pageSz));
+            this->read(phdr.p_filesz, copyTo, phdr.p_offset);
+        }
+        // zero remaining area (XXX: technically, we can skip this as anon pages are faulted in zeroed)
+        if(phdr.p_memsz > phdr.p_filesz) {
+            auto zeroStart = reinterpret_cast<void *>(seg.vmStart + (phdr.p_offset % pageSz) + phdr.p_filesz);
+            const auto numZeroBytes = phdr.p_memsz - phdr.p_filesz;
+
+            if(gLogSegments) {
+                Linker::Trace("Zeroing %lu bytes at %p", numZeroBytes, zeroStart);
+            }
+
+            memset(zeroStart, 0, numZeroBytes);
+        }
     }
 
     // store info
     this->segments.push_back(std::move(seg));
+}
+
+/**
+ * Establish the connection to the dynamic link server.
+ */
+bool ElfReader::hasDyldosrv() {
+    int err;
+
+    // if we've already allocated a reply port assume success
+    if(gRpcReplyPort && gRpcServerPort) {
+        return true;
+    }
+
+    // allocate the receive buffer
+    if(!gRpcReceiveBuf) {
+        err = posix_memalign(&gRpcReceiveBuf, 16, kMaxMsgLen);
+        if(err) {
+            Linker::Abort("%s failed: %d", "posix_memalign", err);
+        }
+
+        memset(gRpcReceiveBuf, 0, kMaxMsgLen);
+    }
+
+    // resolve the remote port
+    err = LookupService(kDyldosrvPortName.data(), &gRpcServerPort);
+    if(!err) {
+        // server not available
+        return false;
+    } else if(err < 0) {
+        Linker::Abort("%s failed: %d", "LookupService", err);
+    }
+
+    // allocate the reply port
+    err = PortCreate(&gRpcReplyPort);
+    if(err) {
+        Linker::Abort("%s failed: %d", "PortCreate", err);
+    }
+
+    return true;
+}
+
+/**
+ * Sends an RPC request to the dynamic link server, if possible, to map the segment.
+ */
+void ElfReader::loadSegmentShared(const Elf_Phdr &phdr, const uintptr_t base, Segment &seg) {
+    int err;
+
+    // allocate the buffer for the request
+    void *msgBuf;
+    const auto pathBytes = strlen(this->path) + 2;
+    const auto msgBytes = sizeof(rpc::RpcPacket) + sizeof(DyldosrvMapSegmentRequest) + pathBytes;
+
+    err = posix_memalign(&msgBuf, 16, msgBytes);
+    if(err) {
+        Linker::Abort("%s failed: %d", "posix_memalign", err);
+    }
+
+    memset(msgBuf, 0, msgBytes);
+
+    auto outPacket = reinterpret_cast<rpc::RpcPacket *>(msgBuf);
+    outPacket->replyPort = gRpcReplyPort;
+    outPacket->type = static_cast<uint32_t>(DyldosrvMessageType::MapSegment);
+
+    // build the message
+    auto msg = reinterpret_cast<DyldosrvMapSegmentRequest *>(outPacket->payload);
+
+    msg->objectVmBase = base;
+    memcpy(&msg->phdr, &phdr, sizeof(phdr));
+    strncpy(msg->path, this->path, pathBytes);
+
+    // send it :)
+    err = PortSend(gRpcServerPort, msgBuf, msgBytes);
+    free(msgBuf);
+
+    if(err) {
+        Linker::Abort("%s failed: %d", "PortSend", err);
+    }
+
+    // wait to receive response
+    auto replyMsg = reinterpret_cast<struct MessageHeader *>(gRpcReceiveBuf);
+    err = PortReceive(gRpcReplyPort, replyMsg, kMaxMsgLen, UINTPTR_MAX);
+
+    if(err < 0) {
+        Linker::Abort("%s failed: %d", "PortReceive", err);
+    }
+
+    // validate it
+    if(replyMsg->receivedBytes < sizeof(rpc::RpcPacket) + sizeof(DyldosrvMapSegmentReply)) {
+        Linker::Abort("RPC reply too small (%lu bytes)", replyMsg->receivedBytes);
+    }
+
+    auto packet = reinterpret_cast<const rpc::RpcPacket *>(replyMsg->data);
+    if(packet->type != static_cast<uint32_t>(DyldosrvMessageType::MapSegmentReply)) {
+        Linker::Abort("Invalid RPC reply type %08x", packet->type);
+    }
+
+    // handle failures
+    auto reply = reinterpret_cast<const DyldosrvMapSegmentReply *>(packet->payload);
+    if(reply->status) {
+        Linker::Abort("Failed to map shared region (off $%x len $%x) in %s: %d", phdr.p_offset,
+                phdr.p_memsz, this->path, reply->status);
+    }
+
+    // and successes
+    seg.vmRegion = reply->vmRegion;
+    seg.shared = true;
 }
 
 /**
@@ -518,6 +647,9 @@ void ElfReader::applyProtection() {
     int err;
 
     for(const auto &seg : this->segments) {
+        // shared mappings are properly protected already
+        if(seg.shared) continue;
+
         // always readable
         uintptr_t flags = VM_REGION_READ;
 
