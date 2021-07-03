@@ -45,6 +45,12 @@ void SymbolMap::add(const char *name, const Elf_Sym &sym, Library *library) {
 
         // if already defined as global, abort
         if(bind == SymbolFlags::BindGlobal) {
+            // if a global symbol is redefined as weak, we ignore the weak redefinition
+            if(ELF_ST_BIND(sym.st_info) == STB_WEAK) {
+                return;
+            }
+
+            // otherwise, this is an error
             Linker::Abort("duplicate definition for symbol '%s': in '%s' and '%s'", name,
                     existing->library->soname, library->soname);
         }
@@ -61,7 +67,7 @@ void SymbolMap::add(const char *name, const Elf_Sym &sym, Library *library) {
     info->length = sym.st_size;
 
     // get object type
-    switch(ELF32_ST_TYPE(sym.st_info)) {
+    switch(ELF_ST_TYPE(sym.st_info)) {
         /*
          * Data/object: address is a virtual address
          */
@@ -92,12 +98,12 @@ void SymbolMap::add(const char *name, const Elf_Sym &sym, Library *library) {
 
         default:
             Linker::Abort("unknown %s for '%s' in %s: %u (strtab %u, value %08x size %08x shdx %u)",
-                    "symbol type", name, library->soname, ELF32_ST_TYPE(sym.st_info), sym.st_name,
+                    "symbol type", name, library->soname, ELF_ST_TYPE(sym.st_info), sym.st_name,
                     sym.st_value, sym.st_size, sym.st_shndx);
     }
 
     // get binding type
-    switch(ELF32_ST_BIND(sym.st_info)) {
+    switch(ELF_ST_BIND(sym.st_info)) {
         case STB_LOCAL:
             info->flags |= SymbolFlags::BindLocal;
             break;
@@ -109,7 +115,7 @@ void SymbolMap::add(const char *name, const Elf_Sym &sym, Library *library) {
             break;
         default:
             Linker::Abort("unknown %s for '%s' in %s: %u (strtab %u, value %08x size %08x shdx %u)",
-                    "binding type", name, library->soname, ELF32_ST_BIND(sym.st_info), sym.st_name,
+                    "binding type", name, library->soname, ELF_ST_BIND(sym.st_info), sym.st_name,
                     sym.st_value, sym.st_size, sym.st_shndx);
     }
 

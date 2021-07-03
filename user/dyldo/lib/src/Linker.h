@@ -35,16 +35,6 @@ class Linker {
     friend class ThreadLocal;
 
     public:
-#if defined(__i386__)
-        /// desired alignment for shared libraries
-        constexpr static const uintptr_t kLibAlignment = 0x100000;
-#elif defined(__amd64__)
-        /// desired alignment for shared libraries
-        constexpr static const uintptr_t kLibAlignment = 0x1000000;
-#else
-#error Please define shared library alignment for current architecture
-#endif
-
         /// system search paths
         constexpr static const std::array<const char *, 3> kDefaultSearchPaths = {
             "/lib",
@@ -121,6 +111,8 @@ class Linker {
 
         /// Slide load addresses for objects if supported
         void calcSlides();
+        /// Gets the offset to use to the next library.
+        uintptr_t calcLibOffset();
 
         /// Load a shared library
         void loadSharedLib(const char * _Nonnull soname);

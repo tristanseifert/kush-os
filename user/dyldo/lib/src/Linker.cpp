@@ -7,6 +7,8 @@
 #include "elf/ElfLibReader.h"
 #include "struct/PaddedArray.h"
 
+#include <unistd.h>
+
 using namespace dyldo;
 
 extern "C" void __dyldo_jmp_to(const uintptr_t pc, const uintptr_t sp,
@@ -14,17 +16,17 @@ extern "C" void __dyldo_jmp_to(const uintptr_t pc, const uintptr_t sp,
 uintptr_t __dyldo_stack_start = 0;
 
 /// shared linker instance
-Linker *Linker::gShared = nullptr;
+Linker *Linker::gShared{nullptr};
 
 #ifdef NDEBUG
-bool Linker::gLogTraceEnabled = false;
+bool Linker::gLogTraceEnabled{false};
 #else
-bool Linker::gLogTraceEnabled = true;
+bool Linker::gLogTraceEnabled{true};
 #endif
 
-bool Linker::gLogOpenAttempts = false;
-bool Linker::gLogInitFini = false;
-bool Linker::gLogTls = false;
+bool Linker::gLogOpenAttempts{false};
+bool Linker::gLogInitFini{false};
+bool Linker::gLogTls{false};
 
 /**
  * Initializes a new linker, for the executable at the path given.
@@ -79,16 +81,38 @@ void Linker::calcSlides() {
      * boundary at 0x6FFF'FFFF'FFFF for the dynamic linker runtime.
      *
      * The majority of this is reserved for dynamic libraries, which are allocated a 512G region
-     * that is slid on a 16M alignment from 0x6801'0000'0000 to 0x6F80'0000'0000; this gives us
-     * roughly 19 bits of entropy here.
+     * that is slid on a 2M alignment from 0x6801'0000'0000 to 0x6F80'0000'0000; this gives us
+     * roughly 20 bits of entropy here.
      */
     this->soBase = 0x680100000000;
-    this->soBase += arc4random_uniform(0x80000) * kLibAlignment;
+    this->soBase += arc4random_uniform(0x3BF800) * 0x200000ULL;
 #else
 #error Unknown architecture
 #endif
 
     this->soSlide = this->soBase;
+}
+
+/**
+ * Calculates the alignment to use to round up the base address of the next library. This is used
+ * to introduce another layer of randomness into the load addresses of libraries in lieu of
+ * changing the order in which they're loaded.
+ */
+uintptr_t Linker::calcLibOffset() {
+#if defined(__i386__)
+    // no variable offsets
+    return 0x100000;
+#elif defined(__amd64__)
+    /*
+     * We want to have libraries offset by at least a full page directory (2MB) and up to a maximum
+     * of 32M, with page granularity in between.
+     */
+    uintptr_t offset = 0x200000;
+    offset += arc4random_uniform(0x1E00) * 0x1000;
+    return offset;
+#else
+#error Unknown architecture
+#endif
 }
 
 /**
@@ -288,7 +312,8 @@ void Linker::loadSharedLib(const char *soname) {
 
     // advance the pointer to place the next library
     const auto nextBase = base + loader->getVmRequirements();
-    this->soBase = ((nextBase + kLibAlignment - 1) / kLibAlignment) * kLibAlignment;
+    const auto off = this->calcLibOffset();
+    this->soBase = ((nextBase + off - 1) / off) * off;
 
     // process dependencies of the library that was just loaded
     for(const auto &dep : loader->getDeps()) {
@@ -380,16 +405,17 @@ void Linker::setLibTlsRequirements(const size_t totalLen, const std::span<std::b
  */
 void Linker::printImageBases() {
     // executable info
-    Info("Entry point: %p", this->entryAddr);
+    Info("Entry point: $%p -- %s", this->entryAddr, this->path);
 
     // all libraries
-    Info("Dylib base: $%p (%lu bytes)", this->soSlide, (this->soBase - this->soSlide));
+    Info(" Dylib base: $%p (%lu pages)", this->soSlide, (this->soBase - this->soSlide) / sysconf(_SC_PAGESIZE));
     Info("%-18s %-20s %-10s %s", "Base Address", "Mapping", "Size", "Path");
 
     hashmap_iterate(&this->loaded, [](void *ctx, void * _lib) -> int {
         auto lib = reinterpret_cast<Library *>(_lib);
+        auto linker = reinterpret_cast<Linker *>(ctx);
 
-        Info("$%p: vm <%p, %8lu> %s", lib->base, lib->vmBase, lib->vmLength, lib->soname);
+        Info("$%p: vm <%p, %8lu> %s", lib->base - linker->soSlide, lib->vmBase, lib->vmLength, lib->soname);
         return 1;
     }, this);
 }
