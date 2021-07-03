@@ -51,12 +51,17 @@ _start:
     call        main
 
 3:
-    add         $0x10, %esp
+    push        %rax
 
     // global destructors
     call        _fini
 
-    // exit (with a status code of 0)
+    // call TaskExit with the return value of main (in %rax)
+    pop         %rax
     xor         %rdi, %rdi
-    xor         %rsi, %rsi
+    mov         %rax, %rsi
     call        TaskExit
+
+    // should never get here!
+    ud2
+

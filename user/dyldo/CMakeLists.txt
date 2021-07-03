@@ -3,8 +3,7 @@
 ###############################################################################
 # dynamic link server
 if(BUILD_SYSTEM_SERVERS)
-    # dyldosrv is pending a (re)write
-    #    add_subdirectory(srv)
+    add_subdirectory(srv)
 endif()
 
 # Shared library part of the linker
