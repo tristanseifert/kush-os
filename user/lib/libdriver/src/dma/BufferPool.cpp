@@ -13,9 +13,9 @@ using namespace libdriver;
 /// Region of virtual memory space for buffer pools
 static uintptr_t kIoBufferMappingRange[2] = {
     // start
-    0x67809000000,
+    0x60809000000,
     // end
-    0x67819000000,
+    0x60819000000,
 };
 
 /**

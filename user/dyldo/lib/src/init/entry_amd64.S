@@ -37,12 +37,13 @@ __dyldo_start:
     /*
      * Initialize the C library.
      *
-     * Additionally, relocate the standard heap to grow upwards, 16M after the start of the dynamic
-     * linker .text start, with a maximum size of 64M.
+     * Additionally, relocate the standard heap to grow upwards, up to 64M, somewhere in the first
+     * 4G of the dynamic linker region that we reserve for our own use rather than loading shared
+     * libraries.
      *
-     * The address range 0x7FFFF8000000 to 0x7FFFFCFFFFFF is reserved for the dynamic linker use.
+     * The address range 0x680000000000 to 0x6FFFFFFFFFFF is reserved for the dynamic linker use.
      */
-    mov         $0x7FFFF9000000, %rdi
+    mov         $0x680080000000, %rdi
     mov         $0x4000000, %rsi
     call        __libc_set_heap_start
 

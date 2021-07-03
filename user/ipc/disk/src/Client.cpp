@@ -13,16 +13,16 @@ using namespace DriverSupport::disk;
 /// Region of virtual memory space for command buffers
 static uintptr_t kCommandMappingRange[2] = {
     // start
-    0x67800000000,
+    0x60900000000,
     // end
-    0x67801000000,
+    0x60901000000,
 };
 /// Region of virtual memory space for disk read/write buffers
 static uintptr_t kIoBufferMappingRange[2] = {
     // start
-    0x67810000000,
+    0x60A00000000,
     // end
-    0x67820000000,
+    0x60B00000000,
 };
 /**
  * Allocates a new disk device, if the given forest path is a valid disk.
@@ -201,8 +201,8 @@ int Disk::Read(const uint64_t sector, const size_t numSectors, std::vector<std::
                 command.bufferOffset);
         const size_t numBytes = command.bytesTransfered;
 
-        out.reserve(numBytes);
-        out.insert(out.end(), ptr, ptr+numBytes);
+        out.resize(numBytes);
+        memcpy(out.data(), ptr, numBytes);
     } else {
         fprintf(stderr, "[%s] Command failed! %d\n", "disk", status);
     }

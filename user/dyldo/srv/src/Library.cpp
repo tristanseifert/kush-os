@@ -40,8 +40,7 @@ int Library::CompareSegment(const void *a, const void *b, void *) {
     auto e1 = reinterpret_cast<const Segment *>(a);
     auto e2 = reinterpret_cast<const Segment *>(b);
 
-    //return memcmp(&e1->a, &e2->a, sizeof(e1->a));
-    return e1->a.virt < e2->a.virt;
+    return memcmp(&e1->a, &e2->a, sizeof(e1->a));
 }
 
 

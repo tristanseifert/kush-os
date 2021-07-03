@@ -1,6 +1,7 @@
-/*	$OpenBSD: arc4random.h,v 1.4 2015/01/15 06:57:18 deraadt Exp $	*/
-
 /*
+ * Roughly based on the original OpenBSD arc4random portability stubs, original copyright notice
+ * below:
+ *
  * Copyright (c) 1996, David Mazieres <dm@uun.org>
  * Copyright (c) 2008, Damien Miller <djm@openbsd.org>
  * Copyright (c) 2013, Markus Friedl <markus@openbsd.org>
@@ -18,12 +19,9 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-/*
- * Stub functions for portability.
- */
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include <sys/syscalls.h>
 
@@ -42,7 +40,11 @@ _getentropy_fail(int err)
  * Allocates internal random state.
  */
 #if defined(__amd64__)
+#ifdef LIBC_NOTLS
+#define STATE_ADDR                      0x7ff000010000
+#else
 #define STATE_ADDR                      0x7ff000000000
+#endif
 #else
 #error define arc4random state vm address
 #endif
@@ -66,13 +68,13 @@ _rs_allocate(struct _rs **rsp, struct _rsx **rsxp) {
     err = AllocVirtualAnonRegion(bytes, VM_REGION_RW, &handle);
     if(err) {
         fprintf(stderr, "%s failed: %d\n", "AllocVirtualAnonRegion", err);
-        _exit(1);
+        abort();
     }
 
     err = MapVirtualRegion(handle, STATE_ADDR, bytes, 0);
     if(err) {
         fprintf(stderr, "%s failed: %d\n", "MapVirtualRegion", err);
-        _exit(1);
+        abort();
     }
 
     p = (void *) STATE_ADDR;

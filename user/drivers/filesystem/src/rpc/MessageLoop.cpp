@@ -48,6 +48,7 @@ MessageLoop::OpenFileReturn MessageLoop::implOpenFile(const std::string &path, u
 
     err = Automount::the()->getFsFor(path, fs, fsPath);
     if(err) {
+        if(kLogOpen) Warn("No fs for %s: %d", path.c_str(), err);
         return { err };
     }
 
@@ -68,16 +69,19 @@ MessageLoop::OpenFileReturn MessageLoop::implOpenFile(const std::string &path, u
         // get the entry
         auto entry = dir->getEntry(dirName);
         if(!entry) {
+            if(kLogOpen) Warn("No entry at %s", dirName.c_str());
             return { ENOENT };
         }
 
         // recurse if it's a directory (it must be)
         if(entry->getType() != DirectoryEntryBase::Type::Directory) {
+            if(kLogOpen) Warn("Got non-directory at %s", dirName.c_str());
             return { ENOTDIR };
         }
 
         err = fs->readDirectory(entry, dir);
         if(err) {
+            if(kLogOpen) Warn("Failed to read directory at %s: %d", dirName.c_str(), err);
             return { err };
         }
     }
@@ -87,6 +91,7 @@ MessageLoop::OpenFileReturn MessageLoop::implOpenFile(const std::string &path, u
     fileDent = dir->getEntry(fileName);
 
     if(!fileDent) {
+        if(kLogOpen) Warn("Failed to get directory entry '%s'", fileName.c_str());
         return { ENOENT };
     }
 

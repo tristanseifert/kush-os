@@ -42,6 +42,9 @@ Linker::Linker(const char *_path) {
     this->path = strdup(_path);
     if(!this->path) Abort("out of memory");
 
+    // calculate the slides for libraries and friends
+    this->calcSlides();
+
     // read executable file in
     this->exec = new ElfExecReader(this->path);
     // set up the symbol map
@@ -61,6 +64,31 @@ void Linker::secondInit() {
     this->exec->exportInitFiniFuncs();
 
     this->dlInfo->loadedExec(this->exec, this->path);
+}
+
+/**
+ * Calculates the random base addresses for various parts of the runtime.
+ */
+void Linker::calcSlides() {
+#if defined(__i386__)
+    // 32-bit x86 does not support sliding the addresses
+    this->soBase = 0xA0000000;
+#elif defined(__amd64__)
+    /*
+     * On amd64, we reserve the virtual address space from 0x6800'0000'0000 up to the C library
+     * boundary at 0x6FFF'FFFF'FFFF for the dynamic linker runtime.
+     *
+     * The majority of this is reserved for dynamic libraries, which are allocated a 512G region
+     * that is slid on a 16M alignment from 0x6801'0000'0000 to 0x6F80'0000'0000; this gives us
+     * roughly 19 bits of entropy here.
+     */
+    this->soBase = 0x680100000000;
+    this->soBase += arc4random_uniform(0x80000) * kLibAlignment;
+#else
+#error Unknown architecture
+#endif
+
+    this->soSlide = this->soBase;
 }
 
 /**
@@ -355,10 +383,13 @@ void Linker::printImageBases() {
     Info("Entry point: %p", this->entryAddr);
 
     // all libraries
+    Info("Dylib base: $%p (%lu bytes)", this->soSlide, (this->soBase - this->soSlide));
+    Info("%-18s %-20s %-10s %s", "Base Address", "Mapping", "Size", "Path");
+
     hashmap_iterate(&this->loaded, [](void *ctx, void * _lib) -> int {
         auto lib = reinterpret_cast<Library *>(_lib);
 
-        Info("%p: vm <%p, %8lu> %s", lib->base, lib->vmBase, lib->vmLength, lib->soname);
+        Info("$%p: vm <%p, %8lu> %s", lib->base, lib->vmBase, lib->vmLength, lib->soname);
         return 1;
     }, this);
 }

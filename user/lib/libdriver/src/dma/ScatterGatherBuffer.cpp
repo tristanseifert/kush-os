@@ -11,9 +11,9 @@ using namespace libdriver;
 /// Region of virtual memory space for scatter/gather buffers
 static uintptr_t kMappingRange[2] = {
     // start
-    0x69800000000,
+    0x60800000000,
     // end
-    0x69F00000000,
+    0x60808000000,
 };
 
 /**

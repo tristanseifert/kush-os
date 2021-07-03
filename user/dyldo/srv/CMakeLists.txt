@@ -22,6 +22,7 @@ target_include_directories(dyldosrv PRIVATE src)
 
 target_link_libraries(dyldosrv PRIVATE system_static c_crt0T c_static rpc_static_small)
 target_link_options(dyldosrv PRIVATE -nostdlib -lopenlibm -flto -fno-exceptions -fno-rtti)
+target_link_options(dyldosrv PRIVATE -s)
 
 # use the correct linker script
 set_target_properties(dyldosrv PROPERTIES LINK_DEPENDS ${C_STATIC_LINKER_SCRIPT})

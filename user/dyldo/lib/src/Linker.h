@@ -36,17 +36,13 @@ class Linker {
 
     public:
 #if defined(__i386__)
-        /// base address for shared libraries
-        constexpr static const uintptr_t kSharedLibBase = 0xA0000000;
         /// desired alignment for shared libraries
         constexpr static const uintptr_t kLibAlignment = 0x100000;
 #elif defined(__amd64__)
-        /// base address for shared libraries
-        constexpr static const uintptr_t kSharedLibBase = 0xA0000000;
         /// desired alignment for shared libraries
-        constexpr static const uintptr_t kLibAlignment = 0x200000;
+        constexpr static const uintptr_t kLibAlignment = 0x1000000;
 #else
-#error Please define shared library base address for current architecture
+#error Please define shared library alignment for current architecture
 #endif
 
         /// system search paths
@@ -123,6 +119,9 @@ class Linker {
     private:
         void secondInit();
 
+        /// Slide load addresses for objects if supported
+        void calcSlides();
+
         /// Load a shared library
         void loadSharedLib(const char * _Nonnull soname);
         /// Searches for a library with the given name in system paths and open it
@@ -149,16 +148,18 @@ class Linker {
         const char * _Nonnull path;
 
         /// ELF reader for the executable
-        ElfExecReader * _Nullable exec = nullptr;
+        ElfExecReader * _Nullable exec{nullptr};
         /// thread local information
         ThreadLocal *_Nonnull tls;
         /// dynamic linker runtime functions
         DlInfo *_Nonnull dlInfo;
 
         /// base address to load the next shared library at
-        uintptr_t soBase = kSharedLibBase;
+        uintptr_t soBase{0};
+        /// base address of the shared library region
+        uintptr_t soSlide{0};
         /// memory address holding program entry point
-        uintptr_t entryAddr = 0;
+        uintptr_t entryAddr{0};
 
         /// executable initializer functions
         std::list<void(*)(void)> execInitFuncs;

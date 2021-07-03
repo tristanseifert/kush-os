@@ -162,7 +162,6 @@ int FAT::readDirectory(const uint32_t start, std::shared_ptr<fat::Directory> &ou
     // read all clusters belonging to the directory
     do {
         // read this cluster and interpret its directory entries
-        data.clear();
         err = this->readCluster(cluster, data);
         if(err) return err;
 

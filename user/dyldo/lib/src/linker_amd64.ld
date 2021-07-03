@@ -6,7 +6,7 @@ OUTPUT_FORMAT(elf64-x86-64)
 
 SECTIONS {
     /* default load address */
-    . = 0x7FFFF8000000;
+    . = 0x680000000000;
     __elf_base = .;
 
     /* skip past ELF headers */
