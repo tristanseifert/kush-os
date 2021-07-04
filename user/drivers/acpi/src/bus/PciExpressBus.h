@@ -28,6 +28,9 @@ class PciExpressBus: public Bus {
         /// key to the device specific aux data property
         constexpr static const std::string_view kAuxDataKey{"pcie.resources"};
 
+        /// produce logging when the bus is registered
+        constexpr static const bool gLogRegister{false};
+
     public:
         /**
          * Initializes a PCI Express root bridge segment from an ACPI MCFG entry.

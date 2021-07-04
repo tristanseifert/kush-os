@@ -40,7 +40,7 @@ class Device {
 
     private:
         /// Whether the forest paths new devices are registered under is logged
-        constexpr static const bool kLogPaths{true};
+        constexpr static const bool kLogPaths{false};
 
         /// the bus that this device is on
         std::weak_ptr<PciExpressBus> bus;

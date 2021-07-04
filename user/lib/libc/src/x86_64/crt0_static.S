@@ -4,6 +4,11 @@
 .global _start
 .type _start, function
 .extern __libc_task_info
+.extern __stack_chk_guard
+.extern GetEntropy
+
+/// temporary buffer for entropy
+.lcomm      EarlyEntropyBuf, 8
 
 /**
  * Program entry point: this will perform initialization of our temporary sections, then invoke
@@ -30,6 +35,36 @@ _start:
 
 1:
     mov         %rbx, __libc_task_info
+
+    /*
+     * Get entropy from the kernel into a temporary storage we've allocated in the .bss segment; if
+     * the call fails, we exit immediately.
+     *
+     * Until this step is complete, we're using the default stack guard value that's defined in
+     * libsystem. Therefore, we should minimize the number of function calls made (and call no user
+     * provided code) until this step is done. (Besides, you can't change the stack guard while in
+     * a function as the return will fail without fixing up the stack manually.)
+     */
+    lea         EarlyEntropyBuf(%rip), %rdi
+    mov         $0x8, %rsi
+    call        GetEntropy
+
+    cmpq        $0x8, %rax
+    je          4f
+
+    // abort if we can't get the entropy for the stack guard
+    ud2
+
+4:
+    lea         EarlyEntropyBuf(%rip), %rdi
+    lea         __stack_chk_guard(%rip), %rsi
+
+    // copy out of the early entropy buffer and into stack guard
+    movq        (%rdi), %rax
+    movq        %rax, (%rsi)
+    // then clear the entropy buffer
+    xor         %rax, %rax
+    movq        %rax, (%rdi)
 
     // set up the initializers and the C library
     call        __libc_init
@@ -64,4 +99,3 @@ _start:
 
     // should never get here!
     ud2
-

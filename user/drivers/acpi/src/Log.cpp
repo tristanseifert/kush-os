@@ -73,6 +73,6 @@ void Abort(const char *str, ...) {
     va_end(va);
 
     fputs("\e[0m\n", stderr);
-    _Exit(-69);
+    abort();
 }
 

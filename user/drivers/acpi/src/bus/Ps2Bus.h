@@ -27,6 +27,9 @@ class Ps2Bus: public Bus {
         /// resources we can assign a PS/2 controller
         using Resource = std::variant<ACPI_RESOURCE_IRQ, ACPI_RESOURCE_IO>;
 
+        /// produce logging when the bus is registered
+        constexpr static const bool gLogRegister{false};
+
     public:
         /// Probes the ACPI tables to see if a PS/2 controller exists.
         static std::shared_ptr<Ps2Bus> probe();

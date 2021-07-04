@@ -39,11 +39,14 @@ void sem_up(naive_sem_t *sem) {
     atomic_fetch_add_explicit(&(sem->val), 1, memory_order_release);
 }
 
+/// Whether creation/deallocation of semaphores is logged
+static bool gLogLifecycle{false};
+
 /**
  * Creates a new semaphore.
  */
 ACPI_STATUS AcpiOsCreateSemaphore(UINT32 max, UINT32 current, ACPI_SEMAPHORE *outHandle) {
-    Trace("AcpiOsCreateSemaphore max %u current %u", max, current);
+    if(gLogLifecycle) Trace("AcpiOsCreateSemaphore max %u current %u", max, current);
 
     // allocate it
     auto sem = new naive_sem_t;
@@ -64,7 +67,7 @@ ACPI_STATUS AcpiOsCreateSemaphore(UINT32 max, UINT32 current, ACPI_SEMAPHORE *ou
  * Deletes a previously allocated semaphore.
  */
 ACPI_STATUS AcpiOsDeleteSemaphore(ACPI_SEMAPHORE handle) {
-    Trace("AcpiOsDeleteSemaphore %p", handle);
+    if(gLogLifecycle) Trace("AcpiOsDeleteSemaphore %p", handle);
 
     delete handle;
     return AE_OK;

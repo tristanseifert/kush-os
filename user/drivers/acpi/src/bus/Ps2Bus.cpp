@@ -146,7 +146,7 @@ void Ps2Bus::loadDriver(const uintptr_t id) {
 
     // register driver
     this->drivermanPath = rpc->AddDevice(kAcpiBusRoot, kDriverName);
-    Trace("PS/2 bus registered at %s", this->drivermanPath.c_str());
+    if(gLogRegister) Trace("PS/2 bus registered at %s", this->drivermanPath.c_str());
 
     // set configuration
     rpc->SetDeviceProperty(this->drivermanPath, kAuxDataKey, aux);

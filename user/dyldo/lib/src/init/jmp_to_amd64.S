@@ -4,7 +4,8 @@
  *
  * 1. LaunchInfo struct ptr
  *
- * We're called like "void __dyldo_jmp_to(uintptr_t pc, uintptr_t sp, uintptr_t arg)"
+ * We're called like "void __dyldo_jmp_to(uintptr_t pc, uintptr_t sp, uintptr_t arg,
+ * uintptr_t stackGuard)"
  */
 .globl __dyldo_jmp_to
 __dyldo_jmp_to:
@@ -12,16 +13,16 @@ __dyldo_jmp_to:
     mov         %rsi, %rsp
     mov         %rdi, %rax
     mov         %rdx, %rdi
+    mov         %rcx, %rsi
 
     /*
-     * Clear all registers, EXCEPT for RAX (contains destination address) and RDI (contains the
-     * argument to the entry point)
+     * Clear all registers, EXCEPT for RAX (contains destination address), RDI (contains the
+     * argument to the entry point) and RSI (contains stack cookie)
      */
     xor         %rbx, %rbx
     xor         %rcx, %rcx
     xor         %rdx, %rdx
     xor         %rbp, %rbp
-    xor         %rsi, %rsi
     xor         %r8, %r8
     xor         %r9, %r9
     xor         %r10, %r10

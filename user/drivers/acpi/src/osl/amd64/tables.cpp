@@ -26,6 +26,8 @@ static once_flag gLoaderInfoInitFlag = ONCE_FLAG_INIT;
 static uintptr_t gTableAddress = 0;
 /// whether the loader info is actually valid
 static bool gLoaderInfoValid = false;
+/// whether we produce special debug logging
+static bool gLogInfo{false};
 
 /**
  * Override an object in ACPI namespace.
@@ -68,7 +70,7 @@ static void InitAcpiTableBase() {
         Abort("%s failed: %d", "Amd64CopyLoaderInfo", err);
     }
 
-    Trace("EFI sysinfo at phys $%p", gLoaderInfo.arch.x86_64.efi_ptr);
+    if(gLogInfo) Trace("EFI sysinfo at phys $%p", gLoaderInfo.arch.x86_64.efi_ptr);
 
     {
         // map the EFI info table and get the config table base
@@ -80,7 +82,7 @@ static void InitAcpiTableBase() {
 
         const auto sysinfo = reinterpret_cast<const efi_system_table *>(sysinfoMapped);
 
-        Trace("EFI sysinfo has %lu configuration tables at $%p",
+        if(gLogInfo) Trace("EFI sysinfo has %lu configuration tables at $%p",
                 sysinfo->NumberOfTableEntries, sysinfo->ConfigurationTable);
 
         // unmap the system table now once we've read the cfg table info
@@ -121,7 +123,7 @@ static void InitAcpiTableBase() {
     Abort("Failed to find ACPI RSDP in EFI config tables!");
 
 beach:;
-    Trace("Found RSDP at phys $%p", gTableAddress);
+    if(gLogInfo) Trace("Found RSDP at phys $%p", gTableAddress);
 
     // clean up
     AcpiOsUnmapMemory(cfgTableBase, cfgTableBytes);

@@ -22,7 +22,7 @@ void PciExpressBus::loadDriver(const uintptr_t) {
 
     // register driver
     this->drivermanPath = rpc->AddDevice(kAcpiBusRoot, kDriverName);
-    Trace("PCIe bus registered at %s", this->drivermanPath.c_str());
+    if(gLogRegister) Trace("PCIe bus registered at %s", this->drivermanPath.c_str());
 
     // set configuration
     rpc->SetDeviceProperty(this->drivermanPath, kAuxDataKey, aux);

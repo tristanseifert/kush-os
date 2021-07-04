@@ -3,6 +3,11 @@
 # secret libc api :D
 .extern __libc_set_heap_start
 .extern __dyldo_stack_start
+.extern __stack_chk_guard
+.extern GetEntropy
+
+/// temporary buffer for entropy
+.lcomm      EarlyEntropyBuf, 8
 
 /**
  * When we enter here, we will have a stack frame that looks a little bit like the following:
@@ -25,14 +30,33 @@ __dyldo_start:
     test        %rcx, %rcx
     js          1f
 
-    movabs      $__bss_start, %rdi
+    lea         __bss_start(%rip), %rdi
     xor         %rax, %rax
     cld
     rep stosb
 
 1:
-    movabs      $__dyldo_stack_start, %rax
+    lea         __dyldo_stack_start(%rip), %rax
     mov         %rsp, (%rax)
+
+    // set up stack guard; see the libc crt0.S comments for more detail
+    lea         EarlyEntropyBuf(%rip), %rdi
+    mov         $0x8, %rsi
+    call        GetEntropy
+
+    cmpq        $0x8, %rax
+    je          1f
+
+    ud2
+
+1:
+    lea         EarlyEntropyBuf(%rip), %rdi
+    lea         __stack_chk_guard(%rip), %rsi
+
+    movq        (%rdi), %rax
+    movq        %rax, (%rsi)
+    xor         %rax, %rax
+    movq        %rax, (%rdi)
 
     /*
      * Initialize the C library.
@@ -41,9 +65,9 @@ __dyldo_start:
      * 4G of the dynamic linker region that we reserve for our own use rather than loading shared
      * libraries.
      *
-     * The address range 0x680000000000 to 0x6FFFFFFFFFFF is reserved for the dynamic linker use.
+     * The address range 0x700000000000 to 0x77FFFFFFFFFF is reserved for the dynamic linker use.
      */
-    mov         $0x680080000000, %rdi
+    mov         $0x700080000000, %rdi
     mov         $0x4000000, %rsi
     call        __libc_set_heap_start
 

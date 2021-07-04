@@ -12,8 +12,9 @@
 using namespace dyldo;
 
 extern "C" void __dyldo_jmp_to(const uintptr_t pc, const uintptr_t sp,
-        const kush_task_launchinfo_t *info);
+        const kush_task_launchinfo_t *info, const uintptr_t stackGuard);
 uintptr_t __dyldo_stack_start = 0;
+extern uintptr_t __stack_chk_guard;
 
 /// shared linker instance
 Linker *Linker::gShared{nullptr};
@@ -77,14 +78,14 @@ void Linker::calcSlides() {
     this->soBase = 0xA0000000;
 #elif defined(__amd64__)
     /*
-     * On amd64, we reserve the virtual address space from 0x6800'0000'0000 up to the C library
-     * boundary at 0x6FFF'FFFF'FFFF for the dynamic linker runtime.
+     * On amd64, we reserve the virtual address space from 0x7000'0000'0000 up to the C library
+     * boundary at 0x77FF'FFFF'FFFF for the dynamic linker runtime.
      *
      * The majority of this is reserved for dynamic libraries, which are allocated a 512G region
-     * that is slid on a 2M alignment from 0x6801'0000'0000 to 0x6F80'0000'0000; this gives us
+     * that is slid on a 2M alignment from 0x7001'0000'0000 to 0x7780'0000'0000; this gives us
      * roughly 20 bits of entropy here.
      */
-    this->soBase = 0x680100000000;
+    this->soBase = 0x700100000000;
     this->soBase += arc4random_uniform(0x3BF800) * 0x200000ULL;
 #else
 #error Unknown architecture
@@ -194,7 +195,7 @@ void Linker::jumpToEntry(const kush_task_launchinfo_t *info) {
     // round up stack address
     const auto stack = ((__dyldo_stack_start + 256 - 1) / 256) * 256;
 
-    __dyldo_jmp_to(this->entryAddr, stack, info);
+    __dyldo_jmp_to(this->entryAddr, stack, info, __stack_chk_guard);
 
     // should really never get here...
     abort();

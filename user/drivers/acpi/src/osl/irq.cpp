@@ -41,6 +41,9 @@ static uintptr_t gDispatcherHandle;
 /// Bits we've allocated to interrupts
 static uintptr_t gAllocatedBits = 0;
 
+static bool gLogInstall{false};
+static bool gLogRemove{false};
+
 /// IRQ registration lock
 static std::mutex gRegistrationsLock;
 /// Active interrupt registrations
@@ -51,7 +54,7 @@ static std::unordered_map<uint32_t, IrqRegistration> gRegistrations;
  * Installs an interrupt handler.
  */
 ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 irq, ACPI_OSD_HANDLER ServiceRoutine, void *ctx) {
-    Trace("AcpiOsInstallInterruptHandler: irq %u, routine %p ctx %p", irq, (void *) ServiceRoutine, ctx);
+    if(gLogInstall) Trace("AcpiOsInstallInterruptHandler: irq %u, routine %p ctx %p", irq, (void *) ServiceRoutine, ctx);
 
     int err;
     uintptr_t bit = 0;
@@ -89,7 +92,7 @@ ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 irq, ACPI_OSD_HANDLER ServiceRo
         return AE_ERROR;
     }
 
-    Trace("irq %u -> bit %u", irq, bit);
+    if(gLogInstall) Trace("irq %u -> bit %u", irq, bit);
 
     std::lock_guard<std::mutex> lg(gRegistrationsLock);
     gRegistrations.emplace(irq, std::move(reg));
@@ -102,7 +105,7 @@ ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 irq, ACPI_OSD_HANDLER ServiceRo
  * Removes a previously installed interrupt handler.
  */
 ACPI_STATUS AcpiOsRemoveInterruptHandler(UINT32 irq, ACPI_OSD_HANDLER ServiceRoutine) {
-    Trace("AcpiOsRemoveInterruptHandler: irq %u, routine %p", irq, (void *) ServiceRoutine);
+    if(gLogRemove) Trace("AcpiOsRemoveInterruptHandler: irq %u, routine %p", irq, (void *) ServiceRoutine);
 
     if(!ServiceRoutine) {
         return AE_BAD_PARAMETER;

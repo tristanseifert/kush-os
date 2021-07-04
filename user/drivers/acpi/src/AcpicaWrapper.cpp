@@ -15,8 +15,6 @@ using namespace acpi;
 /// Shared ACPICA wrapper
 AcpicaWrapper *AcpicaWrapper::gShared = nullptr;
 
-bool AcpicaWrapper::gLogBusses = true;
-
 /**
  * Initialize the shared ACPICA handler.
  */
@@ -31,10 +29,7 @@ void AcpicaWrapper::init() {
 AcpicaWrapper::AcpicaWrapper() {
     ACPI_STATUS status;
 
-    // debug all the things
-    AcpiDbgLevel = ACPI_LV_ALL_EXCEPTIONS;
     AcpiDbgLevel = ACPI_NORMAL_DEFAULT;
-    AcpiDbgLayer = ACPI_ALL_COMPONENTS;
 
     // initialize ACPICA subsystem
     status = AcpiInitializeSubsystem();
@@ -281,7 +276,7 @@ void AcpicaWrapper::probePciExpress() {
     const auto mcfg = reinterpret_cast<ACPI_TABLE_MCFG *>(hdr);
     const auto numEntries = (hdr->Length - sizeof(*mcfg)) / sizeof(ACPI_MCFG_ALLOCATION);
 
-    Trace("MCFG table is at %p; has %lu entries", mcfg, numEntries);
+    if(gLogBusses) Trace("MCFG table is at %p; has %lu entries", mcfg, numEntries);
 
     // handle each entry
     const auto entries = reinterpret_cast<ACPI_MCFG_ALLOCATION *>(

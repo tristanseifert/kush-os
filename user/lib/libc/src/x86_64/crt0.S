@@ -5,19 +5,28 @@
 .type _start, function
 
 .extern __libc_task_info
+.extern __stack_chk_guard
 
 /**
  * Program entry point
  *
  * We don't have a whole lot to do, since the loader has already ran all initializers and cleared
- * the .bss section. We'll simply go ahead and initialize the C library.
+ * the .bss section. The stack guard needs to be set up, and we can then go initialize the C
+ * library.
  *
- * The address of the task info structure is passed in %rdi like a traditional function argument.
+ * This function is invoked by the linker like with two arguments: first, the info structure in
+ * %rdi; and the stack guard value in %rsi.
  */
 _start:
-    # set up stack
+    // set up stack
     xor         %rbp, %rbp
     mov         %rdi, __libc_task_info
+
+    // fix up stack guard (so the dynamic linker and us use the same value)
+    lea         __stack_chk_guard(%rip), %rax
+    mov         %rsi, (%rax)
+    xor         %rsi, %rsi
+    xor         %rax, %rax
 
     // set up the initializers and the C library
     call        __libc_init

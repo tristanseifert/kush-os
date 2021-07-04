@@ -25,7 +25,7 @@
 
 \begin{document}
 
-The C library reserves all user memory from \texttt{0000 7000 0000 0000} up to the user/kernel boundary of \texttt{0000 7fff 0000 0000}. It's broken down as follows:
+The C library reserves all user memory from \texttt{0000 7800 0000 0000} up to the user/kernel boundary of \texttt{0000 7fff 0000 0000}. It's broken down as follows:
 
 \begin{bytefield}{32}		
 	%%%
@@ -36,9 +36,9 @@ The C library reserves all user memory from \texttt{0000 7000 0000 0000} up to t
 	
 	\memsection{0000 7ff0 ffff ffff}{0000 7ff0 0000 0000}{2}{\texttt{arc4random} state}\\
 	
-	\memsection{0000 7fef ffff ffff}{0000 7800 0000 0000}{2}{\sc -- reseved --}\\
+	\memsection{0000 7fef ffff ffff}{0000 7c00 0000 0000}{2}{\sc -- reseved --}\\
 	
-	\memsection{0000 77ff ffff ffff}{0000 7000 0000 0000}{10}{Heap (8 TB)}\\
+	\memsection{0000 7bff ffff ffff}{0000 7800 0000 0000}{8}{Heap (4 TB)}\\
 \end{bytefield}
 
 All sections marked as reserved are currently not mapped.

@@ -10,15 +10,9 @@
  * ACPI server entry point
  *
  * We are invoked by the appropriate platform expert in the driver manager during init; it may pass
- * to us one argument, which is a serialized info struct. (This is not currently used.)
+ * to us one argument, which is our path in the device tree.
  */
 int main(const int argc, const char **argv) {
-    // decode info struct if available
-    if(argc >= 2) {
-        // TODO: decode
-        Trace("TODO: decode arg '%s'", argv[1]);
-    }
-
     // initialise ACPICA
     AcpicaWrapper::init();
 

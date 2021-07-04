@@ -30,7 +30,7 @@ class AcpicaWrapper {
         static AcpicaWrapper *gShared;
 
         /// whether found busses are logged
-        static bool gLogBusses;
+        constexpr static bool gLogBusses{false};
 
     private:
         AcpicaWrapper();
