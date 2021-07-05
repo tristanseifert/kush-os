@@ -71,6 +71,7 @@ list(APPEND c_objs_files
     # stdlib
     src/stdlib/getopt.c
     src/stdlib/getsubopt.c
+    src/stdlib/random.c
     # stdlib math stuff
     src/stdlib/abs.c
     src/stdlib/div.c
@@ -90,6 +91,7 @@ list(APPEND c_objs_files
     # stdio
     src/stdio/printf.c
     src/stdio/puts.c
+    src/stdio/getc.c
     # locale
     src/locale/locale.c
     src/locale/strto.c
@@ -133,6 +135,7 @@ list(APPEND c_objs_files
     # error handling
     src/error/errno.c
     src/error/strerror.c
+    src/error/perror.c
     # dynamic linking
     src/dylink/dlopen.c
     src/dylink/dlsym.c
@@ -176,7 +179,10 @@ add_library(c_extra_objs OBJECT
     src/file/fd/map.c
     src/file/fd/read.c
     src/file/fd/write.c
+    src/file/fd/open.c
     src/file/fd/close.c
+    src/file/fd/seek.c
+    src/file/fd/stat.c
 )
 
 target_compile_options(c_extra_objs PRIVATE -flto -fno-exceptions -fno-rtti -fno-asynchronous-unwind-tables)
@@ -312,6 +318,9 @@ if(${KERNEL_ARCH} STREQUAL "x86")
     set(C_STATIC_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/x86/app_static.ld CACHE FILEPATH "Statically linked C executable linker script")
 elseif(${KERNEL_ARCH} STREQUAL "x86_64")
     target_compile_definitions(c_objs PRIVATE LIBC_ARCH_X86_64=1)
+
+    # add the setjmp arch specific stuff
+    target_sources(c_objs PRIVATE src/x86_64/setjmp.c)
 
     # compile the C library entry point (for static executables)
     add_library(c_crt0T OBJECT

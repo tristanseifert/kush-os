@@ -8,3 +8,7 @@ int puts(const char *s) {
 
     return temp;
 }
+
+int putchar(int c) {
+    return fputc(c, __stdoutp);
+}

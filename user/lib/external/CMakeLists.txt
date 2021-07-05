@@ -1,19 +1,23 @@
-###############################################################################
+###################################################################################################
 # Third party libraries
-###############################################################################
-
+###################################################################################################
 # these have native cmake-based build systems
 add_subdirectory(bzip2)
 add_subdirectory(lzfse)
+add_subdirectory(libpng)
+add_subdirectory(libjpeg-turbo)
 
+###################################################################################################
 # string formatting
 SET(FMT_OS OFF CACHE BOOL "disable fmtlib OS component" FORCE)
 add_subdirectory(fmtlib EXCLUDE_FROM_ALL)
 
+###################################################################################################
 # header only libraries
 add_subdirectory(HppOnly/tomlplusplus EXCLUDE_FROM_ALL)
 add_subdirectory(HppOnly/concurrentqueue EXCLUDE_FROM_ALL)
 
+###################################################################################################
 # OpenLibm (math library)
 ExternalProject_Add(openlibm
     SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/openlibm
@@ -31,7 +35,39 @@ ExternalProject_Add(openlibm
     INSTALL_COMMAND make DESTDIR=${CMAKE_SYSROOT} libdir=/lib includedir=/usr/include install
 )
 
+###################################################################################################
+# zlib
+###################################################################################################
+add_library(zlib SHARED
+    zlib/adler32.c
+    zlib/crc32.c
+    zlib/deflate.c
+    zlib/infback.c
+    zlib/inffast.c
+    zlib/inflate.c
+    zlib/inftrees.c
+    zlib/trees.c
+    zlib/zutil.c
+    zlib/compress.c
+    zlib/uncompr.c
+    zlib/gzclose.c
+    zlib/gzlib.c
+    zlib/gzread.c
+    zlib/gzwrite.c
+)
+target_compile_options(zlib PRIVATE -flto -fPIC)
+target_compile_options(zlib PRIVATE -Wno-cast-qual -Wno-implicit-fallthrough -Wno-format-nonliteral)
+set_target_properties(zlib PROPERTIES OUTPUT_NAME "z")
+
+install(TARGETS zlib LIBRARY)
+add_custom_command(TARGET zlib POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/zlib/zlib.h ${SYSROOT_DIR}/usr/include/zlib.h)
+add_custom_command(TARGET zlib POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/zlib/zconf.h ${SYSROOT_DIR}/usr/include/zconf.h)
+
+###################################################################################################
 # libcrc
+###################################################################################################
 add_library(libcrc SHARED
     libcrc/src/crc8.c
     libcrc/src/crc16.c
@@ -51,7 +87,9 @@ install(TARGETS libcrc LIBRARY)
 add_custom_command(TARGET libcrc POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/libcrc.so ${SYSROOT_DIR}/boot/lib/libcrc.so)
 
+###################################################################################################
 # MessagePack lib
+###################################################################################################
 add_library(mpack_objs OBJECT
     mpack/src/mpack/mpack-common.c
     mpack/src/mpack/mpack-expect.c

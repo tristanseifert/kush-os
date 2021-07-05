@@ -40,6 +40,13 @@ FILE *fopen(const char * restrict path, const char * restrict mode) {
 }
 
 /**
+ * Returns the file descriptor number of this file stream.
+ */
+int fileno(FILE *stream) {
+    return stream->fd;
+}
+
+/**
  * Simply return the file stream previously allocated to this descriptor.
  *
  * TODO: Do stuff with the mode argument

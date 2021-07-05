@@ -4,3 +4,5 @@ toolchain/
 sysroot/
 # output products go there
 build/
+.cache/
+compile_commands.json

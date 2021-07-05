@@ -16,7 +16,7 @@ int close(int filedes) {
     stream_t *fp = ConvertFdToStream(filedes);
     if(!fp) {
         errno = EBADF;
-        return -1 ;
+        return -1;
     }
 
     return fclose(fp);

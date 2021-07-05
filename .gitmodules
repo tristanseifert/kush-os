@@ -25,3 +25,12 @@
 [submodule "user/lib/external/icu"]
 	path = user/lib/external/icu
 	url = git@github.com:unicode-org/icu.git
+[submodule "user/lib/external/zlib"]
+	path = user/lib/external/zlib
+	url = git@github.com:madler/zlib.git
+[submodule "user/lib/external/libpng"]
+	path = user/lib/external/libpng/source
+	url = git@github.com:glennrp/libpng.git
+[submodule "user/lib/external/libjpeg-turbo"]
+	path = user/lib/external/libjpeg-turbo/source
+	url = git@github.com:libjpeg-turbo/libjpeg-turbo.git

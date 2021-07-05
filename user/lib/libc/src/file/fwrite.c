@@ -19,6 +19,10 @@ int fputc(int ch, FILE *stream) {
     return -1;
 }
 
+int putc(int ch, FILE *f) {
+    return fputc(ch, f);
+}
+
 /**
  * Writes a string to the file.
  */
@@ -30,7 +34,7 @@ int fputs(const char *str, FILE *stream) {
         if(err < 0) return err;
         else i++;
     }
-    
+
     return i;
 }
 

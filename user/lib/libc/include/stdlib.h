@@ -80,7 +80,10 @@ _Noreturn void	 _Exit(int);
 /// Run the given function at program exit time
 int	 atexit(void (* _Nonnull)(void));
 
-char	*getenv(const char *);
+LIBC_EXPORT char *getenv(const char *);
+LIBC_EXPORT int setenv(const char *name, const char *value, int overwrite);
+LIBC_EXPORT int putenv(char *string);
+LIBC_EXPORT int unsetenv(const char *name);
 
 LIBC_EXPORT int heapsort(void *base, size_t nel, size_t width,
         int (*compare)(const void *, const void *));
@@ -112,6 +115,11 @@ LIBC_EXPORT void *realloc_in_place(void *ptr, const size_t newSize);
 LIBC_EXPORT void *dlmemalign(const size_t alignment, const size_t size);
 /// Aligned malloc
 LIBC_EXPORT int posix_memalign(void **outPtr, const size_t alignment, const size_t size);
+
+/// Max value returned by random: a 32-bit quantity
+#define RAND_MAX 0xFFFFFFFF
+/// Returns a random long value.
+LIBC_EXPORT long random();
 
 /// Returns a random 32-bit value
 LIBC_EXPORT uint32_t arc4random(void);

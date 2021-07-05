@@ -5,11 +5,13 @@
 #ifndef __off_t_defined
 #ifndef __USE_FILE_OFFSET64
 typedef int off_t;
-# else
+#else
 typedef long long off_t;
 #endif
 #define __off_t_defined
 #endif
+
+typedef long long off64_t;
 
 // POSIX types
 typedef unsigned int pid_t;
