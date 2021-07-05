@@ -66,6 +66,7 @@ void SectorTestFs::workerMain() {
     // configurations
     constexpr static const size_t kMaxSectors{16};
     constexpr static const uint32_t kMaxSleepInterval{33}; // msec
+    constexpr static const size_t kPrintInterval{50};
 
     // set up
     std::vector<std::byte> data;
@@ -124,6 +125,9 @@ void SectorTestFs::workerMain() {
         }
 
         loops++;
+        if(!(loops % kPrintInterval)) {
+            Trace("%s loop %lu", __PRETTY_FUNCTION__, loops);
+        }
 
         if(kMaxSleepInterval) {
             ThreadUsleep(1000 * (arc4random_uniform(kMaxSleepInterval)+1));

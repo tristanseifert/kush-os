@@ -1,6 +1,7 @@
 #ifndef LIBDRIVER_DMA_BUFFERPOOL_H
 #define LIBDRIVER_DMA_BUFFERPOOL_H
 
+#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <list>
@@ -89,12 +90,17 @@ class BufferPool {
             uintptr_t offset;
             /// Length of the free region
             size_t length;
+
+            inline auto operator<=>(const FreeRegion &r) const {
+                return this->offset <=> r.offset;
+            }
         };
 
     private:
         BufferPool(const size_t initial, const size_t maxSize);
 
         void freeRange(const uintptr_t offset, const size_t size);
+        void defragFreeList();
 
     private:
         /// Status code used to abort initialization if needed

@@ -111,10 +111,42 @@ success:;
  * Marks the given range as free again. We'll insert it into the free list.
  */
 void BufferPool::freeRange(const uintptr_t offset, const size_t size) {
-    // TODO: we should ensure the item is in order
+    // ensure the free list is ordered
     this->freeList.push_front({offset, size});
+    this->freeList.sort();
 
-    // TODO: we should coalesce adjacent blocks
+    // try to defragment the freelist
+    this->defragFreeList();
+}
+
+/**
+ * Defragments the free list by merging adjacent blocks.
+ */
+void BufferPool::defragFreeList() {
+    for(auto it = this->freeList.begin(); it != this->freeList.end();) {
+        auto &x = *it;
+        auto next = it; ++next;
+
+        // if we're not yet at the end of the free list, see if the next entry is adjacent
+        if(next != this->freeList.end()) {
+            const auto thisEnd = x.offset + x.length;
+            const auto nextBase = (*next).offset;
+
+            // they are adjacent, so add the length of the next one and then remove that entry
+            if(thisEnd == nextBase) {
+                x.length += (*next).length;
+                this->freeList.erase(next);
+            }
+            // they can't be merged so check the next entry
+            else {
+                it++;
+            }
+        }
+        // this is the last entry and we cannot merge it
+        else {
+            it++;
+        }
+    }
 }
 
 /**
@@ -163,10 +195,10 @@ BufferPool::Buffer::Buffer(BufferPool * _Nonnull pool, const uintptr_t offset,
             return;
         }
 
-        extents.emplace_back(physAddr, std::min(bytesLeft, pageSz));
+        const auto used = pageSz - (x % pageSz);
+        extents.emplace_back(physAddr, std::min(bytesLeft, used));
 
         // advance to the next page
-        const auto used = pageSz - (x % pageSz);
         bytesLeft -= std::min(bytesLeft, used);
         x += used;
     }
