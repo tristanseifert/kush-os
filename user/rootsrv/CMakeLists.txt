@@ -12,7 +12,6 @@ add_executable(rootsrv
     src/task/Task.cpp
     src/task/Registry.cpp
     src/task/RpcHandler.cpp
-    src/task/TaskEndpoint.capnp.c++
     src/task/InfoPage.cpp
     src/task/loader/ElfCommon.cpp
     src/task/loader/Elf32.cpp
@@ -50,7 +49,7 @@ target_include_directories(rootsrv PRIVATE rpc)
 
 # required libraries
 target_link_libraries(rootsrv PRIVATE c_static system_static rpc_static)
-target_link_libraries(rootsrv PRIVATE lzfse_static fmt::fmt-header-only capnp)
+target_link_libraries(rootsrv PRIVATE lzfse_static fmt::fmt-header-only)
 
 # we have to compile the root server as standalone; pull in required runtime libs
 target_link_options(rootsrv PRIVATE -static -nostdlib++ -lopenlibm)

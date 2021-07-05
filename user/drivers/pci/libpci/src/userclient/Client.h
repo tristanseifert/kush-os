@@ -6,8 +6,6 @@
 #include <libpci/UserClientTypes.h>
 #include <libpci/Device.h>
 
-#include <capnp/serialize.h>
-
 #include <cstddef>
 #include <cstdint>
 #include <mutex>

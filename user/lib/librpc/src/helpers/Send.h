@@ -11,14 +11,9 @@ namespace rpc {
 struct RpcPacket;
 }
 
-namespace capnp {
-class MessageBuilder;
-}
-
 /**
  * Replies to a received RPC message.
  */
 LIBRPC_INTERNAL int _RpcSendReply(const rpc::RpcPacket *packet, const uint32_t type, const std::span<uint8_t> &buf);
-LIBRPC_INTERNAL int _RpcSendReply(const rpc::RpcPacket *packet, const uint32_t type, capnp::MessageBuilder &reply);
 
 #endif

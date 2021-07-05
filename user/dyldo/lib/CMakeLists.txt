@@ -52,7 +52,7 @@ endif()
 target_compile_options(dyldo PRIVATE -static)
 target_compile_options(dyldo PRIVATE -flto -fno-rtti -fno-exceptions)
 target_link_options(dyldo PRIVATE -nostartfiles -nolibc -nostdlib++ -static -fno-exceptions -fno-use-init-array)
-target_link_libraries(dyldo PRIVATE c_static_notls system_static rpc_static_small)
+target_link_libraries(dyldo PRIVATE c_static_notls system_static rpc_static)
 target_compile_definitions(dyldo PRIVATE BUILDING_LIBDYLDO=1)
 
 # optimize for size

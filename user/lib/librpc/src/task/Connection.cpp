@@ -58,7 +58,7 @@ void task::UpdateServerPort() {
 
     err = LookupService(kServiceName, &gState.serverPort);
     if(err != 1) {
-        fprintf(stderr, "service lookup %s failed: %d\n", kServiceName, err);
+        fprintf(stderr, "[rpc] service lookup %s failed: %d\n", kServiceName, err);
         abort();
     }
 }

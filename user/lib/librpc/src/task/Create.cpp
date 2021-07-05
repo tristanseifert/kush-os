@@ -6,14 +6,11 @@
 #include <cstdio>
 
 #include <rpc/RpcPacket.hpp>
-#include "rootsrv/TaskEndpoint.capnp.h"
-
-#include <capnp/message.h>
-#include <capnp/serialize.h>
+#include <rootsrv/TaskEndpoint.h>
+#include <mpack/mpack.h>
 
 using namespace task;
 using namespace rpc;
-using namespace rpc::TaskEndpoint;
 
 /**
  * Task creation function
@@ -28,12 +25,21 @@ int RpcTaskCreate(const char *path, const char **args, uintptr_t *outHandle) {
         Init();
     });
 
-    // build up message
-    capnp::MallocMessageBuilder requestBuilder;
-    auto request = requestBuilder.initRoot<rpc::TaskEndpoint::CreateRequest>();
+    // set up the mpack writer
+    char *reqData{nullptr};
+    size_t reqSize{0};
 
-    request.setPath(path);
+    mpack_writer_t writer;
+    mpack_writer_init_growable(&writer, &reqData, &reqSize);
 
+    mpack_start_map(&writer, 3);
+
+    // write the path
+    mpack_write_cstr(&writer, "path");
+    mpack_write_cstr(&writer, path);
+
+    // arguments
+    mpack_write_cstr(&writer, "args");
     if(args) {
         // count number of args
         size_t nArgs = 0;
@@ -41,13 +47,31 @@ int RpcTaskCreate(const char *path, const char **args, uintptr_t *outHandle) {
 
         // set up the list
         if(nArgs) {
-            auto list = request.initArgs(nArgs);
+            mpack_start_array(&writer, nArgs);
 
             const char *arg = args[0];
             for(size_t i = 0; arg; i++, arg = args[i]) {
-                list.set(i, arg);
+                mpack_write_cstr(&writer, arg);
             }
+
+            mpack_finish_array(&writer);
         }
+        // no args: write nil
+        else {
+            mpack_write_nil(&writer);
+        }
+    }
+
+    // finish up the param
+    mpack_write_cstr(&writer, "flags");
+    mpack_write_u32(&writer, 0);
+
+    mpack_finish_map(&writer);
+
+    auto status = mpack_writer_destroy(&writer);
+    if(status != mpack_ok) {
+        fprintf(stderr, "[rpc] %s failed: %d", "mpack_writer_destroy", status);
+        return -1;
     }
 
     // acquire lock
@@ -55,7 +79,11 @@ int RpcTaskCreate(const char *path, const char **args, uintptr_t *outHandle) {
     if(err != thrd_success) return -1;
 
     // send it
-    err = rpc::RpcSend(gState.serverPort, K_TYPE_CREATE_REQUEST, requestBuilder, gState.replyPort);
+    std::span<uint8_t> request(reinterpret_cast<uint8_t *>(reqData), reqSize);
+    err = rpc::RpcSend(gState.serverPort,
+            static_cast<uint32_t>(TaskEndpointType::CreateTaskRequest), request, gState.replyPort);
+
+    free(reqData);
 
     if(err) {
         err = -1;
@@ -76,28 +104,40 @@ int RpcTaskCreate(const char *path, const char **args, uintptr_t *outHandle) {
         }
 
         const auto packet = reinterpret_cast<RpcPacket *>(rxMsg->data);
-        if(packet->type != K_TYPE_CREATE_REPLY) {
-            fprintf(stderr, "%s received wrong packet type %08x!\n", __FUNCTION__, packet->type);
+        if(packet->type != static_cast<uint32_t>(TaskEndpointType::CreateTaskReply)) {
+            fprintf(stderr, "[rpc] %s received wrong packet type %08x!\n", __FUNCTION__, packet->type);
             err = -3;
             goto fail;
         }
 
         // deserialize the response
         auto resBuf = std::span(packet->payload, rxMsg->receivedBytes - sizeof(RpcPacket));
-        kj::ArrayPtr<const capnp::word> message(reinterpret_cast<const capnp::word *>(resBuf.data()),
-                resBuf.size() / sizeof(capnp::word));
-        capnp::FlatArrayMessageReader responseReader(message);
-        auto res = responseReader.getRoot<rpc::TaskEndpoint::CreateReply>();
 
-        if(res.getStatus()) {
-            err = res.getStatus();
+        mpack_tree_t tree;
+        mpack_tree_init_data(&tree, reinterpret_cast<const char *>(resBuf.data()), resBuf.size());
+        mpack_tree_parse(&tree);
+        mpack_node_t root = mpack_tree_root(&tree);
+
+        const auto status = mpack_node_i32(mpack_node_map_cstr(root, "status"));
+
+        if(status != 1) {
+            err = status;
         } else {
             err = 0;
 
             if(outHandle) {
-                *outHandle = res.getHandle();
+                // XXX: is there a cleaner way to get the handle size?
+#if defined(__i386__)
+                *outHandle = mpack_node_u32(mpack_node_map_cstr(root, "handle"));
+#elif defined(__x86_64__)
+                *outHandle = mpack_node_u64(mpack_node_map_cstr(root, "handle"));
+#else
+#error what the hell
+#endif
             }
         }
+
+        mpack_tree_destroy(&tree);
     }
     // failed to receive
     else {

@@ -15,7 +15,7 @@ add_library(driver SHARED
 )
 
 # allow the library to have link time optimization
-target_compile_options(driver PRIVATE -flto -fno-rtti -fno-exceptions)
+target_compile_options(driver PRIVATE -flto -fno-rtti -fno-exceptions -fstack-protector-all)
 target_link_options(driver PRIVATE -flto -fno-rtti -fno-exceptions)
 
 # specify the include directories
