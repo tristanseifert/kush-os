@@ -57,7 +57,7 @@ class FilesystemRegistry {
         static FilesystemRegistry *gShared;
 
         /// Number of installed filesystems
-        constexpr static const size_t kNumFilesystems{1};
+        constexpr static const size_t kNumFilesystems{2};
         /// List of all supported filesystems
         static const std::array<Match, kNumFilesystems> gSupportedFs;
 };

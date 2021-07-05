@@ -16,6 +16,8 @@ add_executable(fsdrv
     src/fs/fat/FAT32.cpp
     src/fs/fat/Directory.cpp
     src/fs/fat/File.cpp
+    # various testing filesystems
+    src/fs/test/SectorTest.cpp
     # automounting
     src/auto/Automount.cpp
     # RPC service
