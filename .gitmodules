@@ -34,3 +34,6 @@
 [submodule "user/lib/external/libjpeg-turbo"]
 	path = user/lib/external/libjpeg-turbo/source
 	url = git@github.com:libjpeg-turbo/libjpeg-turbo.git
+[submodule "user/lib/external/freetype2/source"]
+	path = user/lib/external/freetype2/source
+	url = https://gitlab.freedesktop.org/freetype/freetype.git

@@ -1,0 +1,13 @@
+# compiled files
+**.o
+**.la
+**.lo
+test/.deps/
+test/.libs/
+demos/.deps/
+demos/.libs/
+pixman/.deps/
+pixman/.libs/
+
+# log files
+*.log

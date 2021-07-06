@@ -6,6 +6,7 @@ add_subdirectory(bzip2)
 add_subdirectory(lzfse)
 add_subdirectory(libpng)
 add_subdirectory(libjpeg-turbo)
+add_subdirectory(freetype2)
 
 ###################################################################################################
 # string formatting
