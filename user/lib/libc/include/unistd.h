@@ -93,6 +93,12 @@ typedef    size_t    useconds_t;
 #define _SC_PAGESIZE            28 
 #define _SC_PAGE_SIZE           _SC_PAGESIZE
 
+// bitfields for the access() call
+#define R_OK                    (1 << 0)
+#define W_OK                    (1 << 1)
+#define X_OK                    (1 << 2)
+#define F_OK                    (1 << 7)
+
 #ifdef __cplusplus
 extern "C" {
 #endif

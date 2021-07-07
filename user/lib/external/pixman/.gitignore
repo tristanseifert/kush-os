@@ -2,6 +2,7 @@
 **.o
 **.la
 **.lo
+**.cache
 test/.deps/
 test/.libs/
 demos/.deps/

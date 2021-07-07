@@ -74,7 +74,7 @@ int Amd64PortReadW(const uintptr_t port, const uintptr_t flags, uint16_t *read) 
     return 0;
 }
 
-int Amd64PortReadD(const uintptr_t port, const uintptr_t flags, uint32_t *read) {
+int Amd64PortReadL(const uintptr_t port, const uintptr_t flags, uint32_t *read) {
     return Amd64PortRead(port, 
             (flags & ~SYS_ARCH_AMD64_PORT_SIZE_MASK) | SYS_ARCH_AMD64_PORT_DWORD, read);
 }

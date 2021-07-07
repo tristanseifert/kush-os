@@ -11,3 +11,11 @@ path = "/sbin/ps2drv"
 [[drivers.match]]
 name = "AcpiPs2Controller"
 
+# VMWare SVGA virtual graphics adapger
+[[drivers]]
+path = "/sbin/vmwaresvga"
+[[drivers.match]]
+[drivers.match.pci]
+[[drivers.match.pci.device]]
+vid = 0x15AD
+pid = 0x0405

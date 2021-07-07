@@ -63,17 +63,6 @@ int main(const int argc, const char **argv) {
             if(!err) {
                 // add to automounter
                 Automount::the()->startedFs(disk, p, fs);
-
-                /*
-                // test reading root directory
-                auto root = fs->getRootDirectory();
-
-                for(const auto &ent : root->getEntries()) {
-                    Trace("%70s: %c %8lu bytes", ent->getName().c_str(),
-                            (ent->getType() == DirectoryEntryBase::Type::File) ? 'F' : 'D',
-                            ent->getFileSize());
-                }
-                */
             } else {
                 const auto &i = p.typeId;
                 Trace("Failed to initialize fs (%d) %10lu (%10lu sectors): %02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X - %s", err,

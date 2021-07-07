@@ -74,6 +74,11 @@ size_t	 wcstombs(char * __restrict, const wchar_t * __restrict, size_t);
 int	 rand(void);
 void	 srand(unsigned);
 
+/// Exit code indicating the program failed
+#define EXIT_FAILURE (-1)
+/// Exit code indicating the program succeeded
+#define EXIT_SUCCESS (0)
+
 /// Terminates the current program with the specified exit code
 _Noreturn void	 exit(int);
 _Noreturn void	 _Exit(int);

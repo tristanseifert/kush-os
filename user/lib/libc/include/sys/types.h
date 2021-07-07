@@ -13,6 +13,9 @@ typedef long long off_t;
 
 typedef long long off64_t;
 
+// the signed counterpart to size_t
+typedef long ssize_t;
+
 // POSIX types
 typedef unsigned int pid_t;
 
