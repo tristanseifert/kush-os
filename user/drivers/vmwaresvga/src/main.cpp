@@ -1,6 +1,7 @@
 #include <memory>
 
 #include <sys/syscalls.h>
+#include <sys/amd64/syscalls.h>
 #include <libpci/UserClient.h>
 
 #include "Log.h"
@@ -16,6 +17,12 @@ int main(const int argc, const char **argv) {
     int err;
     if(argc != 2) {
         Abort("You must specify the forest path of a device.");
+    }
+
+    // disable the kernel console first
+    err = Amd64SetKernelFbConsEnabled(false);
+    if(err) {
+        Abort("Failed to disable kernel framebuffer console: %d", err);
     }
 
     // get the PCI device and create the SVGA device from it

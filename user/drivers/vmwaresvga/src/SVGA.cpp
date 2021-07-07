@@ -1,5 +1,6 @@
 #include "SVGA.h"
 #include "FIFO.h"
+#include "Commands2D.h"
 #include "Log.h"
 
 #include <cstdint>
@@ -137,6 +138,12 @@ SVGA::SVGA(const std::shared_ptr<libpci::Device> &_device) : device(_device) {
         this->status = this->fifo ? this->fifo->getStatus() : Errors::MissingBar;
         return;
     }
+
+    /*
+     * The device has been fully initialized. We can now create the various command handlers for
+     * the various components, set the initial mode and enable.
+     */
+    this->cmd2d = std::make_unique<svga::Commands2D>(this);
 
     // set default mode and enable device
     const auto [w, h, bpp] = kDefaultMode;
@@ -282,6 +289,13 @@ void SVGA::enable() {
 
     // XXX: this is where we'd perform an irq test
     memset(this->vram, 0xFF, this->vramFramebufferSize);
+
+    int err = this->cmd2d->update();
+
+    if(err) {
+        Warn("Failed to update display: %d", err);
+        this->status = err;
+    }
 }
 
 /**

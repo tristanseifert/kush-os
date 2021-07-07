@@ -11,6 +11,8 @@ add_executable(vmwaresvga
     # basic GPU driver
     src/SVGA.cpp
     src/FIFO.cpp
+    # 2D support
+    src/Commands2D.cpp
 )
 
 target_compile_options(vmwaresvga PRIVATE -flto -fno-rtti -fno-exceptions)

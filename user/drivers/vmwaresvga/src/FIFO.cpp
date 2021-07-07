@@ -3,6 +3,8 @@
 
 #include "Log.h"
 
+#include <algorithm>
+
 #include <unistd.h>
 #include <svga_reg.h>
 #include <svga3d_reg.h>
@@ -95,6 +97,9 @@ FIFO::~FIFO() {
  * Checks whether we support a particular FIFO capability.
  */
 bool FIFO::hasCapability(const uintptr_t cap) const {
+    if(kLogCapabilities) Trace("Testing for capability $%08x (have $%08x)",
+            this->fifo[SVGA_FIFO_CAPABILITIES], cap);
+
     return !!(this->fifo[SVGA_FIFO_CAPABILITIES] & cap);
 }
 
@@ -132,6 +137,9 @@ int FIFO::reserve(const size_t bytes, std::span<std::byte> &outRange) {
     uint32_t nextCmd = fifo[SVGA_FIFO_NEXT_CMD];
     bool reserveable = this->hasCapability(SVGA_FIFO_CAP_RESERVE);
 
+    if(kLogReservations) Trace("Reserving %lu bytes of FIFO (min $%08x, max $%08x, nextCmd $%08x ,"
+            "reservable? %c)", bytes, min, max, nextCmd, reserveable ? 'Y' : 'N');
+
     // validate the command length
     if(bytes > (max - min)) {
         return Err::CommandTooLarge;
@@ -142,6 +150,8 @@ int FIFO::reserve(const size_t bytes, std::span<std::byte> &outRange) {
     else if(this->reservedSize) {
         return Err::CommandInFlight;
     }
+
+    this->reservedSize = bytes;
 
     while(1) {
         uint32_t stop = this->fifo[SVGA_FIFO_STOP];
@@ -179,6 +189,7 @@ int FIFO::reserve(const size_t bytes, std::span<std::byte> &outRange) {
          * FIFO for command buffers; if not, default to using the bounce buffer.
          */
         if(reserveInPlace) {
+            // driver supports reservation OR it's dword sized
             if(reserveable || bytes <= sizeof(uint32_t)) {
                 this->usingBounceBuffer = false;
                 if(reserveable) {
@@ -189,11 +200,11 @@ int FIFO::reserve(const size_t bytes, std::span<std::byte> &outRange) {
                         bytes);
                 return 0;
             }
+            // use bounce buffer as we don't support reservation
+            else {
+                needBounce = true;
+            }
         } 
-        // use bounce buffer as we don't support reservation
-        else {
-            needBounce = true;
-        }
 
         // use bounce buffer if needed
         if(needBounce) {
@@ -211,6 +222,133 @@ int FIFO::reserve(const size_t bytes, std::span<std::byte> &outRange) {
 }
 
 /**
+ * Reserves memory for a command in the FIFO, which is prefixed by a 32-bit value that
+ * indicates the command type.
+ *
+ * @param type Value to tag the command with
+ * @param nBytes Number of bytes of command memory to allocate
+ * @param outRange On success, contains a span the command may be written into
+ *
+ * @return 0 on success or an error code
+ */
+int FIFO::reserveCommand(const uint32_t type, const size_t nBytes, std::span<std::byte> &outRange){
+    // allocate the buffer
+    std::span<std::byte> range;
+    int err = this->reserve(nBytes + sizeof(type), range);
+    if(err) return err;
+
+    // write the header
+    memcpy(range.data(), &type, sizeof(type));
+    outRange = range.subspan(sizeof(type));
+    return 0;
+}
+
+/**
+ * Reserves memory for an ESCAPE command in the FIFO; these are variable length packets that are
+ * used for more advanced SVGA device capabilities.
+ *
+ * The given number of bytes, plus a 3 dword header, are allocated.
+ *
+ * @param nsid Namespace identifier for the escape command
+ * @param nBytes Number of bytes of command memory to allocate
+ * @param outRange On success, contains a span the command may be written into
+ *
+ * @return 0 on success or an error code
+ */
+int FIFO::reserveEscape(const uint32_t nsid, const size_t nBytes, std::span<std::byte> &outRange){
+    struct EscapeHeader {
+        uint32_t cmd;
+        uint32_t nsid;
+        uint32_t size;
+    } __attribute__((__packed__));
+
+    // allocate the buffer
+    std::span<std::byte> range;
+    int err = this->reserve(nBytes + sizeof(EscapeHeader), range);
+    if(err) return err;
+
+    // populate the buffer
+    auto escHdr = reinterpret_cast<EscapeHeader *>(range.data());
+    escHdr->cmd = SVGA_CMD_ESCAPE;
+    escHdr->nsid = nsid;
+    escHdr->size = nBytes;
+
+    outRange = range.subspan(sizeof(*escHdr));
+    return 0;
+}
+
+/**
+ * Commits a sequence of bytes that's been written into the buffer provided by `reserve()` for
+ * command submission.
+ *
+ * @param nBytes Number of command bytes to commit; may be less than reserved.
+ */
+int FIFO::commit(const size_t nBytes) {
+    // get the current FIFO state
+    volatile uint32_t *fifo = this->fifo;
+    uint32_t max = fifo[SVGA_FIFO_MAX];
+    uint32_t min = fifo[SVGA_FIFO_MIN];
+    uint32_t nextCmd = fifo[SVGA_FIFO_NEXT_CMD];
+    bool reserveable = this->hasCapability(SVGA_FIFO_CAP_RESERVE);
+
+    if(kLogCommits) Trace("Committing %lu bytes of command data", nBytes);
+
+    // clear reservation
+    if(!this->reservedSize) {
+        return Err::NoCommandsAvailable;
+    }
+    this->reservedSize = 0;
+
+    // copy out of the bounce buffer if needed
+    if(this->usingBounceBuffer) {
+        auto buffer = this->bounceBuf.data();
+
+        // copy as two chunks
+        if(reserveable) {
+            const auto chunkSz = std::min(nBytes, static_cast<size_t>(max - nextCmd));
+            fifo[SVGA_FIFO_RESERVED] = nBytes;
+
+            memcpy(nextCmd + reinterpret_cast<std::byte *>(this->fifo), buffer, chunkSz);
+            memcpy(min + reinterpret_cast<std::byte *>(this->fifo), buffer + chunkSz,
+                    nBytes - chunkSz);
+        }
+        // copy a dword at a time
+        else {
+            auto dword = reinterpret_cast<uint32_t *>(buffer);
+
+            auto bytes = nBytes;
+            while(bytes > 0) {
+                fifo[nextCmd / sizeof(uint32_t)] = *dword++;
+                nextCmd += sizeof(uint32_t);
+
+                if(nextCmd == max) {
+                    nextCmd = min;
+                }
+
+                fifo[SVGA_FIFO_NEXT_CMD] = nextCmd;
+                bytes -= sizeof(uint32_t);
+            }
+        }
+    }
+
+    // update the NEXT_CMD field
+    if(!this->usingBounceBuffer || reserveable) {
+        nextCmd += nBytes;
+        if(nextCmd >= max) {
+            nextCmd -= (max - min);
+        }
+        fifo[SVGA_FIFO_NEXT_CMD] = nextCmd;
+    }
+
+    // clear FIFO reservation
+    if(reserveable) {
+        fifo[SVGA_FIFO_RESERVED] = 0;
+    }
+
+    return 0;
+}
+
+/**
  * Handles a full FIFO; this performs a legacy style sync against the graphics device FIFO.
  *
  * TODO: extend to use FIFO IRQs
@@ -218,4 +356,122 @@ int FIFO::reserve(const size_t bytes, std::span<std::byte> &outRange) {
 void FIFO::handleFifoFull() {
     this->s->regWrite(SVGA_REG_SYNC, 1);
     this->s->regRead(SVGA_REG_BUSY);
+}
+
+
+
+/**
+ * Allocates a new fence and inserts it at the next avaialble position in the device's command
+ * FIFO. The identifiers assigned to fences are monotonically increasing integers; though callers
+ * should treat them as opaque tokens: we only guarantee that the token is never zero.
+ *
+ * @param outFence Opaque identifier for this fence
+ *
+ * @return 0 on success, error code otherwise.
+ */
+int FIFO::insertFence(uint32_t &outFence) {
+    int err;
+    std::span<std::byte> buffer;
+
+    struct Fence {
+        uint32_t cmd;
+        uint32_t fenceId;
+    } __attribute__((__packed__));
+
+    // bail if FIFO doesn't support fences
+    if(!this->hasCapability(SVGA_FIFO_CAP_FENCE)) {
+        outFence = kUnsupportedFence;
+        return 0;
+    }
+
+    // allocate fence number
+    if(!this->nextFence) {
+        this->nextFence = 1;
+    }
+    const auto fence = this->nextFence++;
+
+    // allocate and build the command structure
+    err = this->reserve(sizeof(Fence), buffer);
+    if(err) return err;
+
+    auto cmd = reinterpret_cast<Fence *>(buffer.data());
+    cmd->cmd = SVGA_CMD_FENCE;
+    cmd->fenceId = fence;
+
+    // submit the command
+    err = this->commitAll();
+    if(err) return err;
+
+    if(kLogFences) Trace("Allocated fence $%08x", fence);
+
+    outFence = fence;
+    return 0;
+}
+
+/**
+ * Waits for the device to finish processing all commands preceding the given fence.
+ *
+ * TODO: Use interrupt driven mechanism
+ *
+ * @param fence Fence identifier (from `insertFence()`) to sync against
+ *
+ * @return 0 on success or error code
+ */
+int FIFO::syncToFence(const uint32_t fence) {
+    // bail if invalid fence
+    if(!fence || fence == kUnsupportedFence) return 0;
+
+    // use legacy sync mechanism if hardware doesn't support fences
+    if(!this->hasCapability(SVGA_FIFO_CAP_FENCE)) {
+        this->s->regWrite(SVGA_REG_SYNC, 1);
+        while(!this->s->regRead(SVGA_REG_BUSY)) {}
+        return 0;
+    }
+    // bail if fence has already passed
+    if(this->hasFencePassed(fence)) {
+        return 0;
+    }
+
+    // wake up the host and spin until no longer busy
+    bool busy{false};
+    this->s->regWrite(SVGA_REG_SYNC, 1);
+
+    while(!this->hasFencePassed(fence) && busy) {
+        busy = !!this->s->regRead(SVGA_REG_BUSY);
+    }
+
+    return 0;
+}
+
+/**
+ * Checks if we've passed the given fence.
+ *
+ * @note This does not handle wrap-around (where we have 2^31-1 fences generated) well. You should
+ * discard a fence object once this call returns true.
+ *
+ * @param fence Fence identifier to checkpoint
+ *
+ * @return Whether the fence has passed.
+ */
+bool FIFO::hasFencePassed(const uint32_t fence) {
+    // invalid fence
+    if(!fence || fence == kUnsupportedFence) {
+        return true;
+    }
+    else if(!this->hasCapability(SVGA_FIFO_CAP_FENCE)) {
+        return false;
+    }
+
+    return (static_cast<int32_t>(this->fifo[SVGA_FIFO_FENCE] - fence)) >= 0;
+}
+
+/**
+ * Wakes up the host to process commands.
+ */
+void FIFO::ringDoorbell() {
+    if(this->isRegisterValid(SVGA_FIFO_BUSY) && !this->fifo[SVGA_FIFO_BUSY]) {
+        this->fifo[SVGA_FIFO_BUSY] = true;
+
+        this->s->regWrite(SVGA_REG_SYNC, 1);
+    }
 }

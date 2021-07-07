@@ -13,10 +13,12 @@
 
 namespace svga {
 class FIFO;
+class Commands2D;
 }
 
 class SVGA {
     friend class svga::FIFO;
+    friend class svga::Commands2D;
 
     using BAR = libpci::Device::AddressResource;
 
@@ -42,6 +44,8 @@ class SVGA {
             CommandNotAligned                   = -71004,
             /// Attempted to start a new command before finishing the previous one
             CommandInFlight                     = -71005,
+            /// Attempted to commit a command when there are no commands in flight
+            NoCommandsAvailable                 = -71006,
         };
 
     public:
@@ -58,6 +62,11 @@ class SVGA {
         /// Set the video mode of the device
         int setMode(const uint32_t width, const uint32_t height, const uint8_t bpp,
                 const bool enable = true);
+
+        /// Gets the current framebuffer size
+        constexpr auto getFramebufferDimensions() const {
+            return this->fbSize;
+        }
 
     private:
         SVGA(const std::shared_ptr<libpci::Device> &dev);
@@ -104,4 +113,6 @@ class SVGA {
 
         /// FIFO handler
         std::unique_ptr<svga::FIFO> fifo;
+        /// 2D commands handler
+        std::unique_ptr<svga::Commands2D> cmd2d;
 };
