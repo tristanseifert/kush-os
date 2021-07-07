@@ -121,6 +121,11 @@ uintptr_t IrqAllocCoreLocal(uintptr_t &outVector);
  * @return 0 on success, error code otherwise
  */
 int GetEntropy(void *out, const size_t outBytes);
+
+/**
+ * Sets the state of the platform's framebuffer console.
+ */
+int SetConsoleState(const bool enabled);
 }
 
 /**

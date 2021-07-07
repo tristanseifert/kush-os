@@ -177,6 +177,12 @@ static const struct {
         .ecx    = (1 << 30),
         .name   = "Hardware RNG (RDRAND)"
     },
+    // XSAVE support
+    {
+        .leaf   = 0x01,
+        .ecx    = (1 << 26),
+        .name   = "XSAVE",
+    },
     // supervisor mode access protection
     /*{
         .leaf   = 0x07,

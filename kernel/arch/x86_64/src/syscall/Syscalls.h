@@ -15,6 +15,8 @@ intptr_t UpdateIoPermission(const Handle taskHandle, const uint8_t *bitmap, cons
 intptr_t LockIoPermission(const Handle taskHandle);
 intptr_t IoPortRead(const uintptr_t port, const uintptr_t flags, uint32_t *outValue);
 intptr_t IoPortWrite(const uintptr_t port, const uintptr_t flags, const uint32_t value);
+
+intptr_t SetFbConsState(const bool enabled);
 }
 
 #endif

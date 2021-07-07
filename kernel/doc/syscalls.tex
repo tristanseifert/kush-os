@@ -727,4 +727,11 @@ The flags field is used to specify the size of the IO operation. The following v
 
 Performs an IO port write to the given port. The flags field is used to specify the size of the IO operation, using the same meaning as for IO port reads.
 
+%%%%%
+\subsubsection{{\tt 0x4E}: Set kernel graphical console state}
+\textbf{Arguments:} (1) Enable state of kernel console \\
+\textbf{Returns:} 0, or a negative error code \\
+
+Enables or disables the kernel's built in graphical framebuffer console, if it's supported. This should be used when graphics drivers are being initialized to prevent access conflicts between the kernel and the userspace drivers.
+
 \end{document}  

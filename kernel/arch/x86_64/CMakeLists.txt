@@ -21,6 +21,7 @@ add_library(kernel_arch_amd64 OBJECT
     src/syscall/Handler.cpp
     src/syscall/ThreadLocal.cpp
     src/syscall/Io.cpp
+    src/syscall/Misc.cpp
 )
 
 set(ARCH_COMPILE_OPTS -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-omit-frame-pointer CACHE STRING "Architecture specific compile flags")

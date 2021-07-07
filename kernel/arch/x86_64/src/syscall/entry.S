@@ -183,6 +183,8 @@ arch_syscall_table:
     .quad       _ZN4arch7syscall10IoPortReadEmmPj
     // 0x4D: amd64: Write to IO port
     .quad       _ZN4arch7syscall11IoPortWriteEmmj
+    // 0x4E: amd64: Set kernel framebuffer console state
+    .quad       _ZN4arch7syscall14SetFbConsStateEb
 
 arch_syscall_table_end:
 

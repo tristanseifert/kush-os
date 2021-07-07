@@ -140,6 +140,13 @@ int Amd64LockAllowedIoPorts() {
     return Amd64LockAllowedIoPortsFor(0);
 }
 
+/**
+ * Sets the state of the kernel framebuffer console.
+ */
+int Amd64SetKernelFbConsEnabled(const bool enabled) {
+    return __do_syscall1((uintptr_t) enabled, SYS_ARCH_AMD64_SET_FBCONS_STATE);
+}
+
 
 
 /**

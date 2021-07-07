@@ -9,8 +9,11 @@
 #include "timer/pit.h"
 #include "timer/Tsc.h"
 
+#include <version.h>
+#include <printf.h>
 #include <debug/FramebufferConsole.h>
 #include <sched/Task.h>
+#include <mem/PhysicalAllocator.h>
 #include <vm/Map.h>
 #include <vm/MapEntry.h>
 
@@ -24,6 +27,7 @@ namespace platform {
     debug::FramebufferConsole *gConsole = nullptr;
 };
 static void InitFbCons();
+static void PrintBootMsg();
 
 using namespace platform;
 
@@ -65,6 +69,7 @@ void platform::VmAvailable() {
 
     // set up the framebuffer console
     InitFbCons();
+    PrintBootMsg();
 
     // prepare stacks, per core info, etc. for all APs
 
@@ -116,6 +121,28 @@ int platform::GetEntropy(void *out, const size_t outBytes) {
 
 
 /**
+ * Sets the framebuffer console state. If it's currently enabled, we'll deallocate it and remove
+ * the VM allocation.
+ */
+int platform::SetConsoleState(const bool enabled) {
+    // bail if the state is already achieved
+    if(enabled && gConsole) return 0;
+    else if(!enabled && !gConsole) return 0;
+
+    // need to enable
+    if(enabled) {
+        InitFbCons();
+    }
+    // need to disable
+    else {
+        delete gConsole;
+        gConsole = nullptr;
+    }
+
+    return 0;
+}
+
+/**
  * Initialize the global framebuffer console
  */
 static void InitFbCons() {
@@ -158,4 +185,60 @@ static void InitFbCons() {
 
     gConsole = new FramebufferConsole(reinterpret_cast<uint32_t *>(fbBase), fbFormat,
             bootboot.fb_width, bootboot.fb_height, bootboot.fb_scanline);
+}
+
+/**
+ * Prints some information about the system to the framebuffer console.
+ */
+static void PrintBootMsg() {
+    int nChars;
+    char buf[100]{0};
+
+    constexpr static const size_t kInfoBoxWidth{50};
+
+    // version
+    char hash[9]{0};
+    memcpy(hash, gVERSION_HASH, 8);
+    nChars = snprintf(buf, sizeof(buf), "kush-os (%s, built on %s) - "
+        "Copyright 2021 Tristan Seifert\n\n", hash, __DATE__);
+    gConsole->write(buf, nChars);
+
+    // top info box
+    gConsole->write(" \x05", 2);
+    for(size_t i = 0; i < kInfoBoxWidth; i++) {
+        gConsole->write(0x01);
+    }
+    gConsole->write("\x06\n", 2);
+
+    // CPUs (TODO: use the actual number of started cores)
+    gConsole->write(" \x00", 2);
+    nChars = snprintf(buf, sizeof(buf), "%32s: %lu", "Processors Available", bootboot.numcores);
+    gConsole->write(buf, nChars);
+
+    for(size_t i = nChars; i < kInfoBoxWidth; i++) {
+        gConsole->write(' ');
+    }
+    gConsole->write("\x00\n", 2);
+
+    // available memory
+    gConsole->write(" \x00", 2);
+
+    nChars = snprintf(buf, sizeof(buf), "%32s: %lu K", "Available physical memory",
+            mem::PhysicalAllocator::getTotalPages() * (arch_page_size() / 1024ULL));
+    gConsole->write(buf, nChars);
+
+    for(size_t i = nChars; i < kInfoBoxWidth; i++) {
+        gConsole->write(' ');
+    }
+    gConsole->write("\x00\n", 2);
+
+    // bottom info box
+    gConsole->write(" \x04", 2);
+    for(size_t i = 0; i < kInfoBoxWidth; i++) {
+        gConsole->write(0x01);
+    }
+    gConsole->write("\x03\n", 2);
+
+    // and the start message
+    gConsole->write("\n\e[32mSystem is starting up...\e[0m");
 }

@@ -6,6 +6,7 @@
 
 #include <_libsystem.h>
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -22,6 +23,14 @@
 #define SYS_ARCH_AMD64_PORT_DWORD       (0x03)
 /// Bitmask for the port IO flags to get the port size
 #define SYS_ARCH_AMD64_PORT_SIZE_MASK   (0x0F)
+
+#define SYS_ARCH_AMD64_SET_FGS_BASE     (SYS_ARCH + 0x00)
+#define SYS_ARCH_AMD64_GET_LOADER_INFO  (SYS_ARCH + 0x01)
+#define SYS_ARCH_AMD64_PORT_ALLOWLIST   (SYS_ARCH + 0x02)
+#define SYS_ARCH_AMD64_PORT_ALLOWLIST_LOCK      (SYS_ARCH + 0x03)
+#define SYS_ARCH_AMD64_PORT_READ        (SYS_ARCH + 0x04)
+#define SYS_ARCH_AMD64_PORT_WRITE       (SYS_ARCH + 0x05)
+#define SYS_ARCH_AMD64_SET_FBCONS_STATE (SYS_ARCH + 0x06)
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,6 +58,8 @@ LIBSYSTEM_EXPORT int Amd64PortWrite(const uintptr_t port, const uintptr_t flags,
 LIBSYSTEM_EXPORT int Amd64PortWriteB(const uintptr_t port, const uintptr_t flags, const uint8_t write);
 LIBSYSTEM_EXPORT int Amd64PortWriteW(const uintptr_t port, const uintptr_t flags, const uint16_t write);
 LIBSYSTEM_EXPORT int Amd64PortWriteL(const uintptr_t port, const uintptr_t flags, const uint32_t write);
+
+LIBSYSTEM_EXPORT int Amd64SetKernelFbConsEnabled(const bool enabled);
 
 #ifdef __cplusplus
 }
