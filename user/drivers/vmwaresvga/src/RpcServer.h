@@ -22,7 +22,9 @@ class RpcServer: public rpc::DisplayServer {
         GetDeviceCapabilitiesReturn implGetDeviceCapabilities() override;
         int32_t implSetOutputEnabled(bool enabled) override;
         int32_t implSetOutputMode(const DriverSupport::gfx::DisplayMode &mode) override;
-        int32_t implRegionUpdated(int32_t x, int32_t y, int32_t w, int32_t h) override;
+        int32_t implRegionUpdated(int32_t x, int32_t y, uint32_t w, uint32_t h) override;
+        GetFramebufferReturn implGetFramebuffer() override;
+        GetFramebufferInfoReturn implGetFramebufferInfo() override;
 
     private:
         /// Graphics device to perform operations on

@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -55,9 +56,20 @@ class Display: public rpc::DisplayClient {
             return this->RegionUpdated(x, y, w, h);
         }
 
+        /**
+         * Returns the user accessible region of the framebuffer.
+         */
+        inline std::span<std::byte> getFramebuffer() const {
+            return std::span<std::byte>(reinterpret_cast<std::byte *>(this->framebuffer),
+                    this->framebufferBytes);
+        }
+
     private:
         Display(const std::string_view &path, const uint32_t gpuId,
                 const std::shared_ptr<IoStream> &io);
+
+        /// Gets info on the framebuffer region and maps it into our address space.
+        int mapFramebuffer();
 
     private:
         /// Records errors during initialization
@@ -66,6 +78,13 @@ class Display: public rpc::DisplayClient {
         std::string forestPath;
         /// ID of the display we control
         uint32_t displayId{0};
+
+        /// Base of framebuffer region
+        void *framebuffer{nullptr};
+        /// Size of the framebuffer region (in bytes)
+        size_t framebufferBytes{0};
+        /// Handle to the framebuffer region
+        uintptr_t framebufferRegion{0};
 };
 }
 

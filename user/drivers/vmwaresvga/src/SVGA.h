@@ -82,6 +82,10 @@ class SVGA {
         constexpr auto getFramebufferDimensions() const {
             return this->fbSize;
         }
+        /// Gets the current pitch (bytes/line) of the framebuffer
+        constexpr auto getFramebufferPitch() const {
+            return this->fbPitch;
+        }
         /// Gets the path under which the SVGA device is registered
         constexpr auto &getForestPath() const {
             return this->forestPath;
@@ -89,7 +93,7 @@ class SVGA {
 
     private:
         /// Produce logging about the device during initialization
-        constexpr static const bool kLogInit{true};
+        constexpr static const bool kLogInit{false};
 
     private:
         SVGA(const std::shared_ptr<libpci::Device> &dev);

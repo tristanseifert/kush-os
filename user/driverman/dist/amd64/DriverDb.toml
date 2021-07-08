@@ -19,3 +19,9 @@ path = "/sbin/vmwaresvga"
 [[drivers.match.pci.device]]
 vid = 0x15AD
 pid = 0x0405
+
+# Display device
+[[drivers]]
+path = "/sbin/windowserver"
+[[drivers.match]]
+name = "GenericDisplay"

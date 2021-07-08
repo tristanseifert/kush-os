@@ -22,5 +22,15 @@ interface Display {
     /**
      * Indicates that the given region of the display has updated.
      */
-    RegionUpdated(x: Int32, y: Int32, w: Int32, h: Int32) => (status: Int32)
+    RegionUpdated(x: Int32, y: Int32, w: UInt32, h: UInt32) => (status: Int32)
+
+    /**
+     * Gets the virtual memory object that maps the framebuffer of the device.
+     */
+    GetFramebuffer() => (status: Int32, handle: UInt64, size: UInt64)
+
+    /**
+     * Gets information about the current framebuffer.
+     */
+    GetFramebufferInfo() => (status: Int32, w: UInt32, h: UInt32, pitch: UInt32)
 }

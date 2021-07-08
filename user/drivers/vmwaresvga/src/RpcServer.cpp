@@ -86,8 +86,24 @@ int32_t RpcServer::implSetOutputMode(const DriverSupport::gfx::DisplayMode &mode
 /**
  * Invalidates the provided region.
  */
-int32_t RpcServer::implRegionUpdated(int32_t x, int32_t y, int32_t w, int32_t h) {
+int32_t RpcServer::implRegionUpdated(int32_t x, int32_t y, uint32_t w, uint32_t h) {
     auto &c2 = this->s->get2DCommands();
     return c2->update({x, y}, {w, h});
 }
 
+/**
+ * Gets the virtual memory object that maps the framebuffer for this display.
+ */
+RpcServer::GetFramebufferReturn RpcServer::implGetFramebuffer() {
+    return {0, this->s->vramHandle, this->s->vramFramebufferSize};
+}
+
+/**
+ * Gets information about the framebuffer.
+ */
+RpcServer::GetFramebufferInfoReturn RpcServer::implGetFramebufferInfo() {
+    GetFramebufferInfoReturn r{0};
+    std::tie(r.w, r.h) = this->s->getFramebufferDimensions();
+    r.pitch = this->s->getFramebufferPitch();
+    return r;
+}

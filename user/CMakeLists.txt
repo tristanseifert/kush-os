@@ -16,3 +16,4 @@ endif()
 
 add_subdirectory(dyldo)
 add_subdirectory(ipc)
+add_subdirectory(gui)
