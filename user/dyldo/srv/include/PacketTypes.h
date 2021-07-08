@@ -11,6 +11,9 @@ enum class DyldosrvMessageType: uint32_t {
     MapSegment                          = 'SEGM',
     /// Reply for mapping a shared library's segment
     MapSegmentReply                     = 'SEGR',
+
+    /// Indicates that the file IO connection should be reset
+    RootFsUpdated                       = 'FSUP',
 };
 
 /**

@@ -15,6 +15,8 @@
 #include <cstdlib>
 #include <cstring>
 
+extern "C" void __librpc__FileIoResetConnection();
+
 /// Region of virtual memory space for temporary mappings
 static uintptr_t kTempMappingRange[2] = {
     // start
@@ -119,6 +121,10 @@ void MessageLoop::run() {
         switch(packet->type) {
             case static_cast<uint32_t>(DyldosrvMessageType::MapSegment):
                 this->handleMapSegment(*msg);
+                break;
+
+            case static_cast<uint32_t>(DyldosrvMessageType::RootFsUpdated):
+                __librpc__FileIoResetConnection();
                 break;
 
             default:

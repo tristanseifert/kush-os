@@ -199,7 +199,7 @@ static void PrintBootMsg() {
     // version
     char hash[9]{0};
     memcpy(hash, gVERSION_HASH, 8);
-    nChars = snprintf(buf, sizeof(buf), "kush-os (%s, built on %s) - "
+    nChars = snprintf(buf, sizeof(buf), "\n\nkush-os (%s, built on %s) - "
         "Copyright 2021 Tristan Seifert\n\n", hash, __DATE__);
     gConsole->write(buf, nChars);
 

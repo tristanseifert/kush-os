@@ -150,41 +150,53 @@ void Automount::startedFs(const std::shared_ptr<DriverSupport::disk::Disk> &disk
 void Automount::sendRootMountedNotes() {
     int err;
 
+    // allocate a message bvuffer
+    void *buf{nullptr};
+    err = posix_memalign(&buf, 16, sizeof(rpc::RpcPacket) + 16);
+    if(err) {
+        Abort("%s failed: %d", "posix_memalign", err);
+    }
+
     // shut down the init file handler
     constexpr static const uint32_t kInitFileShutdownMessage{0x48b9ef0a};
     constexpr static const std::string_view kInitFilePortName{"me.blraaz.rpc.rootsrv.initfileio"};
 
-    uintptr_t initPort{0};
+    uintptr_t initPort, dyldosrvPort;
 
     err = LookupService(kInitFilePortName.data(), &initPort);
     if(err == 1) {
-        // allocate a temporary buffer
-        void *buf{nullptr};
-        err = posix_memalign(&buf, 16, sizeof(rpc::RpcPacket) + 16);
-        if(err) {
-            Warn("%s failed: %d", "posix_memalign", err);
-            goto next;
-        }
-
-        // set it and send it
-        memset(buf, 0, sizeof(rpc::RpcPacket));
         auto packet = reinterpret_cast<rpc::RpcPacket *>(buf);
+        memset(packet, 0, sizeof(*packet));
         packet->type = kInitFileShutdownMessage;
 
         err = PortSend(initPort, buf, sizeof(rpc::RpcPacket));
         if(err) {
             Warn("%s failed: %d", "PortSend", err);
         }
-
-        // free it
-        free(buf);
     } else {
-        Warn("Failed to resolve init file port: %d", err);
+        Warn("Failed to resolve %s port: %d", "init file", err);
     }
 
     ThreadUsleep(1000 * 100);
 
-next:;
+    // notify dyldosrv (defined as DyldosrvMessageType::RootFsUpdated)
+    constexpr static const uint32_t kDyldosrvRootUpdateMessage{'FSUP'};
+    constexpr static const std::string_view kDyldosrvPortName{"me.blraaz.rpc.dyldosrv"};
+
+    err = LookupService(kDyldosrvPortName.data(), &dyldosrvPort);
+    if(err == 1) {
+        auto packet = reinterpret_cast<rpc::RpcPacket *>(buf);
+        memset(packet, 0, sizeof(*packet));
+        packet->type = kDyldosrvRootUpdateMessage; 
+
+        err = PortSend(dyldosrvPort, buf, sizeof(rpc::RpcPacket));
+        if(err) {
+            Warn("%s failed: %d", "PortSend", err);
+        }
+    } else {
+        Warn("Failed to resolve %s port: %d", "dyldosrv", err);
+    } 
+
     // notify driverman
     auto driverman = libdriver::RpcClient::the();
     err = driverman->NotifyDriverman(libdriver::RpcClient::NoteKeys::RootFsUpdated);
@@ -195,6 +207,9 @@ next:;
 
     // TODO: notify others
     Success("TODO: send root mount notifications");
+
+    // clean up
+    free(buf);
 }
 
 /**
