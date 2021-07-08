@@ -75,8 +75,8 @@ FIFO::FIFO(SVGA *controller, const libpci::Device::AddressResource &bar) : s(con
         this->fifo[SVGA_FIFO_GUEST_3D_HWVERSION] = SVGA3D_HWVERSION_CURRENT;
     }
 
-    Trace("FIFO for $%p: %lu bytes, first command at $%x", controller, this->size,
-            this->fifo[SVGA_FIFO_MIN]);
+    if(SVGA::kLogInit) Trace("FIFO for $%p: %lu bytes, first command at $%x", controller,
+            this->size, this->fifo[SVGA_FIFO_MIN]);
 
     // reserve command size
     this->bounceBuf.reserve(kMaxCommandSize);

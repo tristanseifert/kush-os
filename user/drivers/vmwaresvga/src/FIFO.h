@@ -15,6 +15,8 @@ namespace svga {
  * commands inside it.
  */
 class FIFO {
+    friend class Commands2D;
+
     public:
         /// Maximum supported command size
         constexpr static const size_t kMaxCommandSize{1024 * 16};

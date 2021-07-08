@@ -1,6 +1,7 @@
 #include "SVGA.h"
-#include "FIFO.h"
 #include "Commands2D.h"
+#include "FIFO.h"
+#include "RpcServer.h"
 #include "Log.h"
 
 #include <cstdint>
@@ -11,6 +12,8 @@
 #include <svga3d_reg.h>
 
 #include <libpci/Device.h>
+#include <driver/DrivermanClient.h>
+#include <DriverSupport/gfx/Display.h>
 #include <sys/syscalls.h>
 #include <sys/amd64/syscalls.h>
 
@@ -102,6 +105,7 @@ SVGA::SVGA(const std::shared_ptr<libpci::Device> &_device) : device(_device) {
             this->vramFramebufferSize);
 
     this->caps = this->regRead(SVGA_REG_CAPABILITIES);
+    if(kLogInit) Trace("Capabilities: $%08x", this->caps);
 
     if(!this->initIrq()) {
         Warn("Failed to initialize IRQs");
@@ -140,12 +144,21 @@ SVGA::SVGA(const std::shared_ptr<libpci::Device> &_device) : device(_device) {
     }
 
     /*
-     * The device has been fully initialized. We can now create the various command handlers for
-     * the various components, set the initial mode and enable.
+     * The device has been fully initialized. We can now create the RPC service, the various
+     * command handlers for, set the initial mode and enable video output.
      */
+    uintptr_t port;
+    this->status = PortCreate(&port);
+    if(this->status) {
+        Warn("%s failed: %d", "PortCreate", this->status);
+        return;
+    }
+
+    this->rpc = std::make_unique<svga::RpcServer>(this, port);
+    this->registerUnder(this->device->getPath());
+
     this->cmd2d = std::make_unique<svga::Commands2D>(this);
 
-    // set default mode and enable device
     const auto [w, h, bpp] = kDefaultMode;
     this->setMode(w, h, bpp, false);
 
@@ -207,7 +220,8 @@ bool SVGA::initIrq() {
 
     // bail if IRQs aren't supported
     if(!(this->caps & SVGA_CAP_IRQMASK)) {
-        Warn("SVGA device %s doesn't support interrupts", this->device->getPath().c_str());
+        if(kLogInit) Warn("SVGA device %s doesn't support interrupts",
+                this->device->getPath().c_str());
         return true;
     }
 
@@ -288,7 +302,7 @@ void SVGA::enable() {
     this->enabled = true;
 
     // XXX: this is where we'd perform an irq test
-    memset(this->vram, 0xFF, this->vramFramebufferSize);
+    memset(this->vram, 0, this->vramFramebufferSize);
 
     int err = this->cmd2d->update();
 
@@ -353,4 +367,43 @@ int SVGA::setMode(const uint32_t width, const uint32_t height, const uint8_t bpp
     this->fbPitch = this->regRead(SVGA_REG_BYTES_PER_LINE);
 
     return 0;
+}
+
+
+
+/**
+ * Registers the device in the driver forest as a leaf of the PCI device that we attached to, one
+ * for each display.
+ *
+ * TODO: support multiple displays
+ */
+void SVGA::registerUnder(const std::string_view &parentDevice) {
+    auto dm = libdriver::RpcClient::the();
+
+    // serialize connection info
+    std::vector<std::byte> info;
+    this->rpc->encodeInfo(info);
+
+    // try to register the device
+    this->forestPath = dm->AddDevice(std::string(parentDevice), std::string(kDeviceName));
+    REQUIRE(!this->forestPath.empty(), "Failed to register device in forest (under %s)",
+            parentDevice.data());
+
+    if(kLogInit) Trace("Registered device at %s", this->forestPath.c_str());
+
+    // set the connection info
+    dm->SetDeviceProperty(this->forestPath, DriverSupport::gfx::Display::kConnectionPropertyName, info);
+
+    // and start the device
+    int err = dm->StartDevice(this->forestPath);
+    REQUIRE(!err, "Failed to start device: %d", err);
+}
+
+/**
+ * Enters the main run loop for the driver.
+ *
+ * Currently, this just enters the RPC server's main loop.
+ */
+int SVGA::runLoop() {
+    return this->rpc->run();
 }

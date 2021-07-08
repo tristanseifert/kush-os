@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -12,13 +14,15 @@
 #include <libpci/Device.h>
 
 namespace svga {
-class FIFO;
 class Commands2D;
+class FIFO;
+class RpcServer;
 }
 
 class SVGA {
-    friend class svga::FIFO;
     friend class svga::Commands2D;
+    friend class svga::FIFO;
+    friend class svga::RpcServer;
 
     using BAR = libpci::Device::AddressResource;
 
@@ -28,6 +32,9 @@ class SVGA {
      * hardware, it doesn't really matter what it is though.
      */
     constexpr static const std::tuple<uint32_t, uint32_t, uint8_t> kDefaultMode{1024, 768, 32};
+
+    /// Name to register displays under
+    constexpr static const std::string_view kDeviceName{"GenericDisplay"};
 
     public:
         /// Error codes specific to the SVGA driver
@@ -63,10 +70,26 @@ class SVGA {
         int setMode(const uint32_t width, const uint32_t height, const uint8_t bpp,
                 const bool enable = true);
 
+        /// Enters the device's message processing loop
+        int runLoop();
+
+        /// Get 2D command handler
+        auto &get2DCommands() {
+            return this->cmd2d;
+        }
+
         /// Gets the current framebuffer size
         constexpr auto getFramebufferDimensions() const {
             return this->fbSize;
         }
+        /// Gets the path under which the SVGA device is registered
+        constexpr auto &getForestPath() const {
+            return this->forestPath;
+        }
+
+    private:
+        /// Produce logging about the device during initialization
+        constexpr static const bool kLogInit{true};
 
     private:
         SVGA(const std::shared_ptr<libpci::Device> &dev);
@@ -78,6 +101,9 @@ class SVGA {
         uint32_t regRead(const size_t reg);
         /// Writes a device configuration register
         void regWrite(const size_t reg, const uint32_t value);
+
+        /// Registers the SVGA device in the driver forest
+        void registerUnder(const std::string_view &parentDevice);
 
     private:
         /// is the device enabled?
@@ -115,4 +141,9 @@ class SVGA {
         std::unique_ptr<svga::FIFO> fifo;
         /// 2D commands handler
         std::unique_ptr<svga::Commands2D> cmd2d;
+
+        /// RPC server
+        std::unique_ptr<svga::RpcServer> rpc;
+        /// forest path of the device
+        std::string forestPath;
 };

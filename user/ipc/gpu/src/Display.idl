@@ -1,0 +1,26 @@
+#include <DriverSupport/gfx/Types.h>
+
+/*
+ * RPC interface exposed by graphics drivers for a single display.
+ */
+interface Display {
+    /**
+     * Get the capabilities of the display. See the `DeviceCapabilities` enum.
+     */
+    GetDeviceCapabilities() => (status: Int32, caps: Uint32)
+
+    /**
+     * Set the output state for the display.
+     */
+    SetOutputEnabled(enabled: Bool) => (status: Int32)
+
+    /**
+     * Sets the display mode for the display.
+     */
+    SetOutputMode(mode: DriverSupport::gfx::DisplayMode) => (status: Int32)
+
+    /**
+     * Indicates that the given region of the display has updated.
+     */
+    RegionUpdated(x: Int32, y: Int32, w: Int32, h: Int32) => (status: Int32)
+}

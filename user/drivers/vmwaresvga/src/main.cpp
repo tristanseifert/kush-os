@@ -7,6 +7,8 @@
 #include "Log.h"
 #include "SVGA.h"
 
+#include "Commands2D.h"
+
 const char *gLogTag = "svga";
 
 /**
@@ -40,8 +42,7 @@ int main(const int argc, const char **argv) {
 
     Trace("SVGA device: %p (%d)", dev.get(), err);
 
-    // TODO: enter message loop
-    while(1) {
-        ThreadUsleep(1000 * 1000);
-    }
+    // enter message loop
+    err = dev->runLoop();
+    Trace("SVGA run loop returned: %d", err);
 }

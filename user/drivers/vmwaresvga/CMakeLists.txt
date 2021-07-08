@@ -11,6 +11,7 @@ add_executable(vmwaresvga
     # basic GPU driver
     src/SVGA.cpp
     src/FIFO.cpp
+    src/RpcServer.cpp
     # 2D support
     src/Commands2D.cpp
 )
@@ -21,7 +22,7 @@ target_link_options(vmwaresvga PRIVATE -s)
 target_include_directories(vmwaresvga PRIVATE include)
 target_include_directories(vmwaresvga PRIVATE src)
 
-target_link_libraries(vmwaresvga PRIVATE driver rpc libpci)
+target_link_libraries(vmwaresvga PRIVATE driver rpc libpci DriverSupport::Graphics)
 
 install(TARGETS vmwaresvga RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)
 
