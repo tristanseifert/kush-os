@@ -4,7 +4,7 @@
 #include "Log.h"
 #include "bus/PciConfig.h"
 
-#include <fmt/core.h>
+#include <cstdlib>
 #include <mpack/mpack.h>
 #include <driver/DrivermanClient.h>
 
@@ -24,8 +24,9 @@ Device::Device(const BusPtr &_bus, const DeviceAddress &_address) : bus(_bus), a
     const uint8_t subclass = (classes & 0xFF), classCode = (classes >> 8);
 
     // build the string to advertise under
-    std::string name = fmt::format("PciExpress{:04x}.{:04x}@{:x}.{:x}.{:x},GenericPciExpressDevice",
-            vid, pid, _address.bus, _address.device, _address.function);
+    char nameBuf[80];
+    snprintf(nameBuf, sizeof(nameBuf), "PciExpress%04x.%04x@%x.%x.%x,GenericPciExpressDevice", vid,
+            pid, _address.bus, _address.device, _address.function);
 
     // advertise the device and set its information
     auto rpc = libdriver::RpcClient::the();
@@ -33,9 +34,8 @@ Device::Device(const BusPtr &_bus, const DeviceAddress &_address) : bus(_bus), a
     std::vector<std::byte> aux;
     this->serializeAuxData(aux, vid, pid, classCode, subclass);
 
-    this->path = rpc->AddDevice(_bus->getForestPath(), name);
-    if(kLogPaths) Trace("%s", fmt::format("PCI device at {} registered as {}", _address,
-                this->path).c_str());
+    this->path = rpc->AddDevice(_bus->getForestPath(), nameBuf);
+    if(kLogPaths) Trace("PCI device %s registered as %s", nameBuf, this->path.c_str());
 
     rpc->SetDeviceProperty(this->path, kPciAddressPropertyName, aux);
 

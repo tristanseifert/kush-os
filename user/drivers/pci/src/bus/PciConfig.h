@@ -6,7 +6,6 @@
 #include <cstddef>
 
 #include <libpci/UserClientTypes.h>
-#include <fmt/format.h>
 
 /**
  * Base interface for all PCI configuration space access methods. 
@@ -61,15 +60,5 @@ template <> struct hash<libpci::BusAddress> {
 };
 }
 
-template <>
-struct fmt::formatter<libpci::BusAddress> {
-    constexpr auto parse(format_parse_context &ctx) { return ctx.begin(); }
-
-    template <typename FormatContext>
-    auto format(const libpci::BusAddress &a, FormatContext &ctx) {
-        return format_to(ctx.out(), "{:04x}:{:02x}:{:02x}:{:02x}", a.segment, a.bus, a.device,
-                a.function);
-    }
-};
 
 #endif

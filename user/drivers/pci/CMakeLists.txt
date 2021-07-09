@@ -26,7 +26,7 @@ target_include_directories(pcisrv PRIVATE src)
 
 # required libraries
 add_dependencies(pcisrv c_dynamic)
-target_link_libraries(pcisrv PRIVATE driver rpc mpack fmt::fmt)
+target_link_libraries(pcisrv PRIVATE driver rpc mpack)
 
 # install it to boot directory in sysroot
 install(TARGETS pcisrv RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)
