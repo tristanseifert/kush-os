@@ -25,7 +25,54 @@ class AcpiParser {
 
     private:
         /// Base address of the physical memory identity mapping zone
-        constexpr static uintptr_t kPhysIdentityMap = 0xffff800000000000;
+        constexpr static uintptr_t kPhysIdentityMap{0xffff800000000000};
+
+        /// ACPI root descriptor pointer
+        struct Rsdp {
+            constexpr static const char kSignature[]{'R', 'S', 'D', ' ', 'P', 'T', 'R', ' '};
+
+            /// Signature string
+            char signature[8];
+            /// standard modulus based checksum value
+            uint8_t checksum;
+            /// OEM ID
+            char oemid[6];
+            uint8_t revision;
+
+            /// Physical address of the RSDT
+            uint32_t rsdtPhys;
+
+            /// Verify checksum
+            bool validateChecksum() const {
+                uintptr_t sum = 0;
+                for(size_t i = 0; i < 20; i++) {
+                    sum += ((const uint8_t *) this)[i];
+                }
+                return (sum & 0xFF) == 0;
+            }
+        } __attribute__((__packed__));
+
+        /// Extended (ACPI 2.0 and later) root descriptor pointer
+        struct Rsdp2 {
+            /// Old style header
+            Rsdp old;
+
+            /// Total length, in bytes, of the structure
+            uint32_t length;
+            /// Physical address of the XSDT
+            uint64_t xsdtPhys;
+            uint8_t checksum;
+            uint8_t reserved[3];
+
+            /// Verify checksum
+            bool validateChecksum() const {
+                uintptr_t sum = 0;
+                for(size_t i = 0; i < this->length; i++) {
+                    sum += ((const uint8_t *) this)[i];
+                }
+                return (sum & 0xFF) == 0;
+            }
+        } __attribute__((__packed__));
 
         /// Header of an ACPI system description table
         struct SdtHeader {
@@ -208,6 +255,9 @@ class AcpiParser {
         } __attribute__ ((packed));
 
     private:
+        /// Gets the RSDT/XSDT physical address from an RSDP structure
+        static uint64_t GetRootTableFromRsdp(const uint64_t rsdpPhys);
+
         /// Creates an ACPI parser with a given RSDT physical address
         AcpiParser(const uintptr_t rsdtPhys);
 
@@ -239,8 +289,8 @@ class AcpiParser {
         static bool gLogHpet;
 
     private:
-        /// Physical base address
-        uintptr_t rsdpPhys = 0;
+        /// Physical base address of the root table (RSDT/XSDT)
+        uintptr_t rootPhys{0};
 
         /// Location of the MADT
         const MADT *apicInfo = nullptr;

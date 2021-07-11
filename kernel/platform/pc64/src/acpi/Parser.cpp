@@ -1,9 +1,13 @@
 #include "Parser.h"
 
+#include "efi/Parser.h"
+#include "efi/types.h"
+
 #include "irq/pic.h"
 #include "irq/Manager.h"
 
 #include <bootboot.h>
+#include <cstdint>
 #include <platform.h>
 
 #include <log.h>
@@ -24,8 +28,58 @@ bool AcpiParser::gLogHpet       = false;
  * Allocate the shared ACPI parser.
  */
 void AcpiParser::Init() {
+    const auto &a = bootboot.arch.x86_64;
+
+    // get the acpi pointer; either direct from bootboot or traverse EFI tables
+    uintptr_t acpiPtr = a.acpi_ptr;
+
+    if(!acpiPtr) {
+        /*
+         * If we find the ACPI table addresses in the EFI, that is the base address of the RSDP
+         * structure. We have to read it out and extract from it the physical address of the actual
+         * RSDT/XSDT we're after.
+         */
+        const auto rsdpPhys = EfiTableParser::FindTable(ACPI_20_TABLE_GUID);
+        acpiPtr = GetRootTableFromRsdp(rsdpPhys);
+    }
+
+
+    // if we have a valid ACPI pointer, we can create the parser
+    if(!acpiPtr) {
+        EfiTableParser::PrintTables();
+        panic("Failed to locate ACPI tables! (ACPI table base %p, EFI base %p)", a.acpi_ptr,
+                a.efi_ptr);
+    }
+
     REQUIRE(!gShared, "global acpi parser already initialized");
-    gShared = new AcpiParser(bootboot.arch.x86_64.acpi_ptr);
+    gShared = new AcpiParser(acpiPtr);
+}
+
+/**
+ * Reads the Root System Description Pointer (RSDP) which in turn contains a pointer to the ACPI
+ * root table.
+ *
+ * @param rsdpPhys Physical address of RSDP
+ *
+ * @return Physical address of RSDT/XSDT
+ */
+uint64_t AcpiParser::GetRootTableFromRsdp(const uint64_t rsdpPhys) {
+    // validate RSDP (first the "old") header
+    auto rsdp = reinterpret_cast<const Rsdp *>(kPhysIdentityMap + rsdpPhys);
+    REQUIRE(rsdp->validateChecksum(), "RSDP (phys $%p) has invalid checksum (rev %02x)",
+            rsdpPhys, rsdp->revision);
+
+    if(!rsdp->revision) {
+        return rsdp->rsdtPhys;
+    }
+
+    // it's not the OG version so check it as a version 2
+    REQUIRE(rsdp->revision == 2, "unsupported RSDP revision: %02x", rsdp->revision);
+    auto rsdp2 = reinterpret_cast<const Rsdp2 *>(kPhysIdentityMap + rsdpPhys);
+    REQUIRE(rsdp2->validateChecksum(), "RSDP (phys $%p) has invalid checksum (rev %02x)",
+            rsdpPhys, rsdp2->old.revision);
+
+    return rsdp2->xsdtPhys;
 }
 
 /**
@@ -33,9 +87,9 @@ void AcpiParser::Init() {
  *
  * @param phys Physical address of either an RSDT or XSDT table
  */
-AcpiParser::AcpiParser(const uintptr_t phys) : rsdpPhys(phys) {
+AcpiParser::AcpiParser(const uintptr_t sdtPhys) : rootPhys(sdtPhys) {
     // read out the signature of the table
-    auto sdt = reinterpret_cast<const SdtHeader *>(phys + kPhysIdentityMap);
+    auto sdt = reinterpret_cast<const SdtHeader *>(sdtPhys + kPhysIdentityMap);
 
     char sdtSig[5] = {0};
     memcpy(sdtSig, sdt->signature, 4);
@@ -56,7 +110,9 @@ AcpiParser::AcpiParser(const uintptr_t phys) : rsdpPhys(phys) {
     // TODO: handle RSDT
     // unknown table type
     else {
-        panic("invalid ACPI root table signature '%s'", sdtSig);
+        uint32_t temp;
+        memcpy(&temp, sdt->signature, sizeof(temp));
+        panic("invalid ACPI root table signature '%s' (%08x) phys $%p", sdtSig, temp, sdtPhys);
     }
 }
 

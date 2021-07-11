@@ -28,6 +28,7 @@ add_library(kernel_platform_pc64 OBJECT
     src/timer/pit.cpp
     src/init/LoadRootsrv.cpp
     src/acpi/Parser.cpp
+    src/efi/Parser.cpp
     src/syscall/LoaderInfo.cpp
 )
 
