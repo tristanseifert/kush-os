@@ -1,5 +1,5 @@
-#ifndef GUI_LIBGFX_SURFACE
-#define GUI_LIBGFX_SURFACE
+#ifndef GUI_LIBGFX_SURFACE_H
+#define GUI_LIBGFX_SURFACE_H
 
 #include <cstddef>
 #include <cstdint>
@@ -14,6 +14,7 @@ namespace gui::gfx {
  */
 class Surface {
     friend class Context;
+    friend class Pattern;
 
     public:
         using Point = std::pair<int, int>;
@@ -112,6 +113,6 @@ class Surface {
         /// Cairo surface we're representing
         struct _cairo_surface *backing{nullptr};
 };
-}
+} // namespace gui::gfx
 
 #endif

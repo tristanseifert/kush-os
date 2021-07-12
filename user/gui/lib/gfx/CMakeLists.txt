@@ -6,7 +6,9 @@
 add_library(GuiLibGfx SHARED
     # Cairo wrappers
     src/cairo/Context.cpp
+    src/cairo/Pattern.cpp
     src/cairo/Surface.cpp
+    src/cairo/Helpers.cpp
     # image loading
     src/image/Image.cpp
 )

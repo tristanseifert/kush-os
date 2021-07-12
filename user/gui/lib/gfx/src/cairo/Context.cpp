@@ -1,15 +1,18 @@
 #include "Context.h"
+#include "Pattern.h"
 #include "Surface.h"
+
+#include "Helpers.h"
 
 #include <cairo/cairo.h>
 
 #include <cassert>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 
 using namespace gui::gfx;
 
-static cairo_content_t ConvertGroupContent(const Context::GroupContent c);
 
 /**
  * Creates a new context.
@@ -56,10 +59,23 @@ void Context::beginGroup() {
     cairo_push_group(this->ctx);
 }
 void Context::beginGroup(const GroupContent c) {
-    cairo_push_group_with_content(this->ctx, ConvertGroupContent(c));
+    cairo_push_group_with_content(this->ctx, util::ConvertGroupContent(c));
+}
+std::shared_ptr<Pattern> Context::endGroup() {
+    // get the pattern and ensure it's valid
+    auto cpt = cairo_pop_group(this->ctx);
+    if(cairo_pattern_status(cpt) != CAIRO_STATUS_SUCCESS) return nullptr;
+
+    // create the pattern object from it
+    std::shared_ptr<Pattern> pt(new Pattern(cpt, Pattern::Type::Surface));
+    return pt;
 }
 void Context::endGroupAsSource() {
     cairo_pop_group_to_source(this->ctx);
+}
+
+void Context::setAntialiasingMode(const Antialiasing mode) {
+    cairo_set_antialias(this->ctx, util::ConvertAliasingMode(mode));
 }
 
 void Context::setSource(const RgbColor &color) {
@@ -70,8 +86,10 @@ void Context::setSource(const RgbaColor &color) {
     const auto [r, g, b, a] = color;
     cairo_set_source_rgba(this->ctx, r, g, b, a);
 }
-void Context::setSource(const std::shared_ptr<Surface> &surface,
-        const std::tuple<double, double> &origin) {
+void Context::setSource(const std::shared_ptr<Pattern> &pattern) {
+    cairo_set_source(this->ctx, pattern->pt);
+}
+void Context::setSource(const std::shared_ptr<Surface> &surface, const Point &origin) {
     const auto [x, y] = origin;
     cairo_set_source_surface(this->ctx, surface->backing, x, y);
 }
@@ -82,12 +100,40 @@ void Context::fill() {
 void Context::fillPreserve() {
     cairo_fill_preserve(this->ctx);
 }
+Rectangle Context::getFillExtents() const {
+    double x1, y1, x2, y2;
+    cairo_fill_extents(this->ctx, &x1, &y1, &x2, &y2);
+
+    Rectangle r{
+        .origin = {x1, y1},
+        .size   = {x2-x1, y2-y1}
+    };
+    return r;
+}
+bool Context::isInFill(const Point &pt) const {
+    const auto [x, y] = pt;
+    return cairo_in_fill(this->ctx, x, y);
+}
 
 void Context::stroke() {
     cairo_stroke(this->ctx);
 }
 void Context::strokePreserve() {
     cairo_stroke_preserve(this->ctx);
+}
+Rectangle Context::getStrokeExtents() const {
+    double x1, y1, x2, y2;
+    cairo_stroke_extents(this->ctx, &x1, &y1, &x2, &y2);
+
+    Rectangle r{
+        .origin = {x1, y1},
+        .size   = {x2-x1, y2-y1}
+    };
+    return r;
+}
+bool Context::isInStroke(const Point &pt) const {
+    const auto [x, y] = pt;
+    return cairo_in_stroke(this->ctx, x, y);
 }
 
 void Context::paint() {
@@ -97,8 +143,63 @@ void Context::paint(const double alpha) {
     cairo_paint_with_alpha(this->ctx, alpha);
 }
 
+void Context::setDash(const std::span<double> dashes, const double offset) {
+    cairo_set_dash(this->ctx, dashes.data(), dashes.size(), offset);
+}
+void Context::setFillRule(const FillRule rule) {
+    cairo_set_fill_rule(this->ctx, util::ConvertFillRule(rule));
+}
+void Context::setLineCap(const LineCap mode) {
+    cairo_set_line_cap(this->ctx, util::ConvertLineCap(mode));
+}
+void Context::setLineJoin(const LineJoin mode) {
+    cairo_set_line_join(this->ctx, util::ConvertLineJoin(mode));
+}
 void Context::setLineWidth(const double width) {
     cairo_set_line_width(this->ctx, width);
+}
+double Context::getLineWidth() const {
+    return cairo_get_line_width(this->ctx);
+}
+
+void Context::setMiterLimit(const double angle) {
+    const auto lim = 1. / sin(angle / 2.);
+    cairo_set_miter_limit(this->ctx, lim);
+}
+
+void Context::setOperator(const Operator op) {
+    cairo_set_operator(this->ctx, util::ConvertOperator(op));
+}
+
+void Context::setTolerance(const double tolerance) {
+    cairo_set_tolerance(this->ctx, tolerance);
+}
+double Context::getTolerance() const {
+    return cairo_get_tolerance(this->ctx);
+}
+
+void Context::clip() {
+    cairo_clip(this->ctx);
+}
+void Context::clipPreserve() {
+    cairo_clip_preserve(this->ctx);
+}
+void Context::clipReset() {
+    cairo_reset_clip(this->ctx);
+}
+Rectangle Context::getClipExtents() const {
+    double x1, y1, x2, y2;
+    cairo_clip_extents(this->ctx, &x1, &y1, &x2, &y2);
+
+    Rectangle r{
+        .origin = {x1, y1},
+        .size   = {x2-x1, y2-y1}
+    };
+    return r;
+}
+bool Context::isInClip(const Point &pt) const {
+    const auto [x, y] = pt;
+    return cairo_in_clip(this->ctx, x, y);
 }
 
 void Context::newPath() {
@@ -142,17 +243,13 @@ void Context::rectangle(const Point &origin, const Size &size) {
     cairo_rectangle(this->ctx, x, y, w, h);
 }
 
-/**
- * Converts the group content value to the Cairo type.
- */
-static cairo_content_t ConvertGroupContent(const Context::GroupContent c) {
-    switch(c) {
-        case Context::GroupContent::Color:
-            return CAIRO_CONTENT_COLOR;
-        case Context::GroupContent::Alpha:
-            return CAIRO_CONTENT_ALPHA;
-        case Context::GroupContent::ColorAlpha:
-            return CAIRO_CONTENT_COLOR_ALPHA;
-    }
-}
+Rectangle Context::getPathExtents() const {
+    double x1, y1, x2, y2;
+    cairo_path_extents(this->ctx, &x1, &y1, &x2, &y2);
 
+    Rectangle r{
+        .origin = {x1, y1},
+        .size   = {x2-x1, y2-y1}
+    };
+    return r;
+}
