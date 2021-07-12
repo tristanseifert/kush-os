@@ -102,8 +102,8 @@ void ElfReader::validateHeader() {
     // ensure magic is correct, before we try and instantiate an ELF reader
     err = strncmp(reinterpret_cast<const char *>(hdr.e_ident), ELFMAG, SELFMAG);
     if(err) {
-        Linker::Abort("Invalid ELF magic: %02x%02x%02x%02x", hdr.e_ident[0], hdr.e_ident[1],
-                hdr.e_ident[2], hdr.e_ident[3]);
+        Linker::Abort("(%s) Invalid ELF magic: %02x%02x%02x%02x", this->path ? this->path : "",
+                hdr.e_ident[0], hdr.e_ident[1], hdr.e_ident[2], hdr.e_ident[3]);
     }
 
     // validate ELF class based on current architecture

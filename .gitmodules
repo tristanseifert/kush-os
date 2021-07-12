@@ -37,3 +37,9 @@
 [submodule "user/lib/external/freetype2/source"]
 	path = user/lib/external/freetype2/source
 	url = https://gitlab.freedesktop.org/freetype/freetype.git
+[submodule "user/lib/external/pixman/source"]
+	path = user/lib/external/pixman/source
+	url = https://gitlab.freedesktop.org/pixman/pixman.git
+[submodule "user/lib/external/cairo/source"]
+	path = user/lib/external/cairo/source
+	url = https://gitlab.freedesktop.org/cairo/cairo.git

@@ -17,7 +17,7 @@
 
 using namespace dyldo;
 
-bool ThreadLocal::gLogAllocations = false;
+bool ThreadLocal::gLogAllocations{false};
 
 /**
  * Information of a thread-local storage object. This contains the module and offset values, which
