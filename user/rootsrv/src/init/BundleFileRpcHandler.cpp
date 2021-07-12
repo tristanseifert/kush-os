@@ -3,6 +3,7 @@
 
 #include "log.h"
 #include "dispensary/Dispensary.h"
+#include "init/Init.h"
 
 #include <sys/syscalls.h>
 
@@ -343,4 +344,7 @@ void BundleFileRpcHandler::shutdown() {
 
     // make future file IO use the filesystem
     __librpc__FileIoResetConnection();
+
+    // start the various late boot services
+    init::SetupServers(this->bundle, true);
 }

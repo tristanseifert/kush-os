@@ -4,8 +4,12 @@
 # Define the servers to execute on boot-up. This is just enough to allow us to
 # discover devices, and read filesystems for additional drivers.
 #
-# SERVER: Specifies the name of a server to launch. They are lauched in the
-#         order specified.
+# SERVER1: Specifies the name of a server to launch. They are lauched in the
+#          order specified, immediately after the root server has done its
+#          initialization without waiting for root fs mount.
+#
+# SERVER2: Specifies the name of a server to launch after the root fs has been
+#          mounted.
 ###############################################################################
-SERVER dyldosrv
-SERVER driverman --expert=pc_amd64
+SERVER1 dyldosrv
+SERVER1 driverman --expert=pc_amd64

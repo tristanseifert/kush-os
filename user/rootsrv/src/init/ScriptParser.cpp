@@ -58,9 +58,13 @@ void ScriptParser::parse(std::shared_ptr<Bundle::File> file) {
         std::transform(keyword.begin(), keyword.end(), keyword.begin(), ::tolower);
 
         // is this a line giving info about a server to start?
-        if(!keyword.find("server")) {
-            auto args = std::string_view(line.data() + 7, line.length() - 7);
-            this->processServer(args);
+        if(!keyword.find("server1")) {
+            auto args = std::string_view(line.data() + 8, line.length() - 8);
+            this->processServer(args, false);
+        }
+        else if(!keyword.find("server2")) {
+            auto args = std::string_view(line.data() + 8, line.length() - 8);
+            this->processServer(args, true);
         }
         // ignore file directives
         else if(!keyword.find("file")) {
@@ -78,9 +82,13 @@ void ScriptParser::parse(std::shared_ptr<Bundle::File> file) {
  *
  * @param f A function to invoke for each server. Return true to continue iterating, or false to
  * terminate the iteration.
+ * @param haveRootFs Whether servers that require the root fs or not are visited
  */
-void ScriptParser::visitServers(std::function<bool(const std::string &, const std::vector<std::string> &)> const &f) {
+void ScriptParser::visitServers(std::function<bool(const std::string &,
+            const std::vector<std::string> &)> const &f, const bool haveRootFs) {
     for(const auto &server : this->servers) {
+        if(server.needsRootFs != haveRootFs) continue;
+
         if(!f(server.name, server.args)) {
             return;
         }
@@ -97,8 +105,8 @@ void ScriptParser::visitServers(std::function<bool(const std::string &, const st
  *
  * Note that arguments containing spaces can be escaped by surrounding them with quotes.
  */
-void ScriptParser::processServer(const std::string_view &line) {
-    ServerInfo info;
+void ScriptParser::processServer(const std::string_view &line, const bool postRootMount) {
+    ServerInfo info{postRootMount};
 
     // get the server's name (the first token)
     auto firstSpace = line.find_first_of(' ');

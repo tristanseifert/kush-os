@@ -7,7 +7,7 @@ namespace init {
 class Bundle;
 
 /// Sets up servers
-void SetupServers(std::shared_ptr<Bundle> &bundle);
+void SetupServers(const std::shared_ptr<Bundle> &bundle, const bool haveRootFs);
 
 }
 

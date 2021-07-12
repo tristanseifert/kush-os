@@ -41,7 +41,7 @@ static void BundleInit() {
     init::BundleFileRpcHandler::init(bundle);
 
     // initialize the servers we've loaded from the init script
-    init::SetupServers(bundle);
+    init::SetupServers(bundle, false);
 }
 
 /**
