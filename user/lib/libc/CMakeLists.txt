@@ -39,6 +39,7 @@ list(APPEND c_objs_files
     src/string/strcpy.c
     src/string/strstr.c
     src/string/strcasecmp.c
+    src/string/strpbrk.c
     # wide strings
     src/string/wcpcpy.c
     src/string/wcpncpy.c
@@ -92,6 +93,8 @@ list(APPEND c_objs_files
     src/stdio/printf.c
     src/stdio/puts.c
     src/stdio/getc.c
+    # directory manipulation
+    src/stdio/dirs/remove.c
     # locale
     src/locale/locale.c
     src/locale/strto.c
@@ -132,6 +135,8 @@ list(APPEND c_objs_files
     src/mem/dlmalloc.cpp
     # environment handling
     src/env/getenv.c
+    src/env/setenv.c
+    src/env/putenv.c
     # error handling
     src/error/errno.c
     src/error/strerror.c

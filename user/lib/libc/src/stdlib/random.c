@@ -6,3 +6,10 @@
 long random() {
     return arc4random();
 }
+
+/**
+ * Returns a random integer.
+ */
+int rand() {
+    return arc4random_uniform(RAND_MAX);
+}

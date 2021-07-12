@@ -70,6 +70,7 @@ else()
 endif()
 
 # install the library to the sysroot
+install(TARGETS system_static LIBRARY)
 install(TARGETS system_dynamic LIBRARY)
 add_library(system ALIAS system_dynamic)
 

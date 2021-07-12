@@ -7,6 +7,8 @@ add_subdirectory(lzfse)
 add_subdirectory(libpng)
 add_subdirectory(libjpeg-turbo)
 add_subdirectory(freetype2)
+add_subdirectory(pixman)
+add_subdirectory(cairo)
 
 ###################################################################################################
 # string formatting

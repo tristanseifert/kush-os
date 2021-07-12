@@ -40,6 +40,7 @@ add_library(pixman SHARED
 )
 
 target_include_directories(pixman PRIVATE source/pixman)
+target_link_options(pixman PRIVATE -flto)
 
 # architecture specific stuff
 if(${KERNEL_ARCH} STREQUAL "x86_64")
@@ -60,7 +61,7 @@ target_compile_definitions(pixman PRIVATE HAVE_CONFIG_H)
 target_include_directories(pixman PRIVATE extra/includes)
 
 # define public interface and install locations
-target_include_directories(pixman PUBLIC include)
+target_include_directories(pixman PUBLIC include/pixman-1)
 
 install(TARGETS pixman LIBRARY)
 set_target_properties(pixman PROPERTIES OUTPUT_NAME "pixman-1")

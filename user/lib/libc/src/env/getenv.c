@@ -11,7 +11,7 @@ char *getenv(const char *name) {
         errno = EINVAL;
         return NULL;
     }
-    
+
     // TODO: actually read environment variables
     return NULL;
 }

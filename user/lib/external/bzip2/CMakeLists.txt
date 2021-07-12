@@ -12,7 +12,6 @@ add_library(bzip2 SHARED
 target_compile_options(bzip2 PRIVATE -fPIC)
 target_include_directories(bzip2 PRIVATE src)
 target_include_directories(bzip2 PUBLIC include)
-target_compile_definitions(bzip2 PRIVATE BZ_NO_STDIO=1)
 
 target_compile_options(bzip2 PRIVATE "-Wno-implicit-fallthrough")
 
