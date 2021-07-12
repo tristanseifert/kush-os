@@ -1,5 +1,7 @@
 #include "ThreeAxisMouse.h"
 
+#include "rpc/EventSubmitter.h"
+
 #include "Ps2IdentifyCommand.h"
 #include "Log.h"
 
@@ -125,7 +127,11 @@ ThreeAxisMouse::ThreeAxisMouse(const GenericMouse &from) : GenericMouse(from.con
 void ThreeAxisMouse::handlePacket(const std::span<std::byte> &_packet) {
     const auto packet = reinterpret_cast<ZPacket *>(_packet.data());
 
-    Trace("Button state: %c %c %c, dx %d dy %d dz %d (%lu)", packet->isButtonDown(0) ? 'Y' : 'N',
-           packet->isButtonDown(1) ? 'Y' : 'N', packet->isButtonDown(2) ? 'Y' : 'N',
-           packet->getDx(), packet->getDy(), packet->getDz(), _packet.size());
+    uintptr_t buttons{0};
+    for(size_t i = 0; i < 3; i++) {
+        if(packet->isButtonDown(i)) buttons |= (1 << i);
+    }
+
+    auto es = EventSubmitter::the();
+    es->submitMouseEvent(buttons, {packet->getDx(), packet->getDy(), packet->getDz()});
 }

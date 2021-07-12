@@ -1,5 +1,7 @@
 #include "Keyboard.h"
 
+#include "rpc/EventSubmitter.h"
+
 #include "Ps2Command.h"
 #include "Log.h"
 
@@ -107,11 +109,19 @@ void Keyboard::handleScancode(const std::byte data) {
  * Generates a key down/up event.
  */
 void Keyboard::generateKeyEvent(const std::byte key) {
-    const char *action = TestFlags(this->keyFlags & KeyFlags::Break) ? "break" : "make";
-    const size_t set = TestFlags(this->keyFlags & KeyFlags::ScanCodeAlternate) ? 1 : 0;
+    auto es = EventSubmitter::the();
 
-    Trace("KBD: %s code $%02x set %lu", action, key, set);
+    // translate key code and submit it
+    const auto scancode = ConvertScancode(key, this->keyFlags);
+    if(scancode == -1) {
+        Warn("Failed to translate scancode $%02x (flags $%04x)", key,
+                static_cast<uint32_t>(this->keyFlags));
+        goto beach;
+    }
 
+    es->submitKeyEvent(scancode, !TestFlags(this->keyFlags & KeyFlags::Break));
+
+beach:;
     // reset state
     this->keyFlags = KeyFlags::None;
     this->scanState = ScanState::Idle;
@@ -148,4 +158,27 @@ void Keyboard::disableUpdates() {
     }, this);
 
     submit(cmd);
+}
+
+
+
+/**
+ * Converts the given scancode (and flags) to the generic scancode format. This is done by looking
+ * up the values in some big ol tables.
+ *
+ * @return Translated windowserver scancode or -1 if we don't know it
+ */
+uint32_t Keyboard::ConvertScancode(const std::byte code, const KeyFlags flags) {
+    if(!TestFlags(flags & KeyFlags::ScanCodeAlternate)) {
+        if(kScancodePrimary.contains(code)) {
+            return static_cast<uint32_t>(kScancodePrimary.at(code));
+        }
+    } else {
+        if(kScancodeAlternate.contains(code)) {
+            return static_cast<uint32_t>(kScancodeAlternate.at(code));
+        }
+    }
+
+    // the scan code was not found in either of the maps
+    return -1;
 }

@@ -5,8 +5,12 @@
 
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
+#include <unordered_map>
 
 #include <sys/bitflags.hpp>
+
+enum class Scancode: uint32_t;
 
 /// Flags for a key being processed.
 enum class KeyFlags: uintptr_t {
@@ -54,7 +58,14 @@ class Keyboard: public Ps2Device {
         void handleScancode(const std::byte data);
         void generateKeyEvent(const std::byte key);
 
+        static uint32_t ConvertScancode(const std::byte code, const KeyFlags flags);
+
     private:
+        /// lookup table for the primary PS/2 scancode set
+        static const std::unordered_map<std::byte, Scancode> kScancodePrimary;
+        /// lookup table for the alternate PS/2 scancode set
+        static const std::unordered_map<std::byte, Scancode> kScancodeAlternate;
+
         /// whether keyboard scanning is enabled
         std::atomic_bool enabled{false};
 

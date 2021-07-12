@@ -400,7 +400,9 @@ void Ps2Controller::reset() {
     this->writeCmd(kDisablePort1);
     this->writeCmd(kDisablePort2);
 
-    this->io->read(PortIo::Port::Data);
+    for(size_t i = 0; i < 3; i++) {
+        this->io->read(PortIo::Port::Data);
+    }
 
     /*
      * Update the configuration byte of the controller; we disable translation, and disable the
