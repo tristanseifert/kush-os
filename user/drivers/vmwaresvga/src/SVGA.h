@@ -94,6 +94,8 @@ class SVGA {
     private:
         /// Produce logging about the device during initialization
         constexpr static const bool kLogInit{false};
+        /// Produce logging about modesets
+        constexpr static const bool kLogModeset{false};
 
     private:
         SVGA(const std::shared_ptr<libpci::Device> &dev);

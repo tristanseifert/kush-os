@@ -15,12 +15,11 @@ add_executable(windowserver
 )
 
 target_compile_options(windowserver PRIVATE -flto -fno-rtti -fno-exceptions)
-#target_link_options(windowserver PRIVATE -s)
 
 target_include_directories(windowserver PRIVATE include)
 target_include_directories(windowserver PRIVATE src)
 
-target_link_libraries(windowserver PRIVATE DriverSupport::Graphics rpc)
+target_link_libraries(windowserver PRIVATE Gui::Graphics DriverSupport::Graphics rpc)
 
 install(TARGETS windowserver RUNTIME DESTINATION ${SYSROOT_DIR}/sbin)
 

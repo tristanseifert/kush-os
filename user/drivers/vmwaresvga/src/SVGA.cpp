@@ -362,9 +362,12 @@ int SVGA::setMode(const uint32_t width, const uint32_t height, const uint8_t bpp
     }
 
     // update bookkeeping
-    this->fbSize = {width, height};
-    this->fbBpp = bpp;
+    this->fbSize = {this->regRead(SVGA_REG_WIDTH), this->regRead(SVGA_REG_HEIGHT)};
+    this->fbBpp = this->regRead(SVGA_REG_BITS_PER_PIXEL);
     this->fbPitch = this->regRead(SVGA_REG_BYTES_PER_LINE);
+
+    if(kLogModeset) Trace("New mode: %lu x %lu, %u bpp pitch %lu", this->fbSize.first,
+            this->fbSize.second, this->fbBpp, this->fbPitch);
 
     return 0;
 }

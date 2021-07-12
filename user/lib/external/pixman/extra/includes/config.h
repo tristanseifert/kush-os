@@ -129,8 +129,14 @@
 /* The compiler supported TLS storage class */
 #define TLS __thread
 
+/*
+ * TODO: figure out why this, when enabled, produces broken shared libraries.
+ *
+ * It likely has to do with the fact that ldyldo doesn't run the initializers in the "correct" order
+ * as defined by the POSIX standards.
+ */
 /* Whether the tool chain supports __attribute__((constructor)) */
-#define TOOLCHAIN_SUPPORTS_ATTRIBUTE_CONSTRUCTOR /**/
+// #define TOOLCHAIN_SUPPORTS_ATTRIBUTE_CONSTRUCTOR /**/
 
 /* use ARM IWMMXT compiler intrinsics */
 /* #undef USE_ARM_IWMMXT */

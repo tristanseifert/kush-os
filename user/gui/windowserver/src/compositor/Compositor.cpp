@@ -3,6 +3,9 @@
 
 #include <DriverSupport/gfx/Display.h>
 
+#include <gfx/Context.h>
+#include <gfx/Surface.h>
+
 /**
  * Instantiates a compositor instance for the given display.
  */
@@ -27,25 +30,26 @@ void Compositor::updateBuffer() {
     REQUIRE(!info.status, "Failed to get framebuffer info: %d", info);
 
     this->bufferDimensions = {info.w, info.h};
-    this->bufferStride = info.pitch;
 
-    // resize our buffer
-    this->buffer.resize(info.pitch * info.h);
-    Trace("New back buffer size: %lu bytes (%u x %u)", this->buffer.size(), info.w, info.h);
+    // update the backing surface and recreate context
+    auto fb = this->display->getFramebuffer();
+    this->surface = std::make_shared<gui::gfx::Surface>(fb, info.pitch,
+            gui::gfx::Surface::Format::ARGB32, this->bufferDimensions);
+
+    this->context = std::make_unique<gui::gfx::Context>(this->surface);
 
     // clear it
-    auto fb = this->display->getFramebuffer();
-    Trace("Framebuffer is %lu bytes at $%p", fb.size(), fb.data());
+    this->context->setSource({1, 0, 1, 1});
+    this->context->rectangle({8, 64}, {64, 64});
+    this->context->fill();
 
-    for(size_t y = 0; info.h; y++) {
-        const auto offset = y * info.pitch;
-        const auto bytesLeft = std::min(static_cast<size_t>(info.pitch), fb.size() - offset);
-        auto line = fb.subspan(offset, bytesLeft);
+    this->context->setLineWidth(4);
+    this->context->arc({256, 256}, 100, {0, 2});
+    this->context->stroke();
 
-        if(line.empty()) break;
-        memset(line.data(), 0, line.size());
-    }
+    this->surface->flush();
 
     // and mark it as updated
     this->display->RegionUpdated({0, 0}, this->bufferDimensions);
 }
+

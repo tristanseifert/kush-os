@@ -10,6 +10,11 @@ namespace DriverSupport::gfx {
 class Display;
 }
 
+namespace gui::gfx {
+class Context;
+class Surface;
+}
+
 /**
  * The compositor handles drawing windows on an internal back buffer, which is copied to the output
  * framebuffer as regions of it are dirtied.
@@ -33,8 +38,9 @@ class Compositor {
 
         /// Dimensions of back buffer (width, height)
         std::pair<uint32_t, uint32_t> bufferDimensions{0, 0};
-        /// stride (bytes per line) in buffer
-        size_t bufferStride{0};
-        /// Back buffer
-        std::vector<std::byte> buffer;
+
+        /// graphics context
+        std::unique_ptr<gui::gfx::Context> context;
+        /// bitmap surface backed by the framebuffer
+        std::shared_ptr<gui::gfx::Surface> surface;
 };
