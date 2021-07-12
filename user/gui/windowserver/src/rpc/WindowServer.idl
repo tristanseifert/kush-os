@@ -1,0 +1,24 @@
+/**
+ * RPC interface for the window server
+ *
+ * It exposes mechanisms for creating and managing windows, as well as for drivers to push events
+ * into the window server's event queue.
+ */
+interface WindowServer {
+    /**
+     * Submit a keyboard event to the window servers' event queue.
+     */
+    SubmitKeyEvent(scancode: UInt32, release: Bool) =|
+
+    /**
+     * Submit a mouse movement event to the window servers' event queue. This currently only
+     * supports mice with up to three axes: two for the X/Y position, one for a scroll wheel.
+     *
+     * Note that mouse coordinates are relative always.
+     *
+     * The buttons field is a bitset indicating which mouse buttons are down: only bits 0-2 are
+     * defined (as left, middle and right, respectively) but mice may provide other buttons that
+     * user applications do stuff with.
+     */
+    SubmitMouseEvent(buttons: UInt32, dX: Int32, dY: Int32, dZ: Int32) =|
+}

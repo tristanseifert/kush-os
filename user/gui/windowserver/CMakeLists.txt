@@ -9,6 +9,7 @@ add_executable(windowserver
     src/Log.cpp
     # rpc interface
     src/rpc/RpcServer.cpp
+    src/rpc/Server_WindowServer.cpp
     # compositor
     src/compositor/Compositor.cpp
 )
