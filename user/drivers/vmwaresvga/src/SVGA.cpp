@@ -302,8 +302,6 @@ void SVGA::enable() {
     this->enabled = true;
 
     // XXX: this is where we'd perform an irq test
-    memset(this->vram, 0, this->vramFramebufferSize);
-
     int err = this->cmd2d->update();
 
     if(err) {

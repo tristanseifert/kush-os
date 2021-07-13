@@ -5,6 +5,7 @@
 
 #include <gfx/Image.h>
 #include <gfx/Context.h>
+#include <gfx/Pattern.h>
 #include <gfx/Surface.h>
 
 #include <toml++/toml.h>
@@ -182,6 +183,7 @@ void CursorHandler::draw(const std::unique_ptr<gui::gfx::Context> &ctx) {
     // draw it
     ctx->pushState();
 
+    //ctx->setSource(gui::gfx::RgbColor{0, 0.2, 0});
     ctx->setSource(cursor.surface, origin);
     ctx->rectangle(origin, cursor.size);
     ctx->fill();

@@ -4,6 +4,7 @@
 
 #include <gfx/Surface.h>
 
+#include <cassert>
 #include <cerrno>
 #include <cstdio>
 #include <vector>
@@ -122,6 +123,8 @@ int gui::gfx::LoadPng(const std::string_view &path, std::shared_ptr<Surface> &ou
     }
 
     // allocate and populate the row pointers array
+    sfc->flush();
+
     base = reinterpret_cast<std::byte *>(sfc->data());
     pitch = sfc->getPitch();
 
@@ -132,6 +135,7 @@ int gui::gfx::LoadPng(const std::string_view &path, std::shared_ptr<Surface> &ou
     }
 
     // read the image
+    assert(rows.size() == height);
     png_read_image(png, rows.data());
 
     // convert alpha channel from straight to premultiplied if needed

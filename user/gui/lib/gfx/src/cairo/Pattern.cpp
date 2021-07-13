@@ -26,7 +26,7 @@ Pattern::PatternPtr Pattern::Make(const RgbaColor &color) {
 }
 
 Pattern::PatternPtr Pattern::Make(const std::shared_ptr<Surface> &surface) {
-    auto cpat = cairo_pattern_create_for_surface(surface->backing);
+    auto cpat = cairo_pattern_create_for_surface(cairo_surface_reference(surface->backing));
     if(cairo_pattern_status(cpat) != CAIRO_STATUS_SUCCESS) return nullptr;
 
     return std::shared_ptr<Pattern>(new Pattern(cpat, Type::Surface));

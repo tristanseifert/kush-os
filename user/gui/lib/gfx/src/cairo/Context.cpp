@@ -87,7 +87,7 @@ void Context::setSource(const RgbaColor &color) {
     cairo_set_source_rgba(this->ctx, r, g, b, a);
 }
 void Context::setSource(const std::shared_ptr<Pattern> &pattern) {
-    cairo_set_source(this->ctx, cairo_pattern_reference(pattern->pt));
+    cairo_set_source(this->ctx, pattern->pt);
 }
 void Context::setSource(const std::shared_ptr<Surface> &surface, const Point &origin) {
     const auto [x, y] = origin;

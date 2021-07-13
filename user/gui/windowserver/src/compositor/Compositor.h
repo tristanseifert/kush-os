@@ -33,6 +33,8 @@ class Compositor {
     constexpr static const uintptr_t kCursorUpdateBit{1 << 1};
     constexpr static const uintptr_t kShutdownBit{1 << 16};
 
+    constexpr static const uintptr_t kDrawEverything{kCursorUpdateBit};
+
     public:
         /// Create a compositor instance for the given display
         Compositor(const std::shared_ptr<DriverSupport::gfx::Display> &display);

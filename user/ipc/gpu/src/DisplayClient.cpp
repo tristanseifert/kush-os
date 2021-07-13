@@ -13,9 +13,9 @@ using namespace DriverSupport::gfx;
 /// Region of virtual memory in which framebuffers are mapped
 static uintptr_t kPrivateMappingRange[2] = {
     // start
-    0x110B0000000,
+    0x60200000000,
     // end
-    0x110D0000000,
+    0x60220000000,
 };
 
 /**

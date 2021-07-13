@@ -53,12 +53,13 @@ void Compositor::updateBuffer() {
     this->context = std::make_unique<gui::gfx::Context>(this->surface);
 
     // clear it
-    this->context->setSource({0, 0, 0, 1});
+    this->context->setSource(gui::gfx::RgbColor{0, 0, 0});
     this->context->paint();
 
-    this->surface->flush();
+    this->draw(kDrawEverything);
 
     // and mark it as updated
+    this->surface->flush();
     this->display->RegionUpdated({0, 0}, this->bufferDimensions);
 }
 
@@ -162,15 +163,15 @@ void Compositor::draw(const uintptr_t what) {
             this->context->clip();
 
             // and draw the windows in it
-            Trace("Clearing old mouse rect at (%.f, %.f) size (%.f, %.f)", rect.origin.x,
-                    rect.origin.y, rect.size.width, rect.size.height);
+            //Trace("Clearing old mouse rect at (%.f, %.f) size (%.f, %.f)", rect.origin.x,
+            //        rect.origin.y, rect.size.width, rect.size.height);
 
             this->drawWindows();
             this->context->popState();
         }
     }
 
-    this->context->setSource({0, 0.3, 0, 1});
+    //this->context->setSource(gui::gfx::RgbColor{0, 0.3, 0});
     //this->context->paint();
 
     // draw cursor
@@ -189,7 +190,7 @@ void Compositor::draw(const uintptr_t what) {
 void Compositor::drawWindows() {
     // set up state
     this->context->pushState();
-    this->context->setSource({0, 0, 0, 1});
+    this->context->setSource(gui::gfx::RgbColor{0, 0, 0});
 
     this->context->paint();
 

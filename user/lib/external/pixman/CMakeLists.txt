@@ -41,11 +41,11 @@ add_library(pixman SHARED
 
 target_include_directories(pixman PRIVATE source/pixman)
 target_link_options(pixman PRIVATE -flto)
-target_compile_options(pixman PRIVATE -fPIC)
+target_compile_options(pixman PRIVATE -flto -O1)
 
 # architecture specific stuff
 if(${KERNEL_ARCH} STREQUAL "x86_64")
-    target_sources(pixman PRIVATE
+        target_sources(pixman PRIVATE
         source/pixman/pixman-mmx.c
         source/pixman/pixman-sse2.c
         source/pixman/pixman-ssse3.c

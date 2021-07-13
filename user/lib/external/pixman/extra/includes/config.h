@@ -126,8 +126,16 @@
    backward compatibility; new code need not use it. */
 #define STDC_HEADERS 1
 
+/*
+ * TODO: Figure out why TLS breaks Pixman.
+ *
+ * This leads to odd issues where structs are overwritten with pixel data. There's got to be some
+ * sort of memory out of bounds type issue, or the TLS allocation for threads in the dynamic
+ * linker is janked up.
+ */
 /* The compiler supported TLS storage class */
-#define TLS __thread
+//#define TLS __thread
+#define PIXMAN_NO_TLS
 
 /*
  * TODO: figure out why this, when enabled, produces broken shared libraries.
