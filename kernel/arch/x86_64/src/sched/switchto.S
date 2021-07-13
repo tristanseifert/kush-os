@@ -19,11 +19,16 @@ amd64_switchto:
  */
 amd64_switchto_common:
     // restore FPU state
-    movb        TS_OFF_FPU_ENABLED(%rdi), %al
+    movb        TS_OFF_FPU_SHOULD_RESTORE(%rdi), %al
     test        %al, %al
     jz          1f
 
-    fxrstor     TS_OFF_FXSAVE(%rdi)
+    movq        TS_OFF_FPU_STATE_PTR(%rdi), %rcx
+    mov         $0xFFFFFFFF, %eax
+    mov         $0xFFFFFFFF, %edx
+
+amd64_switchto_common_xrstor:
+    xrstor64    (%rcx)
 
 1:
     // switch back to the appropriate stack
@@ -67,28 +72,38 @@ amd64_switchto_save:
     // save stack pointer
     mov         %rsp, TS_OFF_STACKTOP(%rdi)
 
-    // back up %rdi first so we can set it to the reg base
-    mov         %rdi, TS_OFF_REGS+64(%rdi)
-    lea         TS_OFF_REGS(%rdi), %rdi
+    // back up %r15 first so we can set it to the reg base
+    mov         %r15, TS_OFF_REGS+0(%rdi)
+    lea         TS_OFF_REGS(%rdi), %r15
 
     // save general purpose regs
-    mov         %r15,   0(%rdi)
-    mov         %r14,   8(%rdi)
-    mov         %r13,  16(%rdi)
-    mov         %r12,  24(%rdi)
-    mov         %r11,  32(%rdi)
-    mov         %r10,  40(%rdi)
-    mov         %r9,   48(%rdi)
-    mov         %r8,   56(%rdi)
-    mov         %rsi,  72(%rdi)
-    mov         %rbp,  80(%rdi)
-    mov         %rbx,  88(%rdi)
-    mov         %rdx,  96(%rdi)
-    mov         %rcx, 104(%rdi)
-    mov         %rax, 112(%rdi)
+    mov         %r14,   8(%r15)
+    mov         %r13,  16(%r15)
+    mov         %r12,  24(%r15)
+    mov         %r11,  32(%r15)
+    mov         %r10,  40(%r15)
+    mov         %r9,   48(%r15)
+    mov         %r8,   56(%r15)
+    mov         %rdi,  64(%r15)
+    mov         %rsi,  72(%r15)
+    mov         %rbp,  80(%r15)
+    mov         %rbx,  88(%r15)
+    mov         %rdx,  96(%r15)
+    mov         %rcx, 104(%r15)
+    mov         %rax, 112(%r15)
 
     pushfq
-    pop         120(%rdi)
+    pop         120(%r15)
+
+    // save floating point state; set all bits (since it's ANDed against XCR0)
+    movq        TS_OFF_FPU_STATE_PTR(%rdi), %rcx
+    mov         $0xFFFFFFFF, %eax
+    mov         $0xFFFFFFFF, %edx
+
+amd64_switchto_save_xsave:
+    xsave64     (%rcx)
+
+    movb        $1, TS_OFF_FPU_SHOULD_RESTORE(%rdi)
 
     // the previous thread's state has been saved. switch to the next thread
     mov         %rsi, %rdi

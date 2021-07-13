@@ -2,9 +2,10 @@
 #define ARCH_X86_64_THREADSTATE_H
 
 // we have to manually define structs offsets for our assembler code
+#include "arch/ThreadState.h"
 #define TS_OFF_STACKTOP                 0
-#define TS_OFF_FPU_ENABLED              8
-#define TS_OFF_FXSAVE                   16
+#define TS_OFF_FPU_SHOULD_RESTORE       8
+#define TS_OFF_FPU_STATE_PTR            16
 #define TS_OFF_REGS                     32
 
 #ifndef ASM_FILE
@@ -43,22 +44,20 @@ struct ThreadState {
     /// Stack pointer to return to
     void *stackTop = nullptr;
 
-    /// when set, FPU state should be saved and restored
-    bool fpuEnabled = false;
-    /// whether the FPU state needs to be saved when switching out
-    bool fpuNeedsSave = true;
-    /// pointer to FPU data area (must be 16 byte aligned)
-    void *fxsave = nullptr;
+    /// when set, the FPU has been used and its state should be restored
+    bool fpuShouldRestore{false};
+    /// XSAVE data area for floating point state
+    void *fpuState{nullptr};
     /// number of times we've taken an FPU fault in this thread
-    size_t fpuFaults = 0;
+    size_t fpuFaults{0};
 
     /// saved thread state
     CpuRegs saved;
 
     /// FS base for the thread
-    uintptr_t fsBase = 0;
+    uintptr_t fsBase{0};
     /// GS Base for the thread
-    uintptr_t gsBase = 0;
+    uintptr_t gsBase{0};
 };
 
 /**
@@ -219,9 +218,9 @@ struct TaskState {
 
 // ensure the manually defined offsets are right
 static_assert(offsetof(arch::ThreadState, stackTop) == TS_OFF_STACKTOP, "TS_OFF_STACKTOP wrong");
-static_assert(offsetof(arch::ThreadState, fpuEnabled) == TS_OFF_FPU_ENABLED,
-        "TS_OFF_FPU_ENABLED wrong");
-static_assert(offsetof(arch::ThreadState, fxsave) == TS_OFF_FXSAVE, "TS_OFF_FXSAVE wrong");
+static_assert(offsetof(arch::ThreadState, fpuShouldRestore) == TS_OFF_FPU_SHOULD_RESTORE,
+        "TS_OFF_FPU_SHOULD_RESTORE wrong");
+static_assert(offsetof(arch::ThreadState, fpuState) == TS_OFF_FPU_STATE_PTR, "TS_OFF_FPU_STATE_PTR wrong");
 static_assert(offsetof(arch::ThreadState, saved) == TS_OFF_REGS, "TS_OFF_REGS wrong");
 
 #endif // ASM_FILE

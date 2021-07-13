@@ -16,6 +16,7 @@ add_library(kernel_arch_amd64 OBJECT
     src/vm/Caches.cpp
     src/vm/PTEHandler.cpp
     src/sched/Thread.cpp
+    src/sched/XSave.cpp
     src/sched/switchto.S
     src/syscall/entry.S
     src/syscall/Handler.cpp

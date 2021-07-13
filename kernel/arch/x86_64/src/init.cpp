@@ -8,6 +8,8 @@
 #include "vm/PTEHandler.h"
 #include "syscall/Handler.h"
 
+#include "sched/XSave.h"
+
 #include <arch/x86_msr.h>
 #include <cpuid.h>
 
@@ -38,7 +40,7 @@ void arch_init() {
     // test CPU features we need to support
     TestCpuSupport();
 
-    // determine if we support the NX bit; enable the feature if needed
+    // determine if we support the NX bit; enable the feature if so
     update_supports_nx();
 
     uint32_t lo, hi;
@@ -60,6 +62,9 @@ void arch_init() {
     IrqRegistry::Init();
 
     PerCpuInfo::BspInit();
+
+    // initialize CPU extensions and XSAVE support
+    InitXSave();
 }
 
 /**

@@ -1,4 +1,5 @@
 #include "Thread.h"
+#include "XSave.h"
 
 #include <platform.h>
 #include <arch.h>
@@ -108,14 +109,9 @@ void arch::RestoreThreadState(const rt::SharedPtr<sched::Thread> &from,
         // stop the task timer
         sched::Scheduler::get()->willSwitchFrom(from);
 
-        // save FPU state if needed
-        if(fromRegs.fpuEnabled && fromRegs.fpuNeedsSave) {
-            if(!fromRegs.fxsave) {
-                panic("TODO: allocate floating point save area");
-            }
-
-            asm volatile("fxsave %0" :: "m"(fromRegs.fxsave));
-            fromRegs.fpuNeedsSave = false;
+        // initialize the XSAVE area if needed
+        if(!fromRegs.fpuState) {
+            AllocXSaveRegion(fromRegs);
         }
 
         // set the running flags
