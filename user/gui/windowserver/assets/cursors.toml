@@ -1,0 +1,25 @@
+####################################################################################################
+# Defines the system cursors, including the images and hotspots for each.
+####################################################################################################
+# Base directory containing cursors
+base = "/System/Data/windowserver/cursors"
+
+## Standard left pointing arrow cursor
+[[cursors]]
+name = "Normal"
+file = "left_ptr.png"
+hotspot = [2, 1]
+#file = "test.png"
+#hotspot = [0, 0]
+
+# Pointing hand
+[[cursors]]
+name = "Pointer"
+file = "pointing_hand.png"
+hotspot = [6, 1]
+
+# Standard horizontal text (I bar)
+[[cursors]]
+name = "Caret"
+file = "text.png"
+hotspot = [16, 16]

@@ -1,4 +1,6 @@
 #include "RpcServer.h"
+#include "compositor/Compositor.h"
+
 #include "Log.h"
 
 #include <rpc/rt/ServerPortRpcStream.h>
@@ -16,6 +18,7 @@ RpcServer::RpcServer(const std::shared_ptr<Compositor> &comp) :
  */
 void RpcServer::addCompositor(const std::shared_ptr<Compositor> &comp) {
     REQUIRE(this->comps.empty(), "No support for multiple compositors yet");
+    this->comps.emplace_back(std::move(comp));
 }
 
 
@@ -24,13 +27,20 @@ void RpcServer::addCompositor(const std::shared_ptr<Compositor> &comp) {
  * Handles a received key event.
  */
 void RpcServer::implSubmitKeyEvent(uint32_t scancode, bool release) {
-    Trace("Key event: %5s %08x", release ? "break" : "make", scancode);
+    const auto &c = this->comps[0];
+    c->handleKeyEvent(scancode, release);
 }
 
 
 /**
  * Handles a received mouse movement event.
+ *
+ * This pushes the relative movements into the compositor's mouse handler, which is responsible for
+ * scaling the input and updating the position of the cursor on screen. It will also handle sending
+ * the event to any interested parties.
  */
 void RpcServer::implSubmitMouseEvent(uint32_t buttons, int32_t dX, int32_t dY, int32_t dZ) {
-    Trace("Mouse event: buttons %08x offsets %4d %4d %4d", buttons, dX, dY, dZ);
+    const auto &c = this->comps[0];
+    c->handleMouseEvent({dX, dY, dZ}, buttons);
 }
+

@@ -15,14 +15,14 @@ static bool gLogTraceEnabled = true;
 /// Outputs a message if trace logging is enabled
 void Trace(const char * _Nonnull str, ...) {
     if(!gLogTraceEnabled) return;
-    fprintf(stderr, "\e[34m[%s] ", gLogTag);
+    fprintf(stdout, "\e[34m[%s] ", gLogTag);
 
     va_list va;
     va_start(va, str);
     vfprintf(stdout, str, va);
     va_end(va);
 
-    fputs("\e[0m\n", stderr);
+    fputs("\e[0m\n", stdout);
 }
 /**
  * Logs a success message.

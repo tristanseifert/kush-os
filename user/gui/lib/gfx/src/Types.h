@@ -30,6 +30,12 @@ struct Size {
     double width{0};
     double height{0};
 
+    Size() = default;
+    Size(const double _width, const double _height) : width(_width), height(_height) {}
+
+    template<typename T>
+    Size(const std::pair<T, T> &p) : width(p.first), height(p.second) {}
+
     auto operator<=> (const Size &) const = default;
 };
 
@@ -39,6 +45,24 @@ struct Size {
 struct Point {
     double x{0};
     double y{0};
+
+    Point() = default;
+    Point(const double _x, const double _y) : x(_x), y(_y) {}
+    template<typename T>
+    Point(const std::pair<T, T> &p) : x(p.first), y(p.second) {}
+    template<typename T>
+    Point(const std::tuple<T, T> &p) : x(std::get<0>(p)), y(std::get<1>(p)) {}
+
+    inline Point& operator -=(const Point& p) {
+        this->x -= p.x;
+        this->y -= p.y;
+        return *this;
+    }
+    inline Point& operator +=(const Point& p) {
+        this->x += p.x;
+        this->y += p.y;
+        return *this;
+    }
 
     auto operator<=> (const Point &) const = default;
 };

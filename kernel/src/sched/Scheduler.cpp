@@ -540,9 +540,12 @@ void Scheduler::threadUnblocked(const rt::SharedPtr<Thread> &thread) {
         case Thread::State::NotifyWait:
             break;
 
+        // about to be destroyed, so do NOT put it on the unblocked list
+        case Thread::State::Zombie:
+            return;
+
         case Thread::State::Paused:
         case Thread::State::Runnable:
-        case Thread::State::Zombie:
             panic("thread $%p'h (%lu) unblocked, but has invalid state %d",
                     thread->getHandle(), thread->tid, static_cast<int>(thread->state));
     }

@@ -1,23 +1,37 @@
 #include "Compositor.h"
+#include "CursorHandler.h"
+
 #include "Log.h"
 
 #include <DriverSupport/gfx/Display.h>
 
+#ifdef __Kush__
+#include <threads.h>
+#endif
+
 #include <gfx/Context.h>
 #include <gfx/Surface.h>
+#include <gfx/Pattern.h>
 
 /**
  * Instantiates a compositor instance for the given display.
  */
 Compositor::Compositor(const std::shared_ptr<DriverSupport::gfx::Display> &_d) : display(_d) {
+    this->cursor = std::make_unique<CursorHandler>(this);
+
+#ifdef __Kush__
+    this->worker = std::make_unique<std::thread>(&Compositor::workerMain, this);
+#else
     this->updateBuffer();
+#endif
 }
 
 /**
  * Cleans up our drawing context(s) and any other resources allocated.
  */
 Compositor::~Compositor() {
-
+    // shut down the worker
+    this->notifyWorker(kShutdownBit);
 }
 
 /**
@@ -39,13 +53,8 @@ void Compositor::updateBuffer() {
     this->context = std::make_unique<gui::gfx::Context>(this->surface);
 
     // clear it
-    this->context->setSource({1, 0, 1, 1});
-    this->context->rectangle({8, 64}, {64, 64});
-    this->context->fill();
-
-    this->context->setLineWidth(4);
-    this->context->arc({256, 256}, 100, {0, 2});
-    this->context->stroke();
+    this->context->setSource({0, 0, 0, 1});
+    this->context->paint();
 
     this->surface->flush();
 
@@ -53,3 +62,155 @@ void Compositor::updateBuffer() {
     this->display->RegionUpdated({0, 0}, this->bufferDimensions);
 }
 
+
+
+#ifdef __Kush__
+/**
+ * Main loop for the worker thread. We'll wait to receive notifications forever and redraw the
+ * display in response to them.
+ */
+void Compositor::workerMain() {
+    uintptr_t note;
+
+    // set up buffer initially
+    this->updateBuffer();
+
+    // handle events
+    while(this->run) {
+        note = NotificationReceive(UINTPTR_MAX, UINTPTR_MAX);
+
+        if(!note) continue;
+
+        // system events
+        if(note & kShutdownBit) {
+            this->run = false;
+            continue;
+        }
+        if(note & kUpdateBufferBit) {
+            this->updateBuffer();
+        }
+
+        // redraw events
+        bool needsDraw{false};
+        uintptr_t drawWhat{0};
+
+        if(note & kCursorUpdateBit) {
+            needsDraw = true;
+            drawWhat |= kCursorUpdateBit;
+        }
+
+        // perform the drawing if needed
+        if(needsDraw) {
+            this->draw(drawWhat);
+        }
+    }
+
+    // clean up
+    this->context.reset();
+    this->surface.reset();
+}
+#endif
+
+/**
+ * Sends a notification to the worker thread.
+ */
+void Compositor::notifyWorker(const uintptr_t bits) {
+#ifdef __Kush__
+    if(!bits) return;
+    if(!this->run) return;
+
+    auto workLoopThrd = reinterpret_cast<thrd_t>(this->worker->native_handle());
+    const auto thread = thrd_get_handle_np(workLoopThrd);
+
+    auto err = NotificationSend(thread, bits);
+    if(err) {
+        Warn("%s failed: %d", "NotificationSend", err);
+    }
+#endif
+}
+
+
+/**
+ * Redraws the output display and updates the framebuffer.
+ *
+ * We try to be smart about this and only update the regions of the display that actually changed;
+ * for example, when the cursor moves, we only redraw the part of the display where the old cursor
+ * was, and then draw the new cursor on top; this is done via clever use of clip rects.
+ */
+void Compositor::draw(const uintptr_t what) {
+    // redraw the windows under the last cursor position
+
+    // add a clipping rect for the last cursor position if it changed
+    if(what & kCursorUpdateBit) {
+        auto rect = this->cursor->getCursorRect();
+        if(!rect.isEmpty()) {
+            // truncate rect to positive coordinates only
+            if(rect.origin.x < 0) {
+                rect.size.width += rect.origin.x;
+                rect.origin.x = 0;
+            }
+            if(rect.origin.y < 0) {
+                rect.size.height += rect.origin.y;
+                rect.origin.y = 0;
+            }
+
+            // then set up the clipping rectangle
+            this->context->pushState();
+
+            this->context->clipReset();
+            this->context->rectangle(rect);
+            this->context->clip();
+
+            // and draw the windows in it
+            Trace("Clearing old mouse rect at (%.f, %.f) size (%.f, %.f)", rect.origin.x,
+                    rect.origin.y, rect.size.width, rect.size.height);
+
+            this->drawWindows();
+            this->context->popState();
+        }
+    }
+
+    this->context->setSource({0, 0.3, 0, 1});
+    //this->context->paint();
+
+    // draw cursor
+    this->cursor->draw(this->context);
+
+    // TODO: use more granular update region
+    this->display->RegionUpdated({0, 0}, this->bufferDimensions);
+}
+
+/**
+ * Draws all application windows.
+ *
+ * You should have the clipping rects for the context configured appropriately to redraw only the
+ * parts of the screen that are desired.
+ */
+void Compositor::drawWindows() {
+    // set up state
+    this->context->pushState();
+    this->context->setSource({0, 0, 0, 1});
+
+    this->context->paint();
+
+    // restore state
+    this->context->popState();
+}
+
+
+
+/**
+ * Handles a mouse event. This is pushed into the cursor handler, which will then request a redraw
+ * if needed.
+ */
+void Compositor::handleMouseEvent(const std::tuple<int, int, int> &move, const uintptr_t buttons) {
+    this->cursor->handleEvent(move, buttons);
+}
+
+/**
+ * Handles a keyboard event. The event is simply dispatched to the application that's currently
+ * the key window.
+ */
+void Compositor::handleKeyEvent(const uint32_t scancode, const bool release) {
+    Trace("Key event: %5s %08x", release ? "break" : "make", scancode);
+}

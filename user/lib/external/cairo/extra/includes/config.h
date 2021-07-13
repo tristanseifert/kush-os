@@ -192,7 +192,7 @@
 /* #undef HAVE_MMAP */
 
 /* Define to 1 if you have the `newlocale' function. */
-#define HAVE_NEWLOCALE 1
+// #define HAVE_NEWLOCALE 1
 
 /* Enable if you have MacOS X atomic operations */
 /* #undef HAVE_OS_ATOMIC_OPS */

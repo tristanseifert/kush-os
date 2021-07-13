@@ -40,7 +40,8 @@ void EventSubmitter::submitMouseEvent(const uintptr_t buttons,
     }
 
     // submit the event
-    rpc->SubmitMouseEvent(buttons, dX, dY, dZ);
+    // XXX: we need to flip the Y coordinate for some reason?
+    rpc->SubmitMouseEvent(buttons, dX, -dY, dZ);
 }
 
 /**

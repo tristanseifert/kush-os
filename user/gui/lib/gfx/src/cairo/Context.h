@@ -393,6 +393,12 @@ class Context {
          * @param size Size of the rectangle
          */
         void rectangle(const Point &origin, const Size &size);
+        /**
+         * Adds the given rectangle to the path of the context.
+         */
+        inline void rectangle(const Rectangle &rect) {
+            this->rectangle(rect.origin, rect.size);
+        }
 
         /**
          * Computes the bounding box of the current path.

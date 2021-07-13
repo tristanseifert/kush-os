@@ -17,8 +17,8 @@ class Surface {
     friend class Pattern;
 
     public:
-        using Point = std::pair<int, int>;
-        using Size = std::pair<int, int>;
+        using Point = std::pair<unsigned int, unsigned int>;
+        using Size = std::pair<unsigned int, unsigned int>;
 
         /// Formats that a surface may take on
         enum class Format {
@@ -108,6 +108,10 @@ class Surface {
         size_t getPitch() const;
         /// Get the pixel format of this surface
         Format getFormat() const;
+        /// Get the size of the surface
+        inline Size getSize() const {
+            return {this->getWidth(), this->getHeight()};
+        }
 
     private:
         /// Cairo surface we're representing
