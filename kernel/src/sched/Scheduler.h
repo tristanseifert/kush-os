@@ -102,9 +102,9 @@ class Scheduler {
         void handleIpi(void (*ackIrq)(void *), void *ackCtx);
 
         /// Adds a deadline to the scheduler
-        void addDeadline(const rt::SharedPtr<Deadline> &deadline);
+        void addDeadline(const rt::SharedPtr<Deadline> &deadline, const bool inCritical = false);
         /// Removes an existing deadline, if it hasn't expired yet
-        bool removeDeadline(const rt::SharedPtr<Deadline> &deadline);
+        bool removeDeadline(const rt::SharedPtr<Deadline> &deadline, const bool inCritical = false);
 
     private:
         static void Init();

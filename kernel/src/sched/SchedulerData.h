@@ -70,6 +70,8 @@ struct SchedulerThreadData {
 
     /// whether the thread was most recently preempted
     bool preempted = false;
+    /// when set, we've requested to unblock the thread already
+    bool unblockRequested{false};
 };
 
 }

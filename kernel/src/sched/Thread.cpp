@@ -346,7 +346,7 @@ Thread::BlockOnReturn Thread::blockOn(const rt::SharedPtr<Blockable> &b, const u
 
         // install scheduler deadline (for timed blocks)
         if(deadline){
-            Scheduler::get()->addDeadline(deadline);
+            Scheduler::get()->addDeadline(deadline, true);
         }
 
 beach:;
@@ -374,7 +374,7 @@ beach:;
 
         // remove the old deadline
         if(deadline) {
-            Scheduler::get()->removeDeadline(deadline);
+            Scheduler::get()->removeDeadline(deadline, true);
         }
 
         // process each blockable
@@ -612,11 +612,19 @@ void Thread::notify(const uintptr_t bits) {
  * @param mask If nonzero, a new value to set for the thread's notification mask.
  * @return The bitwise AND of the notification bits and the notification mask.
  *
- * TODO: Handle timeout value!
+ * @param timeout Timeout in nanoseconds; 0 means poll, UINTPTR_MAX means wait forever.
  */
 uintptr_t Thread::blockNotify(const uintptr_t _mask, const uintptr_t timeout) {
     uintptr_t mask;
     bool shouldBlock = !!timeout;
+
+    rt::SharedPtr<BlockWait> deadline;
+
+    // create the timeout blockable
+    if(timeout && timeout != UINTPTR_MAX) {
+        const auto until = platform_timer_now() + timeout;
+        deadline = rt::SharedPtr<BlockWait>(new BlockWait(until, this->sharedFromThis()));
+    }
 
     DECLARE_CRITICAL();
     CRITICAL_ENTER();
@@ -637,18 +645,45 @@ uintptr_t Thread::blockNotify(const uintptr_t _mask, const uintptr_t timeout) {
         return (oldBits & mask);
     }
 
-    // we need to block
+    // set up for block
     if(shouldBlock) {
         this->setState(State::NotifyWait);
+        this->blockState = BlockState::Blocking;
+
+        // install scheduler deadline (for timed blocks)
+        if(deadline) {
+            Scheduler::get()->addDeadline(deadline, true);
+        }
     }
+
     CRITICAL_EXIT();
 
+    // perform the blocking
     if(shouldBlock) {
         Scheduler::get()->yield();
         __atomic_clear(&this->notified, __ATOMIC_RELEASE);
+
+        CRITICAL_ENTER();
+        RW_LOCK_WRITE(&this->lock);
+
+        // remove deadline
+        if(deadline) {
+            Scheduler::get()->removeDeadline(deadline, true);
+        }
+
+        // determine why we got woken
+        const auto timedOut = (this->blockState == BlockState::Timeout);
+
+        RW_UNLOCK_WRITE(&this->lock);
+        CRITICAL_EXIT();
+
+        // if we timed out return a corresponding status code
+        if(timedOut) {
+            return 0;
+        }
     }
 
-    // return the set bits
+    // otherwise, return notification bits
     const auto newBits = __atomic_fetch_and(&this->notifications, ~mask, __ATOMIC_RELAXED);
     return (newBits & mask);
 } 

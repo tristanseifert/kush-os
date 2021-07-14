@@ -533,6 +533,11 @@ void Scheduler::handleIpi(void (*ackIrq)(void *), void *ackCtx) {
  * IPI is taken immediately and the thread will likely be switched to.
  */
 void Scheduler::threadUnblocked(const rt::SharedPtr<Thread> &thread) {
+    // ignore if we've already requested to unblock
+    if(__atomic_test_and_set(&thread->sched.unblockRequested, __ATOMIC_RELAXED)) {
+        return;
+    }
+
     // ensure it's in a valid state
     switch(thread->state) {
         case Thread::State::Sleeping:
@@ -593,6 +598,9 @@ void Scheduler::processUnblockedThreads() {
         if(thread->getState() == Thread::State::Runnable) {
             this->schedule(thread);
         }
+
+        // clear the unblock requested flag
+        __atomic_clear(&thread->sched.unblockRequested, __ATOMIC_RELAXED);
     }
 }
 
@@ -723,9 +731,13 @@ bool Scheduler::processDeadlines() {
 
 /**
  * Adds a new deadline for the scheduler to consider.
+ *
+ * @param inCritical When set, the method is invoked from a critical section and the IRQL does not
+ *        need to be adjusted.
  */
-void Scheduler::addDeadline(const rt::SharedPtr<Deadline> &deadline) {
-    const auto oldIrql = platform_raise_irql(platform::Irql::Scheduler);
+void Scheduler::addDeadline(const rt::SharedPtr<Deadline> &deadline, const bool inCritical) {
+    platform::Irql oldIrql;
+    if(!inCritical) oldIrql = platform_raise_irql(platform::Irql::Scheduler);
 
     DeadlineWrapper wrap(deadline);
     bool needTimerUpdate = true;
@@ -750,17 +762,23 @@ void Scheduler::addDeadline(const rt::SharedPtr<Deadline> &deadline) {
     if(needTimerUpdate) {
         this->timerUpdate();
     }
-    platform_lower_irql(oldIrql);
+
+    if(!inCritical) platform_lower_irql(oldIrql);
 }
 
 /**
  * Removes an existing deadline, if it has not yet expired.
  *
+ * @param inCritical When set, the method is invoked from a critical section and the IRQL does not
+ *        need to be adjusted.
+ *
  * @return Whether the given deadline was found and removed
  */
-bool Scheduler::removeDeadline(const rt::SharedPtr<Deadline> &deadline) {
+bool Scheduler::removeDeadline(const rt::SharedPtr<Deadline> &deadline, const bool inCritical) {
     bool needTimerUpdate;
-    const auto oldIrql = platform_raise_irql(platform::Irql::Scheduler);
+    platform::Irql oldIrql;
+
+    if(!inCritical) oldIrql = platform_raise_irql(platform::Irql::Scheduler);
 
     if(kLogDeadlines) {
         log("removing deadline: %p", static_cast<void *>(deadline));
@@ -802,7 +820,8 @@ bool Scheduler::removeDeadline(const rt::SharedPtr<Deadline> &deadline) {
     if(needTimerUpdate) {
         this->timerUpdate();
     }
-    platform_lower_irql(oldIrql);
+
+    if(!inCritical) platform_lower_irql(oldIrql);
 
     return (info.numRemoved != 0);
 }

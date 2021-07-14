@@ -56,5 +56,10 @@ intptr_t sys::NotifyReceive(uintptr_t mask, const uintptr_t timeout) {
     }
 
     // return the notify wait result
-    return thread->blockNotify(mask);
+    uint64_t nanos{timeout};
+    if(nanos && nanos != UINTPTR_MAX) {
+        nanos *= 1000;
+    }
+
+    return thread->blockNotify(mask, nanos);
 }
