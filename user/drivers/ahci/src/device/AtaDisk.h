@@ -21,7 +21,8 @@ class AtaDisk: public Device, public std::enable_shared_from_this<AtaDisk> {
     using DMABufferPtr = std::shared_ptr<libdriver::DmaBuffer>;
 
     /// Device name for ATA disk
-    constexpr static const std::string_view kDeviceName{"AtaDisk,GenericDisk"};
+    //constexpr static const std::string_view kDeviceName{"AtaDisk,GenericDisk"};
+    constexpr static const std::string_view kDeviceName{"GenericDisk"};
 
     /// Name of the device property that contains information about the disk
     constexpr static const std::string_view kInfoPropertyName{"disk.ata.info"};

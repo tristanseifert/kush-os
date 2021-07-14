@@ -235,7 +235,7 @@ bool SVGA::initIrq() {
     }
 
     // TODO: implement the remainder of this
-    return false;
+    return true;
 }
 
 /**

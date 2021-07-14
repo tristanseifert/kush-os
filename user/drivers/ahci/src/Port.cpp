@@ -11,6 +11,7 @@
 #include "util/String.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 
 #include <driver/ScatterGatherBuffer.h>
@@ -105,7 +106,7 @@ Port::Port(Controller *controller, const uint8_t _port) : port(_port), parent(co
 
     // enable port interrupts
     regs.irqEnable = AhciPortIrqs::DeviceToHostReg | AhciPortIrqs::TaskFileError |
-        AhciPortIrqs::ReceiveOverflow;// | AhciPortIrqs::DescriptorProcessed;
+        AhciPortIrqs::ReceiveOverflow |/* AhciPortIrqs::DescriptorProcessed |*/ AhciPortIrqs::PioSetup;
 }
 
 /**
@@ -290,6 +291,10 @@ void Port::handleIrq() {
     regs.irqStatus = is;
     if(kLogIrq) Trace("Port %u irq: %08x", this->port, is);
 
+    // figure out which command(s) just completed
+    const auto ci = regs.cmdIssue;
+    const auto completedCmds = ~ci & this->outstandingCommands;
+
     // TODO: check for command errors
     /**
      * A task file error was raised; this means that a command we issued likely failed. We should
@@ -319,17 +324,14 @@ void Port::handleIrq() {
      */
     if(is & AhciPortIrqs::DeviceToHostReg) {
         auto &rfis = this->receivedFis->rfis;
+        const auto dmaCmds = completedCmds & this->dmaCommands;
 
         // are there any outstanding commands?
         if(this->outstandingCommands) {
-            // figure out which command(s) just completed
-            const auto ci = regs.cmdIssue;
-            const auto completedCmds = ~ci & this->outstandingCommands;
-
             // TODO: should this be a loop or is it a one off deal per irq?
             for(size_t i = 0; i < this->parent->getQueueDepth(); i++) {
                 const uint32_t bit{1U << i};
-                if(!(completedCmds & bit)) continue;
+                if(!(dmaCmds & bit)) continue;
 
                 // extract command information and call completion handler
                 if(!(rfis.status & AtaStatus::Busy) && !(rfis.status & AtaStatus::Error) &&
@@ -338,11 +340,13 @@ void Port::handleIrq() {
                 } else {
                     this->completeCommand(i, rfis, false);
                 }
+
+                this->dmaCommands &= ~bit;
             }
         }
         // the register FIS was unsolicited. we just ignore these
         else {
-            if(kLogIrq) Trace("Unsolicted register FIS: status %02x error %02x", rfis.status,
+            if(kLogIrq) Trace("Unsolicted %s FIS: status %02x error %02x", "register", rfis.status,
                     rfis.error);
         }
     }
@@ -351,7 +355,45 @@ void Port::handleIrq() {
      * descriptor in a chain, so this indicates all data for a command has transfered.
      */
     if(is & AhciPortIrqs::DescriptorProcessed) {
-        Success("Finished descriptor");
+        if(kLogIrq) Success("Finished descriptor");
+    }
+
+    /**
+     * A PIO Setup FIS has been received. This indicates that data has been transfered to the
+     * host's memory.
+     */
+    if(this->pioCommands && is & AhciPortIrqs::PioSetup) {
+        auto &pf = this->receivedFis->psfis;
+        const auto pioCmds = completedCmds & this->pioCommands;
+
+        // are there any outstanding commands?
+        if(this->outstandingCommands) {
+            // TODO: should this be a loop or is it a one off deal per irq?
+            for(size_t i = 0; i < this->parent->getQueueDepth(); i++) {
+                const uint32_t bit{1U << i};
+                if(!(pioCmds & bit)) continue;
+
+                // extract command information and call completion handler
+                if(!(pf.status & AtaStatus::Busy) && !(pf.status & AtaStatus::Error) &&
+                    (pf.status & AtaStatus::Ready)) {
+                    this->completeCommand(i, pf, true);
+                } else {
+                    this->completeCommand(i, pf, false);
+                }
+
+                this->pioCommands &= ~bit; 
+            }
+        }
+        // the register FIS was unsolicited. we just ignore these
+        else {
+            if(kLogIrq) Trace("Unsolicted %s FIS: status %02x error %02x", "PIO Setup", pf.status,
+                pf.error);
+        }
+        /*Trace("PIO Setup FIS: status $%02x, error $%02x, LBA $%012lx, count $%04x, new status $%02x "
+                "commands completed $%08x",
+                pf.status, pf.error, (pf.lba0 | pf.lba1 << 8 | pf.lba2 << 16 | pf.lba3 << 24 |
+                    (uint64_t) pf.lba4 << 32 | (uint64_t) pf.lba5 << 40), 
+                ((uint32_t) pf.countl | (uint32_t) pf.counth << 8), pf.newStatus, completedCmds);*/
     }
 }
 
@@ -364,11 +406,12 @@ void Port::handleIrq() {
  *        the given command.
  * @param result Buffer large enough to store the full response of this request
  * @param cb Callback to invoke when the command completes.
+ * @param flags Flags affecting the command, including how data is transfered.
  *
  * @return 0 if the command was submitted successfully, otherwise a negative error code.
  */
 int Port::submitAtaCommand(const RegHostToDevFIS &fis, const DMABufferPtr &result,
-        const CommandCallback &cb) {
+        const CommandCallback &cb, const AtaCommandFlags flags) {
     // find a command slot
     const auto slotIdx = this->allocCommandSlot();
     auto table = this->cmdTables[slotIdx];
@@ -406,7 +449,7 @@ int Port::submitAtaCommand(const RegHostToDevFIS &fis, const DMABufferPtr &resul
     CommandInfo i(cb);
     i.buffers.emplace_back(result);
 
-    return this->submitCommand(slotIdx, std::move(i));
+    return this->submitCommand(slotIdx, std::move(i), flags);
 }
 
 /**
@@ -418,18 +461,19 @@ int Port::submitAtaCommand(const RegHostToDevFIS &fis, const DMABufferPtr &resul
  * @param cmd Command byte to write to the device
  * @param result Buffer large enough to store the full response of this request
  * @param cb Callback to invoke when the command completes.
+ * @param flags Flags affecting the command, including how data is transfered.
  *
  * @return 0 if the command was submitted successfully, otherwise a negative error code.
  */
 int Port::submitAtaCommand(const AtaCommand cmd, const DMABufferPtr &result,
-        const CommandCallback &cb) {
+        const CommandCallback &cb, const AtaCommandFlags flags) {
     // build the register FIS
     RegHostToDevFIS fis;
     fis.command = static_cast<uint8_t>(cmd);
     fis.c = 1; // write to command register
 
     // then submit command
-    return this->submitAtaCommand(fis, result, cb);
+    return this->submitAtaCommand(fis, result, cb, flags);
 }
 
 /**
@@ -503,27 +547,37 @@ size_t Port::allocCommandSlot() {
  * Submits the given command. This will insert it into the outstanding commands map, then notify
  * the HBA that this command is ready to execute.
  *
+ * @param flags Defines how the command is interpreted. Currently, we handle the DMA/PIO flag which
+ * determines whether we mark a command as completed on DMA reception or PIO reception.
+ *
  * @return 0 on success, negative error code otherwise.
  */
-int Port::submitCommand(const uint8_t slot, CommandInfo info) {
+int Port::submitCommand(const uint8_t slot, CommandInfo info, const AtaCommandFlags flags) {
+    const uint32_t bit{1U << slot};
     auto &regs = this->parent->abar->ports[this->port];
 
     // record keeping
     {
         std::lock_guard<std::mutex> lg(this->inFlightCommandsLock);
-        this->outstandingCommands |= (1 << slot);
+        this->outstandingCommands |= bit;
         this->inFlightCommands[slot].emplace(std::move(info));
     }
 
+    if(TestFlags(flags & AtaCommandFlags::TransferPio)) {
+        this->pioCommands |= bit;
+    } else {
+        this->dmaCommands |= bit;
+    }
+
     // start command
-    regs.cmdIssue = (1 << slot);
+    regs.cmdIssue = bit;
     return 0;
 }
 
 /**
  * Marks the given command as completed, whether that is with a success or a failure.
  */
-void Port::completeCommand(const uint8_t slot, const volatile RegDevToHostFIS &rfis,
+void Port::completeCommand(const uint8_t slot, const CmdCompletionInfo &rfis,
         const bool success) {
     std::lock_guard<std::mutex> lg(this->inFlightCommandsLock);
     const uint32_t bit{1U << slot};
@@ -534,6 +588,9 @@ void Port::completeCommand(const uint8_t slot, const volatile RegDevToHostFIS &r
 
     CommandResult res(rfis.status);
 
+    if(kLogCompletion) Trace("Command %u completed: status $%02x (%s)", slot,
+            rfis.status, success ? "success" : "failure", rfis.lba);
+
     if(success) {
         CommandResult::Success s;
         res.storage = s;
@@ -541,7 +598,7 @@ void Port::completeCommand(const uint8_t slot, const volatile RegDevToHostFIS &r
         CommandResult::Failure f{rfis.error};
         res.storage = f;
 
-        Warn("LBA that failed is: %02x%02x%02x%02x%02x%02x", rfis.lba5, rfis.lba4, rfis.lba3, rfis.lba2, rfis.lba1, rfis.lba0);
+        Warn("LBA that failed is: $%012lx", rfis.lba);
     }
 
     /*
@@ -561,4 +618,24 @@ void Port::completeCommand(const uint8_t slot, const volatile RegDevToHostFIS &r
 
     cmd.reset();
     this->outstandingCommands &= ~bit;
+}
+
+
+
+/**
+ * Extracts command completion info from a Device to Host Register FIS.
+ */
+Port::CmdCompletionInfo::CmdCompletionInfo(const volatile RegDevToHostFIS &rfis) :
+    status(rfis.status), error(rfis.error) {
+    this->lba = rfis.lba0 | (rfis.lba1 << 8) | (rfis.lba2 << 16) | (rfis.lba3 << 24) |
+        ((uint64_t) rfis.lba4 << 32) | ((uint64_t) rfis.lba5 << 40);
+}
+
+/**
+ * Extracts command completion info from a PIO Setup FIS.
+ */
+Port::CmdCompletionInfo::CmdCompletionInfo(const volatile PioSetupFIS &psfis) :
+    status(psfis.status), error(psfis.error) {
+    this->lba = psfis.lba0 | (psfis.lba1 << 8) | (psfis.lba2 << 16) | (psfis.lba3 << 24) |
+        ((uint64_t) psfis.lba4 << 32) | ((uint64_t) psfis.lba5 << 40);
 }

@@ -241,7 +241,6 @@ void Controller::deinitWorkLoopIrq() {
 void Controller::handleAhciIrq() {
     // figure out which ports have an interrupt pending
     const auto is = this->abar->irqStatus;
-    this->abar->irqStatus = is;
 
     for(size_t i = 0; i < kMaxPorts; i++) {
         const uint32_t bit{1U << i};
@@ -249,6 +248,8 @@ void Controller::handleAhciIrq() {
             this->ports[i]->handleIrq();
         }
     }
+
+    this->abar->irqStatus = is;
 }
 
 

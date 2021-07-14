@@ -14,14 +14,28 @@
 #include <driver/DmaBuffer.h>
 #include <driver/ScatterGatherBuffer.h>
 
+#include <sys/bitflags.hpp>
+
 class Controller;
 class Device;
 
 struct PortReceivedFIS;
 struct PortCommandTable;
 struct PortCommandList;
+struct PioSetupFIS;
 struct RegDevToHostFIS;
 struct RegHostToDevFIS;
+
+enum class AtaCommandFlags: uintptr_t {
+    None                                = 0,
+
+    TransferMask                        = (0b1111 << 0),
+    /// Command data transfer uses PIO
+    TransferPio                         = (0b0001 << 0),
+    /// Command data transfer uses DMA
+    TransferDma                         = (0b0000 << 0),
+};
+ENUM_FLAGS_EX(AtaCommandFlags, uintptr_t);
 
 /**
  * Handles transactions for a single port on an AHCI controller.
@@ -104,10 +118,10 @@ class Port: public std::enable_shared_from_this<Port> {
 
         /// Submit an ATA command with a fixed size response.
         [[nodiscard]] int submitAtaCommand(const AtaCommand cmd, const DMABufferPtr &result,
-                const CommandCallback &callback);
+                const CommandCallback &callback, const AtaCommandFlags f = AtaCommandFlags::None);
         /// Submit an ATA command with the given register state and a fixed size response.
         [[nodiscard]] int submitAtaCommand(const RegHostToDevFIS &regs, const DMABufferPtr &result,
-                const CommandCallback &callback);
+                const CommandCallback &callback, const AtaCommandFlags f = AtaCommandFlags::None);
 
         /// Returns the controller to which this port belongs
         constexpr auto getController() const {
@@ -132,6 +146,19 @@ class Port: public std::enable_shared_from_this<Port> {
             CommandInfo(const CommandCallback &_callback) : callback(_callback) {}
         };
 
+        /**
+         * Information passed to a command completer. This encapsulates the important state of the
+         * device from a PIO Setup or Device Register FIS.
+         */
+        struct CmdCompletionInfo {
+            uint8_t status, error;
+            uint64_t lba;
+
+            CmdCompletionInfo() = default;
+            CmdCompletionInfo(const volatile RegDevToHostFIS &rfis);
+            CmdCompletionInfo(const volatile PioSetupFIS &psfis);
+        };
+
     private:
         void initCommandTables(const uintptr_t);
 
@@ -145,8 +172,8 @@ class Port: public std::enable_shared_from_this<Port> {
                 const DMABufferPtr &buf, const bool irq);
 
         size_t allocCommandSlot();
-        int submitCommand(const uint8_t slot, CommandInfo);
-        void completeCommand(const uint8_t slot, const volatile RegDevToHostFIS &regs,
+        int submitCommand(const uint8_t slot, CommandInfo, const AtaCommandFlags);
+        void completeCommand(const uint8_t slot, const CmdCompletionInfo &regs,
                 const bool success);
 
     private:
@@ -160,6 +187,8 @@ class Port: public std::enable_shared_from_this<Port> {
         constexpr static const bool kLogCmdHeaders{false};
         /// Enable to dump all written PRDs to the console
         constexpr static const bool kLogPrds{false};
+        /// Are command completions logged?
+        constexpr static const bool kLogCompletion{false};
 
         /// Offset of command list into the port's private physical memory region
         constexpr static const size_t kCmdListOffset{0};
@@ -198,6 +227,11 @@ class Port: public std::enable_shared_from_this<Port> {
          * command in to, but may not yet have been finished and sent yet.
          */
         uint32_t busyCommands{0};
+
+        /// Command slots using DMA transfers
+        uint32_t dmaCommands{0};
+        /// Command slots using PIO transfers
+        uint32_t pioCommands{0};
 
         /**
          * Information on any commands that are currently in flight; this includes the buffer(s)

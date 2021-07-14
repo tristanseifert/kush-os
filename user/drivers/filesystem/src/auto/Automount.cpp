@@ -217,7 +217,13 @@ void Automount::sendRootMountedNotes() {
  */
 bool Automount::AutoInfo::match(const std::shared_ptr<DriverSupport::disk::Disk> &disk,
         const PartitionTable::Partition &p, const std::shared_ptr<Filesystem> &fs) const {
-    return disk->getForestPath() == this->diskForestPath && p.index == this->diskPartition;
+    // ensure disk path matches
+    if(this->diskForestPath != "*" && disk->getForestPath() != this->diskForestPath) {
+        return false;
+    }
+
+    // then check index
+    return p.index == this->diskPartition;
 }
 
 

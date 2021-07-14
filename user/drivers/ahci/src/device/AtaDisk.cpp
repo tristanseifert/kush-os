@@ -55,7 +55,7 @@ void AtaDisk::identify() {
     // send the ATA IDENTIFY DEVICE command
     using namespace std::placeholders;
     err = this->port.lock()->submitAtaCommand(AtaCommand::Identify, this->smallBuf,
-            std::bind(&AtaDisk::handleIdentifyResponse, this, _1));
+            std::bind(&AtaDisk::handleIdentifyResponse, this, _1), AtaCommandFlags::TransferPio);
     if(err) {
         this->status = err;
         return;
