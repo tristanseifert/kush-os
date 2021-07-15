@@ -4,22 +4,156 @@
 # Base directory containing cursors
 base = "/System/Data/windowserver/cursors"
 
-## Standard left pointing arrow cursor
+# standard arrow pointers
 [[cursors]]
-name = "Normal"
-file = "left_ptr.png"
+name = "pointer.normal"
+file = "LeftPtrNormal.png"
 hotspot = [2, 1]
-#file = "test.png"
-#hotspot = [0, 0]
-
-# Pointing hand
 [[cursors]]
-name = "Pointer"
-file = "pointing_hand.png"
+name = "pointer.help"
+file = "LeftPtrHelp.png"
+hotspot = [2, 1]
+[[cursors]]
+name = "pointer.prohibited"
+file = "LeftPtrProhibited.png"
+hotspot = [2, 1]
+[[cursors]]
+name = "pointer.add"
+file = "LeftPtrPlus.png"
+hotspot = [2, 1]
+[[cursors]]
+name = "pointer.menu"
+file = "LeftPtrMenu.png"
+hotspot = [2, 1]
+[[cursors]]
+name = "pointer.link"
+file = "LeftPtrLink.png"
+hotspot = [2, 1]
+
+[[cursors]]
+name = "pointer.progress"
+file = "LeftPtrProgress.png"
+hotspot = [2, 1]
+[cursors.animation]
+delay = 50
+frames = 16
+
+# Waiting indicator
+[[cursors]]
+name = "wait"
+file = "Wait.png"
+hotspot = [11, 11]
+[cursors.animation]
+delay = 50
+frames = 16
+
+# Various types of hands
+[[cursors]]
+name = "hand.pointer"
+file = "HandPointing.png"
 hotspot = [6, 1]
-
-# Standard horizontal text (I bar)
 [[cursors]]
-name = "Caret"
-file = "text.png"
+name = "hand.closed"
+file = "HandClosed.png"
+hotspot = [10, 10]
+[[cursors]]
+name = "hand.open"
+file = "HandOpen.png"
+hotspot = [10, 11]
+
+# column/row resizing
+[[cursors]]
+name = "resize.col"
+file = "ResizeColumn.png"
+hotspot = [11, 11]
+[[cursors]]
+name = "resize.row"
+file = "ResizeRow.png"
+hotspot = [11, 11]
+
+# general resizing
+[[cursors]]
+name = "resize.e"
+file = "ResizeE.png"
+hotspot = [19, 11]
+[[cursors]]
+name = "resize.ew"
+file = "ResizeEW.png"
+hotspot = [11, 11]
+[[cursors]]
+name = "resize.ne"
+file = "ResizeNE.png"
+hotspot = [18, 4]
+[[cursors]]
+name = "resize.nesw"
+file = "ResizeNESW.png"
+hotspot = [11, 11]
+[[cursors]]
+name = "resize.ns"
+file = "ResizeNS.png"
+hotspot = [11, 11]
+[[cursors]]
+name = "resize.nw"
+file = "ResizeNW.png"
+hotspot = [4, 4]
+[[cursors]]
+name = "resize.n"
+file = "ResizeN.png"
+hotspot = [11, 4]
+[[cursors]]
+name = "resize.nwse"
+file = "ResizeNWSE.png"
+hotspot = [11, 11]
+[[cursors]]
+name = "resize.sw"
+file = "ResizeSW.png"
+hotspot = [4, 18]
+[[cursors]]
+name = "resize.s"
+file = "ResizeS.png"
+hotspot = [11, 19]
+[[cursors]]
+name = "resize.se"
+file = "ResizeSE.png"
+hotspot = [18, 18]
+[[cursors]]
+name = "resize.w"
+file = "ResizeW.png"
+hotspot = [4, 11]
+
+
+# text cursors
+[[cursors]]
+name = "text.ibar"
+file = "TextHorizontal.png"
 hotspot = [16, 16]
+
+# crosshair and friends
+[[cursors]]
+name = "crosshair"
+file = "CrossHair.png"
+hotspot = [12, 12]
+[[cursors]]
+name = "cross"
+file = "Cross.png"
+hotspot = [12, 12]
+[[cursors]]
+name = "colorpicker"
+file = "ColorPicker.png"
+hotspot = [2, 20]
+
+# Movement grabber
+[[cursors]]
+name = "move"
+file = "Move.png"
+hotspot = [11, 11]
+
+# zoom cursors
+[[cursors]]
+name = "zoom.in"
+file = "ZoomIn.png"
+hotspot = [10, 10]
+[[cursors]]
+name = "zoom.out"
+file = "ZoomOut.png"
+hotspot = [10, 10]

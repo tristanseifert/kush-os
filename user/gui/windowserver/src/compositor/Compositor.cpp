@@ -78,9 +78,21 @@ void Compositor::workerMain() {
 
     // handle events
     while(this->run) {
-        note = NotificationReceive(UINTPTR_MAX, UINTPTR_MAX);
+        bool needsDraw{false};
+        uintptr_t drawWhat{0};
 
-        if(!note) continue;
+        // receive notifications
+        note = NotificationReceive(UINTPTR_MAX, 16666);
+        if(!note) {
+            // animate cursor
+            const bool cursorUpdated = this->cursor->tick();
+            if(cursorUpdated) {
+                needsDraw = true;
+                drawWhat |= kCursorUpdateBit;
+            }
+
+            goto draw;
+        }
 
         // system events
         if(note & kShutdownBit) {
@@ -92,14 +104,12 @@ void Compositor::workerMain() {
         }
 
         // redraw events
-        bool needsDraw{false};
-        uintptr_t drawWhat{0};
-
         if(note & kCursorUpdateBit) {
             needsDraw = true;
             drawWhat |= kCursorUpdateBit;
         }
 
+draw:;
         // perform the drawing if needed
         if(needsDraw) {
             this->draw(drawWhat);
@@ -139,7 +149,10 @@ void Compositor::notifyWorker(const uintptr_t bits) {
  * was, and then draw the new cursor on top; this is done via clever use of clip rects.
  */
 void Compositor::draw(const uintptr_t what) {
-    // redraw the windows under the last cursor position
+    // redraw windows
+    if(what & kUpdateBufferBit) {
+        this->drawWindows();
+    }
 
     // add a clipping rect for the last cursor position if it changed
     if(what & kCursorUpdateBit) {
@@ -163,16 +176,10 @@ void Compositor::draw(const uintptr_t what) {
             this->context->clip();
 
             // and draw the windows in it
-            //Trace("Clearing old mouse rect at (%.f, %.f) size (%.f, %.f)", rect.origin.x,
-            //        rect.origin.y, rect.size.width, rect.size.height);
-
             this->drawWindows();
             this->context->popState();
         }
     }
-
-    //this->context->setSource(gui::gfx::RgbColor{0, 0.3, 0});
-    //this->context->paint();
 
     // draw cursor
     this->cursor->draw(this->context);
@@ -190,7 +197,7 @@ void Compositor::draw(const uintptr_t what) {
 void Compositor::drawWindows() {
     // set up state
     this->context->pushState();
-    this->context->setSource(gui::gfx::RgbColor{0, 0, 0});
+    this->context->setSource(gui::gfx::RgbColor{0.2, 0, 0});
 
     this->context->paint();
 

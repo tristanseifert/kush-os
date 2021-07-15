@@ -33,7 +33,7 @@ class Compositor {
     constexpr static const uintptr_t kCursorUpdateBit{1 << 1};
     constexpr static const uintptr_t kShutdownBit{1 << 16};
 
-    constexpr static const uintptr_t kDrawEverything{kCursorUpdateBit};
+    constexpr static const uintptr_t kDrawEverything{kCursorUpdateBit | kUpdateBufferBit};
 
     public:
         /// Create a compositor instance for the given display

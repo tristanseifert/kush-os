@@ -27,13 +27,53 @@ class CursorHandler {
         /// Defines the various types of system cursors
         enum class SystemCursor {
             /// Standard pointer
-            Normal,
-            /// Pointer (like for links)
-            Pointer,
-            /// Movement cursor
+            PointerNormal,
+            /// Normal pointer indicating help is available
+            PointerHelp,
+            /// Pointer indicating the action is prohibited
+            PointerProhibited,
+            /// Pointer with a plus sign
+            PointerAdd,
+            /// Pointer with a context menu icon
+            PointerMenu,
+            /// Pointer with a small link icon
+            PointerLink,
+            /// Pointer indicating progress is happening
+            PointerProgress,
+
+            HandPointer,
+            HandClosed,
+            HandOpen,
+
             Move,
+
+            ResizeColumn,
+            ResizeRow,
+
+            ResizeEast,
+            ResizeEastWest,
+            ResizeNorth,
+            ResizeNorthEast,
+            ResizeNorthEastSouthWest,
+            ResizeNorthSouth,
+            ResizeNorthWest,
+            ResizeNorthWestSouthEast,
+            ResizeSouth,
+            ResizeSouthEast,
+            ResizeSouthWest,
+            ResizeWest,
+
             /// Text insertion bar (I-Bar)
             Caret,
+
+            Cross,
+            Crosshair,
+            ColorPicker,
+
+            ZoomIn,
+            ZoomOut,
+
+            Wait,
         };
 
     public:
@@ -43,6 +83,9 @@ class CursorHandler {
         void draw(const std::unique_ptr<gui::gfx::Context> &ctx);
         /// Handles a mouse movement/button event.
         void handleEvent(const std::tuple<int, int, int> &move, const uintptr_t buttons);
+
+        /// Handles animated cursors
+        bool tick();
 
         /// Returns the rectangle in which the cursor was most recently drawn.
         constexpr auto &getCursorRect() const {
@@ -61,9 +104,19 @@ class CursorHandler {
 
             /// Number of frames for the cursor
             size_t numFrames{1};
+            /// Current frame
+            size_t currentFrame{0};
+
+            /// Number of milliseconds between frames
+            unsigned int frameDelay{0};
 
             /// Surface holding the image(s) for the cursor
             std::shared_ptr<gui::gfx::Surface> surface;
+
+            /// Is this an animated cursor?
+            constexpr bool isAnimated() const {
+                return (this->numFrames > 1);
+            }
         };
 
     private:
@@ -82,6 +135,9 @@ class CursorHandler {
     private:
         /// Whether loading of cursors is logged
         constexpr static const bool kLogCursorLoad{false};
+
+        /// Map from lowercase names to cursor type enum
+        static const std::unordered_map<std::string_view, SystemCursor> gCursorNameMap;
 
         /// Compositor instance for which we are responsible for handling the cursor
         Compositor *comp;

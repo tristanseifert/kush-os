@@ -15,6 +15,52 @@
 using namespace std::string_view_literals;
 
 /**
+ * This map contains a list of lower case cursor names to the corresponding cursor enum.
+ */
+const std::unordered_map<std::string_view, CursorHandler::SystemCursor> CursorHandler::gCursorNameMap{
+    {"pointer.normal"sv,        SystemCursor::PointerNormal},
+    {"pointer.help"sv,          SystemCursor::PointerHelp},
+    {"pointer.prohibited"sv,    SystemCursor::PointerProhibited},
+    {"pointer.add"sv,           SystemCursor::PointerAdd},
+    {"pointer.menu"sv,          SystemCursor::PointerMenu},
+    {"pointer.link"sv,          SystemCursor::PointerLink},
+    {"pointer.progress"sv,      SystemCursor::PointerProgress},
+
+    {"hand.pointer"sv,          SystemCursor::HandPointer},
+    {"hand.closed"sv,           SystemCursor::HandClosed},
+    {"hand.open"sv,             SystemCursor::HandOpen},
+
+    {"text.ibar"sv,             SystemCursor::Caret},
+
+    {"move"sv,                  SystemCursor::Move},
+
+    {"resize.col"sv,            SystemCursor::ResizeColumn},
+    {"resize.row"sv,            SystemCursor::ResizeRow},
+
+    {"resize.e"sv,              SystemCursor::ResizeEast},
+    {"resize.ew"sv,             SystemCursor::ResizeEastWest},
+    {"resize.n"sv,              SystemCursor::ResizeNorth},
+    {"resize.ne"sv,             SystemCursor::ResizeNorthEast},
+    {"resize.nesw"sv,           SystemCursor::ResizeNorthEastSouthWest},
+    {"resize.ns"sv,             SystemCursor::ResizeNorthSouth},
+    {"resize.nw"sv,             SystemCursor::ResizeNorthWest},
+    {"resize.nwse"sv,           SystemCursor::ResizeNorthWestSouthEast},
+    {"resize.s"sv,              SystemCursor::ResizeSouth},
+    {"resize.se"sv,             SystemCursor::ResizeSouthEast},
+    {"resize.sw"sv,             SystemCursor::ResizeSouthWest},
+    {"resize.w"sv,              SystemCursor::ResizeWest},
+
+    {"cross"sv,                 SystemCursor::Cross},
+    {"crosshair"sv,             SystemCursor::Crosshair},
+    {"colorpicker"sv,           SystemCursor::ColorPicker},
+
+    {"zoom.in"sv,               SystemCursor::ZoomIn},
+    {"zoom.out"sv,              SystemCursor::ZoomOut},
+
+    {"wait"sv,                  SystemCursor::Wait},
+};
+
+/**
  * Initializes the cursor handler.
  */
 CursorHandler::CursorHandler(Compositor *_comp) : comp(_comp) {
@@ -78,6 +124,16 @@ void CursorHandler::loadCursors() {
 
             inf.size = inf.surface->getSize();
 
+            // read animation info (if provided)
+            auto anim = info["animation"].as_table();
+            if(anim) {
+                auto &animInfo = *anim;
+                inf.numFrames = animInfo["frames"].value_or(1);
+                inf.frameDelay = animInfo["delay"].value_or(100);
+
+                inf.size.width /= inf.numFrames;
+            }
+
             // read optional info and store it in the map
             auto hotspot = info["hotspot"].as_array();
             if(hotspot && hotspot->size() == 2) {
@@ -85,14 +141,17 @@ void CursorHandler::loadCursors() {
                 inf.hotspot = {arr[0].value_or(0.), arr[1].value_or(0.)};
             }
 
-            if(kLogCursorLoad) Trace("Cursor %s: %.0f x %.0f, hotspot at (%.0f, %.0f)",
+            if(kLogCursorLoad) Trace("Cursor %s: %.0f x %.0f, hotspot at (%.0f, %.0f) "
+                    "with %lu frames (delay %u ms)",
                     filename.c_str(), inf.size.width, inf.size.height, inf.hotspot.x,
-                    inf.hotspot.y);
+                    inf.hotspot.y, inf.numFrames, inf.frameDelay);
             cursors.emplace(type, std::move(inf));
         }
     }
 
     this->systemCursors = cursors;
+    if(kLogCursorLoad) Trace("Loaded %lu cursors (total %lu kinds known)", cursors.size(),
+            gCursorNameMap.size());
 }
 
 /**
@@ -132,6 +191,7 @@ void CursorHandler::handleEvent(const std::tuple<int, int, int> &move, const uin
     // handle buttons
     if(buttons != this->buttonState) {
         this->buttonState = buttons;
+        redrawCursor = true;
 
         this->distributeButtonEvent();
     }
@@ -176,21 +236,39 @@ void CursorHandler::distributeScrollEvent(const int delta) {
  */
 void CursorHandler::draw(const std::unique_ptr<gui::gfx::Context> &ctx) {
     // calculate the cursor's origin
-    const auto &cursor = this->systemCursors.at(this->cursor);
+    auto &cursor = this->systemCursors.at(this->cursor);
     gui::gfx::Point origin = this->position;
-    origin -= cursor.hotspot;
+    //origin -= cursor.hotspot;
+
+    // if the cursor is animated, shift the surface's origin
+    auto imageOrigin = origin;
+
+    if(cursor.numFrames) {
+        imageOrigin.x -= (cursor.size.width * cursor.currentFrame);
+    }
 
     // draw it
     ctx->pushState();
 
-    //ctx->setSource(gui::gfx::RgbColor{0, 0.2, 0});
-    ctx->setSource(cursor.surface, origin);
+    ctx->setSource(cursor.surface, imageOrigin);
     ctx->rectangle(origin, cursor.size);
     ctx->fill();
 
     ctx->popState();
 
     this->cursorRect = {origin, cursor.size};
+}
+
+/**
+ * Increments the animation frame for the current cursor.
+ *
+ * @return Whether the cursor image has changed and needs to be redrawn
+ */
+bool CursorHandler::tick() {
+    auto &cursor = this->systemCursors.at(this->cursor);
+    cursor.currentFrame = (cursor.currentFrame + 1) % cursor.numFrames;
+
+    return true;
 }
 
 
@@ -205,18 +283,9 @@ bool CursorHandler::TranslateTypeName(const std::string_view &name, SystemCursor
     std::string lower(name);
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
 
-    // compare them
-    if(lower == "normal") {
-        outType = SystemCursor::Normal;
-        return true;
-    } else if(lower == "pointer") {
-        outType = SystemCursor::Pointer;
-        return true;
-    } else if(lower == "move") {
-        outType = SystemCursor::Move;
-        return true;
-    } else if(lower == "caret") {
-        outType = SystemCursor::Caret;
+    // look up in map
+    if(gCursorNameMap.contains(name)) {
+        outType = gCursorNameMap.at(name);
         return true;
     }
 
