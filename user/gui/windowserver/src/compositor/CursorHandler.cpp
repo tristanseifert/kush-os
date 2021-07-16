@@ -233,8 +233,11 @@ void CursorHandler::distributeScrollEvent(const int delta) {
 
 /**
  * Draws the current mouse cursor.
+ *
+ * @param outDirtyRects Region(s) drawn to are inserted here
  */
-void CursorHandler::draw(const std::unique_ptr<gui::gfx::Context> &ctx) {
+void CursorHandler::draw(const std::unique_ptr<gui::gfx::Context> &ctx,
+        std::vector<gui::gfx::Rectangle> &outDirtyRects) {
     // calculate the cursor's origin
     auto &cursor = this->systemCursors.at(this->cursor);
     gui::gfx::Point origin = this->position;
@@ -257,6 +260,7 @@ void CursorHandler::draw(const std::unique_ptr<gui::gfx::Context> &ctx) {
     ctx->popState();
 
     this->cursorRect = {origin, cursor.size};
+    outDirtyRects.emplace_back(this->cursorRect);
 }
 
 /**

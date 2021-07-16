@@ -2,6 +2,7 @@
 #include "CursorHandler.h"
 
 #include "Log.h"
+#include "gfx/Types.h"
 
 #include <DriverSupport/gfx/Display.h>
 
@@ -149,6 +150,8 @@ void Compositor::notifyWorker(const uintptr_t bits) {
  * was, and then draw the new cursor on top; this is done via clever use of clip rects.
  */
 void Compositor::draw(const uintptr_t what) {
+    std::vector<gui::gfx::Rectangle> dirtyRects;
+
     // redraw windows
     if(what & kUpdateBufferBit) {
         this->drawWindows();
@@ -178,14 +181,19 @@ void Compositor::draw(const uintptr_t what) {
             // and draw the windows in it
             this->drawWindows();
             this->context->popState();
+
+            // mark it as dirty
+            dirtyRects.emplace_back(std::move(rect));
         }
     }
 
     // draw cursor
-    this->cursor->draw(this->context);
+    this->cursor->draw(this->context, dirtyRects);
 
-    // TODO: use more granular update region
-    this->display->RegionUpdated({0, 0}, this->bufferDimensions);
+    // update the dirty rects
+    for(const auto &rect : dirtyRects) {
+        this->display->RegionUpdated(rect.origin, rect.size);
+    }
 }
 
 /**

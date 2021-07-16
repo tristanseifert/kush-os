@@ -205,9 +205,6 @@ void Automount::sendRootMountedNotes() {
         Warn("Failed to send driverman a root fs updated notification: %d", err);
     }
 
-    // TODO: notify others
-    Success("TODO: send root mount notifications");
-
     // clean up
     free(buf);
 }

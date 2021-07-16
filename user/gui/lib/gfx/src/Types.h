@@ -36,6 +36,11 @@ struct Size {
     template<typename T>
     Size(const std::pair<T, T> &p) : width(p.first), height(p.second) {}
 
+    template<typename T>
+    inline operator std::pair<T, T>() const {
+        return {this->width, this->height};
+    }
+
     auto operator<=> (const Size &) const = default;
 };
 
@@ -52,6 +57,11 @@ struct Point {
     Point(const std::pair<T, T> &p) : x(p.first), y(p.second) {}
     template<typename T>
     Point(const std::tuple<T, T> &p) : x(std::get<0>(p)), y(std::get<1>(p)) {}
+
+    template<typename T>
+    inline operator std::pair<T, T>() const {
+        return {this->x, this->y};
+    }
 
     inline Point& operator -=(const Point& p) {
         this->x -= p.x;

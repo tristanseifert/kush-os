@@ -77,10 +77,10 @@ add_library(cairo SHARED
     source/src/cairo-path.c
     source/src/cairo-pattern.c
 
-source/src/cairo-pdf-interchange.c
-source/src/cairo-pdf-operators.c
-source/src/cairo-pdf-shading.c
-source/src/cairo-pdf-surface.c
+#source/src/cairo-pdf-interchange.c
+#source/src/cairo-pdf-operators.c
+#source/src/cairo-pdf-shading.c
+#source/src/cairo-pdf-surface.c
 source/src/cairo-pen.c
 source/src/cairo-png.c
 source/src/cairo-polygon-intersect.c
@@ -135,6 +135,7 @@ source/src/cairo-wideint.c
 
 target_include_directories(cairo PRIVATE source/cairo)
 target_link_options(cairo PRIVATE -flto)
+target_compile_options(cairo PRIVATE -flto -O2)
 
 # architecture specific stuff
 if(${KERNEL_ARCH} STREQUAL "x86_64")

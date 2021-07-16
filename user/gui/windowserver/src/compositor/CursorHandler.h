@@ -6,6 +6,7 @@
 #include <string_view>
 #include <tuple>
 #include <unordered_map>
+#include <vector>
 
 #include <gfx/Types.h>
 #include <gfx/Context.h>
@@ -80,7 +81,8 @@ class CursorHandler {
         CursorHandler(Compositor *comp);
 
         /// Draws the current mouse cursor on the given graphics context.
-        void draw(const std::unique_ptr<gui::gfx::Context> &ctx);
+        void draw(const std::unique_ptr<gui::gfx::Context> &ctx,
+                std::vector<gui::gfx::Rectangle> &outDirtyRects);
         /// Handles a mouse movement/button event.
         void handleEvent(const std::tuple<int, int, int> &move, const uintptr_t buttons);
 
