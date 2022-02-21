@@ -19,21 +19,23 @@ set(CMAKE_INSTALL_PREFIX ${SYSROOT_DIR})
 set(CMAKE_INSTALL_INCLUDEDIR "/Local/Includes")
 
 ##### Get build version (based on git tags)
-include(GetGitRevisionDescription)
-git_describe(VERSION --tags --dirty=-d)
-
-get_git_head_revision(GIT_REFSPEC GIT_HASH)
-
-string(REGEX REPLACE "^v([0-9]+)\\..*" "\\1" VERSION_MAJOR "${VERSION}")
-string(REGEX REPLACE "^v[0-9]+\\.([0-9]+).*" "\\1" VERSION_MINOR "${VERSION}")
-string(REGEX REPLACE "^v[0-9]+\\.[0-9]+\\.([0-9]+).*" "\\1" VERSION_PATCH "${VERSION}")
-string(REGEX REPLACE "^v[0-9]+\\.[0-9]+\\.[0-9]+(.*)" "\\1" VERSION_SHA1 "${VERSION}")
-set(VERSION_SHORT "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
-
-execute_process(COMMAND git describe --tags --dirty=d OUTPUT_VARIABLE VERSION_TAG OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(
+    COMMAND git rev-parse --abbrev-ref HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_COMMIT_BRANCH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+execute_process(
+    COMMAND git log -1 --format=%h
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_COMMIT_HASH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+cmake_host_system_information(RESULT BUILD_HOSTNAME QUERY FQDN)
+set(BUILD_USERNAME $ENV{USER})
 
 ##### Top level options for what to be compiled
-option(BUILD_KERNEL "Build kernel" ON)
+option(BUILD_CORE "Build core system" ON)
 
 ##### General defines
 set(CMAKE_CXX_STANDARD 20)
@@ -48,12 +50,9 @@ add_compile_options(-Wno-unused-private-field)
 endif()
 
 ####################
-##### Use cross toolchain for all targets below
-
 ##### Specify options for kernel, free-standing userspace components
 add_compile_options(-g1 -fstack-protector-strong -Wundef -Wcast-qual -Wwrite-strings)
 
-##### Kernel
-if(BUILD_KERNEL)
+if(BUILD_CORE)
+    add_subdirectory(Core)
 endif()
-

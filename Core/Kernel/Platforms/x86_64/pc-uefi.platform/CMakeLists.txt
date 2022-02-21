@@ -1,0 +1,22 @@
+###################################################################################################
+# 64-bit x86 UEFI platform
+###################################################################################################
+
+##### Build the platform code
+add_library(platform-amd64-uefi OBJECT
+    Sources/Boot/Entry.cpp
+    Sources/Boot/Header.cpp
+)
+
+target_include_directories(platform-amd64-uefi PRIVATE ${CMAKE_CURRENT_LIST_DIR}/External/stivale)
+
+
+##### Define the expected platform defines
+set(KERNEL_PLATFORM_FILE_EXTENSION ".elf" PARENT_SCOPE)
+set(KERNEL_PLATFORM_LINKER_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/kernel.ld" PARENT_SCOPE)
+
+set(KERNEL_PLATFORM_LIB platform-amd64-uefi PARENT_SCOPE)
+set(KERNEL_PLATFORM_COMPILE_OPTS -mcmodel=kernel -mno-red-zone -fPIC -fPIE PARENT_SCOPE)
+
+# Ensure we're built with the appropriate options also
+target_compile_options(platform-amd64-uefi PRIVATE ${KERNEL_PLATFORM_COMPILE_OPTS})

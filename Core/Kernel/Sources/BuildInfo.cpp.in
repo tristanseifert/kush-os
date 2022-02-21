@@ -1,0 +1,21 @@
+/**
+ * This is a template file that's filled in with information about the current build.
+ */
+#include "BuildInfo.h"
+
+extern "C" {
+
+const struct BuildInfo gBuildInfo{
+    .gitBranch = "@GIT_COMMIT_BRANCH@",
+    .gitHash = "@GIT_COMMIT_HASH@",
+
+    .arch = "@CMAKE_SYSTEM_PROCESSOR@",
+    .platform = "@KERNEL_PLATFORM@",
+
+    .buildType = "@CMAKE_BUILD_TYPE@",
+    .buildUser = "@BUILD_USERNAME@",
+    .buildHost = "@BUILD_HOSTNAME@",
+    .buildDate = __DATE__ " " __TIME__,
+};
+
+};

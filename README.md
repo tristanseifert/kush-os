@@ -6,11 +6,14 @@ This is yet another hobby OS, but this one doesn't try to be yet another UNIX cl
 ## Building
 We use CMake to build everything. The single `CMakeLists.txt` in this directory can build the kernel, all userspace components, and tools automatically. You will have to select one of the toolchains to use and pass it to CMake in the `CMAKE_TOOLCHAIN_FILE` flag.
 
+Most likely, you're best served by setting `CMAKE_BUILD_TYPE` to `RelwithDebInfo` to produce optimized, release binaries but with debugging information. Especially a debug kernel will cause significant performance losses.
+
 ### Directory structure
+- Core: Basic system components
+    - Kernel: Code for the kush-os kernel
 - tools: Host side utilities
 - sysroot: Base directory of the OS root directory. Automatically built up as kernel/userspace is built.
 - toolchain: Created by the `build_toolchain.sh` script.
-
 
 ### Build Dependencies
 Build system is made with cmake, and tested to target the Ninja build system. You'll need also the cross compiled LLVM toolchain, and a host toolchain if the host side tools are required. Each of the platforms may have additional build requirements:
