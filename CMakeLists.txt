@@ -4,7 +4,7 @@
 # Automatically builds kernel and userland components.
 ###############################################################################
 cmake_minimum_required(VERSION 3.7 FATAL_ERROR)
-project(kush VERSION 0.1 LANGUAGES ASM C CXX)
+project(kush VERSION 2.0 LANGUAGES ASM C CXX)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 
@@ -12,13 +12,13 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 include(ExternalProject)
 
 ##### Sysroot directory: we install libraries and so forth there
-set(SYSROOT_DIR ${CMAKE_CURRENT_BINARY_DIR}/../sysroot CACHE FILEPATH "Sysroot directory" FORCE)
+set(SYSROOT_DIR ${CMAKE_CURRENT_LIST_DIR}/sysroot CACHE FILEPATH "Sysroot directory" FORCE)
 message("Sysroot at ${SYSROOT_DIR}")
 
 set(CMAKE_INSTALL_PREFIX ${SYSROOT_DIR})
-set(CMAKE_INSTALL_INCLUDEDIR "usr/include")
+set(CMAKE_INSTALL_INCLUDEDIR "/Local/Includes")
 
-##### Version
+##### Get build version (based on git tags)
 include(GetGitRevisionDescription)
 git_describe(VERSION --tags --dirty=-d)
 
@@ -32,16 +32,12 @@ set(VERSION_SHORT "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 
 execute_process(COMMAND git describe --tags --dirty=d OUTPUT_VARIABLE VERSION_TAG OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-##### Options for what to be compiled
-option(BUILD_KERNEL "Build the kernel" ON)
-option(BUILD_USER_LIBS "Build userspace libraries" ON)
-option(BUILD_SYSTEM_SERVERS "Build core system servers" ON)
+##### Top level options for what to be compiled
+option(BUILD_KERNEL "Build kernel" ON)
 
 ##### General defines
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-#set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # configure warnings
 add_compile_options(-Wall -Wno-format -Wmissing-declarations -Wformat=2 -fdiagnostics-color=always -ftls-model=initial-exec -Wundef -Wcast-qual -Wwrite-strings)
@@ -59,8 +55,5 @@ add_compile_options(-g1 -fstack-protector-strong -Wundef -Wcast-qual -Wwrite-str
 
 ##### Kernel
 if(BUILD_KERNEL)
-    add_subdirectory(kernel)
 endif()
 
-##### Userspace
-add_subdirectory(user)
