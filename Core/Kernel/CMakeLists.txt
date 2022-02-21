@@ -25,6 +25,7 @@ set(BuildInfoFile "${CMAKE_CURRENT_BINARY_DIR}/BuildInfo.cpp")
 
 ##### Define the kernel target
 add_executable(Kernel
+    Sources/Init.cpp
     ${BuildInfoFile}
 )
 
@@ -35,6 +36,7 @@ target_compile_options(Kernel PRIVATE ${KERNEL_COMPILE_OPTS} ${ARCH_COMPILE_OPTS
 target_link_options(Kernel PRIVATE ${KERNEL_COMPILE_OPTS} --static -nostartfiles)
 
 ##### Include selected platform code
+set(KERNEL_LIST_DIR ${CMAKE_CURRENT_LIST_DIR})
 add_subdirectory(platforms/${CMAKE_SYSTEM_PROCESSOR}/${KERNEL_PLATFORM_OPTIONS}.platform)
 
 # Link the platform code
@@ -47,8 +49,8 @@ set_target_properties(Kernel PROPERTIES OUTPUT_NAME "kernel-${CMAKE_SYSTEM_PROCE
 set_target_properties(Kernel PROPERTIES SUFFIX "${KERNEL_PLATFORM_FILE_EXTENSION}")
 
 # Use the appropriate linker script
-message("Platform linker script: ${KERNEL_PLATFORM_LINKER_SCRIPT}")
 set_target_properties(Kernel PROPERTIES LINK_DEPENDS ${KERNEL_PLATFORM_LINKER_SCRIPT})
+target_link_options(Kernel PRIVATE ${KERNEL_PLATFORM_LINKER_OPTS})
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     target_link_options(Kernel PRIVATE "-Wl,-T${KERNEL_PLATFORM_LINKER_SCRIPT}")

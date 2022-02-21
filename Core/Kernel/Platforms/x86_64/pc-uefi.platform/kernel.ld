@@ -17,15 +17,11 @@ SECTIONS {
 
     /* kernel code (immutable) section */
     .text : ALIGN(4K) {
-        __kern_code_start = .;
-
         *(.text .text.*)
     } :text
-    __kern_code_end = .;
 
     /* Place the stivale2 header into rodata */
     .stivale2hdr : ALIGN(4K) {
-        __kernel_rodata_start = .;
         KEEP(*(.stivale2hdr))
     } :rodata
 
@@ -33,14 +29,11 @@ SECTIONS {
     .rodata : {
         *(.rodata .rodata.*)
     } :rodata
-    __kernel_rodata_end = .;
 
     /* kernel data (mutable) section */
     .data : ALIGN(4K) {
-        __kern_data_start = .;
         *(*.data .data.*)
     } :data
-    __kern_data_size = SIZEOF(.data);
 
     /* kernel data (uninitialized, mutable) and stack */
     .bss (NOLOAD) : ALIGN(64) {
@@ -48,11 +41,5 @@ SECTIONS {
         *(COMMON)
         *(.bss .bss.*)
     } :data
-    __kern_bss_end = .;
-    __kern_size = __kern_bss_start - __kern_code_start;
-
-    /* align to a page boundary */
-    __kern_keep_end = (. + 4095) & ~ 4095;
-    __kern_end = .;
 }
 

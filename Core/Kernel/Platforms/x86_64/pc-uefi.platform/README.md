@@ -6,3 +6,7 @@ You can tweak the following settings for this platform:
 
 - 
 
+## Boot Arguments
+The kernel's command line can be augmented with the following keys to control the platform at runtime:
+
+- `console=`: Specify additional console devices, such as an IO port or 16650-compatible UART.
