@@ -22,6 +22,7 @@
 
 #include "Helpers.h"
 #include "Io/Console.h"
+#include "Util/Backtrace.h"
 
 using namespace Platform::Amd64Uefi;
 
@@ -31,15 +32,13 @@ using namespace Platform::Amd64Uefi;
 extern "C" void _osentry(struct stivale2_struct *loaderInfo) {
     // set up the console (bootloader terminal, serial, etc.)
     Console::Init(loaderInfo);
-
     Kernel::Console::Init();
+
+    // initialize some more stuff with bootloader info
+    Backtrace::Init(loaderInfo);
 
     // jump to the kernel's entry point now
     Kernel::Start();
 
     PANIC("Kernel entry point returned!");
-
-    for (;;) {
-        asm ("hlt" ::: "memory");
-    }
 }

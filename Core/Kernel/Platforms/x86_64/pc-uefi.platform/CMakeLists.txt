@@ -6,6 +6,7 @@
 add_library(platform-amd64-uefi OBJECT
     Sources/Boot/Entry.cpp
     Sources/Boot/Header.cpp
+    Sources/Arch/Processor.cpp
     Sources/Io/Console.cpp
     Sources/Util/Backtrace.cpp
 )

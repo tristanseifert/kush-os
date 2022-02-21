@@ -1,15 +1,27 @@
 #include "Backtrace.h"
+#include "Boot/Helpers.h"
 
 #include <Runtime/Printf.h>
 #include <stdint.h>
 
 using namespace Platform::Amd64Uefi;
 
+extern char __kernel_text_start, __kernel_text_end;
+
 /// x86_64 stack frame
 struct stackframe {
     struct stackframe *rbp;
     uint64_t rip;
 };
+
+/**
+ * Initializes the backtrace facility.
+ *
+ * This attempts to locate the string and symbol tables in the loaded kernel ELF image.
+ */
+void Backtrace::Init(struct stivale2_struct *loaderInfo) {
+    // TODO: implement
+}
 
 /**
  * Prints a backtrace to the given character buffer.
@@ -40,6 +52,9 @@ int Backtrace::Print(const void *stack, char *outBuf, const size_t outBufLen,
     char *writePtr = outBuf;
     int written;
 
+    constexpr static const size_t kSymbolNameBufLen{100};
+    char symbolNameBuf[kSymbolNameBufLen];
+
     for(size_t frame = 0; stk && frame < 50; ++frame) {
         const auto bufAvail = outBufLen - (writePtr - outBuf);
         if(!bufAvail) goto full;
@@ -49,11 +64,21 @@ int Backtrace::Print(const void *stack, char *outBuf, const size_t outBufLen,
 
         // symbolicate, if requested
         if(symbolicate) {
-            written = snprintf_(writePtr, bufAvail, "%2zu %016llx\n", frame, stk->rip);
+            written = Symbolicate(stk->rip, symbolNameBuf, kSymbolNameBufLen);
+            if(written == 1) {
+                written = snprintf_(writePtr, bufAvail, "\n%2zu %016llx %s", frame, stk->rip,
+                        symbolNameBuf);
+            }
+            // regular peasant output
+            else {
+                goto beach;
+            }
+
         }
         // print raw address
         else {
-            written = snprintf_(writePtr, bufAvail, "%2zu %016llx\n", frame, stk->rip);
+beach:;
+            written = snprintf_(writePtr, bufAvail, "\n%2zu %016llx", frame, stk->rip);
         }
 
 next:
@@ -68,5 +93,25 @@ next:
 
 full:
     return numFrames;
+}
+
+/**
+ * Attempt to symbolicate the provided symbol; it must be inside the kernel.
+ *
+ * @param pc Symbol address
+ * @param outBuf Location where the symbol name is written
+ * @param outBufLen Length of symbol name buffer
+ *
+ * @return 0 if no symbol found, -1 if an error occurred, and 1 if symbol was found.
+ */
+int Backtrace::Symbolicate(const uintptr_t pc, char *outBuf, const size_t outBufLen) {
+    // ensure it's in the kernel .text section
+    if(pc < reinterpret_cast<uintptr_t>(&__kernel_text_start) ||
+            pc > reinterpret_cast<uintptr_t>(&__kernel_text_end)) {
+        return 0;
+    }
+
+    // TODO: implement
+    return -1;
 }
 

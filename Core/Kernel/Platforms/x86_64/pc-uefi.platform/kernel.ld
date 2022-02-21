@@ -17,8 +17,10 @@ SECTIONS {
 
     /* kernel code (immutable) section */
     .text : ALIGN(4K) {
+        __kernel_text_start = .;
         *(.text .text.*)
     } :text
+    __kernel_text_end = .;
 
     /* Place the stivale2 header into rodata */
     .stivale2hdr : ALIGN(4K) {
@@ -37,7 +39,6 @@ SECTIONS {
 
     /* kernel data (uninitialized, mutable) and stack */
     .bss (NOLOAD) : ALIGN(64) {
-        __kern_bss_start = .;
         *(COMMON)
         *(.bss .bss.*)
     } :data

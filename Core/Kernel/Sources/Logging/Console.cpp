@@ -82,13 +82,9 @@ void Console::Panic(const char *fmt, ...) {
 
     panicMsgBuf[0] = '\0';
     Platform::Backtrace::Print(nullptr, panicMsgBuf, kMsgBufChars, true);
-    Log(Priority::Error, "Backtrace:\n%s", panicMsgBuf);
+    Log(Priority::Error, "Backtrace:%s", panicMsgBuf);
 
     // halt machine
-    // TODO: implement
-    for(;;) {
-        asm volatile("" ::: "memory");
-        asm ("hlt" ::: "memory");
-    }
+    Platform::Processor::HaltAll();
 }
 
