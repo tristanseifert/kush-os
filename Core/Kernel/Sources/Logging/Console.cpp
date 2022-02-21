@@ -67,6 +67,7 @@ void Console::Log(const Priority level, const char *fmt, ...) {
  */
 void Console::Panic(const char *fmt, ...) {
     va_list va;
+    void *pc = __builtin_return_address(0);
 
     // format panic message
     static constexpr const size_t kMsgBufChars{1024};
@@ -76,10 +77,12 @@ void Console::Panic(const char *fmt, ...) {
     vsnprintf_(panicMsgBuf, kMsgBufChars, fmt, va);
     va_end(va);
 
-    // TODO: collect backtrace
+    // then output it, and the backtrace
+    Log(Priority::Error, "\n\033[101;97mPANIC: %s\033[0m\nPC = %p\n", panicMsgBuf, pc);
 
-    // and output the panic message
-    Log(Priority::Error, "\n\033[101;97mPANIC: %s\033[0m\n\n", panicMsgBuf);
+    panicMsgBuf[0] = '\0';
+    Platform::Backtrace::Print(nullptr, panicMsgBuf, kMsgBufChars, true);
+    Log(Priority::Error, "Backtrace:\n%s", panicMsgBuf);
 
     // halt machine
     // TODO: implement

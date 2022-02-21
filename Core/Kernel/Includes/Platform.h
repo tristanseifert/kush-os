@@ -4,6 +4,7 @@
 #ifndef KERNEL_PLATFORM_H
 #define KERNEL_PLATFORM_H
 
+#include <platform/Backtrace.h>
 #include <platform/Console.h>
 
 #endif

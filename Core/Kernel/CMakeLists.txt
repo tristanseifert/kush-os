@@ -68,10 +68,7 @@ add_library(printf OBJECT
 )
 
 target_include_directories(printf PUBLIC External/printf/src)
-
-# do not allow printf to use SIMD instructions (used too early in boot)
-target_compile_options(printf PRIVATE ${KERNEL_COMPILE_OPTS} ${KERNEL_PLATFORM_COMPILE_OPTS} -flto
-    -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx)
+target_compile_options(printf PRIVATE ${KERNEL_COMPILE_OPTS} ${KERNEL_PLATFORM_COMPILE_OPTS} -flto)
 
 # disable floating point, writeback specifier (security issue)
 target_compile_definitions(printf PRIVATE -DPRINTF_ALIAS_STANDARD_FUNCTION_NAMES=0

@@ -7,6 +7,7 @@ add_library(platform-amd64-uefi OBJECT
     Sources/Boot/Entry.cpp
     Sources/Boot/Header.cpp
     Sources/Io/Console.cpp
+    Sources/Util/Backtrace.cpp
 )
 
 target_include_directories(platform-amd64-uefi PUBLIC ${CMAKE_CURRENT_LIST_DIR}/Includes)
@@ -21,7 +22,9 @@ set(KERNEL_PLATFORM_LINKER_OPTS "" PARENT_SCOPE)
 
 set(KERNEL_PLATFORM_LIB platform-amd64-uefi PARENT_SCOPE)
 
-set(COMPILE_OPTS -mno-red-zone -fPIC -fPIE)
+# disable SIMD in the kernel (we can still use intrinsics as needed)
+set(COMPILE_OPTS -mno-red-zone -fPIC -fPIE -fno-omit-frame-pointer
+    -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx)
 set(KERNEL_PLATFORM_COMPILE_OPTS -mcmodel=kernel ${COMPILE_OPTS} PARENT_SCOPE)
 
 # Ensure we're built with the appropriate options also
