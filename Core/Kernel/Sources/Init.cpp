@@ -3,6 +3,7 @@
  */
 #include <Platform.h>
 #include <Init.h>
+#include <Logging/Console.h>
 
 using namespace Kernel;
 

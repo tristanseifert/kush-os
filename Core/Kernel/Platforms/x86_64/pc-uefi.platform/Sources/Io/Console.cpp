@@ -159,7 +159,6 @@ void Console::ParseCmdToken(const char *value, const size_t valueLen) {
     // unknown type :(
     else {
         // TODO: display error? what can we do at this point
-        Write(type, typeLen);
     }
 }
 

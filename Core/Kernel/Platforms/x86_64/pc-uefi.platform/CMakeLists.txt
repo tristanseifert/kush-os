@@ -20,7 +20,10 @@ set(KERNEL_PLATFORM_LINKER_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/kernel.ld" PARENT_S
 set(KERNEL_PLATFORM_LINKER_OPTS "" PARENT_SCOPE)
 
 set(KERNEL_PLATFORM_LIB platform-amd64-uefi PARENT_SCOPE)
-set(KERNEL_PLATFORM_COMPILE_OPTS -mcmodel=kernel -mno-red-zone -fPIC -fPIE PARENT_SCOPE)
+
+set(COMPILE_OPTS -mno-red-zone -fPIC -fPIE)
+set(KERNEL_PLATFORM_COMPILE_OPTS -mcmodel=kernel ${COMPILE_OPTS} PARENT_SCOPE)
 
 # Ensure we're built with the appropriate options also
-target_compile_options(platform-amd64-uefi PRIVATE ${KERNEL_PLATFORM_COMPILE_OPTS} -fno-lto)
+# XXX: why do we need to use mcmodel=large here? Otherwise we get link errors…
+target_compile_options(platform-amd64-uefi PRIVATE -mcmodel=large ${COMPILE_OPTS})

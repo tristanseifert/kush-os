@@ -18,6 +18,8 @@
 
 #include <Init.h>
 
+#include "Logging/Console.h"
+
 #include "Helpers.h"
 #include "Io/Console.h"
 
@@ -30,9 +32,12 @@ extern "C" void _osentry(struct stivale2_struct *loaderInfo) {
     // set up the console (bootloader terminal, serial, etc.)
     Console::Init(loaderInfo);
 
+    Kernel::Console::Init();
 
     // jump to the kernel's entry point now
     Kernel::Start();
+
+    PANIC("Kernel entry point returned!");
 
     for (;;) {
         asm ("hlt" ::: "memory");

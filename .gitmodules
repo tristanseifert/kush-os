@@ -1,3 +1,6 @@
 [submodule "Core/Kernel/Platforms/x86_64/pc-uefi.platform/External/stivale"]
 	path = Core/Kernel/Platforms/x86_64/pc-uefi.platform/External/stivale
 	url = https://github.com/stivale/stivale.git
+[submodule "Core/Kernel/External/printf"]
+	path = Core/Kernel/External/printf
+	url = https://github.com/eyalroz/printf.git

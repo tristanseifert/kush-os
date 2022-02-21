@@ -26,14 +26,17 @@ set(BuildInfoFile "${CMAKE_CURRENT_BINARY_DIR}/BuildInfo.cpp")
 ##### Define the kernel target
 add_executable(Kernel
     Sources/Init.cpp
+    Sources/Logging/Console.cpp
+    Sources/Runtime/StackGuard.cpp
+    Sources/Runtime/String.cpp
     ${BuildInfoFile}
 )
 
 target_include_directories(Kernel PRIVATE Sources)
 target_include_directories(Kernel PRIVATE Includes)
 
-target_compile_options(Kernel PRIVATE ${KERNEL_COMPILE_OPTS} ${ARCH_COMPILE_OPTS})
-target_link_options(Kernel PRIVATE ${KERNEL_COMPILE_OPTS} --static -nostartfiles)
+target_compile_options(Kernel PRIVATE ${KERNEL_COMPILE_OPTS} ${ARCH_COMPILE_OPTS} -flto)
+target_link_options(Kernel PRIVATE ${KERNEL_COMPILE_OPTS} --static -nostartfiles -flto)
 
 ##### Include selected platform code
 set(KERNEL_LIST_DIR ${CMAKE_CURRENT_LIST_DIR})
@@ -58,6 +61,24 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     target_link_options(Kernel PRIVATE "-T${KERNEL_PLATFORM_LINKER_SCRIPT}")
 endif()
 
+##### Include various external libraries
+# printf: without floating point support
+add_library(printf OBJECT
+    External/printf/src/printf/printf.c
+)
+
+target_include_directories(printf PUBLIC External/printf/src)
+
+# do not allow printf to use SIMD instructions (used too early in boot)
+target_compile_options(printf PRIVATE ${KERNEL_COMPILE_OPTS} ${KERNEL_PLATFORM_COMPILE_OPTS} -flto
+    -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx)
+
+# disable floating point, writeback specifier (security issue)
+target_compile_definitions(printf PRIVATE -DPRINTF_ALIAS_STANDARD_FUNCTION_NAMES=0
+    -DPRINTF_SUPPORT_DECIMAL_SPECIFIERS=0 -DPRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS=0
+    -DPRINTF_SUPPORT_WRITEBACK_SPECIFIER=0)
+
+target_link_libraries(Kernel PRIVATE printf)
 
 ##### Specify install location of kernel
 
