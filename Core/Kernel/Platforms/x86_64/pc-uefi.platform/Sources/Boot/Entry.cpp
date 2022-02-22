@@ -21,6 +21,7 @@
 
 #include "Helpers.h"
 #include "Arch/Gdt.h"
+#include "Arch/Idt.h"
 #include "Io/Console.h"
 #include "Util/Backtrace.h"
 
@@ -36,6 +37,7 @@ extern "C" void _osentry(struct stivale2_struct *loaderInfo) {
 
     // initialize CPU stuff
     Gdt::Init();
+    Idt::InitBsp();
 
     // initialize some more stuff with bootloader info
     Backtrace::Init(loaderInfo);
