@@ -11,6 +11,8 @@ extern "C" {
 void *memset(void *dst, int c, size_t n);
 void *memmove(void *dst0, const void *src0, size_t length);
 
+char *strncpy(char *dst, const char *src, size_t n);
+
 #ifdef __cplusplus
 }
 #endif

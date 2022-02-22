@@ -42,5 +42,11 @@ SECTIONS {
         *(COMMON)
         *(.bss .bss.*)
     } :data
+
+    /* discard some stuff */
+    /DISCARD/ : {
+        /* exception handling */
+        *(.eh_frame)
+    }
 }
 

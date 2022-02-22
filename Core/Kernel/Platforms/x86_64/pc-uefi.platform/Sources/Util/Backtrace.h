@@ -21,6 +21,16 @@ class Backtrace {
 
     private:
         static void Init(struct stivale2_struct *);
+
+        /// Start of the ELF symbol table
+        static const void *gSymtab;
+        /// Size of the ELF symbol table, in bytes
+        static size_t gSymtabLen;
+
+        /// Start of the ELF string table (for symbol names)
+        static const char *gStrtab;
+        /// Length of the ELF string table
+        static size_t gStrtabLen;
 };
 }
 

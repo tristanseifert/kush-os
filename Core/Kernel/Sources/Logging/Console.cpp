@@ -1,14 +1,14 @@
 #include "Logging/Console.h"
+#include "Runtime/Printf.h"
 #include "BuildInfo.h"
 
-#include <printf/printf.h>
 #include <Platform.h>
 
 #include <stdarg.h>
 
 using namespace Kernel::Logging;
 
-Console::Priority gPriority{Console::Priority::Notice};
+Console::Priority Console::gPriority{Console::Priority::Notice};
 bool Console::gPlatformConsoleEnabled{true};
 
 /**
@@ -26,10 +26,10 @@ void putchar_(char) {
  *         be done very early in the platform initialization code.
  */
 void Console::Init() {
-    Log(Priority::Notice, "kush-os (%s@%s) %s\nBuilt on %s by %s@%s", gBuildInfo.gitHash,
+    Notice("kush-os (%s@%s) %s\nBuilt on %s by %s@%s", gBuildInfo.gitHash,
             gBuildInfo.gitBranch, gBuildInfo.buildType, gBuildInfo.buildDate, gBuildInfo.buildUser,
             gBuildInfo.buildHost);
-    Log(Priority::Notice, "Active platform: %s (%s)", gBuildInfo.platform, gBuildInfo.arch);
+    Notice("Active platform: %s (%s)", gBuildInfo.platform, gBuildInfo.arch);
 }
 
 /**
@@ -42,16 +42,30 @@ void Console::Init() {
  */
 void Console::Log(const Priority level, const char *fmt, ...) {
     va_list va;
+    va_start(va, fmt);
+    Log(level, fmt, va);
+    va_end(va);
+}
 
-    // TODO: check log severity
-
+/**
+ * Writes a message with the specified severity to the console output.
+ *
+ * @remark This does not validate whether the message is to be filtered out.
+ *
+ * @param level Priority level of the message. Messages with a level lower than the current filter
+ *        are discarded.
+ * @param fmt A printf-style format string
+ * @param va Captured variadic arguments for format message
+ */
+void Console::Log(const Priority level, const char *fmt, va_list va) {
     // format the message (TODO: do not use a static buffer!)
     static constexpr const size_t kBufChars{1024};
     static char buf[kBufChars];
 
-    va_start(va, fmt);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
     int chars = vsnprintf_(buf, kBufChars-1, fmt, va);
-    va_end(va);
+#pragma GCC diagnostic pop
 
     // append a newline
     buf[chars++] = '\n';
@@ -78,11 +92,11 @@ void Console::Panic(const char *fmt, ...) {
     va_end(va);
 
     // then output it, and the backtrace
-    Log(Priority::Error, "\n\033[101;97mPANIC: %s\033[0m\nPC = %p\n", panicMsgBuf, pc);
+    Error("\n\033[101;97mPANIC: %s\033[0m\nPC = %p\n", panicMsgBuf, pc);
 
     panicMsgBuf[0] = '\0';
     Platform::Backtrace::Print(nullptr, panicMsgBuf, kMsgBufChars, true);
-    Log(Priority::Error, "Backtrace:%s", panicMsgBuf);
+    Error("Backtrace:%s", panicMsgBuf);
 
     // halt machine
     Platform::Processor::HaltAll();
