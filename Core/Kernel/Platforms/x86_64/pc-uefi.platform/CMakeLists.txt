@@ -6,6 +6,8 @@
 add_library(platform-amd64-uefi OBJECT
     Sources/Boot/Entry.cpp
     Sources/Boot/Header.cpp
+    Sources/Arch/ExceptionHandlers.cpp
+    Sources/Arch/ExceptionHandlers.S
     Sources/Arch/Gdt.cpp
     Sources/Arch/GdtHelpers.S
     Sources/Arch/Idt.cpp

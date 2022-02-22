@@ -29,6 +29,7 @@ add_executable(Kernel
     Sources/Logging/Console.cpp
     Sources/Runtime/StackGuard.cpp
     Sources/Runtime/String.cpp
+    Sources/Exceptions/Handler.cpp
     ${BuildInfoFile}
 )
 

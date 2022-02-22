@@ -72,9 +72,9 @@ class Idt {
         IdtEntry storage[kNumIdt] __attribute__((aligned(64)));
 
         /// Whether all writers to the IDT are logged
-        constexpr static const bool kLogSet{true};
+        constexpr static const bool kLogSet{false};
         /// Whether the IDT loading is logged
-        constexpr static const bool kLogLoad{true};
+        constexpr static const bool kLogLoad{false};
 };
 }
 

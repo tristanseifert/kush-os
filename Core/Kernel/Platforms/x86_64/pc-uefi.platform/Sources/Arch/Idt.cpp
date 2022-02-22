@@ -1,5 +1,6 @@
 #include "Idt.h"
 #include "IdtTypes.h"
+#include "ExceptionHandlers.h"
 
 #include <Logging/Console.h>
 #include <Runtime/String.h>
@@ -26,7 +27,7 @@ void Idt::InitBsp() {
  */
 Idt::Idt() {
     memset(this->storage, 0, sizeof(IdtEntry) * kNumIdt);
-    //InstallExceptionHandlers(this);
+    ExceptionHandlers::Install(*this);
 
     this->load();
 }

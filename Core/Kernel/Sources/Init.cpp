@@ -1,7 +1,6 @@
 /*
  * Initialization function for the kernel.
  */
-#include <Platform.h>
 #include <Init.h>
 #include <Logging/Console.h>
 
@@ -22,7 +21,7 @@ using namespace Kernel;
  * image, set up its main thread, and start the scheduler.
  */
 void Kernel::Start() {
-    Platform::Console::Write("\nWelcome to the chill zone", 26);
+    Console::Notice("Welcome to the ~ chill zone ~");
 
     // TODO: do stuff
 }
