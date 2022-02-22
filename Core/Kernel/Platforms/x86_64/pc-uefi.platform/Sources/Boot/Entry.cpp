@@ -17,10 +17,10 @@
 #include <stivale2.h>
 
 #include <Init.h>
-
-#include "Logging/Console.h"
+#include <Logging/Console.h>
 
 #include "Helpers.h"
+#include "Arch/Gdt.h"
 #include "Io/Console.h"
 #include "Util/Backtrace.h"
 
@@ -33,6 +33,9 @@ extern "C" void _osentry(struct stivale2_struct *loaderInfo) {
     // set up the console (bootloader terminal, serial, etc.)
     Console::Init(loaderInfo);
     Kernel::Console::Init();
+
+    // initialize CPU stuff
+    Gdt::Init();
 
     // initialize some more stuff with bootloader info
     Backtrace::Init(loaderInfo);

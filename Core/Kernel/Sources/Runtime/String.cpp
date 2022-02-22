@@ -3,6 +3,7 @@
  *
  * Unless specified otherwise, these routines were lifted from OpenBSD libc.
  */
+#include "Logging/Console.h"
 #include "Runtime/String.h"
 
 /**
@@ -113,7 +114,60 @@ done:
     return dst0;
 }
 
+/*
+ * Copy a block of memory, not handling overlap.
+ */
+void *
+memcpy(void *dst0, const void *src0, size_t length)
+{
+    char *dst = reinterpret_cast<char *>(dst0);
+    const char *src = reinterpret_cast<const char *>(src0);
+    size_t t;
 
+    if (length == 0 || dst == src) {
+        /* nothing to do */
+        goto done;
+    }
+
+    if ((dst < src && dst + length > src) ||
+        (src < dst && src + length > dst)) {
+        PANIC("Backwards memcpy (dst %p src %p, %zu bytes)", dst0, src0, length);
+    }
+
+    /*
+     * Macros: loop-t-times; and loop-t-times, t>0
+     */
+#define	TLOOP(s) if (t) TLOOP1(s)
+#define	TLOOP1(s) do { s; } while (--t)
+
+    /*
+     * Copy forward.
+     */
+    t = (long)src; /* only need low bits */
+    if ((t | (long)dst) & wmask) {
+        /*
+         * Try to align operands.  This cannot be done
+         * unless the low bits match.
+         */
+        if ((t ^ (long)dst) & wmask || length < wsize) {
+                t = length;
+        } else {
+            t = wsize - (t & wmask);
+        }
+        length -= t;
+        TLOOP1(*dst++ = *src++);
+    }
+    /*
+     * Copy whole words, then mop up any trailing bytes.
+     */
+    t = length / wsize;
+    TLOOP(*(word *)dst = *(const word *)src; src += wsize; dst += wsize);
+    t = length & wmask;
+    TLOOP(*dst++ = *src++);
+
+done:
+    return dst0;
+}
 
 /*
  * Copy src to dst, truncating or null-padding to always copy n bytes.

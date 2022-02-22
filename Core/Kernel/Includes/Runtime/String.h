@@ -8,8 +8,9 @@
 extern "C" {
 #endif
 
-void *memset(void *dst, int c, size_t n);
+void *memcpy(void *dst0, const void *src0, size_t length);
 void *memmove(void *dst0, const void *src0, size_t length);
+void *memset(void *dst, int c, size_t n);
 
 char *strncpy(char *dst, const char *src, size_t n);
 

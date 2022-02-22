@@ -140,4 +140,9 @@ namespace Kernel {
 /// Shorthand for the kernel console panic function
 #define PANIC Kernel::Logging::Console::Panic
 
+/**
+ * Ensures the given condition is true; otherwise, panics with the given message string.
+ */
+#define REQUIRE(cond, ...) {if(!(cond)) { Kernel::Logging::Console::Panic(__VA_ARGS__); }}
+
 #endif

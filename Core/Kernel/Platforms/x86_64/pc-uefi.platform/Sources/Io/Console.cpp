@@ -34,9 +34,6 @@ void Console::Init(struct stivale2_struct *info) {
     }
 }
 
-const char *equals = " = ";
-const char *nl = "\n";
-
 /**
  * Parse the command line string specified to find all specified output devices.
  *
