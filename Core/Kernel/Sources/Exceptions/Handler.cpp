@@ -25,6 +25,11 @@ void Handler::Dispatch(const ExceptionType type, Platform::ProcessorState &state
     static char stateBuf[kStateBufSz];
     Platform::ProcessorState::Format(state, stateBuf, kStateBufSz);
 
-    PANIC("Unhandled exception $%08x, aux = %p\n%s", (uint32_t) type, auxData, stateBuf);
+    constexpr static const size_t kBacktraceBufSz{1024};
+    static char backtraceBuf[kBacktraceBufSz];
+    int frames = Platform::ProcessorState::Backtrace(state, backtraceBuf, kBacktraceBufSz);
+
+    PANIC("Unhandled exception $%08x, aux = %p\n%s\nState backtrace: %s", (uint32_t) type,
+            auxData, stateBuf, (frames > 0) ? backtraceBuf : nullptr);
 }
 

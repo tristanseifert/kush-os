@@ -123,6 +123,8 @@ class Console {
         static void Log(const Priority level, const char *fmt, ...)
             __attribute__((format (printf, 2, 3)));
 
+        [[noreturn]] static void Hang();
+
     private:
         /// Allow messages of this priority and up
         static Priority gPriority;

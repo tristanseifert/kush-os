@@ -20,18 +20,19 @@ class Idt {
         enum class Stack: uint8_t {
             /// Do not use an interrupt stack
             None                        = 0,
-            /// First interrupt stack: exceptions
+            /// Exceptions
             Stack1                      = 1,
-            /// Second interrupt stack: faults
+            /// Faults
             Stack2                      = 2,
-            /// Third interrupt stack: NMI
+            /// NMI
             Stack3                      = 3,
-            /// Fourth interrupt stack: MCE/Debug
+            /// MCE/Debug
             Stack4                      = 4,
-            /// Fifth interrupt stack: IPIs
+            /// IPIs
             Stack5                      = 5,
-            /// Sixth interrupt stack: General IRQs
+            /// General IRQs
             Stack6                      = 6,
+            /// Reserved for page faults
             Stack7                      = 7,
         };
 

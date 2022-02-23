@@ -5,147 +5,166 @@
 
 /// divide-by-zero
 .globl  amd64_exception_div0
+.type amd64_exception_div0, function
 amd64_exception_div0:
     cli
     pushq       $0x00
     pushq       $AMD64_EXC_DIVIDE
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// debug exception
 .globl amd64_exception_debug
+.type amd64_exception_debug, function
 amd64_exception_debug:
     cli
     pushq       $0x00
     pushq       $AMD64_EXC_DEBUG
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// non-maskable interrupt
 .globl amd64_exception_nmi
+.type amd64_exception_nmi, function
 amd64_exception_nmi:
     cli
     pushq       $0x00
     pushq       $AMD64_EXC_NMI
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// breakpoint handler
 .globl amd64_exception_breakpoint
+.type amd64_exception_breakpoint, function
 amd64_exception_breakpoint:
     cli
     pushq       $0x00
     pushq       $AMD64_EXC_BREAKPOINT
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// overflow
 .globl amd64_exception_overflow
+.type amd64_exception_overflow, function
 amd64_exception_overflow:
     cli
     pushq       $0x00
     pushq       $AMD64_EXC_OVERFLOW
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// bound range exceeded
 .globl amd64_exception_bounds
+.type amd64_exception_bounds, function
 amd64_exception_bounds:
     cli
     pushq       $0x00
     pushq       $AMD64_EXC_BOUNDS
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// invalid opcode
 .globl amd64_exception_invalid_instruction
+.type amd64_exception_invalid_instruction, function
 amd64_exception_invalid_instruction:
     cli
     pushq       $0x00
     pushq       $AMD64_EXC_ILLEGAL_OPCODE
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// device not available; called for FPU instructions if they're unavailable/disabled
 .globl amd64_exception_device_unavailable
+.type amd64_exception_device_unavailable, function
 amd64_exception_device_unavailable:
     cli
     pushq       $0x00
     pushq       $AMD64_EXC_DEVICE_UNAVAIL
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// double fault
 .globl amd64_exception_double_fault
+.type amd64_exception_double_fault, function
 amd64_exception_double_fault:
     cli
     pushq       $AMD64_EXC_DOUBLE_FAULT
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// Invalid TSS
 .globl amd64_exception_tss_invalid
+.type amd64_exception_tss_invalid, function
 amd64_exception_tss_invalid:
     cli
     pushq       $AMD64_EXC_INVALID_TSS
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// Segment not present
 .globl amd64_exception_segment_missing
+.type amd64_exception_segment_missing, function
 amd64_exception_segment_missing:
     cli
     pushq       $AMD64_EXC_SEGMENT_NP
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// Invalid stack segment
 .globl amd64_exception_ss_invalid
+.type amd64_exception_ss_invalid, function
 amd64_exception_ss_invalid:
     cli
     pushq       $AMD64_EXC_SS
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// General protection fault
 .globl amd64_exception_gpf
+.type amd64_exception_gpf, function
 amd64_exception_gpf:
     cli
     pushq       $AMD64_EXC_GPF
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// x87 floating point exception
 .globl amd64_exception_float
+.type amd64_exception_float, function
 amd64_exception_float:
     cli
     pushq       $0x00
     pushq       $AMD64_EXC_FP
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// Alignment check
 .globl amd64_exception_alignment_check
+.type amd64_exception_alignment_check, function
 amd64_exception_alignment_check:
     cli
     pushq       $AMD64_EXC_ALIGNMENT
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// Machine check
 .globl amd64_exception_machine_check
+.type amd64_exception_machine_check, function
 amd64_exception_machine_check:
     cli
     pushq       $0x00
     pushq       $AMD64_EXC_MCE
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// SIMD floating point exception
 .globl amd64_exception_simd
+.type amd64_exception_simd, function
 amd64_exception_simd:
     cli
     pushq       $0x00
     pushq       $AMD64_EXC_SIMD_FP
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /// Virtualization exception
 .globl amd64_exception_virtualization
+.type amd64_exception_virtualization, function
 amd64_exception_virtualization:
     cli
     pushq       $0x00
     pushq       $AMD64_EXC_VIRT
-    jmp         ErrorCommonStub
+    jmp         Amd64CommonErrorHandler
 
 /**
  * Common handler for exceptions; this prepares a function invocation into the platform specific
  * exception dispatcher
  */
-ErrorCommonStub:
+.type Amd64CommonErrorHandler, function
+Amd64CommonErrorHandler:
     // save registers
     pushq       %r15
     pushq       %r14
@@ -194,6 +213,7 @@ ErrorCommonStub:
  * fault handler, but for now, treat it as any other exception.
  */
 .global amd64_exception_pagefault
+.type amd64_exception_pagefault, function
 amd64_exception_pagefault:
     // disable IRQs and push the interrupt number, and all regs
     cli
@@ -241,3 +261,4 @@ amd64_exception_pagefault:
     // clear status code, irq number off the stack and retrurn
     add         $0x10, %rsp
     iretq
+

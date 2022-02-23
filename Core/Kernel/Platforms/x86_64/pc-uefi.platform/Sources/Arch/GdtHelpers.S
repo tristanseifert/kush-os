@@ -4,6 +4,7 @@
 .section .text
 
 .global _ZN8Platform9Amd64Uefi3Gdt5FlushEv
+.type _ZN8Platform9Amd64Uefi3Gdt5FlushEv, function
 _ZN8Platform9Amd64Uefi3Gdt5FlushEv:
     //mov         %rsp, %rbp
 

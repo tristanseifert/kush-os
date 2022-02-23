@@ -48,6 +48,7 @@ class Processor {
             uint64_t ss;
 
             static int Format(const Regs &state, char *out, const size_t outSize);
+            static int Backtrace(const Regs &state, char *out, const size_t outSize);
         } __attribute__((packed));
 
     public:

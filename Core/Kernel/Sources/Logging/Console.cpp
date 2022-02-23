@@ -99,6 +99,15 @@ void Console::Panic(const char *fmt, ...) {
     Error("Backtrace:%s", panicMsgBuf);
 
     // halt machine
-    Platform::Processor::HaltAll();
+    Hang();
 }
 
+/**
+ * Hang the machine after a panic.
+ *
+ * This is a separate method so it shows up easier in backtraces.
+ */
+__attribute__((noinline))
+void Console::Hang() {
+    Platform::Processor::HaltAll();
+}

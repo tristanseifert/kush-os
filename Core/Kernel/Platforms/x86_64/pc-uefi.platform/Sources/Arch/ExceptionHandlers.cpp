@@ -33,7 +33,7 @@ using namespace Platform::Amd64Uefi;
  * Mapping of exception number to name
  */
 static const struct {
-    uint8_t vector;
+    uint32_t vector;
     const char *name;
 } gExceptionNames[] = {
     {AMD64_EXC_DIVIDE, "Divide-by-zero"},
@@ -64,7 +64,7 @@ static const struct {
 /**
  * Convert an exception number (the `errorCode` field in the regs structure) to a name.
  */
-static const char *GetExceptionName(const uint8_t vector) {
+static const char *GetExceptionName(const uint32_t vector) {
     size_t i = 0;
     while(gExceptionNames[i].name) {
         const auto &record = gExceptionNames[i];
@@ -80,52 +80,62 @@ static const char *GetExceptionName(const uint8_t vector) {
 };
 
 /**
+ * Default interrupt/exception handlers to install
+ */
+static const struct {
+    // Interrupt handler function
+    void (*function)();
+
+    // Index into the IDT
+    uint8_t idtIndex;
+    // Segment to use for code
+    uint8_t segment;
+    // IDT entry flags
+    uint8_t flags;
+    /// Interrupt stack to use
+    Idt::Stack stack = Idt::Stack::None;
+} gDefaultHandlers[] = {
+    {amd64_exception_div0,               0, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack1},
+    {amd64_exception_debug,              1, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack4},
+    {amd64_exception_nmi,                2, GDT_KERN_CODE_SEG,Idt::kIsrFlags,  Idt::Stack::Stack3},
+    {amd64_exception_breakpoint,         3, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack4},
+    {amd64_exception_overflow,           4, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack1},
+    {amd64_exception_bounds,             5, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack1},
+    {amd64_exception_invalid_instruction,6, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack2},
+    {amd64_exception_device_unavailable, 7, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack2},
+    {amd64_exception_double_fault,       8, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack2},
+    // 9 - coprocessor overrun. not generated from Pentium+
+    {amd64_exception_tss_invalid,       10, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack1},
+    {amd64_exception_segment_missing,   11, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack1},
+    {amd64_exception_ss_invalid,        12, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack1},
+    {amd64_exception_gpf,               13, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack2},
+    {amd64_exception_pagefault,         14, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack7},
+    // 15 - unused
+    {amd64_exception_float,             16, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack2},
+    {amd64_exception_alignment_check,   17, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack2},
+    {amd64_exception_machine_check,     18, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack4},
+    {amd64_exception_simd,              19, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack1},
+    {amd64_exception_virtualization,    20, GDT_KERN_CODE_SEG,Idt::kTrapFlags, Idt::Stack::Stack1},
+    // end of list
+    {nullptr},
+};
+
+/**
  * Install all of the default exception handlers in the IDT specified.
  *
  * @param idt Interrupt descriptor table to receive the default exception vectors; they will be
  *        written to the first 32 vectors.
  */
 void ExceptionHandlers::Install(Idt &idt) {
-    idt.set(AMD64_EXC_DIVIDE, reinterpret_cast<uintptr_t>(amd64_exception_div0), GDT_KERN_CODE_SEG,
-            Idt::kTrapFlags, Idt::Stack::Stack1);
-    idt.set(AMD64_EXC_DEBUG, reinterpret_cast<uintptr_t>(amd64_exception_debug), GDT_KERN_CODE_SEG,
-            Idt::kTrapFlags, Idt::Stack::Stack4);
-    idt.set(AMD64_EXC_NMI, reinterpret_cast<uintptr_t>(amd64_exception_nmi), GDT_KERN_CODE_SEG,
-                Idt::kIsrFlags, Idt::Stack::Stack3);
-    idt.set(AMD64_EXC_BREAKPOINT, reinterpret_cast<uintptr_t>(amd64_exception_breakpoint),
-        GDT_KERN_CODE_SEG, Idt::kTrapFlags, Idt::Stack::Stack4);
-    idt.set(AMD64_EXC_OVERFLOW, reinterpret_cast<uintptr_t>(amd64_exception_overflow),
-        GDT_KERN_CODE_SEG, Idt::kTrapFlags, Idt::Stack::Stack1);
-    idt.set(AMD64_EXC_BOUNDS, reinterpret_cast<uintptr_t>(amd64_exception_bounds),
-        GDT_KERN_CODE_SEG, Idt::kTrapFlags, Idt::Stack::Stack1);
-    idt.set(AMD64_EXC_ILLEGAL_OPCODE,
-        reinterpret_cast<uintptr_t>(amd64_exception_invalid_instruction), GDT_KERN_CODE_SEG,
-        Idt::kTrapFlags, Idt::Stack::Stack2);
-    idt.set(AMD64_EXC_DEVICE_UNAVAIL,
-        reinterpret_cast<uintptr_t>(amd64_exception_device_unavailable), GDT_KERN_CODE_SEG,
-        Idt::kTrapFlags, Idt::Stack::Stack2);
-    idt.set(AMD64_EXC_DOUBLE_FAULT, reinterpret_cast<uintptr_t>(amd64_exception_double_fault),
-        GDT_KERN_CODE_SEG, Idt::kTrapFlags, Idt::Stack::Stack2);
-    idt.set(AMD64_EXC_INVALID_TSS, reinterpret_cast<uintptr_t>(amd64_exception_tss_invalid),
-        GDT_KERN_CODE_SEG, Idt::kTrapFlags, Idt::Stack::Stack1);
-    idt.set(AMD64_EXC_SEGMENT_NP, reinterpret_cast<uintptr_t>(amd64_exception_segment_missing),
-        GDT_KERN_CODE_SEG, Idt::kTrapFlags, Idt::Stack::Stack1);
-    idt.set(AMD64_EXC_SS, reinterpret_cast<uintptr_t>(amd64_exception_ss_invalid),
-        GDT_KERN_CODE_SEG, Idt::kTrapFlags, Idt::Stack::Stack1);
-    idt.set(AMD64_EXC_GPF, reinterpret_cast<uintptr_t>(amd64_exception_gpf), GDT_KERN_CODE_SEG,
-            Idt::kTrapFlags, Idt::Stack::Stack2);
-    idt.set(AMD64_EXC_PAGING, reinterpret_cast<uintptr_t>(amd64_exception_pagefault),
-            GDT_KERN_CODE_SEG, Idt::kTrapFlags, Idt::Stack::Stack2);
-    idt.set(AMD64_EXC_FP, reinterpret_cast<uintptr_t>(amd64_exception_float), GDT_KERN_CODE_SEG,
-            Idt::kTrapFlags, Idt::Stack::Stack2);
-    idt.set(AMD64_EXC_ALIGNMENT, reinterpret_cast<uintptr_t>(amd64_exception_alignment_check),
-            GDT_KERN_CODE_SEG, Idt::kTrapFlags, Idt::Stack::Stack2);
-    idt.set(AMD64_EXC_MCE, reinterpret_cast<uintptr_t>(amd64_exception_machine_check),
-            GDT_KERN_CODE_SEG, Idt::kTrapFlags, Idt::Stack::Stack4);
-    idt.set(AMD64_EXC_SIMD_FP, reinterpret_cast<uintptr_t>(amd64_exception_simd),
-            GDT_KERN_CODE_SEG, Idt::kTrapFlags, Idt::Stack::Stack1);
-    idt.set(AMD64_EXC_VIRT, reinterpret_cast<uintptr_t>(amd64_exception_virtualization),
-           GDT_KERN_CODE_SEG, Idt::kTrapFlags, Idt::Stack::Stack1);
+    size_t i{0};
+    for(;;) {
+        // check for end of list
+        const auto &handler = gDefaultHandlers[i++];
+        if(!handler.function) break;
+
+        idt.set(handler.idtIndex, reinterpret_cast<uintptr_t>(handler.function), handler.segment,
+                handler.flags, handler.stack);
+    }
 }
 
 /**

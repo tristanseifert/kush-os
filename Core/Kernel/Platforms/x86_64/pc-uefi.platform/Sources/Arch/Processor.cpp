@@ -1,4 +1,5 @@
 #include "Processor.h"
+#include "Util/Backtrace.h"
 
 #include <Runtime/Printf.h>
 
@@ -36,9 +37,29 @@ int Processor::Regs::Format(const Regs &state, char *out, const size_t outSize) 
             "R11 %016llx R12 %016llx\n"
             "R13 %016llx R14 %016llx\n"
             "R15 %016llx\n"
-            "RIP %04x:%016llx RSP %04x:%16llx\n"
-            "RFLAGS %016llx Error %llx",
+            "RFLAGS %016llx Error %llx:%llx\n"
+            "RIP %04x:%016llx RSP %04x:%16llx",
             state.rax, state.rbx, state.rcx, state.rdx, state.rsi, state.rdi, state.rbp, state.r8,
-            state.r9, state.r10, state.r11, state.r12, state.r13, state.r14, state.r15, state.cs,
-            state.rip, state.ss, state.rsp, state.rflags, state.errorCode);
+            state.r9, state.r10, state.r11, state.r12, state.r13, state.r14, state.r15,
+            state.rflags, state.irq, state.errorCode, state.cs, state.rip, state.ss, state.rsp);
 }
+
+/**
+ * Attempt to output a backtrace for the stack referred to by this register state.
+ *
+ * This only works for stacks in kernel space.
+ *
+ * @param state Register state to read
+ * @param out Output string buffer
+ * @param outSize Number of characters of space in the buffer
+ *
+ * @return Number of stack frames output, or -1 if we couldn't format the stack.
+ */
+int Processor::Regs::Backtrace(const Regs &state, char *out, const size_t outSize) {
+    // validate RBP
+    if(state.rbp < 0x8000'0000'0000'0000ULL) return -1;
+
+    // produce backtrace
+    return Backtrace::Print(reinterpret_cast<const void *>(state.rbp), out, outSize, true);
+}
+
