@@ -8,6 +8,8 @@ namespace Platform::Amd64Uefi {
  * Helpers for working with Stivale2 bootloaders.
  */
 struct Stivale2 {
+    Stivale2() = delete;
+
     /**
      * Searches through all tags specified in the given bootloader info structure for a given id.
      *

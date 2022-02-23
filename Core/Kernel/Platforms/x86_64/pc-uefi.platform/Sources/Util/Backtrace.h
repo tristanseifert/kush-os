@@ -14,8 +14,10 @@ class Backtrace {
     friend void ::_osentry(struct stivale2_struct *);
 
     public:
+        Backtrace() = delete;
+
         static int Print(const void *stack, char *outBuf, const size_t outBufLen,
-                const bool symbolicate = false);
+                const bool symbolicate = false, const size_t skip = 0);
 
         static int Symbolicate(const uintptr_t pc, char *outBuf, const size_t outBufLen);
 

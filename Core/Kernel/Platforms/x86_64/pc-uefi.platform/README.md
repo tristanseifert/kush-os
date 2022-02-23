@@ -1,6 +1,8 @@
 # amd64 UEFI Platform
 This platform provides support for booting on any UEFI-compatible 64-bit PC. It expects to be booted with the [Limine bootloader](https://limine-bootloader.org) or any other bootloader that implements the stivale2 protocol.
 
+All Ivy Bridge+ processors are supported. Specifically, the processor must support APICs for interrupt routing, the `POPCNT` and `CMPXCHG16B` instructions, SSE 4.1 and 4.2, and `XSAVE` support. If RDRAND is supported, it will be used to seed the kernel's random buffer on startup: otherwise, initial entropy is sourced from the bootloader, and the EFI monotonic counter.
+
 ## Configuration
 There are no build configuration options yet.
 

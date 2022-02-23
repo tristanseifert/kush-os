@@ -85,11 +85,12 @@ void Backtrace::Init(struct stivale2_struct *loaderInfo) {
  * @param outBuf Character buffer to write data to
  * @param outBufLen Number of characters the output buffer has space for
  * @param symbolicate Whether we should try to resolve addresses to function names
+ * @param skip Number of stack frames at the top to skip
  *
  * @return Number of stack frames output
  */
 int Backtrace::Print(const void *stack, char *outBuf, const size_t outBufLen,
-        const bool symbolicate) {
+        const bool symbolicate, const size_t skip) {
     int numFrames{0};
 
     // get the initial stack frame
@@ -114,14 +115,18 @@ int Backtrace::Print(const void *stack, char *outBuf, const size_t outBufLen,
         const auto bufAvail = outBufLen - (writePtr - outBuf);
         if(!bufAvail) goto full;
 
+        written = 0;
+
         // skip if return address is null
         if(!stk->rip) goto next;
+        // skip if this is still a frame to skip
+        else if(skip && frame < skip) goto next;
 
         // symbolicate, if requested
         if(symbolicate) {
             written = Symbolicate(stk->rip, symbolNameBuf, kSymbolNameBufLen);
             if(written == 1) {
-                written = snprintf_(writePtr, bufAvail, "\n%2zu %016llx %s", frame, stk->rip,
+                written = snprintf_(writePtr, bufAvail, "\n%2zu %016llx %s", frame-skip, stk->rip,
                         symbolNameBuf);
             }
             // regular peasant output
@@ -133,7 +138,7 @@ int Backtrace::Print(const void *stack, char *outBuf, const size_t outBufLen,
         // print raw address
         else {
 beach:;
-            written = snprintf_(writePtr, bufAvail, "\n%2zu %016llx", frame, stk->rip);
+            written = snprintf_(writePtr, bufAvail, "\n%2zu %016llx", frame-skip, stk->rip);
         }
 
 next:

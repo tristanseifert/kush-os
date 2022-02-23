@@ -30,6 +30,9 @@ add_executable(Kernel
     Sources/Runtime/StackGuard.cpp
     Sources/Runtime/String.cpp
     Sources/Exceptions/Handler.cpp
+    Sources/Memory/PhysicalAllocator.cpp
+    Sources/Memory/Pool.cpp
+    Sources/Memory/Region.cpp
     ${BuildInfoFile}
 )
 

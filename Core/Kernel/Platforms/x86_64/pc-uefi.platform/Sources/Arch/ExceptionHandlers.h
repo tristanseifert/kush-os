@@ -61,6 +61,8 @@ class ExceptionHandlers {
     public:
         static void Install(Idt &);
 
+        static const char *GetExceptionName(const uint32_t vector, const bool allowNull = false);
+
     private:
         static void Handle(Processor::Regs &state);
 };

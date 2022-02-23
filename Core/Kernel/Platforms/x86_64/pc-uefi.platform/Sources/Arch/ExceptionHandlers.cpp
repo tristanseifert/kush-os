@@ -63,8 +63,10 @@ static const struct {
 
 /**
  * Convert an exception number (the `errorCode` field in the regs structure) to a name.
+ *
+ * @param allowNull Whether `nullptr` is returned when we cannot find a name
  */
-static const char *GetExceptionName(const uint32_t vector) {
+const char *ExceptionHandlers::GetExceptionName(const uint32_t vector, const bool allowNull) {
     size_t i = 0;
     while(gExceptionNames[i].name) {
         const auto &record = gExceptionNames[i];
@@ -76,7 +78,7 @@ static const char *GetExceptionName(const uint32_t vector) {
         i++;
     }
 
-    return "Unknown";
+    return allowNull ? nullptr : "Unknown";
 };
 
 /**

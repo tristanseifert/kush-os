@@ -21,6 +21,8 @@ class Console {
     friend void ::_osentry(struct stivale2_struct *);
 
     public:
+        Console() = delete;
+
         static void Write(const char *string, const size_t numChars);
 
     private:

@@ -31,6 +31,8 @@ struct Tss;
  */
 class Gdt {
     public:
+        Gdt() = delete;
+
         static void Init();
 
         static void InstallTss(const size_t i, Tss *tss);

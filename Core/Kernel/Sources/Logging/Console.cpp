@@ -95,7 +95,7 @@ void Console::Panic(const char *fmt, ...) {
     Error("\n\033[101;97mPANIC: %s\033[0m\nPC = %p\n", panicMsgBuf, pc);
 
     panicMsgBuf[0] = '\0';
-    Platform::Backtrace::Print(nullptr, panicMsgBuf, kMsgBufChars, true);
+    Platform::Backtrace::Print(nullptr, panicMsgBuf, kMsgBufChars, true, 1);
     Error("Backtrace:%s", panicMsgBuf);
 
     // halt machine
