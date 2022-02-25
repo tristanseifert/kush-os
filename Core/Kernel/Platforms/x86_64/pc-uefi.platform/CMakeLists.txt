@@ -14,6 +14,7 @@ add_library(platform-amd64-uefi OBJECT
     Sources/Arch/Processor.cpp
     Sources/Io/Console.cpp
     Sources/Util/Backtrace.cpp
+    Sources/Memory/PhysicalMap.cpp
 )
 
 target_include_directories(platform-amd64-uefi PUBLIC ${CMAKE_CURRENT_LIST_DIR}/Includes)

@@ -15,13 +15,18 @@ class Pool;
  * Contiguous segment of physical memory, from which pages may be allocated
  *
  * Internally, each region reserves some part of the physical pages it manages as a bitmap, used to
- * indicate which pages are allocated, and which are used.
+ * indicate which pages are allocated, and which are unused. The bitmap is represented such that
+ * all pages that are free are set (1) and allocated pages are cleared (0)
+ *
+ * TODO: Add locking
+ * TODO: Per CPU caches
  */
 class Region {
     friend class Pool;
 
     private:
         Region(Pool *pool, const uintptr_t base, const size_t length);
+        ~Region();
 
         int alloc(Pool *pool, const size_t numPages, uintptr_t *outAddrs);
         int free(Pool *pool, const size_t numPages, const uintptr_t *inAddrs);
@@ -48,6 +53,50 @@ class Region {
          *         will be reserved for metadata.
          */
         size_t numPages;
+
+        /**
+         * Physical address of the bitmap
+         *
+         * The physical address should be page aligned, and refers to the first byte in the bitmap
+         * of allocated pages.
+         */
+        uintptr_t bitmapPhys;
+
+        /**
+         * Number of entries (bits) in the bitmap
+         *
+         * Also known as the total number of allocatable pages in the region
+         */
+        size_t bitmapSize;
+
+        /**
+         * Amount of bytes reserved for bitmap
+         *
+         * Bitmap is allocated in increments of whole pages, so the amount reserved for it will
+         * often be greater than the actual space required.
+         */
+        size_t bitmapReserved;
+
+        /**
+         * Virtual address of the bitmap
+         *
+         * The bitmap should be mapped somewhere in virtual address space where the kernel can
+         * always access it. This points to the first byte of the bitmap. The bitmap is accessed in
+         * machine word sized chunks for optimum performance.
+         */
+        uint64_t *bitmap{nullptr};
+
+        /**
+         * Physical address of the first allocatable page
+         *
+         * The first bit in the bitmap corresponds to the memory page at this physical address. It
+         * takes into account the space reserved at the start of the region for metadata (such as
+         * the bitmap.)
+         */
+        uintptr_t allocBasePhys;
+
+        /// Number of allocated pages
+        size_t numAllocated{0};
 };
 }
 

@@ -106,3 +106,31 @@ int Pool::free(const size_t num, const uintptr_t *inAddrs) {
 
     return freed;
 }
+
+/**
+ * Return the total number of physical pages available across all regions.
+ */
+size_t Pool::getTotalPages() const {
+    size_t sum{0};
+    for(size_t i = 0; i < kMaxRegions; i++) {
+        auto region = this->regions[i];
+        if(!region) break;
+
+        sum += region->bitmapSize;
+    }
+    return sum;
+}
+
+/**
+ * Return the total number of allocated physical pages.
+ */
+size_t Pool::getAllocatedPages() const {
+    size_t sum{0};
+    for(size_t i = 0; i < kMaxRegions; i++) {
+        auto region = this->regions[i];
+        if(!region) break;
+
+        sum += region->numAllocated;
+    }
+    return sum;
+}

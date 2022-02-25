@@ -6,6 +6,7 @@
 
 #include <platform/Backtrace.h>
 #include <platform/Console.h>
+#include <platform/PhysicalMap.h>
 #include <platform/Processor.h>
 
 #endif

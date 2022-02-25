@@ -49,6 +49,9 @@ class Pool {
         int alloc(const size_t num, uintptr_t *outAddrs);
         int free(const size_t num, const uintptr_t *inAddrs);
 
+        size_t getTotalPages() const;
+        size_t getAllocatedPages() const;
+
     private:
         /// Physical allocator that owns this pool
         PhysicalAllocator *allocator;
