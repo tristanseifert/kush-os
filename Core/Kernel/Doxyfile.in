@@ -1,0 +1,36 @@
+PROJECT_NAME            = "kush-os Kernel"
+PROJECT_BRIEF           = "Kernel internals"
+
+# where to write docs to
+OUTPUT_DIRECTORY        = @CMAKE_CURRENT_BINARY_DIR@/docs/
+# source files for these docs; scan directories recursively
+INPUT                   = @CMAKE_CURRENT_LIST_DIR@/Includes @CMAKE_CURRENT_LIST_DIR@/Sources @CMAKE_CURRENT_LIST_DIR@/Platforms
+RECURSIVE               = YES
+
+# make C++ declarations visible
+PREDEFINED              = __cplusplus DOXYGEN_SHOULD_SKIP_THIS
+
+# we don't care to make LaTeX docs
+GENERATE_LATEX          = NO
+# document each group explicitly rather than reusing the first member
+DISTRIBUTE_GROUP_DOC    = YES
+# assume everything is documented even without doc comments
+EXTRACT_ALL             = YES
+
+# pretty diagrams
+HAVE_DOT                = YES
+DOT_IMAGE_FORMAT        = svg
+DOT_TRANSPARENT         = YES
+
+# show source browser (file cross-reference) and embed source
+SOURCE_BROWSER          = YES
+INLINE_SOURCES          = YES
+
+##########
+#use the special CSS
+HTML_EXTRA_STYLESHEET  = @doxygenawesomecss_SOURCE_DIR@/doxygen-awesome.css
+GENERATE_TREEVIEW      = YES
+HTML_COLORSTYLE_HUE    = 209
+HTML_COLORSTYLE_SAT    = 255
+HTML_COLORSTYLE_GAMMA  = 113
+

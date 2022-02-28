@@ -5,7 +5,7 @@
 
 namespace Platform::Amd64Uefi {
 /**
- * Helpers for working with Stivale2 bootloaders.
+ * @brief Helpers for working with Stivale2-compliant bootloaders.
  */
 struct Stivale2 {
     Stivale2() = delete;

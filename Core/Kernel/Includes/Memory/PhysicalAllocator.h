@@ -10,7 +10,7 @@ class Pool;
 }
 
 /**
- * Dispenses physical memory with page granularity
+ * @brief Dispenses physical memory with page granularity
  *
  * The physical allocator keeps track of all memory in the system, spread across one or more pools.
  * Inside each pool can be one or more regions, which are contiguous physical memory sections from

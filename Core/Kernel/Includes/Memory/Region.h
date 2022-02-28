@@ -12,7 +12,7 @@ namespace Kernel::Memory {
 class Pool;
 
 /**
- * Contiguous segment of physical memory, from which pages may be allocated
+ * @brief Contiguous segment of physical memory from which pages may be allocated
  *
  * Internally, each region reserves some part of the physical pages it manages as a bitmap, used to
  * indicate which pages are allocated, and which are unused. The bitmap is represented such that

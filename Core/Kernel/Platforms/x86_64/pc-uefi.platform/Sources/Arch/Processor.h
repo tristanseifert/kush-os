@@ -7,12 +7,15 @@
 
 namespace Platform::Amd64Uefi {
 /**
- * Provide general processor management.
+ * @brief Amd64 processor stuff
  */
 class Processor {
     public:
         /**
-         * Address for a model-specific register
+         * @brief Address for model-specific registers
+         *
+         * There are many more MSRs than are defined here; these are just the set of MSRs that we
+         * use internally to make things go.
          */
         enum Msr: uint32_t {
             /// Extended feature enable register
@@ -36,7 +39,7 @@ class Processor {
         };
 
         /**
-         * Processor registers as pushed on to the stack in an exception handler
+         * @brief All processor registers pushed on to the stack in an exception handler
          */
         struct Regs {
             // General purpose registers
@@ -106,10 +109,12 @@ class Processor {
 };
 };
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
 namespace Platform {
 using Processor = Platform::Amd64Uefi::Processor;
 using ProcessorState = Platform::Amd64Uefi::Processor::Regs;
 }
+#endif
 
 #endif
 #endif

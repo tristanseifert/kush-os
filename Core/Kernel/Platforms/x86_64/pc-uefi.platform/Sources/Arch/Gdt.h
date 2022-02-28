@@ -23,11 +23,13 @@ struct GdtDescriptor;
 struct Tss;
 
 /**
- * Handles a processor's Global Descriptor Table (GDT)
+ * @brief Global descriptor table
  *
  * Since we live in amd64 long mode, the GDT is relatively bare-bones. We allocate all the
  * usual segments, as well as a task state segment (TSS) so that separate interrupt stacks can be
  * specified.
+ *
+ * All processors will share the same GDT instance.
  */
 class Gdt {
     public:

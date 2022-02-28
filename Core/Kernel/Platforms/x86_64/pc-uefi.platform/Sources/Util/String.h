@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <limits.h>
 
+/// Internal helper functions
 namespace Platform::Amd64Uefi::Util {
 /**
  * Is the character a space?

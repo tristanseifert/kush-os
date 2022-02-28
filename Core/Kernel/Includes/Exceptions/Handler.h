@@ -5,9 +5,10 @@
 
 #include <platform/Processor.h>
 
+/// Platform-agnostic exception handling
 namespace Kernel::Exceptions {
 /**
- * Entry point from platform-specific exception handler
+ * @brief Entry point from platform-specific exception handler
  *
  * The exception handler is responsible for dispatching generic exceptions into the rest of the
  * kernel and its subsystems. These generic exceptions correspond roughly to the following

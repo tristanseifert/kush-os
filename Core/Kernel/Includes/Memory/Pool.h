@@ -13,7 +13,7 @@ namespace Kernel::Memory {
 class Region;
 
 /**
- * Collection of allocatable physical regions
+ * @brief Collection of allocatable physical regions
  *
  * Pools satisfy allocations from one or more of its regions, which are just contiguous sections of
  * physical memory space in the system.

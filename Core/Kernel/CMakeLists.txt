@@ -83,3 +83,17 @@ target_link_libraries(Kernel PRIVATE printf)
 
 ##### Specify install location of kernel
 
+##### Kernel documentation
+
+# create the doxyfile for core docs and create the target
+set(DOXYGEN_KERNEL_IN ${CMAKE_CURRENT_LIST_DIR}/Doxyfile.in)
+set(DOXYGEN_KERNEL_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+configure_file(${DOXYGEN_KERNEL_IN} ${DOXYGEN_KERNEL_OUT} @ONLY)
+
+add_custom_target(KernelDocs
+    COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_KERNEL_OUT}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Generating kernel documentation"
+    VERBATIM
+)
+add_dependencies(docs KernelDocs)

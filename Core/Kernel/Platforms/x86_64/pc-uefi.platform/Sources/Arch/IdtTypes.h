@@ -4,6 +4,9 @@
 #include <stdint.h>
 
 namespace Platform::Amd64Uefi {
+/**
+ * @brief A single entry in an IDT
+ */
 struct IdtEntry {
     /// ofset bits 0..15
     uint16_t offset1;
@@ -18,7 +21,7 @@ struct IdtEntry {
     /// offset bits 33..63
     uint32_t offset3;
 
-    // reserved bits: keep as zero
+    /// reserved bits: keep as zero
     uint32_t reserved;
 } __attribute__((packed));
 }

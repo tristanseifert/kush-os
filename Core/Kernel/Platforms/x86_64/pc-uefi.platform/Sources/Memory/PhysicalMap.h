@@ -6,7 +6,7 @@
 
 namespace Platform::Amd64Uefi::Memory {
 /**
- * Performs translations from physical to virtual memory addresses for internal use in the kernel.
+ * @brief Translate physical to virtual memory addresses via the physical memory aperture
  *
  * Since we have a shitload of bonus virtual address space on 64-bit platform, we just reserve a
  * bunch of it for a physical aperture. Then, when a request comes in to perform this mapping, we
@@ -29,8 +29,10 @@ class PhysicalMap {
 };
 }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
 namespace Platform::Memory {
 using PhysicalMap = Platform::Amd64Uefi::Memory::PhysicalMap;
 }
+#endif
 
 #endif

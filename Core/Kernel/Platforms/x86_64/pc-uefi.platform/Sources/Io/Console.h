@@ -10,7 +10,7 @@ struct stivale2_struct_tag_terminal;
 
 namespace Platform::Amd64Uefi {
 /**
- * UEFI based console
+ * @brief UEFI console output
  *
  * This supports simultaneous output to the following devices:
  * - Bootloader console, provided by Sivale2 compatible loaders
@@ -45,9 +45,11 @@ class Console {
 };
 }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
 // re-export the console class under the generic platform namespace
 namespace Platform {
     using Console = Platform::Amd64Uefi::Console;
 }
+#endif
 
 #endif

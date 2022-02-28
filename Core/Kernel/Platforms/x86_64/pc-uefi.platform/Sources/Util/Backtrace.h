@@ -8,7 +8,11 @@ extern "C" void _osentry(struct stivale2_struct *);
 
 namespace Platform::Amd64Uefi {
 /**
- * Implements support for walking stacks and secreting backtraces.
+ * @brief amd64 stack walking and backtrace generation
+ *
+ * If the bootloader provides us the location of the full kernel file image in memory, we try to
+ * parse the ELF sufficiently to read out the location of the string table, in order to symbolicate
+ * backtraces.
  */
 class Backtrace {
     friend void ::_osentry(struct stivale2_struct *);
@@ -36,9 +40,11 @@ class Backtrace {
 };
 }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
 // re-export in platform namespace
 namespace Platform {
 using Backtrace = Platform::Amd64Uefi::Backtrace;
 }
+#endif
 
 #endif

@@ -4,9 +4,10 @@
 #include <stdarg.h>
 #include <stdint.h>
 
+/// Facilities for outputting messages from kernel
 namespace Kernel::Logging {
 /**
- * Output for kernel messages
+ * @brief Sink for kernel messages
  *
  * The console handles receiving kernel messages of various priorities and storing them in the
  * kernel's log buffer, as well as writing them to the platform console output.

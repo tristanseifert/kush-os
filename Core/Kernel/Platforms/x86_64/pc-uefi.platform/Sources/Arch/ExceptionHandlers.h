@@ -52,7 +52,7 @@ namespace Platform::Amd64Uefi {
 class Idt;
 
 /**
- * Encapsulates default amd64 exception handlers
+ * @brief Platform specific exception dispatcher (and default handlers)
  *
  * This includes the intermediary dispatching logic, any exceptions that don't get dispatched, and
  * the assembly stubs.

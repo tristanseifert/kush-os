@@ -8,7 +8,7 @@
 
 namespace Platform::Amd64Uefi {
 /**
- * Represent the processor's Interrupt Descriptor Table (IDT) for mapping interrupts
+ * @brief Interrupt descriptor table
  *
  * Each processor should receive its own IDT, with its own interrupt handlers. However, the first
  * 32 entries are common to all processors, for processor exceptions. These dispatch into the
