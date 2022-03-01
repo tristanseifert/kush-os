@@ -27,12 +27,17 @@ set(BuildInfoFile "${CMAKE_CURRENT_BINARY_DIR}/BuildInfo.cpp")
 add_executable(Kernel
     Sources/Init.cpp
     Sources/Logging/Console.cpp
+    Sources/Runtime/CppSupport.cpp
     Sources/Runtime/StackGuard.cpp
     Sources/Runtime/String.cpp
     Sources/Exceptions/Handler.cpp
     Sources/Memory/PhysicalAllocator.cpp
     Sources/Memory/Pool.cpp
     Sources/Memory/Region.cpp
+    Sources/Vm/Manager.cpp
+    Sources/Vm/Map.cpp
+    Sources/Vm/MapEntry.cpp
+    Sources/Vm/ContiguousPhysRegion.cpp
     ${BuildInfoFile}
 )
 

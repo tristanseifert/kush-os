@@ -6,6 +6,11 @@
 
 namespace Kernel {
 class PhysicalAllocator;
+
+namespace Vm {
+class Map;
+class MapEntry;
+}
 }
 
 namespace Kernel::Memory {
@@ -18,21 +23,23 @@ class Pool;
  * indicate which pages are allocated, and which are unused. The bitmap is represented such that
  * all pages that are free are set (1) and allocated pages are cleared (0)
  *
- * TODO: Add locking
- * TODO: Per CPU caches
+ * @TODO Add locking
+ * @TODO Per CPU caches
  */
 class Region {
     friend class Pool;
 
-    private:
+    protected:
         Region(Pool *pool, const uintptr_t base, const size_t length);
         ~Region();
 
         int alloc(Pool *pool, const size_t numPages, uintptr_t *outAddrs);
         int free(Pool *pool, const size_t numPages, const uintptr_t *inAddrs);
 
+        size_t applyVirtualMap(uintptr_t base, Vm::Map *map);
+
         /**
-         * Test if the given physical page address is contained in this region.
+         * @brief Test if the given physical page address is contained in this region.
          *
          * @param address Physical address to test
          *
@@ -85,6 +92,14 @@ class Region {
          * machine word sized chunks for optimum performance.
          */
         uint64_t *bitmap{nullptr};
+
+        /**
+         * Virtual memory object (in ther kernel map) for the bitmap
+         *
+         * This object is either provided as part of the constructor of the region, or allocated by
+         * the constructor; and is mapped into the kernel virtual memory map.
+         */
+        Vm::MapEntry *bitmapVm{nullptr};
 
         /**
          * Physical address of the first allocatable page

@@ -8,6 +8,10 @@ extern "C" void _osentry(struct stivale2_struct *);
 
 struct stivale2_struct_tag_terminal;
 
+namespace Kernel::Vm {
+class Map;
+}
+
 namespace Platform::Amd64Uefi {
 /**
  * @brief UEFI console output
@@ -27,6 +31,7 @@ class Console {
 
     private:
         static void Init(struct stivale2_struct *);
+        static void PrepareForVm(Kernel::Vm::Map *);
 
         static void ParseCmd(const char *);
         static void ParseCmdToken(const char *, const size_t);

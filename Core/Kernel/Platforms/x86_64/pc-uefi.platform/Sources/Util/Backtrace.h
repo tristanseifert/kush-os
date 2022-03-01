@@ -21,9 +21,12 @@ class Backtrace {
         Backtrace() = delete;
 
         static int Print(const void *stack, char *outBuf, const size_t outBufLen,
-                const bool symbolicate = false, const size_t skip = 0);
+                const bool symbolicate = false, const size_t skip = 0,
+                const uintptr_t bonusFrame = 0);
 
         static int Symbolicate(const uintptr_t pc, char *outBuf, const size_t outBufLen);
+
+        static void ParseKernelElf(const void *base, const size_t len);
 
     private:
         static void Init(struct stivale2_struct *);

@@ -179,3 +179,13 @@ void Console::Write(const char *string, const size_t numChars) {
         gTerminalWrite(string, numChars);
     }
 }
+
+/**
+ * Prepares the console for virtual memory mode.
+ *
+ * This disables the bootloader console, since we'll no longer have its code mapped.
+ */
+void Console::PrepareForVm(Kernel::Vm::Map *map) {
+    Console::Write("Preparing console for VM enablement...\n", 39);
+    gTerminalWrite = nullptr;
+}

@@ -22,7 +22,7 @@ namespace Kernel::Exceptions {
 class Handler {
     public:
         /**
-         * Predefined exception types
+         * @brief Predefined exception types
          *
          * Other platform-specific exceptions can be specified by adding the unique platform
          * exception index to the `PlatformSpecific` value.
@@ -53,6 +53,8 @@ class Handler {
 
         static void Dispatch(const ExceptionType type, Platform::ProcessorState &state,
                 void *auxData = nullptr);
+        [[noreturn]] static void AbortWithException(const ExceptionType type,
+                Platform::ProcessorState &state, void *auxData = nullptr);
 };
 }
 

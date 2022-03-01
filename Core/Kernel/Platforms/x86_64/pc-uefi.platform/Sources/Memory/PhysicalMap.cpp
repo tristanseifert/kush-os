@@ -1,4 +1,5 @@
 #include "PhysicalMap.h"
+#include "Vm/KernelMemoryMap.h"
 
 #include <Logging/Console.h>
 
@@ -24,8 +25,11 @@ int PhysicalMap::Add(const uintptr_t physical, const size_t length, void **outVi
     }
     // use the kernel VM aperture
     else {
-        // TODO: implement
-        REQUIRE(false, "unimplemented");
+        constexpr const auto len{KernelAddressLayout::PhysApertureEnd+1-KernelAddressLayout::PhysApertureStart};
+        REQUIRE(physical < len, "phys addr out of range of aperture: %016llx", physical);
+
+        *outVirtual = reinterpret_cast<void *>(KernelAddressLayout::PhysApertureStart + physical);
+        return 0;
     }
 }
 

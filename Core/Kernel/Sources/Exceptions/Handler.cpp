@@ -7,7 +7,7 @@
 using namespace Kernel::Exceptions;
 
 /**
- * Dispatches an exception.
+ * @brief Dispatches an exception.
  *
  * Whichever handler is invoked is responsible for properly dealing with the exception, which may
  * include altering the return addresses in the processor state, terminating the offending task,
@@ -21,6 +21,18 @@ void Handler::Dispatch(const ExceptionType type, Platform::ProcessorState &state
     // TODO: implement
 
     // for now, just print what happened
+    AbortWithException(type, state, auxData);
+}
+
+/**
+ * @brief Panics the system with a particular exception.
+ *
+ * @param type Exception type; this defines the format (if any) of the `auxData` field.
+ * @param state Processor register state at the time of the exception
+ * @param auxData An optional pointer to auxiliary data.
+ */
+void Handler::AbortWithException(const ExceptionType type, Platform::ProcessorState &state,
+        void *auxData) {
     constexpr static const size_t kStateBufSz{512};
     static char stateBuf[kStateBufSz];
     Platform::ProcessorState::Format(state, stateBuf, kStateBufSz);
@@ -29,7 +41,7 @@ void Handler::Dispatch(const ExceptionType type, Platform::ProcessorState &state
     static char backtraceBuf[kBacktraceBufSz];
     int frames = Platform::ProcessorState::Backtrace(state, backtraceBuf, kBacktraceBufSz);
 
-    PANIC("Unhandled exception $%08x, aux = %p\n%s\nState backtrace: %s", (uint32_t) type,
+    PANIC("Fatal exception $%08x, aux = %p\n%s\nState backtrace: %s", (uint32_t) type,
             auxData, stateBuf, (frames > 0) ? backtraceBuf : nullptr);
 }
 

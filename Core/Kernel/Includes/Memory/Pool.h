@@ -6,6 +6,9 @@
 
 namespace Kernel {
 class PhysicalAllocator;
+namespace Vm {
+class Map;
+}
 }
 
 /// Physical allocator internals
@@ -44,6 +47,7 @@ class Pool {
         Pool(PhysicalAllocator *allocator) : allocator(allocator) {}
 
         void addRegion(const uintptr_t base, const size_t length);
+        void applyVirtualMap(Vm::Map *map);
 
     public:
         int alloc(const size_t num, uintptr_t *outAddrs);

@@ -20,7 +20,7 @@ void putchar_(char) {
 }
 
 /**
- * Initializes the kernel console.
+ * @brief Initializes the kernel console.
  *
  * @remark You must not send any log messages to the console before this call is made; this should
  *         be done very early in the platform initialization code.
@@ -33,7 +33,7 @@ void Console::Init() {
 }
 
 /**
- * Writes a message with the specified severity to the console output.
+ * @brief Writes a message with the specified severity to the console output.
  *
  * @param level Priority level of the message. Messages with a level lower than the current filter
  *        are discarded.
@@ -48,7 +48,7 @@ void Console::Log(const Priority level, const char *fmt, ...) {
 }
 
 /**
- * Writes a message with the specified severity to the console output.
+ * @brief Writes a message with the specified severity to the console output.
  *
  * @remark This does not validate whether the message is to be filtered out.
  *
@@ -77,7 +77,7 @@ void Console::Log(const Priority level, const char *fmt, va_list va) {
 }
 
 /**
- * Write a panic message to the console, then halt the system.
+ * @brief Write a panic message to the console, then halt the system.
  */
 void Console::Panic(const char *fmt, ...) {
     va_list va;

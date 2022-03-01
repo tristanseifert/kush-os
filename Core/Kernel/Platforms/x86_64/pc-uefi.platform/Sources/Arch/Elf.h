@@ -1,4 +1,5 @@
 /**
+ * \file
  * ELF data structures
  *
  * This has only 64-bit ELF structures.

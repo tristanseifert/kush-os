@@ -17,6 +17,20 @@ class PhysicalMap {
         static int Add(const uintptr_t physical, const size_t length, void **outVirtual);
         static int Remove(const void *virtualAddr, const size_t length);
 
+        /**
+         * Indicates early boot is over, and the basic VM subsystem is available.
+         */
+        static void FinishedEarlyBoot() {
+            gIsEarlyBoot = true;
+        }
+
+        /**
+         * Check whether we're still in early boot mode.
+         */
+        static bool IsEarlyBoot() {
+            return gIsEarlyBoot;
+        }
+
     private:
         /**
          * Indicates whether we're using the early boot mappings.

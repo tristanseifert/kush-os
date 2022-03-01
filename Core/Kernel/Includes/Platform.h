@@ -6,6 +6,8 @@
 
 #include <platform/Backtrace.h>
 #include <platform/Console.h>
+#include <platform/KernelMemoryMap.h>
+#include <platform/PageTable.h>
 #include <platform/PhysicalMap.h>
 #include <platform/Processor.h>
 

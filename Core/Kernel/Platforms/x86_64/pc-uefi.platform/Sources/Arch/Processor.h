@@ -78,6 +78,15 @@ class Processor {
 
             static int Format(const Regs &state, char *out, const size_t outSize);
             static int Backtrace(const Regs &state, char *out, const size_t outSize);
+
+            /// Return the program counter value.
+            constexpr inline auto getPc() const {
+                return this->rip;
+            }
+            /// Return a reference to the program counter value.
+            constexpr inline uint64_t &getPc() {
+                return this->rip;
+            }
         } KUSH_PACKED;
 
     public:

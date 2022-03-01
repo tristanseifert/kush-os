@@ -15,6 +15,7 @@ add_library(platform-amd64-uefi OBJECT
     Sources/Io/Console.cpp
     Sources/Util/Backtrace.cpp
     Sources/Memory/PhysicalMap.cpp
+    Sources/Vm/PageTable.cpp
 )
 
 target_include_directories(platform-amd64-uefi PUBLIC ${CMAKE_CURRENT_LIST_DIR}/Includes)
@@ -37,4 +38,4 @@ set(KERNEL_PLATFORM_COMPILE_OPTS -mcmodel=kernel ${COMPILE_OPTS} PARENT_SCOPE)
 
 # Ensure we're built with the appropriate options also
 # XXX: why do we need to use mcmodel=large here? Otherwise we get link errors…
-target_compile_options(platform-amd64-uefi PRIVATE -mcmodel=large ${COMPILE_OPTS})
+target_compile_options(platform-amd64-uefi PRIVATE -mcmodel=large -fno-exceptions -fno-rtti -ffreestanding ${COMPILE_OPTS})

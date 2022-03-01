@@ -3,6 +3,7 @@
 
 #include "Logging/Console.h"
 #include "Runtime/String.h"
+#include "Vm/Map.h"
 
 #include <Intrinsics.h>
 #include <new>
@@ -18,7 +19,7 @@ PhysicalAllocator *PhysicalAllocator::gShared{nullptr};
 
 
 /**
- * Initialize the global physical allocator.
+ * @brief Initialize the global physical allocator.
  *
  * @remark Page sizes (both the base and extra sizes) should be powers of two.
  *
@@ -38,7 +39,7 @@ void PhysicalAllocator::Init(const size_t pageSz, const size_t extraSizes[],
 }
 
 /**
- * Initialize the physical allocator.
+ * @brief Initialize the physical allocator.
  */
 PhysicalAllocator::PhysicalAllocator(const size_t _pageSz, const size_t extraSizes[],
         const size_t numExtraSizes, const size_t numBonusPools) : pageSz(_pageSz) {
@@ -71,7 +72,7 @@ PhysicalAllocator::PhysicalAllocator(const size_t _pageSz, const size_t extraSiz
 }
 
 /**
- * Initialize a new region.of physical memory and adds it to a pool.
+ * @brief Initialize a new region.of physical memory and adds it to a pool.
  *
  * @param base Physical base address (must be page aligned)
  * @param length Length of the region, in bytes
@@ -87,7 +88,7 @@ void PhysicalAllocator::AddRegion(const uintptr_t base, const size_t length, con
 }
 
 /**
- * Allocate some physical pages of the standard page size
+ * @brief Allocate some physical pages of the standard page size
  *
  * @param numPages Number of pages to allocate
  * @param outPageAddrs A buffer to hold the resulting physical addresses; it must have space for
@@ -105,7 +106,7 @@ int PhysicalAllocator::AllocatePages(const size_t numPages, uintptr_t *outPageAd
 }
 
 /**
- * Releases all physical memory pages specified.
+ * @brief Releases all physical memory pages specified.
  *
  * @param numPages Number of pages to release
  * @param inPageAddrs Buffer containing `numPages` physical page addresses
@@ -122,4 +123,45 @@ int PhysicalAllocator::FreePages(const size_t numPages, const uintptr_t *inPageA
     REQUIRE(pool < kMaxPools, "invalid pool");
 
     return gShared->pools[pool]->free(numPages, inPageAddrs);
+}
+
+/**
+ * @brief Return the total number of allocatable pages in the given pool.
+ *
+ * @param pool Pool index to query
+ *
+ * @return Number of total allocatable pages
+ */
+size_t PhysicalAllocator::GetTotalPages(const size_t pool) {
+    REQUIRE(pool < kMaxPools, "invalid pool");
+
+    return gShared->pools[pool]->getTotalPages();
+}
+
+/**
+ * @brief Returns the total number of pages currently allocated in the given pool.
+ *
+ * @param pool Pool index to query
+ *
+ * @return Number of total allocatable pages
+ */
+size_t PhysicalAllocator::GetAllocPages(const size_t pool) {
+    REQUIRE(pool < kMaxPools, "invalid pool");
+
+    return gShared->pools[pool]->getAllocatedPages();
+}
+
+/**
+ * @brief Add VM objects for each pool's bitmap.
+ *
+ * This will request each pool update its regions to use the virtual memory addresses for the free
+ * bitmaps.
+ *
+ * @param map Kernel address map
+ */
+void PhysicalAllocator::RemapTo(Vm::Map *map) {
+    for(size_t i = 0; i < kMaxPools; i++) {
+        if(!gShared->pools[i]) continue;
+        gShared->pools[i]->applyVirtualMap(map);
+    }
 }

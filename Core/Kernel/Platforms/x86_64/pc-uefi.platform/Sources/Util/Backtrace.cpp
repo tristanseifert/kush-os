@@ -34,10 +34,33 @@ void Backtrace::Init(struct stivale2_struct *loaderInfo) {
     // get the file address
     auto file2 = reinterpret_cast<const struct stivale2_struct_tag_kernel_file_v2 *>(
             Stivale2::GetTag(loaderInfo, STIVALE2_STRUCT_TAG_KERNEL_FILE_V2_ID));
-    if(!file2) return;
+    if(file2) {
+        ParseKernelElf(reinterpret_cast<const void *>(file2->kernel_file), file2->kernel_size);
+    }
+
+    // ensure we've loaded the needed sections
+    if(!gSymtab || !gSymtabLen || !gStrtab || !gStrtabLen) {
+        Kernel::Console::Warning("Failed to load symbol info: symtab (%p, %lu), strtab (%p, %lu)",
+                gSymtab, gSymtabLen, gStrtab, gStrtabLen);
+    }
+}
+
+/**
+ * Attempt to parse the kernel ELF at the given virtual memory address, and extract the information
+ * needed to symbolicate later.
+ */
+void Backtrace::ParseKernelElf(const void *base, const size_t len) {
+    if(!base && !len) {
+        gSymtab = nullptr;
+        gSymtabLen = 0;
+        gStrtab = nullptr;
+        gStrtabLen = 0;
+    }
+
+    auto basePtr = reinterpret_cast<const uint8_t *>(base);
 
     // validate ELF header and get the section headers
-    auto elfHdr = reinterpret_cast<const Elf64_Ehdr *>(file2->kernel_file);
+    auto elfHdr = reinterpret_cast<const Elf64_Ehdr *>(base);
     if(elfHdr->ident[0] != ELFMAG0 || elfHdr->ident[1] != ELFMAG1 || elfHdr->ident[2] != ELFMAG2
             || elfHdr->ident[3] != ELFMAG3) {
         Kernel::Console::Warning("Invalid ELF magic (%02x %02x %02x %02x)", elfHdr->ident[0],
@@ -52,12 +75,12 @@ void Backtrace::Init(struct stivale2_struct *loaderInfo) {
 
     // iterate through section headers to find the symbol table
     for(size_t i = 0; i < elfHdr->numSecHdr; i++) {
-        auto shdr = reinterpret_cast<const Elf64_Shdr *>(file2->kernel_file + elfHdr->secHdrOff +
+        auto shdr = reinterpret_cast<const Elf64_Shdr *>(basePtr + elfHdr->secHdrOff +
                 (elfHdr->secHdrSize * i));
 
         // is it the symbol table?
         if(shdr->sh_type == SHT_SYMTAB) {
-            gSymtab = reinterpret_cast<const void *>(file2->kernel_file + shdr->sh_offset);
+            gSymtab = reinterpret_cast<const void *>(basePtr + shdr->sh_offset);
             gSymtabLen = shdr->sh_size;
 
             // find the string table (via the "link" field)
@@ -66,17 +89,11 @@ void Backtrace::Init(struct stivale2_struct *loaderInfo) {
                 return;
             }
 
-            auto strtabShdr = reinterpret_cast<const Elf64_Shdr *>(file2->kernel_file + elfHdr->secHdrOff +
+            auto strtabShdr = reinterpret_cast<const Elf64_Shdr *>(basePtr + elfHdr->secHdrOff +
                     (elfHdr->secHdrSize * shdr->sh_link));
-            gStrtab = reinterpret_cast<const char *>(file2->kernel_file + strtabShdr->sh_offset);
+            gStrtab = reinterpret_cast<const char *>(basePtr + strtabShdr->sh_offset);
             gStrtabLen = strtabShdr->sh_size;
         }
-    }
-
-    // ensure we've loaded the needed sections
-    if(!gSymtab || !gSymtabLen || !gStrtab || !gStrtabLen) {
-        Kernel::Console::Warning("Failed to load symbol info: symtab (%p, %lu), strtab (%p, %lu)",
-                gSymtab, gSymtabLen, gStrtab, gStrtabLen);
     }
 }
 
@@ -88,11 +105,12 @@ void Backtrace::Init(struct stivale2_struct *loaderInfo) {
  * @param outBufLen Number of characters the output buffer has space for
  * @param symbolicate Whether we should try to resolve addresses to function names
  * @param skip Number of stack frames at the top to skip
+ * @param bonusFrame If nonzero, an additional pc value to show as a first frame
  *
  * @return Number of stack frames output
  */
 int Backtrace::Print(const void *stack, char *outBuf, const size_t outBufLen,
-        const bool symbolicate, const size_t skip) {
+        const bool symbolicate, const size_t skip, const size_t bonusFrame) {
     int numFrames{0};
 
     // get the initial stack frame
@@ -113,6 +131,31 @@ int Backtrace::Print(const void *stack, char *outBuf, const size_t outBufLen,
     constexpr static const size_t kSymbolNameBufLen{100};
     char symbolNameBuf[kSymbolNameBufLen];
 
+    if(bonusFrame) {
+        const auto bufAvail = outBufLen - (writePtr - outBuf);
+
+        if(symbolicate) {
+            written = Symbolicate(bonusFrame, symbolNameBuf, kSymbolNameBufLen);
+            if(written == 1) {
+                written = snprintf_(writePtr, bufAvail, "\n%2zu %016llx %s", 0, bonusFrame,
+                        symbolNameBuf);
+            }
+            // regular peasant output
+            else {
+                goto magdonal;
+            }
+
+        }
+        // print raw address
+        else {
+magdonal:;
+            written = snprintf_(writePtr, bufAvail, "\n%2zu %016llx", 0, bonusFrame);
+        }
+
+        writePtr += written;
+        numFrames++;
+    }
+
     for(size_t frame = 0; stk && frame < 50; ++frame) {
         const auto bufAvail = outBufLen - (writePtr - outBuf);
         if(!bufAvail) goto full;
@@ -128,7 +171,7 @@ int Backtrace::Print(const void *stack, char *outBuf, const size_t outBufLen,
         if(symbolicate) {
             written = Symbolicate(stk->rip, symbolNameBuf, kSymbolNameBufLen);
             if(written == 1) {
-                written = snprintf_(writePtr, bufAvail, "\n%2zu %016llx %s", frame-skip, stk->rip,
+                written = snprintf_(writePtr, bufAvail, "\n%2zu %016llx %s", numFrames, stk->rip,
                         symbolNameBuf);
             }
             // regular peasant output
@@ -140,7 +183,7 @@ int Backtrace::Print(const void *stack, char *outBuf, const size_t outBufLen,
         // print raw address
         else {
 beach:;
-            written = snprintf_(writePtr, bufAvail, "\n%2zu %016llx", frame-skip, stk->rip);
+            written = snprintf_(writePtr, bufAvail, "\n%2zu %016llx", numFrames, stk->rip);
         }
 
 next:

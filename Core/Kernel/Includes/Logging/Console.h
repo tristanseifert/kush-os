@@ -4,6 +4,8 @@
 #include <stdarg.h>
 #include <stdint.h>
 
+#include <Intrinsics.h>
+
 /// Facilities for outputting messages from kernel
 namespace Kernel::Logging {
 /**
@@ -35,10 +37,10 @@ class Console {
     public:
         static void Init();
 
-        [[noreturn]] static void Panic(const char *fmt, ...) __attribute__((format(printf,1,2)));
+        [[noreturn]] static void Panic(const char *fmt, ...) KUSH_PRINTF_LIKE(1,2);
 
         /**
-         * Updates the console message filter.
+         * @brief Updates the console message filter.
          *
          * @param level All messages of this level and up will be output.
          */
@@ -47,12 +49,12 @@ class Console {
         }
 
         /**
-         * Output an error level message.
+         * @brief Output an error level message.
          *
          * @param fmt Format string
          * @param ... Arguments to message
          */
-        static void Error(const char *fmt, ...) __attribute__((format (printf, 1, 2))) {
+        static void Error(const char *fmt, ...) KUSH_PRINTF_LIKE(1,2) {
             va_list va;
             va_start(va, fmt);
             Log(Priority::Error, fmt, va);
@@ -60,12 +62,12 @@ class Console {
         }
 
         /**
-         * Output a warning level message.
+         * @brief Output a warning level message.
          *
          * @param fmt Format string
          * @param ... Arguments to message
          */
-        static void Warning(const char *fmt, ...) __attribute__((format (printf, 1, 2))) {
+        static void Warning(const char *fmt, ...) KUSH_PRINTF_LIKE(1,2) {
             if(static_cast<uint8_t>(gPriority) > static_cast<uint8_t>(Priority::Warning)) return;
 
             va_list va;
@@ -75,12 +77,12 @@ class Console {
         }
 
         /**
-         * Output a notice level message.
+         * @brief Output a notice level message.
          *
          * @param fmt Format string
          * @param ... Arguments to message
          */
-        static void Notice(const char *fmt, ...) __attribute__((format (printf, 1, 2))) {
+        static void Notice(const char *fmt, ...) KUSH_PRINTF_LIKE(1,2) {
             if(static_cast<uint8_t>(gPriority) > static_cast<uint8_t>(Priority::Notice)) return;
 
             va_list va;
@@ -90,12 +92,12 @@ class Console {
         }
 
         /**
-         * Output a debug level message.
+         * @brief Output a debug level message.
          *
          * @param fmt Format string
          * @param ... Arguments to message
          */
-        static void Debug(const char *fmt, ...) __attribute__((format (printf, 1, 2))) {
+        static void Debug(const char *fmt, ...) KUSH_PRINTF_LIKE(1,2) {
             if(static_cast<uint8_t>(gPriority) > static_cast<uint8_t>(Priority::Debug)) return;
 
             va_list va;
@@ -105,12 +107,12 @@ class Console {
         }
 
         /**
-         * Output a trace level message.
+         * @brief Output a trace level message.
          *
          * @param fmt Format string
          * @param ... Arguments to message
          */
-        static void Trace(const char *fmt, ...) __attribute__((format (printf, 1, 2))) {
+        static void Trace(const char *fmt, ...) KUSH_PRINTF_LIKE(1,2) {
             if(static_cast<uint8_t>(gPriority) > static_cast<uint8_t>(Priority::Trace)) return;
 
             va_list va;
@@ -121,8 +123,7 @@ class Console {
 
     private:
         static void Log(const Priority level, const char *fmt, va_list args);
-        static void Log(const Priority level, const char *fmt, ...)
-            __attribute__((format (printf, 2, 3)));
+        static void Log(const Priority level, const char *fmt, ...) KUSH_PRINTF_LIKE(2,3);
 
         [[noreturn]] static void Hang();
 

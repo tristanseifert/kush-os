@@ -4,6 +4,7 @@
 
 #include <Exceptions/Handler.h>
 #include <Logging/Console.h>
+#include <Vm/Manager.h>
 
 extern "C" {
 void amd64_exception_div0();
@@ -232,10 +233,5 @@ void ExceptionHandlers::Handle(Processor::Regs &state) {
  * fault.
  */
 void ExceptionHandlers::PageFault(Processor::Regs &state, const uintptr_t faultAddr) {
-    // TODO: implement
-    constexpr static const size_t kStateBufSz{512};
-    static char stateBuf[kStateBufSz];
-    Platform::ProcessorState::Format(state, stateBuf, kStateBufSz);
-
-    PANIC("Unhandled page fault (%016llx)\n%s", faultAddr, stateBuf);
+    Kernel::Vm::Manager::HandleFault(state, faultAddr);
 }

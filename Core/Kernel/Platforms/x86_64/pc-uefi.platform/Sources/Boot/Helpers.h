@@ -4,7 +4,12 @@
 #include <stivale2.h>
 
 /**
+ * \namespace Platform::Amd64Uefi
  * @brief %Platform support for Amd64-based UEFI systems
+ *
+ * Implements support for booting the kernel on UEFI-based Amd64 machines, using a
+ * <a href="https://github.com/stivale/stivale/blob/master/STIVALE2.md">Stivale2</a> compliant
+ * bootloader. Basic IO via the bootloader console or serial port is provided.
  */
 namespace Platform::Amd64Uefi {
 /**

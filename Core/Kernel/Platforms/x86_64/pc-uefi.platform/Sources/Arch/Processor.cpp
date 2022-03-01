@@ -77,7 +77,8 @@ int Processor::Regs::Backtrace(const Regs &state, char *out, const size_t outSiz
     if(state.rbp < 0x8000'0000'0000'0000ULL) return -1;
 
     // produce backtrace
-    return Backtrace::Print(reinterpret_cast<const void *>(state.rbp), out, outSize, true);
+    return Backtrace::Print(reinterpret_cast<const void *>(state.rbp), out, outSize, true, 0,
+            state.rip);
 }
 
 
@@ -123,6 +124,17 @@ static const struct {
         .leaf   = 0x01,
         .ecx    = (1 << 26),
         .name   = "XSAVE",
+    },
+    // Global page support
+    {
+        .leaf   = 0x01,
+        .edx    = (1 << 13),
+        .name   = "Global page support",
+    },
+    {
+        .leaf   = 0x01,
+        .edx    = (1 << 16),
+        .name   = "Page attribute table",
     },
     // supervisor mode access protection
     /*{

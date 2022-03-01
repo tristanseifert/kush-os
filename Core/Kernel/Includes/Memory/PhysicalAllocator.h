@@ -8,6 +8,9 @@ namespace Kernel {
 namespace Memory {
 class Pool;
 }
+namespace Vm {
+class Map;
+}
 
 /**
  * @brief Dispenses physical memory with page granularity
@@ -38,6 +41,11 @@ class PhysicalAllocator {
                 const size_t pool = 0);
         static int FreePages(const size_t numPages, const uintptr_t *inPageAddrs,
                 const size_t pool = 0);
+
+        static size_t GetTotalPages(const size_t pool = 0);
+        static size_t GetAllocPages(const size_t pool = 0);
+
+        static void RemapTo(Kernel::Vm::Map *map);
 
         /// Get the primary page size of the physical allocator
         constexpr inline auto getPageSize() const {
