@@ -3,13 +3,13 @@
 
 #include "Logging/Console.h"
 
+#include <Intrinsics.h>
 #include <new>
 
 using namespace Kernel::Memory;
 
 // space in .bss segment for regions
-static uint8_t gRegionAllocBuf[Pool::kMaxGlobalRegions][sizeof(Region)]
-    __attribute__((aligned(64)));
+static KUSH_ALIGNED(64) uint8_t gRegionAllocBuf[Pool::kMaxGlobalRegions][sizeof(Region)];
 // next free index in the allocation buffer
 static size_t gRegionAllocBufNextFree{0};
 

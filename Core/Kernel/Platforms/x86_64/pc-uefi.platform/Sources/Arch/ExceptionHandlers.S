@@ -239,7 +239,8 @@ amd64_exception_pagefault:
     // jump to dispatcher
     xor         %rbp, %rbp
     mov         %rsp, %rdi
-    call        _ZN8Platform9Amd64Uefi17ExceptionHandlers6HandleERNS0_9Processor4RegsE
+    mov         %cr2, %rsi
+    call        _ZN8Platform9Amd64Uefi17ExceptionHandlers9PageFaultERNS0_9Processor4RegsEm
 
     // restore registers
     popq        %rax

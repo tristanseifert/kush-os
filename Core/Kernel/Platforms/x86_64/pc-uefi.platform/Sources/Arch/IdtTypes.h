@@ -3,11 +3,13 @@
 
 #include <stdint.h>
 
+#include <Intrinsics.h>
+
 namespace Platform::Amd64Uefi {
 /**
  * @brief A single entry in an IDT
  */
-struct IdtEntry {
+struct KUSH_PACKED IdtEntry {
     /// ofset bits 0..15
     uint16_t offset1;
     /// a code segment selector in GDT/LDT
@@ -23,7 +25,7 @@ struct IdtEntry {
 
     /// reserved bits: keep as zero
     uint32_t reserved;
-} __attribute__((packed));
+};
 }
 
 #endif

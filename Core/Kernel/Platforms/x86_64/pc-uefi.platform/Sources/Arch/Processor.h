@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <Intrinsics.h>
+
 namespace Platform::Amd64Uefi {
 /**
  * @brief Amd64 processor stuff
@@ -76,7 +78,7 @@ class Processor {
 
             static int Format(const Regs &state, char *out, const size_t outSize);
             static int Backtrace(const Regs &state, char *out, const size_t outSize);
-        } __attribute__((packed));
+        } KUSH_PACKED;
 
     public:
         /**

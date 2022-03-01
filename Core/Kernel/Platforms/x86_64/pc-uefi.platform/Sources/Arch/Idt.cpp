@@ -2,6 +2,7 @@
 #include "IdtTypes.h"
 #include "ExceptionHandlers.h"
 
+#include <Intrinsics.h>
 #include <Logging/Console.h>
 #include <Runtime/String.h>
 
@@ -10,7 +11,7 @@
 using namespace Platform::Amd64Uefi;
 
 // allocate storage for the BSP IDT
-static uint8_t gBspIdtBuf[sizeof(Idt)] __attribute__((aligned(64)));
+static uint8_t KUSH_ALIGNED(64) gBspIdtBuf[sizeof(Idt)];
 static Idt *gBspIdt{nullptr};
 
 /**
@@ -62,10 +63,10 @@ void Idt::set(const size_t entry, const uintptr_t function, const uintptr_t segm
  * Loads the IDT.
  */
 void Idt::load() {
-    struct {
+    struct KUSH_PACKED {
         uint16_t length;
         uint64_t base;
-    } __attribute__((__packed__)) IDTR;
+    } IDTR;
 
     IDTR.length = (sizeof(IdtEntry) * kNumIdt) - 1;
     IDTR.base = reinterpret_cast<uintptr_t>(&this->storage);

@@ -4,15 +4,15 @@
 #include "Logging/Console.h"
 #include "Runtime/String.h"
 
+#include <Intrinsics.h>
 #include <new>
 
 using namespace Kernel;
 
 // space in .bss segment for the physical allocator
-static uint8_t gPhysAllocBuf[sizeof(PhysicalAllocator)] __attribute__((aligned(64)));
+static KUSH_ALIGNED(64) uint8_t gPhysAllocBuf[sizeof(PhysicalAllocator)];
 // space in .bss segment for pools
-static uint8_t gPoolAllocBuf[PhysicalAllocator::kMaxPools][sizeof(Memory::Pool)]
-    __attribute__((aligned(64)));
+static KUSH_ALIGNED(64) uint8_t gPoolAllocBuf[PhysicalAllocator::kMaxPools][sizeof(Memory::Pool)];
 
 PhysicalAllocator *PhysicalAllocator::gShared{nullptr};
 

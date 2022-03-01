@@ -7,49 +7,52 @@
 #define KERNEL_PLATFORM_UEFI_ARCH_ELF
 
 #include <stdint.h>
+#include <Intrinsics.h>
+
+namespace Platform::Amd64Uefi {
 
 #define EI_NIDENT 16
 
 /**
- * 64-bit ELF fixed file header
+ * @brief 64-bit ELF fixed file header
  */
-typedef struct {
+struct KUSH_PACKED Elf64_Ehdr {
     unsigned char ident[16];
-    // ELF file type and CPU arch
+    /// ELF file type and CPU arch
     uint16_t type, machine;
-    // version (should be 1)
+    /// version (should be 1)
     uint32_t version;
 
-    // virtual address of entry point
+    /// virtual address of entry point
     uint64_t entryAddr;
 
-    // file relative offset to program headers
+    /// file relative offset to program headers
     uint64_t progHdrOff;
-    // file relative offset to section headers
+    /// file relative offset to section headers
     uint64_t secHdrOff;
 
-    // machine specific flags
+    /// machine specific flags
     uint32_t flags;
 
-    // size of this header
+    /// size of this header
     uint16_t headerSize;
-    // size of a program header
+    /// size of a program header
     uint16_t progHdrSize;
-    // number of program headers
+    /// number of program headers
     uint16_t numProgHdr;
-    // size of a section header
+    /// size of a section header
     uint16_t secHdrSize;
-    // number of section headers
+    /// number of section headers
     uint16_t numSecHdr;
 
-    // section header index for the string table
+    /// section header index for the string table
     uint16_t stringSectionIndex;
-} __attribute__((packed)) Elf64_Ehdr;
+};
 
 /**
- * 64-bit ELF section header
+ * @brief 64-bit ELF section header
  */
-typedef struct {
+struct KUSH_PACKED Elf64_Shdr {
     uint32_t	sh_name;	/* Section name (index into the
                                        section header string table). */
     uint32_t	sh_type;	/* Section type. */
@@ -61,45 +64,45 @@ typedef struct {
     uint32_t	sh_info;	/* Depends on section type. */
     uint64_t	sh_addralign;	/* Alignment in bytes. */
     uint64_t	sh_entsize;	/* Size of each entry in section. */
-} __attribute__((packed)) Elf64_Shdr;
+};
 
 /**
- * 64-bit ELF program header
+ * @brief 64-bit ELF program header
  */
-typedef struct {
-    // type of this header
+struct KUSH_PACKED Elf64_Phdr {
+    /// type of this header
     uint32_t type;
-    // flags
+    /// flags
     uint32_t flags;
-    // file offset to the first byte of this segment
+    /// file offset to the first byte of this segment
     uint64_t fileOff;
 
-    // virtual address of this mapping
+    /// virtual address of this mapping
     uint64_t virtAddr;
-    // physical address of this mapping (ignored)
+    /// physical address of this mapping (ignored)
     uint64_t physAddr;
 
-    // number of bytes in the file image for this segment
+    /// number of bytes in the file image for this segment
     uint64_t fileBytes;
-    // number of bytes of memory to use
+    /// number of bytes of memory to use
     uint64_t memBytes;
 
-    // alignment flags
+    /// alignment flags
     uint64_t align;
-} __attribute__((packed)) Elf64_Phdr;
+};
 
-/*
- * Symbol table entries.
+/**
+ * @brief Symbol table entry
  */
 
-typedef struct {
+struct KUSH_PACKED Elf64_Sym {
     uint32_t	st_name;	/* String table index of name. */
     uint8_t	st_info;	/* Type and binding information. */
     uint8_t	st_other;	/* Reserved (not used). */
     uint16_t	st_shndx;	/* Section index of symbol. */
     uint64_t	st_value;	/* Symbol value. */
     uint64_t	st_size;	/* Size of associated object. */
-} __attribute__((packed)) Elf64_Sym;
+};
 
 /* Macros for accessing the fields of st_info. */
 #define	ELF64_ST_BIND(info)		((info) >> 4)
@@ -248,5 +251,7 @@ typedef struct {
 
 /* Special symbol table indexes. */
 #define	STN_UNDEF	0	/* Undefined symbol index. */
+
+}
 
 #endif

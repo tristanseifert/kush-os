@@ -3,18 +3,20 @@
 
 #include <stdint.h>
 
+#include <Intrinsics.h>
+
 namespace Platform::Amd64Uefi {
 /**
  * @brief 32-bit GDT entry
  */
-struct GdtDescriptor {
+struct KUSH_PACKED GdtDescriptor {
     uint16_t limit_low;
     uint16_t base_low;
     uint8_t base_middle;
     uint8_t access;
     uint8_t granularity;
     uint8_t base_high;
-} __attribute__((packed));
+};
 
 /**
  * @brief 64-bit GDT entry
@@ -23,7 +25,7 @@ struct GdtDescriptor {
  * forming a 16-bit descriptor. This contains a full 64-bit pointer, and can be used for TSS
  * segments. (Code/data segments in long mode are ignored.)
  */
-struct GdtDescriptor64 {
+struct KUSH_PACKED GdtDescriptor64 {
     /// limit 15..0
     uint16_t limit0;
     /// base 15..0
@@ -40,7 +42,7 @@ struct GdtDescriptor64 {
     uint32_t base3;
     /// reserved (always zero)
     uint32_t reserved;
-} __attribute__((packed));
+};
 
 
 /**
@@ -55,27 +57,27 @@ struct GdtDescriptor64 {
  *
  * @remark All reserved fields should be initialized to zero.
 */
-struct Tss {
+struct KUSH_PACKED Tss {
     uint32_t reserved1;
 
     /// stack pointers (RSP0 - RSP2)
     struct {
         uint32_t low, high;
-    } __attribute__((packed)) rsp[3];
+    } KUSH_PACKED rsp[3];
 
     uint32_t reserved2[2];
 
     /// interrupt stacks
     struct {
         uint32_t low, high;
-    } __attribute__((packed)) ist[7];
+    } KUSH_PACKED ist[7];
 
     uint32_t reserved3[2];
     uint16_t reserved4;
 
     /// IO map offset (should be sizeof(amd64_tss) as we don't use it). use high word
     uint16_t ioMap;
-} __attribute__((packed));
+};
 }
 
 #endif

@@ -7,10 +7,12 @@
 #include <stddef.h>
 #include <stivale2.h>
 
+#include <Intrinsics.h>
+
 /**
  * Stack for the boot processor.
  */
-static uint8_t gBspStack[8192] __attribute__((aligned(64)));
+static KUSH_ALIGNED(64) uint8_t gBspStack[8192];
 
 // Ignore warnings from unused tags.
 #pragma GCC diagnostic push

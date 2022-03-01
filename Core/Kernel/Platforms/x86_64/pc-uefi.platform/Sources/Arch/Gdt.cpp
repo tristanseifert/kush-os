@@ -1,18 +1,19 @@
 #include "Gdt.h"
 #include "GdtTypes.h"
 
+#include <Intrinsics.h>
 #include <Logging/Console.h>
 #include <Runtime/String.h>
 
 using namespace Platform::Amd64Uefi;
 
-GdtDescriptor Gdt::gGdt[kGdtSize] __attribute__((aligned(64)));
+GdtDescriptor KUSH_ALIGNED(64) Gdt::gGdt[kGdtSize];
 size_t Gdt::gNextTss{0};
 
 /// TSS for the bootstrap processor
 static Tss gBspTss;
 /// Interrupt stacks for the bootstrap processor
-static __attribute__((aligned(64))) uintptr_t gBspIrqStacks[7][Gdt::kIrqStackSize];
+static uintptr_t KUSH_ALIGNED(64) gBspIrqStacks[7][Gdt::kIrqStackSize];
 
 /**
  * Initializes the system's GDT.

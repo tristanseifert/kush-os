@@ -52,7 +52,7 @@ namespace Platform::Amd64Uefi {
 class Idt;
 
 /**
- * @brief Platform specific exception dispatcher (and default handlers)
+ * @brief %Platform specific exception dispatcher (and default handlers)
  *
  * This includes the intermediary dispatching logic, any exceptions that don't get dispatched, and
  * the assembly stubs.
@@ -65,6 +65,7 @@ class ExceptionHandlers {
 
     private:
         static void Handle(Processor::Regs &state);
+        static void PageFault(Processor::Regs &state, const uintptr_t faultAddr);
 };
 }
 

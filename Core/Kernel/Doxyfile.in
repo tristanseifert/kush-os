@@ -5,6 +5,7 @@ PROJECT_BRIEF           = "Kernel internals"
 OUTPUT_DIRECTORY        = @CMAKE_CURRENT_BINARY_DIR@/docs/
 # source files for these docs; scan directories recursively
 INPUT                   = @CMAKE_CURRENT_LIST_DIR@/Includes @CMAKE_CURRENT_LIST_DIR@/Sources @CMAKE_CURRENT_LIST_DIR@/Platforms
+EXCLUDE_PATTERNS        = */External/stivale/*
 RECURSIVE               = YES
 
 # make C++ declarations visible

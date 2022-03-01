@@ -17,6 +17,8 @@ SET(TOOLS_BASE "${TOOLCHAIN_BASE}/bin")
 SET(CMAKE_SYSROOT ${CMAKE_CURRENT_LIST_DIR}/../sysroot)
 get_filename_component(CMAKE_SYSROOT ${CMAKE_SYSROOT} ABSOLUTE)
 
+set(KUSH_TOOLCHAIN_HEADERS ${CMAKE_CURRENT_LIST_DIR}/toolchain-x86_64-clang)
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../cmake/)
 
 # set up search paths for tools

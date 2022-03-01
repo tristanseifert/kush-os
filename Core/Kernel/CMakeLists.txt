@@ -38,6 +38,7 @@ add_executable(Kernel
 
 target_include_directories(Kernel PRIVATE Sources)
 target_include_directories(Kernel PRIVATE Includes)
+target_include_directories(Kernel PRIVATE ${KUSH_TOOLCHAIN_HEADERS})
 
 target_compile_options(Kernel PRIVATE ${KERNEL_COMPILE_OPTS} ${ARCH_COMPILE_OPTS} -flto)
 target_link_options(Kernel PRIVATE ${KERNEL_COMPILE_OPTS} --static -nostartfiles -flto)

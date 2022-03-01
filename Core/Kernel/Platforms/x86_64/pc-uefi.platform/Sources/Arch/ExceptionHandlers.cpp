@@ -222,6 +222,20 @@ void ExceptionHandlers::Handle(Processor::Regs &state) {
     static char stateBuf[kStateBufSz];
     Platform::ProcessorState::Format(state, stateBuf, kStateBufSz);
 
-    PANIC("Unhandled exception: %s\n%s", GetExceptionName(state.errorCode), stateBuf);
+    PANIC("Unhandled exception: %s\n%s", GetExceptionName(state.irq), stateBuf);
 }
 
+/**
+ * Dispatch a page fault.
+ *
+ * This routes the fault to the kernel's virtual memory subsystem, which is expected to handle the
+ * fault.
+ */
+void ExceptionHandlers::PageFault(Processor::Regs &state, const uintptr_t faultAddr) {
+    // TODO: implement
+    constexpr static const size_t kStateBufSz{512};
+    static char stateBuf[kStateBufSz];
+    Platform::ProcessorState::Format(state, stateBuf, kStateBufSz);
+
+    PANIC("Unhandled page fault (%016llx)\n%s", faultAddr, stateBuf);
+}

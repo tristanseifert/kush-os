@@ -16,11 +16,13 @@ size_t Backtrace::gSymtabLen{0}, Backtrace::gStrtabLen{0};
 // defined by the linker
 extern char __kernel_text_start, __kernel_text_end;
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
 /// x86_64 stack frame
 struct stackframe {
     struct stackframe *rbp;
     uint64_t rip;
 };
+#endif
 
 /**
  * Initializes the backtrace facility.

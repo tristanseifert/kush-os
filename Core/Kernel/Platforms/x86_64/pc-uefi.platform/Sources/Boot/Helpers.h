@@ -3,6 +3,9 @@
 
 #include <stivale2.h>
 
+/**
+ * @brief %Platform support for Amd64-based UEFI systems
+ */
 namespace Platform::Amd64Uefi {
 /**
  * @brief Helpers for working with Stivale2-compliant bootloaders.

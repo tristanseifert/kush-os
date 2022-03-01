@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 /**
- * Information about a kernel build
+ * @brief Information about the running kernel
  *
  * This structure holds some metadata about this particular build of the kernel, including the
  * associated git revision and build type.
