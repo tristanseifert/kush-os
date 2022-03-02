@@ -21,7 +21,7 @@ using namespace Kernel;
  * image, set up its main thread, and start the scheduler.
  */
 void Kernel::Start() {
-    Console::Notice("Welcome to the ~ chill zone ~");
+    Console::Notice("Welcome to \x1b[31mk\x1b[33mu\x1b[93ms\x1b[32mh\x1b[34m-\x1b[35mo\x1b[31ms\x1b[0m");
 
     // TODO: do stuff
 }

@@ -35,7 +35,13 @@ set(KERNEL_PLATFORM_LIB platform-amd64-uefi PARENT_SCOPE)
 set(COMPILE_OPTS -mno-red-zone -fPIC -fPIE -fno-omit-frame-pointer
     -mno-sse -mno-sse2 -mno-sse3 -mno-sse4 -mno-avx)
 set(KERNEL_PLATFORM_COMPILE_OPTS -mcmodel=kernel ${COMPILE_OPTS} PARENT_SCOPE)
+set(PLATFORM_SHARED_COMPILE_OPTS -mcmodel=kernel ${COMPILE_OPTS})
 
 # Ensure we're built with the appropriate options also
 # XXX: why do we need to use mcmodel=large here? Otherwise we get link errors…
 target_compile_options(platform-amd64-uefi PRIVATE -mcmodel=large -fno-exceptions -fno-rtti -ffreestanding ${COMPILE_OPTS})
+
+##### Shared support components
+add_subdirectory(${KERNEL_LIST_DIR}/platforms/Shared/FbCons ${CMAKE_CURRENT_BINARY_DIR}/FbCons/)
+target_link_libraries(platform-amd64-uefi PUBLIC platform-shared-fbcons)
+

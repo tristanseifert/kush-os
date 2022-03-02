@@ -42,6 +42,13 @@ static void PopulateKernelVm(struct stivale2_struct *info, Kernel::Vm::Map *map)
 static void MapKernelSections(struct stivale2_struct *info, Kernel::Vm::Map *map);
 
 /**
+ * @brief Base address for framebuffer
+ *
+ * Virtual memory base address (in platform-specific space) for the framebuffer.
+ */
+static constexpr uintptr_t kFramebufferBase{0xffff'e800'0000'0000};
+
+/**
  * Minimum size of physical memory regions to consider for allocation
  *
  * In some cases, the bootloader may provide a very fragmented memory map to the kernel, in which
@@ -92,11 +99,12 @@ extern "C" void _osentry(struct stivale2_struct *loaderInfo) {
     PopulateKernelVm(loaderInfo, map);
 
     // prepare a few internal components
-    Console::PrepareForVm(map);
+    Console::PrepareForVm(loaderInfo, map);
 
     // then activate the map
     map->activate();
     Memory::PhysicalMap::FinishedEarlyBoot();
+    Console::VmEnabled();
 
     if(gKernelImageVm) {
         auto ptr = reinterpret_cast<const void *>(KernelAddressLayout::KernelImageStart);
@@ -217,11 +225,38 @@ static void PopulateKernelVm(struct stivale2_struct *info, Kernel::Vm::Map *map)
         new (vm) Kernel::Vm::ContiguousPhysRegion(phys, bytes, Kernel::Vm::Mode::KernelRead);
 
         err = map->add(KernelAddressLayout::KernelImageStart, vm);
-        REQUIRE(!err, "failed to map kernel image: %d", err);
+        REQUIRE(!err, "failed to map %s: %d", "kernel image", err);
 
         gKernelImageVm = vm;
     } else {
         Backtrace::ParseKernelElf(nullptr, 0);
+    }
+
+    // map framebuffer (if specified by loader)
+    static KUSH_ALIGNED(64) uint8_t gFbVmBuf[sizeof(Kernel::Vm::ContiguousPhysRegion)];
+    Kernel::Vm::ContiguousPhysRegion *framebuffer{nullptr};
+
+    auto mmap = reinterpret_cast<const stivale2_struct_tag_memmap *>
+        (Stivale2::GetTag(info, STIVALE2_STRUCT_TAG_MEMMAP_ID));
+
+    for(size_t i = 0; i < mmap->entries; i++) {
+        const auto &entry = mmap->memmap[i];
+        if(entry.type != STIVALE2_MMAP_FRAMEBUFFER) continue;
+
+        // create the VM object
+        framebuffer = reinterpret_cast<Kernel::Vm::ContiguousPhysRegion *>(gFbVmBuf);
+        new(framebuffer) Kernel::Vm::ContiguousPhysRegion(entry.base, entry.length,
+                Kernel::Vm::Mode::KernelRW);
+
+        err = map->add(kFramebufferBase, framebuffer);
+        REQUIRE(!err, "failed to map %s: %d", "framebuffer", err);
+
+        Kernel::Console::Notice("Framebuffer: %016llx %zu bytes", entry.base, entry.length);
+        break;
+    }
+
+    if(framebuffer) {
+        Console::SetFramebuffer(info, framebuffer, reinterpret_cast<void *>(kFramebufferBase));
     }
 
     // last, remap the physical allocator structures

@@ -3,14 +3,25 @@
 #include "Boot/Helpers.h"
 #include "Util/String.h"
 
+#include <FbCons/Console.h>
+#include <Logging/Console.h>
+#include <Vm/Map.h>
+#include <Vm/ContiguousPhysRegion.h>
+
+#include <new>
+
 using namespace Platform::Amd64Uefi;
 
 struct stivale2_struct_tag_terminal *Console::gTerminal{nullptr};
 Console::TerminalWrite Console::gTerminalWrite{nullptr};
+Kernel::Vm::MapEntry *Console::gFb{nullptr};
+void *Console::gFbBase{nullptr};
+size_t Console::gFbWidth{0}, Console::gFbHeight{0}, Console::gFbStride{0};
+Platform::Shared::FbCons::Console *Console::gFbCons{nullptr};
 uint16_t Console::gDebugconPort{0};
 
 /**
- * Initialize the platform console.
+ * @brief Initialize the platform console.
  *
  * This is basically a multiplexer between the stivale2 terminal, an IO port console and serial
  * port.
@@ -35,7 +46,7 @@ void Console::Init(struct stivale2_struct *info) {
 }
 
 /**
- * Parse the command line string specified to find all specified output devices.
+ * @brief Parse the command line string specified to find all specified output devices.
  *
  * These are specified by the `-console` argument.
  */
@@ -126,7 +137,7 @@ void Console::ParseCmd(const char *cmdline) {
 }
 
 /**
- * Parse the value for a `console` parameter in the command line.
+ * @brief Parse the value for a `console` parameter in the command line.
  *
  * The value consists of comma-separated values, the first of which indicates the type of the
  * output. The following types are supported:
@@ -160,7 +171,7 @@ void Console::ParseCmdToken(const char *value, const size_t valueLen) {
 }
 
 /**
- * Print a message to the console.
+ * @brief Print a message to the console.
  *
  * @param string A character string to output to the console
  * @param numChars Number of characters to read from `string`
@@ -178,14 +189,80 @@ void Console::Write(const char *string, const size_t numChars) {
     if(gTerminalWrite) {
         gTerminalWrite(string, numChars);
     }
+    if(gFbCons) {
+        gFbCons->write(string, numChars);
+    }
 }
 
 /**
- * Prepares the console for virtual memory mode.
+ * @brief Prepares the console for virtual memory mode.
  *
  * This disables the bootloader console, since we'll no longer have its code mapped.
  */
-void Console::PrepareForVm(Kernel::Vm::Map *map) {
+void Console::PrepareForVm(struct stivale2_struct *info, Kernel::Vm::Map *map) {
+    // disable bootloader console
     Console::Write("Preparing console for VM enablement...\n", 39);
     gTerminalWrite = nullptr;
+}
+
+/**
+ * @brief Prepare for using bitmap console
+ *
+ * This fetches more framebuffer info, then stores it for later, so that when the virtual map is
+ * actually enabled, we can just enable the console.
+ *
+ * @param info Bootloader information structure
+ * @param fb Framebuffer VM object
+ * @param base Base address of framebuffer, as mapped in memory
+ *
+ * @return 0 on success
+ */
+int Console::SetFramebuffer(struct stivale2_struct *info, Kernel::Vm::MapEntry *fb, void *base) {
+    // specify a `nullptr` framebuffer to clear its state
+    if(!fb) {
+        //if(gFb) gFb->release();
+        gFb = nullptr;
+
+        return 0;
+    }
+
+    // get framebuffer info
+    REQUIRE(info, "invalid loader info");
+    REQUIRE(fb && base, "invalid framebuffer base");
+
+    auto fbInfo = reinterpret_cast<const stivale2_struct_tag_framebuffer *>
+        (Stivale2::GetTag(info, STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID));
+    if(!fbInfo) {
+        return -1;
+    }
+
+    // store it for later
+    gFbWidth = fbInfo->framebuffer_width;
+    gFbHeight = fbInfo->framebuffer_height;
+    gFbStride = fbInfo->framebuffer_pitch;
+
+    gFb = fb;
+    gFbBase = base;
+
+    return 0;
+}
+
+/**
+ * @brief Initialize framebuffer console
+ *
+ * This is called once the kernel VM map is activated, and we can set up the framebuffer.
+ */
+void Console::VmEnabled() {
+    using FbCons = Platform::Shared::FbCons::Console;
+
+    // bail if no framebuffer was mapped
+    if(!gFb) return;
+
+    // create it out of the static storage
+    static KUSH_ALIGNED(64) uint8_t gBuf[sizeof(FbCons)];
+    auto ptr = reinterpret_cast<FbCons *>(gBuf);
+
+    new(ptr) FbCons(reinterpret_cast<uint32_t *>(gFbBase), FbCons::ColorOrder::ARGB, 1024, 768);
+
+    gFbCons = ptr;
 }

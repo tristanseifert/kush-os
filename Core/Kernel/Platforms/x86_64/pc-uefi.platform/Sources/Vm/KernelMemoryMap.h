@@ -17,14 +17,14 @@ namespace Platform::Amd64Uefi {
  */
 enum KernelAddressLayout: uintptr_t {
     /**
-     * Kernel virtual address split
+     * @brief Kernel virtual address split
      *
      * Addresses below this split belong to userspace.
      */
     KernelBoundary                                      = 0x8000'0000'0000'0000,
 
     /**
-     * Physical aperture
+     * @brief Physical aperture
      *
      * Start of the region used to indirectly access physical memory. It is mapped as read/write
      * and used to modify page tables, etc.
@@ -34,7 +34,7 @@ enum KernelAddressLayout: uintptr_t {
     PhysApertureEnd                                     = 0xffff'81ff'ffff'ffff,
 
     /**
-     * Physical allocator metadata
+     * @brief Physical allocator metadata
      *
      * Start of the physical allocator's metadata region. This is a 1G chunk of virtual memory
      * reserved for the bitmaps indicating what pages are free.
@@ -44,7 +44,7 @@ enum KernelAddressLayout: uintptr_t {
     PhysAllocatorMetadataEnd                            = 0xffff'8200'3fff'ffff,
 
     /**
-     * Kernel file image
+     * @brief Kernel file image
      *
      * Memory mapped view of the entire kernel image file, as read from the boot medium by the
      * bootloader. This is primarily used to extract strings for symbolication of kernel symbols
@@ -55,7 +55,7 @@ enum KernelAddressLayout: uintptr_t {
     KernelImageEnd                                      = 0xffff'8200'41ff'0000,
 
     /**
-     * Kernel executable start
+     * @brief Kernel executable start
      *
      * This marks the start of the kernel's executable region. The actual executable start can be
      * slid anywhere within this region for ASLR purposes.
